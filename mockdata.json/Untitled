@@ -1,0 +1,36 @@
+{
+  "system_status": "VITALIZED",
+  "protocol": "PFF-1.0",
+  "last_vitalization": {
+    "timestamp": "2026-01-28T21:20:00Z",
+    "location": "Lagos, Nigeria",
+    "device_uuid": "REDMI-15-B492-X90",
+    "status": "Success"
+  },
+  "national_reserve": {
+    "country": "Nigeria",
+    "vault_balance_vida_cap": 25000000.00,
+    "backed_currency_circulation_vida": 25000000.00,
+    "backing_ratio": "1:1",
+    "burn_rate_infrastructure": "0.05%",
+    "monthly_growth": "+12.4%"
+  },
+  "citizen_vault": {
+    "owner": "Isreal Okoro",
+    "alias": "mrfundzman",
+    "status": "VITALIZED",
+    "total_vida_cap_minted": 1200.00,
+    "split_records": {
+      "personal_share_50": 600.00,
+      "state_contribution_50": 600.00
+    },
+    "spendable_balance_vida": 450.25,
+    "linked_bank_accounts": ["GTBank-****4920"]
+  },
+  "agent_metrics": {
+    "agent_id": "V-AGENT-001",
+    "total_personal_vitalization": 142,
+    "current_agent_payout_vida": 14.20,
+    "commission_rate": "10% (5/5 Split)"
+  }
+}

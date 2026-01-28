@@ -8,6 +8,7 @@ import * as crypto from 'crypto';
 import { verifyHandshake } from '../lib/verifyHandshake';
 import { signPresenceToken } from '../lib/jwt';
 import { query } from '../db/client';
+import { mintVidaCap } from '../economic/vidaCap';
 import type { VitalizeVerifyRequest } from '../types';
 
 export const vitalizeRouter = Router();
@@ -40,7 +41,7 @@ vitalizeRouter.post('/register', async (req: Request, res: Response) => {
       .digest('hex');
     const pffId = 'pff_' + crypto.randomUUID();
 
-    await query(
+    const { rows: insertedRows } = await query<{ id: string; pff_id: string }>(
       `INSERT INTO citizens (pff_id, vitalization_status, hardware_anchor_hash, public_key, key_id, device_id, legal_identity_ref, attested_at)
        VALUES ($1, 'vitalized', $2, $3, $4, $5, $6, NOW())
        ON CONFLICT (device_id, key_id) DO UPDATE SET
@@ -49,9 +50,44 @@ vitalizeRouter.post('/register', async (req: Request, res: Response) => {
          vitalization_status = 'vitalized',
          legal_identity_ref = EXCLUDED.legal_identity_ref,
          attested_at = NOW(),
-         updated_at = NOW()`,
+         updated_at = NOW()
+       RETURNING id, pff_id`,
       [pffId, hardwareAnchorHash, publicKey, keyId, deviceId, legalIdentityRef ?? null]
     );
+
+    // Check if this was an update (already registered)
+    if (insertedRows.length === 0) {
+      const { rows } = await query<{ id: string; pff_id: string }>(
+        `SELECT id, pff_id FROM citizens WHERE device_id = $1 AND key_id = $2 LIMIT 1`,
+        [deviceId, keyId]
+      );
+      if (rows.length > 0) {
+        res.status(200).json({
+          success: true,
+          pffId: rows[0].pff_id,
+          message: 'Already registered',
+        });
+        return;
+      }
+    }
+
+    const citizenId = insertedRows[0].id;
+    const finalPffId = insertedRows[0].pff_id;
+
+    // Mint VIDA CAP with 50/50 split (only for new registrations)
+    let vidaCap = null;
+    try {
+      vidaCap = await mintVidaCap(citizenId, finalPffId);
+    } catch (mintError) {
+      // Log error but don't fail registration
+      console.error('VIDA CAP minting failed:', mintError);
+    }
+
+    res.status(201).json({
+      success: true,
+      pffId: finalPffId,
+      vidaCap: vidaCap || undefined,
+    });
   } catch (e) {
     const err = e as Error;
     if (String(err.message).includes('unique') || (e as { code?: string }).code === '23505') {
@@ -67,17 +103,7 @@ vitalizeRouter.post('/register', async (req: Request, res: Response) => {
       return;
     }
     res.status(500).json({ success: false, code: 'REGISTER_FAILED', message: err.message });
-    return;
   }
-
-  const { rows } = await query<{ pff_id: string }>(
-    `SELECT pff_id FROM citizens WHERE device_id = $1 AND key_id = $2 LIMIT 1`,
-    [deviceId, keyId]
-  );
-  res.status(201).json({
-    success: true,
-    pffId: rows[0]?.pff_id,
-  });
 });
 
 /**

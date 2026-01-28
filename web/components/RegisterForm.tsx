@@ -72,9 +72,12 @@ export function RegisterForm() {
           )}
         </p>
       )}
-      <p className="mt-8 text-center text-sm text-[#6b6b70]">
-        <Link href="/manifesto" className="text-[#c9a227] hover:text-[#e8c547] underline">
+      <p className="mt-8 text-center text-sm text-[#6b6b70] space-y-2">
+        <Link href="/manifesto" className="text-[#c9a227] hover:text-[#e8c547] underline block">
           ← Back to Manifesto
+        </Link>
+        <Link href="/vitalization" className="text-[#c9a227] hover:text-[#e8c547] underline block">
+          Try Vitalization Screen (Mock)
         </Link>
       </p>
     </>

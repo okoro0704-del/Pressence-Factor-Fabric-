@@ -9,6 +9,7 @@ import express from 'express';
 import { vitalizeRouter } from './routes/vitalize';
 import { vaultRouter } from './routes/vault';
 import { guardianRouter } from './routes/guardian';
+import { economicRouter } from './routes/economic';
 import { config } from './config';
 
 const app = express();
@@ -21,6 +22,7 @@ app.get('/health', (_req, res) => {
 app.use('/vitalize', vitalizeRouter);
 app.use('/vault', vaultRouter);
 app.use('/guardian', guardianRouter);
+app.use('/economic', economicRouter);
 
 app.listen(config.port, () => {
   console.log(`PFF backend listening on ${config.port}`);

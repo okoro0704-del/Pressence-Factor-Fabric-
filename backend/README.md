@@ -19,17 +19,24 @@ npm run dev
 
 - **Identity Metadata:** `citizens` (vitalization_status, hardware_anchor_hash, public_key, device_id; no biometrics), `guardian_anchor` (child tethered to parent PFF).
 - **Transaction Integrity:** `presence_handshakes` (attestations, liveness > 0.99), `the_living_record` (AES-256 encrypted), `living_record_access_log`.
+- **Economic Layer:** `vida_cap_allocations`, `national_reserve`, `citizen_vaults`, `vida_currency`, `recovery_transactions`, `vlt_transactions`.
 
 ## Routes
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | GET | /health | — | Liveness |
-| POST | /vitalize/register | — | Create citizen (publicKey, deviceId, keyId, legalIdentityRef?) |
+| POST | /vitalize/register | — | Create citizen + mint VIDA CAP (50/50 split) |
 | POST | /vitalize/verify | — | Validate signed handshake; returns presenceToken |
 | PUT | /vault | Token | Upsert encrypted medical/financial |
 | POST | /vault/decrypt | Proof | Decrypt with real-time Presence Proof (Heartbeat) |
 | POST | /guardian/tether | Token | Tether child to parent PFF (childId, permissions?, constraints?) |
+| GET | /economic/vida-cap/balance | Token | Get citizen VIDA CAP balance |
+| GET | /economic/vida-cap/reserve | — | Get National Reserve VIDA CAP total |
+| POST | /economic/vida/issue | Token | Issue $VIDA against VIDA CAP Reserve (1:1) |
+| GET | /economic/vida/history | Token | Get $VIDA issuance history |
+| POST | /economic/recovery/split | Admin | Process external fund recovery (45-10-45) |
+| GET | /economic/recovery/history | — | Get recovery transaction history |
 
 ## Verify flow
 

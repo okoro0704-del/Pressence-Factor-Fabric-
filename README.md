@@ -69,16 +69,26 @@ The PFF (Presence Factor Fabric) Protocol eliminates fraud by replacing password
 
 ```
 PFF/
-├── core/           # Shared types, constants, 50/50 boundaries
+├── core/           # Shared types, constants, 50/50 boundaries, economic layer
 ├── protocols/      # Handshake, Heartbeat, 50/50 schema
 ├── guardian/       # Guardian Anchor — sub-identity tethering (Child Protection)
 ├── vitalize/       # Vitalization flow contract
 ├── mobile/         # React Native app (Expo/EAS, Vitalization UI, Secure Enclave)
-├── backend/        # Node.js API (Handshake verification, PFF middleware)
+├── backend/        # Node.js API (Handshake verification, PFF middleware, Economic Layer)
 ├── web/            # Sovereign PWA (Next.js, WebAuthn, Workbox, National Pulse)
 ├── .github/        # CI — tests, version bump, EAS build, Vercel deploy
-└── docs/           # Deployment, Fortress audit, API keys (GitHub Secrets only)
+└── docs/           # Deployment, Fortress audit, Master Prompt, Economic Architecture
 ```
+
+## Economic Layer (ATE)
+
+The **Autonomous Truth Economy** (ATE) implements the three immutable economic laws:
+
+1. **50/50 Minting Split** — When a citizen is Vitalized, 50% of VIDA CAP goes to their Private Vault, 50% to the National Reserve
+2. **45-10-45 Recovery Split** — External funds: 45% to People, 45% to State, 10% to Agents
+3. **Debt-Free Backing** — $VIDA currency issued 1:1 against VIDA CAP Reserve
+
+**See:** `docs/MASTER-PROMPT.md` for framework definitions, `docs/ECONOMIC-ARCHITECTURE.md` for technical details.
 
 ---
 
