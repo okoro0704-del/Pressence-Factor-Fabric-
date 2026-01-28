@@ -1,0 +1,54 @@
+{
+  "name": "pff-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "android": "react-native run-android",
+    "ios": "react-native run-ios",
+    "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
+    "start": "react-native start",
+    "test": "jest",
+    "version:bump": "node scripts/version-bump.js",
+    "prebuild": "expo prebuild"
+  },
+  "dependencies": {
+    "expo": "~50.0.0",
+    "expo-constants": "~15.4.0",
+    "expo-modules-core": "~1.11.0",
+    "expo-status-bar": "~1.11.0",
+    "react": "18.2.0",
+    "react-native": "0.73.2",
+    "react-native-biometrics": "^3.0.1",
+    "react-native-device-info": "^10.13.1",
+    "react-native-get-random-values": "^1.11.0",
+    "react-native-gesture-handler": "^2.14.1",
+    "react-native-pager-view": "^6.2.3",
+    "react-native-qrcode-svg": "^6.3.0",
+    "react-native-reanimated": "^3.10.1",
+    "react-native-safe-area-context": "^4.8.2",
+    "react-native-screens": "^3.29.0",
+    "react-native-svg": "^15.2.0",
+    "react-native-vision-camera": "^4.0.0",
+    "@react-navigation/native": "^6.1.9",
+    "@react-navigation/native-stack": "^6.9.17"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.23.7",
+    "@babel/preset-env": "^7.23.7",
+    "@babel/runtime": "^7.23.7",
+    "@react-native/babel-preset": "0.73.19",
+    "@react-native/eslint-config": "0.73.2",
+    "@react-native/metro-config": "0.73.3",
+    "@react-native/typescript-config": "0.73.1",
+    "@types/react": "^18.2.48",
+    "@types/react-test-renderer": "^18.0.7",
+    "eslint": "^8.56.0",
+    "jest": "^29.7.0",
+    "prettier": "3.2.4",
+    "react-test-renderer": "18.2.0",
+    "typescript": "5.3.3"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

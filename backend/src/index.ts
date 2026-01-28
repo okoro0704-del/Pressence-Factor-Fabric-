@@ -1,0 +1,27 @@
+/**
+ * PFF Backend — Presence Factor Fabric API.
+ * Lead: Isreal Okoro (mrfundzman). Born in Lagos, Built for the World.
+ * 50/50 Doctrine. Presence Token on every protected API.
+ */
+
+import 'dotenv/config';
+import express from 'express';
+import { vitalizeRouter } from './routes/vitalize';
+import { vaultRouter } from './routes/vault';
+import { guardianRouter } from './routes/guardian';
+import { config } from './config';
+
+const app = express();
+app.use(express.json());
+
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok', service: 'pff-backend' });
+});
+
+app.use('/vitalize', vitalizeRouter);
+app.use('/vault', vaultRouter);
+app.use('/guardian', guardianRouter);
+
+app.listen(config.port, () => {
+  console.log(`PFF backend listening on ${config.port}`);
+});
