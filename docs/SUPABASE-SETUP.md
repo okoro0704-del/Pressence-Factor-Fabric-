@@ -37,12 +37,7 @@ You can either run the backend schema in the Supabase SQL Editor, or use the Sup
 1. In Supabase Dashboard, go to **SQL Editor**.
 2. Open `backend/src/db/schema.sql` from this repo and copy its full contents.
 3. Paste into a new query and run it (the schema uses `IF NOT EXISTS`, so it’s safe to run once).
-4. If `presence_handshakes` was created **without** a `nation` column (older schema), run:
-
-```sql
-ALTER TABLE presence_handshakes
-  ADD COLUMN IF NOT EXISTS nation TEXT;
-```
+**If you get "column citizen_id does not exist":** The table may have been created with only `id` and `nation`. Run **`supabase/migrations/20260128100000_fix_presence_handshakes_columns.sql`** (drops and recreates the table with all columns). The **citizens** table must exist first—see **`supabase/SUPABASE_SQL_ORDER.md`**.
 
 ### Option B: Supabase CLI
 
@@ -59,8 +54,10 @@ Then run the migration that adds `nation` if needed (see `supabase/migrations/`)
 
 ## 4. Enable Realtime for National Pulse
 
-1. In Supabase Dashboard, go to **Database** → **Replication**.
-2. Find **presence_handshakes** and turn **Realtime** ON (or enable it for the `public` schema and the `presence_handshakes` table in Replication settings).
+1. In Supabase Dashboard, go to **Database** (table list; the "Functions" section is below).
+2. Find the **presence_handshakes** table. In the table list there is a **Realtime enabled** column—ensure it shows as enabled for **presence_handshakes**.
+
+If you don’t see a Realtime toggle there, you can enable it via SQL: run `ALTER PUBLICATION supabase_realtime ADD TABLE presence_handshakes;` in the SQL Editor (this is already in `supabase/RUN_THIS_IN_SUPABASE.sql`).
 
 This allows the web app to subscribe to new handshake rows and show them on the National Pulse map.
 

@@ -7,6 +7,9 @@
   # Publish dir is set by @netlify/plugin-nextjs when using the plugin.
   # If not using the plugin, set publish = ".next"
 
+[build.environment]
+  NODE_VERSION = "18"
+
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
