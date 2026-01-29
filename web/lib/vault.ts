@@ -73,8 +73,8 @@ export async function encryptPayload(plain: string): Promise<string> {
 export async function decryptPayload(b64: string): Promise<string> {
   const key = await getOrCreateKey();
   const combined = b64Decode(b64);
-  const iv = combined.subarray(0, IV_LEN);
-  const cipher = combined.subarray(IV_LEN);
+  const iv = new Uint8Array(combined.subarray(0, IV_LEN));
+  const cipher = new Uint8Array(combined.subarray(IV_LEN));
   const dec = await crypto.subtle.decrypt(
     { name: 'AES-GCM', iv, tagLength: TAG_LEN * 8 },
     key,
@@ -130,7 +130,7 @@ export async function enqueueProof(handshakeId: string, proofJson: string): Prom
 
 export async function getPending(): Promise<SyncQueueEntry[]> {
   const db = await getDb();
-  const all = await db.getAllFromIndex(STORE_QUEUE, 'by-status', 'pending');
+  const all = (await db.getAllFromIndex(STORE_QUEUE, 'by-status', 'pending')) as SyncQueueEntry[];
   return all.sort((a, b) => a.timestamp - b.timestamp);
 }
 

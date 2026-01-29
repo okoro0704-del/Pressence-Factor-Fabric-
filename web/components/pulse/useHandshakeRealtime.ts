@@ -15,8 +15,8 @@ const NATIONS = Object.keys(MOCK_NATION_METRICS);
 export function useHandshakeRealtime() {
   const mockRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const onInsert = useCallback((payload: { new?: { nation?: string } }) => {
-    const raw = payload.new?.nation;
+  const onInsert = useCallback((payload?: { new?: { nation?: string } }) => {
+    const raw = payload?.new?.nation;
     const n = sanitizeNation(raw);
     if (n) emitHandshake({ nation: n, at: Date.now() });
   }, []);
@@ -32,7 +32,7 @@ export function useHandshakeRealtime() {
         )
         .subscribe();
       return () => {
-        supabase.removeChannel(channel);
+        supabase?.removeChannel(channel);
       };
     }
 

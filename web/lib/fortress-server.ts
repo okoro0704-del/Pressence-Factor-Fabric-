@@ -32,7 +32,9 @@ function b64UrlToBuf(s: string): Buffer | null {
 function challengeBytesMatch(a: string, b: string): boolean {
   const x = b64UrlToBuf(a);
   const y = b64UrlToBuf(b);
-  return !!x && !!y && x.length === y.length && x.equals(y);
+  if (!x || !y || x.length !== y.length) return false;
+  for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return false;
+  return true;
 }
 
 function pruneChallenges(): void {

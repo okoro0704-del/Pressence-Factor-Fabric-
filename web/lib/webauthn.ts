@@ -59,7 +59,7 @@ function encode(n: number[]): string {
 /** Create a new platform authenticator credential (register). userVerification: required → biometrics. */
 export async function createCredential(userId: string, userName: string): Promise<PublicKeyCredential | null> {
   if (!isSecureContext() || !isWebAuthnSupported()) return null;
-  const challenge = generateChallenge();
+  const challenge = new Uint8Array(generateChallenge());
   const opts: CredentialCreationOptions = {
     publicKey: {
       rp: { name: RP_NAME, id: RP_ID },
@@ -98,9 +98,10 @@ export async function getAssertion(
   challengeOverride?: Uint8Array
 ): Promise<AssertionWithCredential | null> {
   if (!isSecureContext() || !isWebAuthnSupported()) return null;
-  const challenge = challengeOverride?.byteLength ? challengeOverride : generateChallenge();
+  const rawChallenge = challengeOverride?.byteLength ? challengeOverride : generateChallenge();
+  const challenge = new Uint8Array(rawChallenge);
   const allowCredentials: PublicKeyCredentialDescriptor[] = credentialIds?.length
-    ? credentialIds.map((id) => ({ type: 'public-key', id }))
+    ? credentialIds.map((id) => ({ type: 'public-key', id: new Uint8Array(id) }))
     : [];
   const opts: CredentialRequestOptions = {
     publicKey: {

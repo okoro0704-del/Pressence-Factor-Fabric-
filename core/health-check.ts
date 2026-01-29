@@ -165,11 +165,15 @@ async function checkNationalPulse(): Promise<LayerReport> {
     };
   }
   let realtimeOk = false;
-  let supabaseInstance: { removeChannel: (ch: unknown) => void } | null = null;
+  type SupabaseClient = {
+    channel: (name: string) => { on: (ev: string, opts: unknown, cb: () => void) => { subscribe: (cb: (s: string) => void) => void } };
+    removeChannel: (ch: unknown) => void;
+  };
+  let supabaseInstance: SupabaseClient | null = null;
   let ch: unknown = null;
   try {
     const { createClient } = await import('@supabase/supabase-js');
-    supabaseInstance = createClient(url, anon);
+    supabaseInstance = createClient(url, anon) as SupabaseClient;
     ch = supabaseInstance.channel('pff-health-check').on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'presence_handshakes' },

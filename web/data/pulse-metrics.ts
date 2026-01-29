@@ -75,7 +75,7 @@ export const MOCK_NATION_METRICS: Record<string, NationMetrics> = {
     wealthSecured: 1_100_000_000,
     fraudBlocked: 280_000_000,
   },
-  South Africa: {
+  'South Africa': {
     name: 'South Africa',
     vitalized: 2_900_000,
     population: 60_000_000,

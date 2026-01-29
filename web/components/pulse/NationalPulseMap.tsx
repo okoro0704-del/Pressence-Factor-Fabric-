@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState, useCallback } from 'react';
+import type { GeoGeography } from 'react-simple-maps';
 import {
   ComposableMap,
   Geographies,
@@ -84,25 +85,25 @@ export function NationalPulseMap({ pulsingNations }: NationalPulseMapProps) {
 
   return (
     <div className="relative w-full h-full min-h-[400px] rounded-xl overflow-hidden border border-[#2a2a2e] bg-obsidian-bg">
-      <ComposableMap
-        projection="geoMercator"
-        projectionConfig={{
-          scale: 140,
-          center: [20, 20],
-        }}
-        className="w-full h-full"
-      >
+      <div className="w-full h-full">
+        <ComposableMap
+          projection="geoMercator"
+          projectionConfig={{
+            scale: 140,
+            center: [20, 20],
+          }}
+        >
         <ZoomableGroup center={[0, 20]} zoom={1} minZoom={0.8} maxZoom={4}>
           <Geographies geography={GEO_URL}>
             {({ geographies }) => (
               <>
-                {geographies.map((geo) => (
+                {(geographies as GeoGeography[]).map((geo) => (
                   <Geography
                     key={geo.rsmKey}
                     geography={geo}
                     style={geographyStyle(geo)}
                     onMouseEnter={(ev) =>
-                      handleMouseEnter(ev, geo.properties?.name ?? '')
+                      handleMouseEnter(ev as React.MouseEvent<SVGPathElement>, geo.properties?.name ?? '')
                     }
                     onMouseLeave={handleMouseLeave}
                   />
@@ -121,6 +122,7 @@ export function NationalPulseMap({ pulsingNations }: NationalPulseMapProps) {
           </Geographies>
         </ZoomableGroup>
       </ComposableMap>
+      </div>
       {hovered && (
         <div
           className="fixed pointer-events-none z-[300] px-3 py-2 rounded-lg bg-obsidian-surface border border-gold/30 text-sm text-white shadow-xl"

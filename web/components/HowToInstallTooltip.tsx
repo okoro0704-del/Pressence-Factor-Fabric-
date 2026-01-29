@@ -4,6 +4,9 @@ import { useState, useEffect } from 'react';
 
 type Platform = 'ios' | 'android' | 'desktop' | null;
 
+/** Keys for INSTALL_STEPS: platform values plus string 'null' for fallback (Record keys must be string | number | symbol). */
+type InstallStepKey = 'ios' | 'android' | 'desktop' | 'null';
+
 function detectPlatform(): Platform {
   if (typeof navigator === 'undefined') return null;
   const ua = navigator.userAgent;
@@ -14,7 +17,7 @@ function detectPlatform(): Platform {
 
 const LAGOS_COPY = 'In Lagos: Add to Home Screen to use PFF on the go—manifesto, Presence Proof, and offline Vitalization—without an App Store download.';
 
-const INSTALL_STEPS: Record<Platform, string> = {
+const INSTALL_STEPS: Record<InstallStepKey, string> = {
   ios: 'Tap the Share icon (□↑) at the bottom of Safari, then **Add to Home Screen**. Open PFF from your home screen for the full experience.',
   android: 'Tap the menu (⋮) in Chrome, then **Add to Home Screen** or **Install app**. Open PFF from your home screen for the full experience.',
   desktop: 'On desktop, use **Chrome** or **Edge** → menu (⋮) → **Install PFF…** or **Create shortcut**. For the best experience, use on mobile and Add to Home Screen.',
