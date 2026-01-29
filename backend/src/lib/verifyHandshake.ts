@@ -51,7 +51,8 @@ export type VerifyResult = VerifyResultOk | VerifyResultFail;
  * 4. Liveness: require score > 0.99 (use livenessScore or livenessOk -> 1.0).
  */
 export async function verifyHandshake(
-  signed: SignedPresenceProof
+  signed: SignedPresenceProof,
+  options?: { nation?: string }
 ): Promise<VerifyResult> {
   const { payload, signature } = signed;
   const now = Date.now();
@@ -120,14 +121,15 @@ export async function verifyHandshake(
   const hash = payloadHash(payloadString);
   try {
     await query(
-      `INSERT INTO presence_handshakes (citizen_id, nonce_used, payload_hash, attestation_info, liveness_score)
-       VALUES ($1, $2, $3, $4, $5)`,
+      `INSERT INTO presence_handshakes (citizen_id, nonce_used, payload_hash, attestation_info, liveness_score, nation)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
       [
         c.id,
         payload.nonce,
         hash,
         payload.attestationCertChain ?? null,
         livenessScore,
+        options?.nation ?? (payload as { nation?: string }).nation ?? null,
       ]
     );
   } catch (e: unknown) {

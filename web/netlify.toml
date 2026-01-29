@@ -1,5 +1,14 @@
 # PFF — Sovereign Web. Deploy to Netlify (alternative to Vercel).
-# Use @netlify/plugin-nextjs for Next.js. Headers below apply to all responses.
+# IMPORTANT: In Netlify site settings, set "Base directory" to: web
+# Build command and publish are set below for the web app.
+
+[build]
+  command = "npm run build"
+  # Publish dir is set by @netlify/plugin-nextjs when using the plugin.
+  # If not using the plugin, set publish = ".next"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
 
 [[headers]]
   for = "/*"

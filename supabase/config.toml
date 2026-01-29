@@ -1,0 +1,21 @@
+# PFF — Supabase project config
+# Use with: supabase link (then supabase db push or run migrations manually)
+
+[api]
+  enabled = true
+  port = 54321
+  schema = "public"
+
+[db]
+  port = 54322
+  shadow_port = 54320
+
+[studio]
+  enabled = true
+  port = 54323
+
+[auth]
+  enabled = true
+
+[realtime]
+  enabled = true

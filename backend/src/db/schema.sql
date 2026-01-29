@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS presence_handshakes (
   attestation_info  TEXT,
   liveness_score    NUMERIC(5,4) NOT NULL,             -- required > 0.99
   verified_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  nation            TEXT,                              -- for National Pulse realtime (e.g. Nigeria, Ghana)
   CHECK (liveness_score > 0.99)
 );
 

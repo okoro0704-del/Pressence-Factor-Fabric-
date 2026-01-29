@@ -113,7 +113,7 @@ vitalizeRouter.post('/register', async (req: Request, res: Response) => {
  */
 vitalizeRouter.post('/verify', async (req: Request, res: Response) => {
   try {
-    const { signedProof } = req.body as VitalizeVerifyRequest;
+    const { signedProof, nation } = req.body as VitalizeVerifyRequest;
     if (!signedProof?.payload || !signedProof?.signature) {
       res.status(400).json({
         success: false,
@@ -123,7 +123,7 @@ vitalizeRouter.post('/verify', async (req: Request, res: Response) => {
       return;
     }
 
-    const result = await verifyHandshake(signedProof);
+    const result = await verifyHandshake(signedProof, { nation });
     if (!result.ok) {
       res.status(401).json({
         success: false,

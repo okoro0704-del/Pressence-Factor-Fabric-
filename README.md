@@ -48,7 +48,8 @@ The PFF (Presence Factor Fabric) Protocol eliminates fraud by replacing password
 1. **Sovereign Web (PWA)**  
    ```bash
    cd web && npm install && npm run dev
-   ```  
+   ```
+   Then open **http://localhost:3000** (not from repo root—the app is in `web/`).  
    Open the app, complete the Manifesto flow, and trigger your first **Prove Presence** handshake. Install via *Add to Home Screen* for the full experience—including Lagos-specific “How to Install” guidance in the UI.
 
 2. **Mobile (React Native)**  
@@ -60,8 +61,22 @@ The PFF (Presence Factor Fabric) Protocol eliminates fraud by replacing password
 3. **Backend**  
    ```bash
    cd backend && npm install && npm run dev
-   ```  
+   ```
    See `backend/README.md` for env, schema, and `/vitalize/verify`.
+
+4. **Supabase (optional)** — For National Pulse realtime and wealth ticker, set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in `web/.env.local`. Backend can use Supabase Postgres via `DATABASE_URL`. See `docs/SUPABASE-SETUP.md`.
+
+---
+
+## Deploy (fix "Page Not Found")
+
+If you see **Page Not Found** after deploying:
+
+- **Netlify:** Site configuration → Build & deploy → **Base directory** = `web` → Save → **Clear cache and deploy**. For Supabase (National Pulse), add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in Environment variables. See `web/docs/NETLIFY-SETUP.md`.
+- **Vercel:** Project Settings → General → **Root Directory** = `web` → Redeploy.
+- **Local:** Run from the `web` folder: `cd web && npm run dev`, then open http://localhost:3000.
+
+See `web/docs/DEPLOYMENT-FIX.md` for full steps.
 
 ---
 

@@ -19,4 +19,6 @@ export interface SignedPresenceProof {
 
 export interface VitalizeVerifyRequest {
   signedProof: SignedPresenceProof;
+  /** Nation for National Pulse (e.g. Nigeria, Ghana). Optional. */
+  nation?: string;
 }
