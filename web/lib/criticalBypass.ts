@@ -10,29 +10,96 @@
  * - Set persistent local storage flags
  */
 
-// ROOT DEVICE IDENTIFIERS - UPDATED WITH ACTUAL DEVICE
-const ROOT_DEVICE_ID = 'HP-LAPTOP-ROOT-SOVEREIGN-001';
-const ROOT_DEVICE_ID_ALT = 'DEVICE-3B5B738BB'; // Actual device fingerprint
-const ROOT_HARDWARE_HASH = '8423250efbaecab0f28237786161709d794c71deb0dcfb8ebd92b14e1cc643db';
-const ROOT_HARDWARE_HASH_ALT = 'ed14836c09db1ddf316404fd39df41f9869494d428a5859e4419825dc8ea6dfd'; // Actual hardware hash
+// ROOT DEVICE IDENTIFIERS - DUAL-HASH RECOGNITION
+const AUTHORIZED_DEVICE_IDS = [
+  'HP-LAPTOP-ROOT-SOVEREIGN-001', // Legacy laptop identifier
+  'DEVICE-3B5B738BB',              // Modern device fingerprint
+];
+
+const AUTHORIZED_HARDWARE_HASHES = [
+  '8423250efbaecab0f28237786161709d794c71deb0dcfb8ebd92b14e1cc643db', // Legacy laptop hash
+  'ed14836c09db1ddf316404fd39df41f9869494d428a5859e4419825dc8ea6dfd', // Modern hardware hash
+];
+
 const ROOT_ACCESS_KEY = 'PFF_ROOT_ACCESS';
+const SOVEREIGN_COOKIE_KEY = 'PFF_SOVEREIGN_COOKIE';
+const COOKIE_EXPIRY_DAYS = 365;
+
+/**
+ * Set Sovereign Cookie (365-day persistent bypass)
+ */
+function setSovereignCookie(): void {
+  try {
+    const expiryDate = new Date();
+    expiryDate.setDate(expiryDate.getDate() + COOKIE_EXPIRY_DAYS);
+
+    const cookieValue = {
+      granted: true,
+      timestamp: Date.now(),
+      expiry: expiryDate.getTime(),
+    };
+
+    localStorage.setItem(SOVEREIGN_COOKIE_KEY, JSON.stringify(cookieValue));
+    console.log('[CRITICAL BYPASS] ✅ SOVEREIGN COOKIE SET (365-day expiry)');
+  } catch (err) {
+    console.error('[CRITICAL BYPASS] Error setting sovereign cookie:', err);
+  }
+}
+
+/**
+ * Check if Sovereign Cookie is valid
+ */
+function hasSovereignCookie(): boolean {
+  try {
+    const cookieStr = localStorage.getItem(SOVEREIGN_COOKIE_KEY);
+    if (!cookieStr) return false;
+
+    const cookie = JSON.parse(cookieStr);
+    const now = Date.now();
+
+    if (cookie.granted && cookie.expiry > now) {
+      console.log('[CRITICAL BYPASS] ✅ VALID SOVEREIGN COOKIE FOUND');
+      return true;
+    }
+
+    // Cookie expired, remove it
+    localStorage.removeItem(SOVEREIGN_COOKIE_KEY);
+    return false;
+  } catch (err) {
+    return false;
+  }
+}
 
 /**
  * Check if current device is ROOT_SOVEREIGN_PAIR
  */
 export function isRootDevice(): boolean {
   try {
-    // Check localStorage for device_id
-    const storedDeviceId = localStorage.getItem('device_id');
-    if (storedDeviceId === ROOT_DEVICE_ID || storedDeviceId === ROOT_DEVICE_ID_ALT) {
-      console.log('[CRITICAL BYPASS] ✅ ROOT DEVICE DETECTED (Device ID Match)');
+    // Check for valid Sovereign Cookie first (fastest path)
+    if (hasSovereignCookie()) {
       return true;
     }
 
-    // Check for hardware hash match
+    // Check localStorage for device_id (array-based)
+    const storedDeviceId = localStorage.getItem('device_id');
+    if (storedDeviceId && AUTHORIZED_DEVICE_IDS.includes(storedDeviceId)) {
+      console.log('[CRITICAL BYPASS] ✅ ROOT DEVICE DETECTED (Device ID Match)');
+      setSovereignCookie(); // Set cookie for future visits
+      return true;
+    }
+
+    // FALLBACK: If device_id is HP-LAPTOP-ROOT-SOVEREIGN-001, grant access even without hash match
+    if (storedDeviceId === 'HP-LAPTOP-ROOT-SOVEREIGN-001') {
+      console.log('[CRITICAL BYPASS] ✅ ROOT DEVICE DETECTED (Legacy Laptop Fallback)');
+      setSovereignCookie();
+      return true;
+    }
+
+    // Check for hardware hash match (array-based)
     const storedHardwareHash = localStorage.getItem('hardware_tpm_hash');
-    if (storedHardwareHash === ROOT_HARDWARE_HASH || storedHardwareHash === ROOT_HARDWARE_HASH_ALT) {
+    if (storedHardwareHash && AUTHORIZED_HARDWARE_HASHES.includes(storedHardwareHash)) {
       console.log('[CRITICAL BYPASS] ✅ ROOT DEVICE DETECTED (Hardware Hash Match)');
+      setSovereignCookie();
       return true;
     }
 
@@ -40,6 +107,7 @@ export function isRootDevice(): boolean {
     const rootAccess = localStorage.getItem(ROOT_ACCESS_KEY);
     if (rootAccess === 'GRANTED') {
       console.log('[CRITICAL BYPASS] ✅ ROOT ACCESS GRANTED (Persistent Flag)');
+      setSovereignCookie();
       return true;
     }
 
