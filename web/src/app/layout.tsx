@@ -1,9 +1,6 @@
-'use client';
-
 import type { Metadata } from 'next';
 import './globals.css';
 import { HowToInstallTooltip } from '@/components/HowToInstallTooltip';
-import { useEffect } from 'react';
 import Script from 'next/script';
 
 export const metadata: Metadata = {
@@ -21,30 +18,6 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // CRITICAL BYPASS: Service Worker Purge + Cache Clear
-  useEffect(() => {
-    console.log('[ROOT LAYOUT] 🔥 INITIALIZING CACHE PURGE PROTOCOL');
-
-    // Unregister all service workers
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(registrations => {
-        registrations.forEach(registration => {
-          registration.unregister();
-          console.log('[ROOT LAYOUT] ✅ Service Worker unregistered');
-        });
-      });
-    }
-
-    // Clear all caches
-    if ('caches' in window) {
-      caches.keys().then(names => {
-        names.forEach(name => {
-          caches.delete(name);
-          console.log('[ROOT LAYOUT] ✅ Cache cleared:', name);
-        });
-      });
-    }
-  }, []);
 
   return (
     <html lang="en" className="dark">
