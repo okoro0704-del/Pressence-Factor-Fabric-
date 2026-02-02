@@ -576,31 +576,33 @@ export default function ArchitectCommandCenter() {
       <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 
-      <div className="min-h-screen relative overflow-hidden">
-        {/* Deep Space Background */}
+      <div className="min-h-screen relative overflow-hidden bg-[#050505]">
+        {/* Obsidian Background with Gold Accents */}
         <div
           className="fixed inset-0 z-0"
           style={{
             background: `
-              radial-gradient(ellipse at top, rgba(30, 30, 40, 0.4) 0%, transparent 60%),
-              radial-gradient(ellipse at bottom right, rgba(20, 20, 30, 0.3) 0%, transparent 50%),
+              radial-gradient(ellipse at top, rgba(212, 175, 55, 0.05) 0%, transparent 60%),
+              radial-gradient(ellipse at bottom right, rgba(212, 175, 55, 0.03) 0%, transparent 50%),
               #050505
             `,
           }}
         />
 
-        {/* Animated Stars */}
-        <div className="fixed inset-0 z-0 opacity-30">
+        {/* Animated Gold Particles */}
+        <div className="fixed inset-0 z-0 opacity-20">
           {[...Array(50)].map((_, i) => (
             <motion.div
               key={i}
-              className="absolute w-1 h-1 bg-white rounded-full"
+              className="absolute w-1 h-1 rounded-full"
               style={{
                 left: `${Math.random() * 100}%`,
                 top: `${Math.random() * 100}%`,
+                background: '#D4AF37',
+                boxShadow: '0 0 4px #D4AF37',
               }}
               animate={{
-                opacity: [0.2, 1, 0.2],
+                opacity: [0.2, 0.8, 0.2],
                 scale: [1, 1.5, 1],
               }}
               transition={{
@@ -614,42 +616,78 @@ export default function ArchitectCommandCenter() {
 
       {/* Main Content */}
       <div className="relative z-10 container mx-auto px-4 py-8">
-        {/* Header - CLEAR SOVEREIGN OVERLAY: Render at 100% opacity immediately */}
+        {/* Header - Obsidian & Gold Manifesto */}
         <motion.div
-          initial={{ opacity: 1, y: 0 }}
+          initial={{ opacity: 0, y: -50 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0 }}
+          transition={{ duration: 0.8, ease: "easeOut" }}
           className="text-center mb-12"
         >
-          <h1 className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-500 to-blue-500 mb-4">
+          <motion.h1
+            className="text-7xl font-black mb-4"
+            style={{
+              color: '#D4AF37',
+              textShadow: '0 0 20px rgba(212, 175, 55, 0.5), 0 0 40px rgba(212, 175, 55, 0.3)',
+            }}
+            initial={{ scale: 0.9 }}
+            animate={{ scale: 1 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+          >
             {isDualNode ? 'DUAL-NODE SOVEREIGNTY ACTIVE' : "ARCHITECT'S SENTINEL COMMAND CENTER"}
-          </h1>
-          <p className="text-xl text-gray-300 font-semibold tracking-wide">
-            {isDualNode ? '🔥 LAPTOP + MOBILE BOUND 🔥' : 'GOD-MODE SOVEREIGN CONTROL'}
-          </p>
+          </motion.h1>
+          <motion.p
+            className="text-2xl font-bold tracking-wide mb-6"
+            style={{ color: '#D4AF37' }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.6, delay: 0.4 }}
+          >
+            {isDualNode ? '🔥 LAPTOP + MOBILE BOUND 🔥' : 'THE SIMULATION ENDS HERE. WELCOME TO THE REAL ECONOMY.'}
+          </motion.p>
+          <motion.p
+            className="text-lg text-gray-400 max-w-3xl mx-auto"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.6, delay: 0.6 }}
+          >
+            Powered by the PFF Protocol & The Vitalie Economic Model
+          </motion.p>
 
-          {/* Mobile Sync & Force Presence Buttons */}
-          <div className="flex items-center justify-center gap-4 mt-6 flex-wrap">
+          {/* Mobile Sync & Force Presence Buttons - Gold Theme */}
+          <motion.div
+            className="flex items-center justify-center gap-4 mt-8 flex-wrap"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.8 }}
+          >
             <motion.button
-              whileHover={{ scale: 1.05 }}
+              whileHover={{ scale: 1.05, boxShadow: '0 0 30px rgba(212, 175, 55, 0.6)' }}
               whileTap={{ scale: 0.95 }}
               onClick={() => setIsMobileSyncOpen(true)}
-              className="px-6 py-3 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold rounded-xl transition-all duration-300 flex items-center gap-2"
+              className="px-8 py-4 bg-black/40 backdrop-blur-md border-2 text-white font-bold rounded-xl transition-all duration-300 flex items-center gap-3"
+              style={{
+                borderColor: '#D4AF37',
+                boxShadow: '0 0 20px rgba(212, 175, 55, 0.3)',
+              }}
             >
-              <Shield className="w-5 h-5" />
-              Mobile Sync
+              <Shield className="w-6 h-6" style={{ color: '#D4AF37' }} />
+              <span style={{ color: '#D4AF37' }}>Mobile Sync</span>
             </motion.button>
 
             <motion.button
-              whileHover={{ scale: 1.05 }}
+              whileHover={{ scale: 1.05, boxShadow: '0 0 30px rgba(212, 175, 55, 0.6)' }}
               whileTap={{ scale: 0.95 }}
               onClick={handleForceGlobalPresence}
-              className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-bold rounded-xl transition-all duration-300 flex items-center gap-2"
+              className="px-8 py-4 bg-black/40 backdrop-blur-md border-2 text-white font-bold rounded-xl transition-all duration-300 flex items-center gap-3"
+              style={{
+                borderColor: '#D4AF37',
+                boxShadow: '0 0 20px rgba(212, 175, 55, 0.3)',
+              }}
             >
-              <Activity className="w-5 h-5" />
-              FORCE GLOBAL PRESENCE
+              <Activity className="w-6 h-6" style={{ color: '#D4AF37' }} />
+              <span style={{ color: '#D4AF37' }}>FORCE GLOBAL PRESENCE</span>
             </motion.button>
-          </div>
+          </motion.div>
         </motion.div>
 
         {/* CLEAR SOVEREIGN OVERLAY: Remove all blocking overlays and verification screens */}

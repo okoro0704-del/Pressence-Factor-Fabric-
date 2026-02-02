@@ -27,7 +27,7 @@ export default function LiveTelemetryPanel({ telemetry }: LiveTelemetryPanelProp
     {
       title: 'ACTIVE SENTINELS',
       icon: Shield,
-      color: 'from-purple-500 to-pink-500',
+      goldAccent: true,
       stats: [
         { label: 'Citizen (Tier 1)', value: telemetry.activeSentinels.citizen, icon: Users },
         { label: 'Personal Multi (Tier 2)', value: telemetry.activeSentinels.personalMulti, icon: Users },
@@ -39,7 +39,7 @@ export default function LiveTelemetryPanel({ telemetry }: LiveTelemetryPanelProp
       title: 'TOTAL TRIBUTES COLLECTED',
       subtitle: '50:50 Economic Model',
       icon: DollarSign,
-      color: 'from-green-500 to-emerald-500',
+      goldAccent: true,
       stats: [
         { label: 'Total Tributes (VIDA)', value: telemetry.totalTributes.deepTruthVIDA.toFixed(8) },
         { label: 'Total Businesses Connected', value: telemetry.totalTributes.businessCount },
@@ -51,7 +51,7 @@ export default function LiveTelemetryPanel({ telemetry }: LiveTelemetryPanelProp
       title: 'NATIONAL LIQUIDITY LEVELS',
       subtitle: '195 Sovereign Blocks',
       icon: Globe,
-      color: 'from-blue-500 to-cyan-500',
+      goldAccent: true,
       stats: [
         { label: 'Total National Reserves (VIDA)', value: telemetry.nationalLiquidity.totalReservesVIDA.toFixed(8) },
         { label: 'Total National Reserves (USD)', value: `$${telemetry.nationalLiquidity.totalReservesUSD.toFixed(2)}` },
@@ -64,63 +64,108 @@ export default function LiveTelemetryPanel({ telemetry }: LiveTelemetryPanelProp
   return (
     <div className="mb-12">
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-        className="mb-6"
+        transition={{ duration: 0.8, delay: 1.0 }}
+        className="mb-8"
       >
-        <h2 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
-          <TrendingUp className="w-8 h-8 text-green-400" />
+        <h2
+          className="text-4xl font-black mb-2 flex items-center gap-3"
+          style={{
+            color: '#D4AF37',
+            textShadow: '0 0 20px rgba(212, 175, 55, 0.5)',
+          }}
+        >
+          <TrendingUp className="w-10 h-10" style={{ color: '#D4AF37' }} />
           LIVE TELEMETRY
         </h2>
-        <p className="text-gray-400">Real-time sovereign control metrics</p>
+        <p className="text-gray-400 text-lg">Real-time sovereign control metrics</p>
       </motion.div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {telemetryCards.map((card, index) => (
           <motion.div
             key={card.title}
-            initial={{ opacity: 0, y: 50 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: index * 0.1 }}
-            whileHover={{ scale: 1.02 }}
+            initial={{ opacity: 0, x: -50 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.8, delay: 1.2 + index * 0.2, ease: "easeOut" }}
+            whileHover={{
+              scale: 1.03,
+              boxShadow: '0 0 40px rgba(212, 175, 55, 0.4)',
+            }}
             className="relative group"
           >
-            {/* Card Container - Glassmorphism */}
-            <div className="relative bg-white/5 backdrop-blur-[10px] border border-white/10 rounded-2xl p-6 shadow-2xl hover:shadow-purple-500/20 transition-all duration-300">
-              {/* Glow Effect */}
-              <div className={`absolute inset-0 bg-gradient-to-r ${card.color} opacity-0 group-hover:opacity-10 rounded-2xl transition-opacity duration-300`} />
+            {/* Card Container - Obsidian Glassmorphism with Gold Border */}
+            <div
+              className="relative bg-black/60 backdrop-blur-xl border-2 rounded-2xl p-8 transition-all duration-300"
+              style={{
+                borderColor: '#D4AF37',
+                boxShadow: '0 0 20px rgba(212, 175, 55, 0.2), inset 0 0 20px rgba(212, 175, 55, 0.05)',
+              }}
+            >
+              {/* Gold Glow Effect on Hover */}
+              <div
+                className="absolute inset-0 opacity-0 group-hover:opacity-20 rounded-2xl transition-opacity duration-300"
+                style={{
+                  background: 'radial-gradient(circle at center, #D4AF37 0%, transparent 70%)',
+                }}
+              />
 
-              {/* Header */}
-              <div className="flex items-center gap-3 mb-6">
-                <div className={`p-3 rounded-xl bg-gradient-to-r ${card.color}`}>
-                  <card.icon className="w-6 h-6 text-white" />
+              {/* Header - Gold Theme */}
+              <div className="flex items-center gap-4 mb-8">
+                <div
+                  className="p-4 rounded-xl"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(212, 175, 55, 0.2) 0%, rgba(212, 175, 55, 0.1) 100%)',
+                    border: '2px solid #D4AF37',
+                    boxShadow: '0 0 15px rgba(212, 175, 55, 0.3)',
+                  }}
+                >
+                  <card.icon className="w-7 h-7" style={{ color: '#D4AF37' }} />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-white">{card.title}</h3>
+                  <h3
+                    className="text-xl font-black"
+                    style={{ color: '#D4AF37' }}
+                  >
+                    {card.title}
+                  </h3>
                   {card.subtitle && (
-                    <p className="text-sm text-gray-400">{card.subtitle}</p>
+                    <p className="text-sm text-gray-400 font-semibold">{card.subtitle}</p>
                   )}
                 </div>
               </div>
 
-              {/* Stats */}
-              <div className="space-y-4">
+              {/* Stats - Gold Accents */}
+              <div className="space-y-3">
                 {card.stats.map((stat: any, statIndex: any) => (
-                  <div
+                  <motion.div
                     key={statIndex}
-                    className="flex items-center justify-between p-3 rounded-lg bg-black/20"
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.4, delay: 1.4 + index * 0.2 + statIndex * 0.1 }}
+                    className="flex items-center justify-between p-4 rounded-lg"
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(0, 0, 0, 0.4) 0%, rgba(0, 0, 0, 0.2) 100%)',
+                      border: '1px solid rgba(212, 175, 55, 0.2)',
+                    }}
                   >
-                    <div className="flex items-center gap-2">
-                      {stat.icon && <stat.icon className="w-4 h-4 text-gray-400" />}
-                      <span className="text-sm text-gray-300">
+                    <div className="flex items-center gap-3">
+                      {stat.icon && <stat.icon className="w-5 h-5" style={{ color: '#D4AF37' }} />}
+                      <span className="text-sm text-gray-300 font-semibold">
                         {stat.label}
                       </span>
                     </div>
-                    <span className="font-mono text-lg font-bold text-white">
+                    <span
+                      className="font-mono text-xl font-black"
+                      style={{
+                        color: stat.highlight ? '#D4AF37' : '#FFFFFF',
+                        textShadow: stat.highlight ? '0 0 10px rgba(212, 175, 55, 0.5)' : 'none',
+                      }}
+                    >
                       {stat.value}
                     </span>
-                  </div>
+                  </motion.div>
                 ))}
               </div>
 
@@ -134,17 +179,20 @@ export default function LiveTelemetryPanel({ telemetry }: LiveTelemetryPanelProp
                 </div>
               )}
 
-              {/* Enhanced LIVE Indicator with Pulsing Animation */}
-              <div className="mt-6 flex items-center gap-2">
+              {/* Enhanced LIVE Indicator with Gold Pulsing Animation */}
+              <div className="mt-8 flex items-center gap-3">
                 <motion.div
-                  className="w-3 h-3 bg-green-400 rounded-full shadow-lg shadow-green-400/50"
+                  className="w-4 h-4 rounded-full"
+                  style={{
+                    background: '#D4AF37',
+                  }}
                   animate={{
-                    opacity: [1, 0.4, 1],
-                    scale: [1, 1.3, 1],
+                    opacity: [1, 0.5, 1],
+                    scale: [1, 1.4, 1],
                     boxShadow: [
-                      '0 0 10px rgba(74, 222, 128, 0.5)',
-                      '0 0 20px rgba(74, 222, 128, 0.8)',
-                      '0 0 10px rgba(74, 222, 128, 0.5)',
+                      '0 0 10px rgba(212, 175, 55, 0.5)',
+                      '0 0 25px rgba(212, 175, 55, 0.9)',
+                      '0 0 10px rgba(212, 175, 55, 0.5)',
                     ],
                   }}
                   transition={{
@@ -153,7 +201,12 @@ export default function LiveTelemetryPanel({ telemetry }: LiveTelemetryPanelProp
                     ease: 'easeInOut',
                   }}
                 />
-                <span className="text-xs text-green-400 font-bold tracking-wider">LIVE</span>
+                <span
+                  className="text-sm font-black tracking-widest"
+                  style={{ color: '#D4AF37' }}
+                >
+                  LIVE
+                </span>
               </div>
             </div>
           </motion.div>
