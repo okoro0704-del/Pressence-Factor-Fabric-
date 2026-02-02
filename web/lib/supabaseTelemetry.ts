@@ -6,6 +6,28 @@
 
 import { supabase, hasSupabase } from './supabase';
 
+// ============================================================================
+// SOVEREIGN BLOCK EXCHANGE RATES
+// ============================================================================
+
+/**
+ * VIDA CAP to Naira Exchange Rate
+ * This is the Sovereign Block Exchange Rate for local liquidity conversion
+ * 1 VIDA CAP = 1,500 Nigerian Naira (₦)
+ */
+export const VIDA_TO_NAIRA_RATE = 1500;
+
+/**
+ * VIDA CAP to USD Exchange Rate
+ * This is the Global Benchmark Rate for international valuation
+ * 1 VIDA CAP = 1 USD ($)
+ */
+export const VIDA_TO_USD_RATE = 1.0;
+
+// ============================================================================
+// TYPE DEFINITIONS
+// ============================================================================
+
 export interface SentinelTelemetry {
   id: string;
   active_sentinels_citizen: number;
@@ -36,6 +58,8 @@ export interface NationalReserve {
   country: string;
   vault_balance_vida_cap: number;
   backed_currency_circulation_vida: number;
+  vault_balance_naira: number;
+  vault_balance_usd: number;
   backing_ratio: string;
   burn_rate_infrastructure: string;
   monthly_growth: string;
@@ -135,10 +159,14 @@ export async function fetchNationalReserve(): Promise<NationalReserve | null> {
     const telemetry = await fetchLiveTelemetry();
     if (!telemetry) return null;
 
+    const vaultBalanceVida = telemetry.state_share_vida * 2;
+
     const nationalReserve: NationalReserve = {
       country: 'Nigeria',
-      vault_balance_vida_cap: telemetry.state_share_vida * 2,
+      vault_balance_vida_cap: vaultBalanceVida,
       backed_currency_circulation_vida: telemetry.total_tributes_vida,
+      vault_balance_naira: vaultBalanceVida * VIDA_TO_NAIRA_RATE,
+      vault_balance_usd: vaultBalanceVida * VIDA_TO_USD_RATE,
       backing_ratio: '1:1',
       burn_rate_infrastructure: '0.05%',
       monthly_growth: '+12.4%',
