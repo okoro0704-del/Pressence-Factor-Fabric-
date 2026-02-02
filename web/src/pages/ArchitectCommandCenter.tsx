@@ -26,12 +26,14 @@ import NationalLiquidityGrid from '../components/commandCenter/NationalLiquidity
 export default function ArchitectCommandCenter() {
   const [telemetry, setTelemetry] = useState<CommandCenterTelemetry | null>(null);
   const [securityStatus, setSecurityStatus] = useState<SecurityStatus | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // Start with false to render immediately
   const [error, setError] = useState<string | null>(null);
 
   // Initialize with mock data immediately to prevent white screen
   useEffect(() => {
-    // Set mock data immediately
+    console.log('[COMMAND CENTER] Initializing with mock data - v2.0');
+
+    // Set mock data IMMEDIATELY (no waiting for API)
     const mockTelemetry: CommandCenterTelemetry = {
       activeSentinels: {
         citizen: 1247,
