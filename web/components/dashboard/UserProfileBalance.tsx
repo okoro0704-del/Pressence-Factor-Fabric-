@@ -9,30 +9,29 @@ export function UserProfileBalance() {
   const [loading, setLoading] = useState(true);
 
   const TOTAL_MINTED_CAP = 10;
+  const ARCHITECT_SHARE = 5;
+  const STATE_SHARE = 5;
   const VIDA_PRICE_USD = 1000;
   const NAIRA_RATE = 1400;
-  const NATIONAL_VIDA_POOL_PERCENT = 0.15;
+  const SPENDABLE_PERCENT = 0.20;
+  const LOCKED_PERCENT = 0.80;
 
   useEffect(() => {
     async function loadVaultData() {
       setLoading(true);
       const liveData = await fetchCitizenVault();
       
-      if (liveData) {
-        setVaultData(liveData);
-      } else {
-        const mockData = getCitizenVaultData();
-        setVaultData({
-          owner: mockData.owner,
-          alias: mockData.alias,
-          status: mockData.status,
-          total_vida_cap_minted: TOTAL_MINTED_CAP,
-          personal_share_50: 5,
-          state_contribution_50: 5,
-          spendable_balance_vida: 5 * NATIONAL_VIDA_POOL_PERCENT,
-          linked_bank_accounts: mockData.linked_bank_accounts,
-        });
-      }
+      const mockData = liveData || getCitizenVaultData();
+      setVaultData({
+        owner: mockData.owner || 'Isreal Okoro',
+        alias: mockData.alias || 'mrfundzman',
+        status: mockData.status || 'VITALIZED',
+        total_vida_cap_minted: TOTAL_MINTED_CAP,
+        personal_share_50: ARCHITECT_SHARE,
+        state_contribution_50: STATE_SHARE,
+        spendable_balance_vida: ARCHITECT_SHARE * SPENDABLE_PERCENT,
+        linked_bank_accounts: mockData.linked_bank_accounts || [],
+      });
       setLoading(false);
     }
 
@@ -51,6 +50,8 @@ export function UserProfileBalance() {
   }
 
   const yourShareNaira = vaultData.personal_share_50 * VIDA_PRICE_USD * NAIRA_RATE;
+  const spendableNaira = vaultData.spendable_balance_vida * VIDA_PRICE_USD * NAIRA_RATE;
+  const lockedVida = vaultData.personal_share_50 * LOCKED_PERCENT;
 
   return (
     <div className="space-y-6">
@@ -80,7 +81,21 @@ export function UserProfileBalance() {
           <p className="text-4xl font-bold text-[#e8c547] mb-1">
             {vaultData.spendable_balance_vida.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
-          <p className="text-xs text-[#6b6b70]">15% Liquidity Pool of Your Share (5 × 0.15 = 0.75 VIDA)</p>
+          <p className="text-xs text-[#00ff41] font-mono mb-2">
+            ₦{spendableNaira.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </p>
+          <p className="text-xs text-[#6b6b70]">20% of Your Share (5 × 0.20 = 1 VIDA)</p>
+        </div>
+
+        <div className="mb-6 p-4 bg-gradient-to-br from-red-500/10 to-red-600/5 rounded-lg border border-red-500/20">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm text-[#6b6b70]">Locked Until 1B Users</span>
+            <span className="text-xs text-red-400">🔒 LOCKED</span>
+          </div>
+          <p className="text-2xl font-bold text-red-400 mb-1">
+            {lockedVida.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VIDA CAP
+          </p>
+          <p className="text-xs text-[#6b6b70]">80% of Your Share (5 × 0.80 = 4 VIDA)</p>
         </div>
 
         <div className="space-y-4">
