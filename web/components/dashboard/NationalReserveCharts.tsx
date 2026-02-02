@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect } from 'react';
 import { fetchNationalReserve, type NationalReserve } from '@/lib/supabaseTelemetry';
@@ -35,73 +35,95 @@ export function NationalReserveCharts() {
     );
   }
 
-  const VIDA_TO_NAIRA = 1500; // Sovereign Block Exchange Rate
-
   return (
     <div className="space-y-6">
-      {/* TRIPLE-VAULT CURRENCY DISPLAY */}
+      {/* THE ARCHITECT'S SOVEREIGN PORTFOLIO HEADER */}
+      <div className="bg-gradient-to-r from-[#050505] via-[#0d0d0f] to-[#050505] rounded-xl p-6 border-2 border-[#D4AF37]/30">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-[#D4AF37] mb-2 tracking-wider">THE ARCHITECT'S SOVEREIGN PORTFOLIO</h2>
+          <div className="flex items-center justify-center gap-4 text-sm text-[#6b6b70]">
+            <span>Total Minted: <span className="font-mono text-[#D4AF37]">{reserve.sovereign_share_vida * 2} VIDA CAP</span></span>
+            <span className="text-[#D4AF37]">•</span>
+            <span>Sovereign Share (50%): <span className="font-mono text-[#D4AF37]">{reserve.sovereign_share_vida} VIDA CAP</span></span>
+          </div>
+          <div className="mt-3 text-xs text-[#6b6b70]">
+            Total Value: <span className="font-mono text-[#00ff41]">₦{reserve.total_value_naira.toLocaleString()}</span> | <span className="font-mono text-[#3B82F6]"></span>
+          </div>
+        </div>
+      </div>
+
+      {/* 70/15/15 LIQUIDITY SPLIT - TRIPLE-VAULT DISPLAY */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* VAULT 1: THE CORE - VIDA CAP (Pulsing Gold) */}
-        <div className="relative bg-[#16161a] rounded-xl p-6 border border-[#2a2a2e] overflow-hidden group">
+        {/* CARD 1: NATIONAL VAULT (70%) - LOCKED RESERVES */}
+        <div className="relative bg-[#050505] rounded-xl p-6 border-2 border-[#D4AF37]/50 overflow-hidden group">
           {/* Pulsing Gold Glow */}
-          <div className="absolute inset-0 bg-gradient-to-br from-[#D4AF37]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-          <div className="absolute -top-20 -right-20 w-40 h-40 bg-[#D4AF37]/20 rounded-full blur-3xl animate-pulse" />
+          <div className="absolute inset-0 bg-gradient-to-br from-[#D4AF37]/20 to-transparent opacity-50 group-hover:opacity-100 transition-opacity duration-500" />
+          <div className="absolute -top-20 -right-20 w-40 h-40 bg-[#D4AF37]/30 rounded-full blur-3xl animate-pulse" />
           
           <div className="relative z-10">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xs font-bold text-[#D4AF37] uppercase tracking-wider">Vault 1: The Core</h3>
-              <span className="text-xs text-[#6b6b70]">{reserve.country}</span>
+              <h3 className="text-xs font-bold text-[#D4AF37] uppercase tracking-wider">Card 1: National Vault</h3>
+              <span className="text-xs font-mono text-[#D4AF37]">70%</span>
             </div>
             <div className="space-y-2">
-              <p className="text-4xl font-bold font-mono text-[#D4AF37] tracking-tight">
-                {reserve.vault_balance_vida_cap.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              <p className="text-5xl font-bold font-mono text-[#D4AF37] tracking-tight">
+                {reserve.national_vault_vida.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
-              <p className="text-sm font-semibold text-[#6b6b70]">VIDA CAP</p>
-              <p className="text-xs text-[#6b6b70] mt-2">Primary Hard Asset</p>
+              <p className="text-sm font-semibold text-[#D4AF37]">VIDA CAP</p>
+              <p className="text-xs text-[#6b6b70] mt-2 uppercase tracking-wide">🔒 Locked Reserves</p>
+              <div className="mt-3 pt-3 border-t border-[#D4AF37]/20">
+                <p className="text-xs text-[#6b6b70]">Value: <span className="font-mono text-[#D4AF37]">₦{(reserve.national_vault_vida * 1000 * 1400).toLocaleString()}</span></p>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* VAULT 2: LOCAL LIQUIDITY - NAIRA (Matrix Green) */}
-        <div className="relative bg-[#16161a] rounded-xl p-6 border border-[#2a2a2e] overflow-hidden group">
-          {/* Matrix Green Glow */}
-          <div className="absolute inset-0 bg-gradient-to-br from-[#00ff41]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-          <div className="absolute -top-20 -right-20 w-40 h-40 bg-[#00ff41]/15 rounded-full blur-3xl" />
+        {/* CARD 2: NATIONAL LIQUIDITY (15%) - ACTIVE SUPPLY */}
+        <div className="relative bg-[#050505] rounded-xl p-6 border-2 border-[#D4AF37]/30 overflow-hidden group">
+          {/* Gold Glow */}
+          <div className="absolute inset-0 bg-gradient-to-br from-[#D4AF37]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+          <div className="absolute -top-20 -right-20 w-40 h-40 bg-[#D4AF37]/15 rounded-full blur-3xl" />
           
           <div className="relative z-10">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xs font-bold text-[#00ff41] uppercase tracking-wider">Vault 2: Local Liquidity</h3>
-              <span className="text-xs text-[#6b6b70]">₦</span>
+              <h3 className="text-xs font-bold text-[#D4AF37] uppercase tracking-wider">Card 2: National Liquidity</h3>
+              <span className="text-xs font-mono text-[#D4AF37]">15%</span>
+            </div>
+            <div className="space-y-2">
+              <p className="text-5xl font-bold font-mono text-[#D4AF37] tracking-tight">
+                {reserve.national_liquidity_vida.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
+              <p className="text-sm font-semibold text-[#D4AF37]">VIDA CAP</p>
+              <p className="text-xs text-[#6b6b70] mt-2 uppercase tracking-wide">⚡ Active Supply</p>
+              <div className="mt-3 pt-3 border-t border-[#D4AF37]/20">
+                <p className="text-xs text-[#6b6b70]">Value: <span className="font-mono text-[#D4AF37]">₦{(reserve.national_liquidity_vida * 1000 * 1400).toLocaleString()}</span></p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* CARD 3: NAIRA-VIDA (15%) - LOCAL CURRENCY */}
+        <div className="relative bg-[#050505] rounded-xl p-6 border-2 border-[#00ff41]/50 overflow-hidden group">
+          {/* Matrix Green Glow */}
+          <div className="absolute inset-0 bg-gradient-to-br from-[#00ff41]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+          <div className="absolute -top-20 -right-20 w-40 h-40 bg-[#00ff41]/20 rounded-full blur-3xl" />
+          
+          <div className="relative z-10">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xs font-bold text-[#00ff41] uppercase tracking-wider">Card 3: Naira-VIDA</h3>
+              <span className="text-xs font-mono text-[#00ff41]">15%</span>
             </div>
             <div className="space-y-2">
               <p className="text-4xl font-bold font-mono text-[#00ff41] tracking-tight">
-                ₦{reserve.vault_balance_naira.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                ₦{reserve.naira_vida_value_naira.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
               <p className="text-sm font-semibold text-[#6b6b70]">Nigerian Naira</p>
               <p className="text-xs text-[#6b6b70] mt-2">
-                Real-time conversion based on Sovereign Block Exchange Rate
+                {reserve.naira_vida_amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VIDA × $1,000 × ₦1,400
               </p>
-            </div>
-          </div>
-        </div>
-
-        {/* VAULT 3: GLOBAL BENCHMARK - USD */}
-        <div className="relative bg-[#16161a] rounded-xl p-6 border border-[#2a2a2e] overflow-hidden group">
-          {/* Blue Glow */}
-          <div className="absolute inset-0 bg-gradient-to-br from-[#1E3A8A]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-          <div className="absolute -top-20 -right-20 w-40 h-40 bg-[#3B82F6]/15 rounded-full blur-3xl" />
-          
-          <div className="relative z-10">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xs font-bold text-[#3B82F6] uppercase tracking-wider">Vault 3: Global Benchmark</h3>
-              <span className="text-xs text-[#6b6b70]">$</span>
-            </div>
-            <div className="space-y-2">
-              <p className="text-4xl font-bold font-mono text-[#3B82F6] tracking-tight">
-                ${reserve.vault_balance_usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </p>
-              <p className="text-sm font-semibold text-[#6b6b70]">United States Dollar</p>
-              <p className="text-xs text-[#6b6b70] mt-2">International Valuation</p>
+              <div className="mt-3 pt-3 border-t border-[#00ff41]/20">
+                <p className="text-xs text-[#6b6b70]">Local Currency Equivalent</p>
+              </div>
             </div>
           </div>
         </div>
@@ -128,19 +150,19 @@ export function NationalReserveCharts() {
         </div>
       </div>
 
-      {/* Exchange Rate Transparency Footer */}
-      <div className="bg-[#0d0d0f] rounded-lg p-4 border border-[#2a2a2e]">
-        <h4 className="text-xs font-bold text-[#00ff41] uppercase tracking-wider mb-2">Sovereign Block Exchange Rates</h4>
+      {/* Genesis Hash Seal - Verification Footer */}
+      <div className="bg-[#0d0d0f] rounded-lg p-4 border-2 border-[#D4AF37]/30">
+        <h4 className="text-xs font-bold text-[#D4AF37] uppercase tracking-wider mb-2">🔐 Genesis Hash Seal</h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-[#6b6b70]">
           <div>
-            <span className="font-mono text-[#D4AF37]">1 VIDA CAP</span> = <span className="font-mono text-[#00ff41]">₦{VIDA_TO_NAIRA.toLocaleString()}</span>
+            <span className="font-mono text-[#D4AF37]">1 VIDA CAP</span> = <span className="font-mono text-[#3B82F6]">$1,000 USD</span>
           </div>
           <div>
-            <span className="font-mono text-[#D4AF37]">1 VIDA CAP</span> = <span className="font-mono text-[#3B82F6]">.00 USD</span>
+            <span className="font-mono text-[#D4AF37]">1 USD</span> = <span className="font-mono text-[#00ff41]">₦1,400</span>
           </div>
         </div>
         <p className="text-xs text-[#6b6b70] mt-2">
-          Real-time conversion based on Sovereign Block Exchange Rate. All values calculated from live telemetry data.
+          All values locked and verified by Sovereign Block Exchange Rate. Total Portfolio: {reserve.sovereign_share_vida} VIDA CAP = ₦{reserve.total_value_naira.toLocaleString()}
         </p>
       </div>
     </div>
