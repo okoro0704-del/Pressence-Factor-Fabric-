@@ -18,6 +18,22 @@ If the deploy fails with "Deploy failed due to an error in @netlify/plugin-nextj
 
 ---
 
+## Netlify: "Publish directory is pointing to the base directory"
+
+If you see: **"Your publish directory is pointing to the base directory of your site. This is not supported for Next.js sites."**
+
+**Fix:** Set Publish directory to the **Next.js output folder**, not the repo root or base.
+
+1. **Netlify Dashboard** → your site → **Site configuration** → **Build & deploy** → **Build settings**.
+2. Find **Publish directory**.
+3. Set it to exactly: **`.next`**  
+   (Leave **Base directory** as **`web`**. Netlify will then publish `web/.next`.)
+4. **Save** → **Deploys** → **Trigger deploy** → **Clear cache and deploy site**.
+
+Do **not** set Publish directory to `web` or `.` or the same as Base directory.
+
+---
+
 ## Netlify: "Page not found" or "Page not work"
 
 The app lives in the **`web`** folder. If Netlify builds from the repo root, it won’t find the Next.js app and you’ll get a broken or empty site.

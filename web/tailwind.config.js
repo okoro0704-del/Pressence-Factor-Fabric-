@@ -10,6 +10,9 @@ module.exports = {
       colors: {
         obsidian: { bg: '#0d0d0f', surface: '#16161a' },
         gold: { DEFAULT: '#c9a227', bright: '#e8c547' },
+        sovereign: { gold: '#D4AF37' },
+        vitalie: { blue: '#007FFF' },
+        companion: { amber: '#F59E0B' },
       },
       animation: {
         'pulse-glow': 'pulse-glow 2s ease-in-out infinite',

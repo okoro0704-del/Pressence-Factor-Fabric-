@@ -98,6 +98,12 @@ export function DashboardContent() {
             >
               Vitalization Screen →
             </Link>
+            <Link
+              href="/companion"
+              className="text-sm font-medium text-[#c9a227] hover:text-[#e8c547] transition-colors"
+            >
+              SOVRYN Companion →
+            </Link>
           </div>
         </div>
       </div>

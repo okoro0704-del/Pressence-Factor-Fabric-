@@ -44,9 +44,10 @@ const withPWA = require('@ducanh2912/next-pwa').default({
 });
 
 const nextConfig = {
+  output: 'export', // Forces static HTML generation
+  images: { unoptimized: true }, // Required for static export
   reactStrictMode: true,
   webpack: (config) => {
-    // Resolve idb and @supabase/supabase-js from web when bundling ../core (e.g. health-check.ts)
     config.resolve.modules = config.resolve.modules || [];
     config.resolve.modules.push(path.join(__dirname, 'node_modules'));
     return config;

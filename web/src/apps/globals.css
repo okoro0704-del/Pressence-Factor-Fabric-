@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --obsidian-bg: #0d0d0f;
+  --obsidian-surface: #16161a;
+  --gold: #c9a227;
+  --gold-bright: #e8c547;
+  --sovereign-gold: #D4AF37;
+  --vitalie-blue: #007FFF;
+  --companion-amber: #F59E0B;
+}
+
+body {
+  background-color: var(--obsidian-bg);
+}
+
+@keyframes companion-orb-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.9; }
+  50% { transform: scale(1.08); opacity: 1; }
+}
+.companion-orb-pulse {
+  animation: companion-orb-pulse 2.2s ease-in-out infinite;
+}
