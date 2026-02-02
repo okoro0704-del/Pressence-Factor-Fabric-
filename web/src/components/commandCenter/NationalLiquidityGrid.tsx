@@ -37,7 +37,7 @@ function AnimatedNumber({ value, decimals = 2 }: { value: number; decimals?: num
 
 export default function NationalLiquidityGrid() {
   const [topNations, setTopNations] = useState<NationalLiquidity[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // CLEAR SOVEREIGN OVERLAY: Start with false
 
   useEffect(() => {
     fetchTopNations();
@@ -49,7 +49,6 @@ export default function NationalLiquidityGrid() {
     try {
       if (!hasSupabase() || !supabase) {
         console.error('[NATIONAL LIQUIDITY] Supabase not configured');
-        setLoading(false);
         return;
       }
 
@@ -64,7 +63,6 @@ export default function NationalLiquidityGrid() {
 
       if (error) {
         console.error('[NATIONAL LIQUIDITY] Fetch error:', error);
-        setLoading(false);
         return;
       }
 
@@ -82,28 +80,20 @@ export default function NationalLiquidityGrid() {
 
         console.log('[NATIONAL LIQUIDITY] Fetched nations:', transformedData.length);
         setTopNations(transformedData);
-        setLoading(false);
       }
     } catch (err) {
       console.error('[NATIONAL LIQUIDITY] Failed to fetch:', err);
-      setLoading(false);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="mb-12 text-center text-gray-400">
-        Loading national liquidity data...
-      </div>
-    );
-  }
+  // CLEAR SOVEREIGN OVERLAY: Remove loading state - always render at 100% opacity
 
   return (
     <div className="mb-12">
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 1, y: 0 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
+        transition={{ duration: 0 }}
         className="mb-6"
       >
         <h2 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
