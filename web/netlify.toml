@@ -2,8 +2,8 @@
 # Framework: Next.js 16 Static Export
 
 [build]
-  # Build command with verbose logging
-  command = "npm ci && npm run build"
+  # Build command - npm run build only (npm ci handled by Netlify automatically)
+  command = "npm run build"
 
   # Publish directory
   publish = "out"

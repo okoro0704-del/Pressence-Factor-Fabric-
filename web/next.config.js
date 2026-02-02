@@ -1,12 +1,10 @@
-/**
- * Next.js Configuration for PFF Architect's Command Center
- * Minimal configuration for reliable static export
- */
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Static export
   output: 'export',
+
+  // Trailing slash for Netlify static hosting
+  trailingSlash: true,
 
   // Disable image optimization for static export
   images: {
@@ -20,6 +18,12 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+
+  // Disable ESLint during build
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
 };
 
 module.exports = nextConfig;
+

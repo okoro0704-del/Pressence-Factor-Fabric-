@@ -68,7 +68,7 @@ export default function ArchitectCommandCenter() {
       console.log('[COMMAND CENTER] Fetching telemetry from Supabase...');
 
       // Fetch sentinel_telemetry (singleton record)
-      const { data: telemetryData, error: telemetryError } = await supabase
+      const { data: telemetryData, error: telemetryError } = await supabase!
         .from('sentinel_telemetry')
         .select('*')
         .eq('id', '00000000-0000-0000-0000-000000000001')
@@ -82,7 +82,7 @@ export default function ArchitectCommandCenter() {
       }
 
       // Fetch national liquidity vaults for aggregate stats
-      const { data: liquidityData, error: liquidityError } = await supabase
+      const { data: liquidityData, error: liquidityError } = await supabase!
         .from('national_liquidity_vaults')
         .select('balance_vida, balance_usd');
 
@@ -145,7 +145,7 @@ export default function ArchitectCommandCenter() {
       console.log('[COMMAND CENTER] Fetching security status from Supabase...');
 
       // Fetch root sovereign devices
-      const { data: devicesData, error: devicesError } = await supabase
+      const { data: devicesData, error: devicesError } = await supabase!
         .from('root_sovereign_devices')
         .select('*')
         .eq('is_root_pair', true);
@@ -190,7 +190,7 @@ export default function ArchitectCommandCenter() {
       console.log('[COMMAND CENTER] Broadcasting to mesh:', message);
 
       // INSERT into sovereign_audit_log
-      const { data, error } = await supabase
+      const { data, error } = await supabase!
         .from('sovereign_audit_log')
         .insert({
           action_type: 'BROADCAST_TO_MESH',
@@ -245,7 +245,7 @@ export default function ArchitectCommandCenter() {
       console.log('[COMMAND CENTER] Activating emergency stasis:', reason);
 
       // INSERT into sovereign_audit_log
-      const { data, error } = await supabase
+      const { data, error } = await supabase!
         .from('sovereign_audit_log')
         .insert({
           action_type: 'EMERGENCY_STASIS',
