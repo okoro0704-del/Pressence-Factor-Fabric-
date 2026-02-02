@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { DLLRBalanceTracker } from './DLLRBalanceTracker';
 import { LaunchSovereignVaultButton } from './LaunchSovereignVaultButton';
 import { NationalReserveCharts } from '../dashboard/NationalReserveCharts';
+import { NationalBlockCommand } from '../dashboard/NationalBlockCommand';
 import { UserProfileBalance } from '../dashboard/UserProfileBalance';
 
 export function DashboardContent() {
@@ -38,9 +39,17 @@ export function DashboardContent() {
           {/* National Reserve Charts */}
           <div>
             <h2 className="text-sm font-semibold text-[#6b6b70] uppercase tracking-wider mb-4">
-              National Reserve
+              The Architect's Sovereign Portfolio
             </h2>
             <NationalReserveCharts />
+          </div>
+
+          {/* National Block Command */}
+          <div className="mt-8">
+            <h2 className="text-sm font-semibold text-[#6b6b70] uppercase tracking-wider mb-4">
+              National Block Command
+            </h2>
+            <NationalBlockCommand />
           </div>
         </div>
 

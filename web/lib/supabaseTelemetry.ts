@@ -38,14 +38,16 @@ export const NAIRA_RATE = 1400;
 export const VIDA_TO_NAIRA_RATE = VIDA_PRICE_USD * NAIRA_RATE;
 
 /**
- * LIQUIDITY SPLIT (70/15/15)
- * National Vault (Locked Reserves): 70% of Sovereign Share
- * National Liquidity (Active Supply): 15% of Sovereign Share
- * Naira-VIDA (Local Currency): 15% of Sovereign Share
+ * LIQUIDITY SPLIT (70/30)
+ * National Vault (Stability Reserve): 70% of Sovereign Share
+ * National Liquidity: 30% of Sovereign Share
+ *   - VIDA CAP Liquidity (15%): Inter-block settlements
+ *   - National VIDA Pool (15%): Citizen circulation
  */
 export const NATIONAL_VAULT_PERCENT = 0.70;
-export const NATIONAL_LIQUIDITY_PERCENT = 0.15;
-export const NAIRA_VIDA_PERCENT = 0.15;
+export const NATIONAL_LIQUIDITY_PERCENT = 0.30;
+export const VIDA_CAP_LIQUIDITY_PERCENT = 0.15;
+export const NATIONAL_VIDA_POOL_PERCENT = 0.15;
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -91,6 +93,38 @@ export interface NationalReserve {
   backing_ratio: string;
   burn_rate_infrastructure: string;
   monthly_growth: string;
+}
+
+/**
+ * National Block Reserves Interface
+ * Tracks National VIDA currency circulation and dual vault system
+ */
+export interface NationalBlockReserves {
+  // NATIONAL STABILITY RESERVE (70%)
+  national_vault_vida_cap: number;
+  national_vault_locked: boolean;
+  national_vault_value_naira: number;
+  national_vault_value_usd: number;
+
+  // NATIONAL LIQUIDITY (30%) - Sub-section 1: VIDA CAP Liquidity (15%)
+  vida_cap_liquidity: number;
+  vida_cap_liquidity_reserved: number;
+  vida_cap_liquidity_available: number;
+  vida_cap_liquidity_value_naira: number;
+
+  // NATIONAL LIQUIDITY (30%) - Sub-section 2: National VIDA Pool (15%)
+  national_vida_pool_vida_cap: number;
+  national_vida_minted: number;
+  national_vida_circulating: number;
+  national_vida_burned: number;
+  national_vida_pool_value_naira: number;
+
+  // Exchange rates
+  vida_price_usd: number;
+  naira_rate: number;
+
+  // Metadata
+  last_updated: string;
 }
 
 /**
@@ -227,6 +261,85 @@ export async function fetchNationalReserve(): Promise<NationalReserve | null> {
 
     return nationalReserve;
   } catch (err) {
+    return null;
+  }
+}
+
+/**
+ * Fetch National Block Reserves data
+ * Returns dual vault system data (70% Stability + 30% Liquidity)
+ */
+export async function fetchNationalBlockReserves(): Promise<NationalBlockReserves | null> {
+  try {
+    console.log('[NATIONAL BLOCK] 🔄 Fetching national block reserves...');
+
+    if (!hasSupabase()) {
+      console.error('[NATIONAL BLOCK] ❌ Supabase client not available');
+      return null;
+    }
+
+    const { data, error } = await supabase
+      .from('national_block_reserves')
+      .select('*')
+      .eq('id', '00000000-0000-0000-0000-000000000002')
+      .single();
+
+    if (error) {
+      console.error('[NATIONAL BLOCK] ❌ Error fetching data:', error);
+      return null;
+    }
+
+    if (!data) {
+      console.error('[NATIONAL BLOCK] ❌ No data found');
+      return null;
+    }
+
+    console.log('[NATIONAL BLOCK] ✅ Data fetched successfully');
+
+    // Calculate derived values
+    const nationalVaultValueNaira = data.national_vault_vida_cap * data.vida_price_usd * data.naira_rate;
+    const nationalVaultValueUsd = data.national_vault_vida_cap * data.vida_price_usd;
+
+    const vidaCapLiquidityAvailable = data.vida_cap_liquidity - data.vida_cap_liquidity_reserved;
+    const vidaCapLiquidityValueNaira = data.vida_cap_liquidity * data.vida_price_usd * data.naira_rate;
+
+    const nationalVidaPoolValueNaira = data.national_vida_pool_vida_cap * data.vida_price_usd * data.naira_rate;
+
+    const reserves: NationalBlockReserves = {
+      // National Stability Reserve (70%)
+      national_vault_vida_cap: parseFloat(data.national_vault_vida_cap),
+      national_vault_locked: data.national_vault_locked,
+      national_vault_value_naira: nationalVaultValueNaira,
+      national_vault_value_usd: nationalVaultValueUsd,
+
+      // VIDA CAP Liquidity (15%)
+      vida_cap_liquidity: parseFloat(data.vida_cap_liquidity),
+      vida_cap_liquidity_reserved: parseFloat(data.vida_cap_liquidity_reserved),
+      vida_cap_liquidity_available: vidaCapLiquidityAvailable,
+      vida_cap_liquidity_value_naira: vidaCapLiquidityValueNaira,
+
+      // National VIDA Pool (15%)
+      national_vida_pool_vida_cap: parseFloat(data.national_vida_pool_vida_cap),
+      national_vida_minted: parseFloat(data.national_vida_minted),
+      national_vida_circulating: parseFloat(data.national_vida_circulating),
+      national_vida_burned: parseFloat(data.national_vida_burned),
+      national_vida_pool_value_naira: nationalVidaPoolValueNaira,
+
+      // Exchange rates
+      vida_price_usd: parseFloat(data.vida_price_usd),
+      naira_rate: parseFloat(data.naira_rate),
+
+      // Metadata
+      last_updated: data.last_updated,
+    };
+
+    console.log('[NATIONAL BLOCK] National Vault:', reserves.national_vault_vida_cap, 'VIDA CAP');
+    console.log('[NATIONAL BLOCK] VIDA CAP Liquidity:', reserves.vida_cap_liquidity, 'VIDA CAP');
+    console.log('[NATIONAL BLOCK] National VIDA Pool:', reserves.national_vida_pool_vida_cap, 'VIDA CAP');
+
+    return reserves;
+  } catch (err) {
+    console.error('[NATIONAL BLOCK] ❌ Exception:', err);
     return null;
   }
 }

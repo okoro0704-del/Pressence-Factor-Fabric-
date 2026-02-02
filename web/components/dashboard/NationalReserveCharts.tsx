@@ -47,22 +47,21 @@ export function NationalReserveCharts() {
             <span>Sovereign Share (50%): <span className="font-mono text-[#D4AF37]">{reserve.sovereign_share_vida} VIDA CAP</span></span>
           </div>
           <div className="mt-3 text-xs text-[#6b6b70]">
-            Total Value: <span className="font-mono text-[#00ff41]">₦{reserve.total_value_naira.toLocaleString()}</span> | <span className="font-mono text-[#3B82F6]"></span>
+            Total Value: <span className="font-mono text-[#00ff41]">₦{reserve.total_value_naira.toLocaleString()}</span> | <span className="font-mono text-[#3B82F6]">${reserve.total_value_usd.toLocaleString()}</span>
           </div>
         </div>
       </div>
 
-      {/* 70/15/15 LIQUIDITY SPLIT - TRIPLE-VAULT DISPLAY */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* CARD 1: NATIONAL VAULT (70%) - LOCKED RESERVES */}
+      {/* 70/30 LIQUIDITY SPLIT */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* CARD 1: NATIONAL VAULT (70%) */}
         <div className="relative bg-[#050505] rounded-xl p-6 border-2 border-[#D4AF37]/50 overflow-hidden group">
-          {/* Pulsing Gold Glow */}
           <div className="absolute inset-0 bg-gradient-to-br from-[#D4AF37]/20 to-transparent opacity-50 group-hover:opacity-100 transition-opacity duration-500" />
           <div className="absolute -top-20 -right-20 w-40 h-40 bg-[#D4AF37]/30 rounded-full blur-3xl animate-pulse" />
           
           <div className="relative z-10">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xs font-bold text-[#D4AF37] uppercase tracking-wider">Card 1: National Vault</h3>
+              <h3 className="text-xs font-bold text-[#D4AF37] uppercase tracking-wider">National Stability Reserve</h3>
               <span className="text-xs font-mono text-[#D4AF37]">70%</span>
             </div>
             <div className="space-y-2">
@@ -78,51 +77,29 @@ export function NationalReserveCharts() {
           </div>
         </div>
 
-        {/* CARD 2: NATIONAL LIQUIDITY (15%) - ACTIVE SUPPLY */}
-        <div className="relative bg-[#050505] rounded-xl p-6 border-2 border-[#D4AF37]/30 overflow-hidden group">
-          {/* Gold Glow */}
-          <div className="absolute inset-0 bg-gradient-to-br from-[#D4AF37]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-          <div className="absolute -top-20 -right-20 w-40 h-40 bg-[#D4AF37]/15 rounded-full blur-3xl" />
+        {/* CARD 2: NATIONAL LIQUIDITY (30%) */}
+        <div className="relative bg-[#050505] rounded-xl p-6 border-2 border-[#3b82f6]/50 overflow-hidden group">
+          <div className="absolute inset-0 bg-gradient-to-br from-[#3b82f6]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+          <div className="absolute -top-20 -right-20 w-40 h-40 bg-[#3b82f6]/20 rounded-full blur-3xl" />
           
           <div className="relative z-10">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xs font-bold text-[#D4AF37] uppercase tracking-wider">Card 2: National Liquidity</h3>
-              <span className="text-xs font-mono text-[#D4AF37]">15%</span>
+              <h3 className="text-xs font-bold text-[#3b82f6] uppercase tracking-wider">National Liquidity</h3>
+              <span className="text-xs font-mono text-[#3b82f6]">30%</span>
             </div>
             <div className="space-y-2">
-              <p className="text-5xl font-bold font-mono text-[#D4AF37] tracking-tight">
+              <p className="text-5xl font-bold font-mono text-[#3b82f6] tracking-tight">
                 {reserve.national_liquidity_vida.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
-              <p className="text-sm font-semibold text-[#D4AF37]">VIDA CAP</p>
-              <p className="text-xs text-[#6b6b70] mt-2 uppercase tracking-wide">⚡ Active Supply</p>
-              <div className="mt-3 pt-3 border-t border-[#D4AF37]/20">
-                <p className="text-xs text-[#6b6b70]">Value: <span className="font-mono text-[#D4AF37]">₦{(reserve.national_liquidity_vida * 1000 * 1400).toLocaleString()}</span></p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* CARD 3: NAIRA-VIDA (15%) - LOCAL CURRENCY */}
-        <div className="relative bg-[#050505] rounded-xl p-6 border-2 border-[#00ff41]/50 overflow-hidden group">
-          {/* Matrix Green Glow */}
-          <div className="absolute inset-0 bg-gradient-to-br from-[#00ff41]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-          <div className="absolute -top-20 -right-20 w-40 h-40 bg-[#00ff41]/20 rounded-full blur-3xl" />
-          
-          <div className="relative z-10">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xs font-bold text-[#00ff41] uppercase tracking-wider">Card 3: Naira-VIDA</h3>
-              <span className="text-xs font-mono text-[#00ff41]">15%</span>
-            </div>
-            <div className="space-y-2">
-              <p className="text-4xl font-bold font-mono text-[#00ff41] tracking-tight">
-                ₦{reserve.naira_vida_value_naira.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </p>
-              <p className="text-sm font-semibold text-[#6b6b70]">Nigerian Naira</p>
-              <p className="text-xs text-[#6b6b70] mt-2">
-                {reserve.naira_vida_amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VIDA × $1,000 × ₦1,400
-              </p>
-              <div className="mt-3 pt-3 border-t border-[#00ff41]/20">
-                <p className="text-xs text-[#6b6b70]">Local Currency Equivalent</p>
+              <p className="text-sm font-semibold text-[#3b82f6]">VIDA CAP</p>
+              <p className="text-xs text-[#6b6b70] mt-2 uppercase tracking-wide">💎 Dual System Reserve</p>
+              <div className="mt-3 pt-3 border-t border-[#3b82f6]/20 space-y-1">
+                <p className="text-xs text-[#6b6b70]">
+                  <span className="font-mono text-[#c0c0c0]">15%</span> VIDA CAP Liquidity
+                </p>
+                <p className="text-xs text-[#6b6b70]">
+                  <span className="font-mono text-[#3b82f6]">15%</span> National VIDA Pool
+                </p>
               </div>
             </div>
           </div>
@@ -150,7 +127,7 @@ export function NationalReserveCharts() {
         </div>
       </div>
 
-      {/* Genesis Hash Seal - Verification Footer */}
+      {/* Genesis Hash Seal */}
       <div className="bg-[#0d0d0f] rounded-lg p-4 border-2 border-[#D4AF37]/30">
         <h4 className="text-xs font-bold text-[#D4AF37] uppercase tracking-wider mb-2">🔐 Genesis Hash Seal</h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-[#6b6b70]">
