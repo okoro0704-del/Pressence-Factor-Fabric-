@@ -3,10 +3,12 @@
 import { useState, useEffect } from 'react';
 import { fetchCitizenVault, type CitizenVault } from '@/lib/supabaseTelemetry';
 import { getCitizenVaultData } from '@/lib/mockDataService';
+import { SendVidaModal } from './SendVidaModal';
 
 export function UserProfileBalance() {
   const [vaultData, setVaultData] = useState<CitizenVault | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showSendVida, setShowSendVida] = useState(false);
 
   const TOTAL_MINTED_CAP = 10;
   const ARCHITECT_SHARE = 5;
@@ -80,7 +82,7 @@ export function UserProfileBalance() {
 
       <div className="bg-[#16161a] rounded-xl p-6 border border-[#2a2a2e]">
         <h3 className="text-sm font-semibold text-[#e8c547] uppercase tracking-wider mb-6 text-center">
-          ⚖️ THE ARCHITECT'S TRIAD VAULT SYSTEM ⚖️
+          ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¯ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â THE ARCHITECT'S TRIAD VAULT SYSTEM ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¯ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â
         </h3>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -101,10 +103,10 @@ export function UserProfileBalance() {
                     USD: <span className="font-mono text-[#f5f5f5]">${liquidUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </p>
                   <p className="text-xs text-[#6b6b70]">
-                    Naira: <span className="font-mono text-[#00ff41]">₦{liquidNaira.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    Naira: <span className="font-mono text-[#00ff41]">ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦{liquidNaira.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </p>
                 </div>
-                <p className="text-[10px] text-[#6b6b70] mt-3 uppercase tracking-wide">💎 20% Spendable Reserve</p>
+                <p className="text-[10px] text-[#6b6b70] mt-3 uppercase tracking-wide">ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â½ 20% Spendable Reserve</p>
               </div>
             </div>
           </div>
@@ -114,7 +116,7 @@ export function UserProfileBalance() {
             <div className="relative z-10">
               <div className="flex items-center justify-between mb-3">
                 <h4 className="text-xs font-bold text-red-400 uppercase tracking-wider">Vault 2: Sovereign Lock</h4>
-                <span className="text-xs font-mono text-red-400 bg-red-500/20 px-2 py-1 rounded animate-pulse">🔒 LOCKED</span>
+                <span className="text-xs font-mono text-red-400 bg-red-500/20 px-2 py-1 rounded animate-pulse">ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚ÂÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ LOCKED</span>
               </div>
               <div className="space-y-2">
                 <p className="text-4xl font-bold font-mono text-red-400 tracking-tight">
@@ -126,10 +128,10 @@ export function UserProfileBalance() {
                     USD: <span className="font-mono text-[#f5f5f5]">${lockedUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </p>
                   <p className="text-xs text-[#6b6b70]">
-                    Naira: <span className="font-mono text-[#00ff41]">₦{lockedNaira.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    Naira: <span className="font-mono text-[#00ff41]">ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦{lockedNaira.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </p>
                 </div>
-                <p className="text-[10px] text-[#6b6b70] mt-3 uppercase tracking-wide">🛡️ 80% Sovereign Guarantee</p>
+                <p className="text-[10px] text-[#6b6b70] mt-3 uppercase tracking-wide">ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚ÂºÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¯ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â 80% Sovereign Guarantee</p>
               </div>
             </div>
           </div>
@@ -154,16 +156,16 @@ export function UserProfileBalance() {
             </div>
           </div>
           <p className="text-[10px] text-[#6b6b70] mt-2 text-center uppercase tracking-wide">
-            🌍 Locked Vault Releases at 1 Billion PFF Users
+            ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â Locked Vault Releases at 1 Billion PFF Users
           </p>
         </div>
 
         <div className="grid grid-cols-2 gap-3 mb-6">
           <button className="relative bg-gradient-to-br from-[#c9a227]/30 to-[#e8c547]/20 hover:from-[#c9a227]/40 hover:to-[#e8c547]/30 text-[#e8c547] font-bold py-3 px-4 rounded-lg border border-[#c9a227]/50 transition-all duration-300 group">
-            <span className="relative z-10 text-sm uppercase tracking-wider">💱 Swap</span>
+            <span className="relative z-10 text-sm uppercase tracking-wider">ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â± Swap</span>
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[#e8c547]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
           </button>
-          <button className="relative bg-gradient-to-br from-[#c9a227]/30 to-[#e8c547]/20 hover:from-[#c9a227]/40 hover:to-[#e8c547]/30 text-[#e8c547] font-bold py-3 px-4 rounded-lg border border-[#c9a227]/50 transition-all duration-300 group">
+          <button onClick={() => setShowSendVida(true)} className="relative bg-gradient-to-br from-[#c9a227]/30 to-[#e8c547]/20 hover:from-[#c9a227]/40 hover:to-[#e8c547]/30 text-[#e8c547] font-bold py-3 px-4 rounded-lg border border-[#c9a227]/50 transition-all duration-300 group">
             <span className="relative z-10 text-sm uppercase tracking-wider">📤 Send</span>
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[#e8c547]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
           </button>
@@ -171,7 +173,7 @@ export function UserProfileBalance() {
 
         <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
           <div className="flex items-start gap-3">
-            <span className="text-2xl">⚠️</span>
+            <span className="text-2xl">ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¯ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â</span>
             <div>
               <p className="text-xs font-bold text-red-400 uppercase tracking-wider mb-1">Transaction Limit Notice</p>
               <p className="text-xs text-[#6b6b70] leading-relaxed">
@@ -208,7 +210,7 @@ export function UserProfileBalance() {
               <div className="flex items-center justify-between">
                 <span className="text-xs text-[#6b6b70]">Naira Equivalent</span>
                 <span className="text-sm font-mono text-[#00ff41]">
-                  ₦{yourShareNaira.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦{yourShareNaira.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
               <div className="flex items-center justify-between pt-2 border-t border-[#2a2a2e]">
@@ -229,12 +231,19 @@ export function UserProfileBalance() {
             {vaultData.linked_bank_accounts.map((account, index) => (
               <div key={index} className="flex items-center justify-between p-3 bg-[#0d0d0f] rounded-lg border border-[#2a2a2e]">
                 <span className="text-sm text-[#f5f5f5]">{account}</span>
-                <span className="text-xs text-green-400">✓ Verified</span>
+                <span className="text-xs text-green-400">ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ Verified</span>
               </div>
             ))}
           </div>
         </div>
       )}
+
+      <SendVidaModal
+        isOpen={showSendVida}
+        onClose={() => setShowSendVida(false)}
+        senderPhone="+2348012345678"
+        maxAmount={1.0}
+      />
     </div>
   );
 }
