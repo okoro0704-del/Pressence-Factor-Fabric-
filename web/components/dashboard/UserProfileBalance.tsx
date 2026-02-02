@@ -15,6 +15,8 @@ export function UserProfileBalance() {
   const NAIRA_RATE = 1400;
   const SPENDABLE_PERCENT = 0.20;
   const LOCKED_PERCENT = 0.80;
+  const MILESTONE_TARGET = 1000000000;
+  const CURRENT_USERS = 1247;
 
   useEffect(() => {
     async function loadVaultData() {
@@ -49,9 +51,14 @@ export function UserProfileBalance() {
     );
   }
 
+  const liquidVida = ARCHITECT_SHARE * SPENDABLE_PERCENT;
+  const lockedVida = ARCHITECT_SHARE * LOCKED_PERCENT;
+  const liquidUSD = liquidVida * VIDA_PRICE_USD;
+  const liquidNaira = liquidVida * VIDA_PRICE_USD * NAIRA_RATE;
+  const lockedUSD = lockedVida * VIDA_PRICE_USD;
+  const lockedNaira = lockedVida * VIDA_PRICE_USD * NAIRA_RATE;
   const yourShareNaira = vaultData.personal_share_50 * VIDA_PRICE_USD * NAIRA_RATE;
-  const spendableNaira = vaultData.spendable_balance_vida * VIDA_PRICE_USD * NAIRA_RATE;
-  const lockedVida = vaultData.personal_share_50 * LOCKED_PERCENT;
+  const progressPercent = (CURRENT_USERS / MILESTONE_TARGET) * 100;
 
   return (
     <div className="space-y-6">
@@ -72,32 +79,112 @@ export function UserProfileBalance() {
       </div>
 
       <div className="bg-[#16161a] rounded-xl p-6 border border-[#2a2a2e]">
-        <h3 className="text-sm font-semibold text-[#6b6b70] uppercase tracking-wider mb-4">Your Balance</h3>
-        <div className="mb-6 p-4 bg-gradient-to-br from-[#c9a227]/20 to-[#e8c547]/10 rounded-lg border border-[#c9a227]/30">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-[#6b6b70]">Spendable Balance (National VIDA)</span>
-            <span className="text-xs text-[#6b6b70]">$VIDA</span>
+        <h3 className="text-sm font-semibold text-[#e8c547] uppercase tracking-wider mb-6 text-center">
+          ⚖️ THE ARCHITECT'S TRIAD VAULT SYSTEM ⚖️
+        </h3>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <div className="relative bg-gradient-to-br from-[#c9a227]/20 to-[#e8c547]/10 rounded-xl p-5 border-2 border-[#c9a227]/50 overflow-hidden group">
+            <div className="absolute -top-10 -right-10 w-32 h-32 bg-[#e8c547]/20 rounded-full blur-3xl animate-pulse" />
+            <div className="relative z-10">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-xs font-bold text-[#e8c547] uppercase tracking-wider">Vault 1: Liquid</h4>
+                <span className="text-xs font-mono text-green-400 bg-green-500/20 px-2 py-1 rounded">AVAILABLE NOW</span>
+              </div>
+              <div className="space-y-2">
+                <p className="text-4xl font-bold font-mono text-[#e8c547] tracking-tight">
+                  {liquidVida.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+                <p className="text-sm font-semibold text-[#e8c547]">VIDA CAP</p>
+                <div className="pt-3 border-t border-[#c9a227]/30 space-y-1">
+                  <p className="text-xs text-[#6b6b70]">
+                    USD: <span className="font-mono text-[#f5f5f5]">${liquidUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </p>
+                  <p className="text-xs text-[#6b6b70]">
+                    Naira: <span className="font-mono text-[#00ff41]">₦{liquidNaira.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </p>
+                </div>
+                <p className="text-[10px] text-[#6b6b70] mt-3 uppercase tracking-wide">💎 20% Spendable Reserve</p>
+              </div>
+            </div>
           </div>
-          <p className="text-4xl font-bold text-[#e8c547] mb-1">
-            {vaultData.spendable_balance_vida.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </p>
-          <p className="text-xs text-[#00ff41] font-mono mb-2">
-            ₦{spendableNaira.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </p>
-          <p className="text-xs text-[#6b6b70]">20% of Your Share (5 × 0.20 = 1 VIDA)</p>
+
+          <div className="relative bg-gradient-to-br from-red-500/10 to-red-600/5 rounded-xl p-5 border-2 border-red-500/30 overflow-hidden group">
+            <div className="absolute -top-10 -right-10 w-32 h-32 bg-red-500/10 rounded-full blur-3xl" />
+            <div className="relative z-10">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-xs font-bold text-red-400 uppercase tracking-wider">Vault 2: Sovereign Lock</h4>
+                <span className="text-xs font-mono text-red-400 bg-red-500/20 px-2 py-1 rounded animate-pulse">🔒 LOCKED</span>
+              </div>
+              <div className="space-y-2">
+                <p className="text-4xl font-bold font-mono text-red-400 tracking-tight">
+                  {lockedVida.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+                <p className="text-sm font-semibold text-red-400">VIDA CAP</p>
+                <div className="pt-3 border-t border-red-500/30 space-y-1">
+                  <p className="text-xs text-[#6b6b70]">
+                    USD: <span className="font-mono text-[#f5f5f5]">${lockedUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </p>
+                  <p className="text-xs text-[#6b6b70]">
+                    Naira: <span className="font-mono text-[#00ff41]">₦{lockedNaira.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </p>
+                </div>
+                <p className="text-[10px] text-[#6b6b70] mt-3 uppercase tracking-wide">🛡️ 80% Sovereign Guarantee</p>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div className="mb-6 p-4 bg-gradient-to-br from-red-500/10 to-red-600/5 rounded-lg border border-red-500/20">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-[#6b6b70]">Locked Until 1B Users</span>
-            <span className="text-xs text-red-400">🔒 LOCKED</span>
+        <div className="bg-[#0d0d0f] rounded-xl p-5 border border-[#2a2a2e] mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-xs font-bold text-[#e8c547] uppercase tracking-wider">Progress to Global Release</h4>
+            <span className="text-xs font-mono text-[#6b6b70]">{CURRENT_USERS.toLocaleString()} / 1B Users</span>
           </div>
-          <p className="text-2xl font-bold text-red-400 mb-1">
-            {lockedVida.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VIDA CAP
+          <div className="relative w-full h-6 bg-[#16161a] rounded-full overflow-hidden border border-[#2a2a2e]">
+            <div 
+              className="absolute top-0 left-0 h-full bg-gradient-to-r from-[#c9a227] to-[#e8c547] rounded-full transition-all duration-1000"
+              style={{ width: `${Math.max(progressPercent, 0.5)}%` }}
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-pulse" />
+            </div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-[10px] font-bold text-[#f5f5f5] drop-shadow-lg">
+                {progressPercent.toFixed(6)}%
+              </span>
+            </div>
+          </div>
+          <p className="text-[10px] text-[#6b6b70] mt-2 text-center uppercase tracking-wide">
+            🌍 Locked Vault Releases at 1 Billion PFF Users
           </p>
-          <p className="text-xs text-[#6b6b70]">80% of Your Share (5 × 0.80 = 4 VIDA)</p>
         </div>
 
+        <div className="grid grid-cols-2 gap-3 mb-6">
+          <button className="relative bg-gradient-to-br from-[#c9a227]/30 to-[#e8c547]/20 hover:from-[#c9a227]/40 hover:to-[#e8c547]/30 text-[#e8c547] font-bold py-3 px-4 rounded-lg border border-[#c9a227]/50 transition-all duration-300 group">
+            <span className="relative z-10 text-sm uppercase tracking-wider">💱 Swap</span>
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[#e8c547]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+          </button>
+          <button className="relative bg-gradient-to-br from-[#c9a227]/30 to-[#e8c547]/20 hover:from-[#c9a227]/40 hover:to-[#e8c547]/30 text-[#e8c547] font-bold py-3 px-4 rounded-lg border border-[#c9a227]/50 transition-all duration-300 group">
+            <span className="relative z-10 text-sm uppercase tracking-wider">📤 Send</span>
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[#e8c547]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+          </button>
+        </div>
+
+        <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <span className="text-2xl">⚠️</span>
+            <div>
+              <p className="text-xs font-bold text-red-400 uppercase tracking-wider mb-1">Transaction Limit Notice</p>
+              <p className="text-xs text-[#6b6b70] leading-relaxed">
+                Swap and Send operations are limited to <span className="font-mono text-[#e8c547]">1.00 VIDA CAP</span> (Vault 1: Liquid). 
+                Attempting to move more will trigger: <span className="font-mono text-red-400">"Asset Locked: Requires 1B User Milestone for Release."</span>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-[#16161a] rounded-xl p-6 border border-[#2a2a2e]">
+        <h3 className="text-sm font-semibold text-[#6b6b70] uppercase tracking-wider mb-4">Vault Summary</h3>
         <div className="space-y-4">
           <div className="p-4 bg-[#0d0d0f] rounded-lg border border-[#2a2a2e]">
             <div className="flex items-center justify-between mb-2">
