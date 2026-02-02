@@ -7,6 +7,8 @@
 CREATE TABLE IF NOT EXISTS citizens (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   pff_id            TEXT UNIQUE NOT NULL,
+  full_name         TEXT,
+  alias             TEXT,
   vitalization_status TEXT NOT NULL DEFAULT 'pending',
   hardware_anchor_hash TEXT NOT NULL,
   public_key        TEXT NOT NULL,
@@ -18,6 +20,16 @@ CREATE TABLE IF NOT EXISTS citizens (
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(device_id, key_id)
 );
+-- Add full_name/alias if table already existed without them (no-op if columns exist)
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'citizens' AND column_name = 'full_name') THEN
+    ALTER TABLE citizens ADD COLUMN full_name TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'citizens' AND column_name = 'alias') THEN
+    ALTER TABLE citizens ADD COLUMN alias TEXT;
+  END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS idx_citizens_device_key ON citizens(device_id, key_id);
 CREATE INDEX IF NOT EXISTS idx_citizens_pff_id ON citizens(pff_id);
 CREATE INDEX IF NOT EXISTS idx_citizens_vitalization ON citizens(vitalization_status);

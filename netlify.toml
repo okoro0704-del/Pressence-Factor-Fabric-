@@ -1,6 +1,0 @@
-# PFF — Netlify (monorepo)
-# REQUIRED: Site settings → Build & deploy → Base directory = web
-# Then Netlify builds from web/ and uses web/netlify.toml. Without this, you get "Page Not Found".
-
-[build.environment]
-  NODE_VERSION = "18"

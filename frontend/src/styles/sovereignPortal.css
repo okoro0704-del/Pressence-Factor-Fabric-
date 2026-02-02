@@ -1,0 +1,767 @@
+/**
+ * PFF Frontend — Sovereign Educational Portal Styles
+ * Unicorn of Trust nebula background with high-contrast professional text
+ * Architect: Isreal Okoro (mrfundzman)
+ */
+
+/* ========================================================================
+   GLOBAL THEME - UNICORN OF TRUST NEBULA
+   ======================================================================== */
+
+:root {
+  /* Nebula Color Palette */
+  --nebula-deep-purple: #1a0b2e;
+  --nebula-royal-purple: #2d1b4e;
+  --nebula-cosmic-blue: #3d2e7c;
+  --nebula-electric-violet: #6b4ce6;
+  --nebula-celestial-pink: #d946ef;
+  --nebula-stardust-gold: #fbbf24;
+  --nebula-pure-white: #ffffff;
+  
+  /* High-Contrast Text Colors */
+  --text-primary: #ffffff;
+  --text-secondary: #e0e0e0;
+  --text-accent: #fbbf24;
+  --text-locked: #ef4444;
+  
+  /* UI Elements */
+  --border-glow: rgba(107, 76, 230, 0.5);
+  --card-bg: rgba(29, 11, 46, 0.85);
+  --card-border: rgba(107, 76, 230, 0.3);
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--nebula-deep-purple);
+  color: var(--text-primary);
+  overflow-x: hidden;
+}
+
+/* Unicorn of Trust Nebula Background */
+.sovereign-portal {
+  min-height: 100vh;
+  background: 
+    radial-gradient(ellipse at 20% 30%, var(--nebula-electric-violet) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 70%, var(--nebula-celestial-pink) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, var(--nebula-cosmic-blue) 0%, transparent 70%),
+    linear-gradient(180deg, var(--nebula-deep-purple) 0%, var(--nebula-royal-purple) 100%);
+  background-attachment: fixed;
+  position: relative;
+}
+
+/* Animated stars overlay */
+.sovereign-portal::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: 
+    radial-gradient(2px 2px at 20% 30%, white, transparent),
+    radial-gradient(2px 2px at 60% 70%, white, transparent),
+    radial-gradient(1px 1px at 50% 50%, white, transparent),
+    radial-gradient(1px 1px at 80% 10%, white, transparent),
+    radial-gradient(2px 2px at 90% 60%, white, transparent);
+  background-size: 200% 200%;
+  animation: stars 60s linear infinite;
+  opacity: 0.3;
+  pointer-events: none;
+  z-index: 0;
+}
+
+@keyframes stars {
+  0% { background-position: 0% 0%; }
+  100% { background-position: 100% 100%; }
+}
+
+/* ========================================================================
+   COUNTDOWN CLOCK - MASSIVE CENTER-ALIGNED
+   ======================================================================== */
+
+.countdown-clock {
+  position: relative;
+  z-index: 10;
+  text-align: center;
+  padding: 3rem 2rem;
+}
+
+.countdown-clock.large {
+  margin: 4rem auto;
+  max-width: 1200px;
+}
+
+.countdown-title {
+  font-size: 3rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  background: linear-gradient(135deg, var(--nebula-stardust-gold), var(--nebula-celestial-pink), var(--nebula-electric-violet));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 1.5rem;
+  text-shadow: 0 0 30px rgba(251, 191, 36, 0.5);
+  animation: titleGlow 3s ease-in-out infinite;
+}
+
+@keyframes titleGlow {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.3); }
+}
+
+.countdown-subtitle {
+  font-size: 1.25rem;
+  color: var(--text-secondary);
+  margin-bottom: 3rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+}
+
+.countdown-display {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 2rem;
+  margin: 3rem 0;
+  flex-wrap: wrap;
+}
+
+.countdown-unit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 120px;
+}
+
+.countdown-value {
+  font-size: 5rem;
+  font-weight: 900;
+  color: var(--text-primary);
+  line-height: 1;
+  text-shadow: 
+    0 0 20px rgba(107, 76, 230, 0.8),
+    0 0 40px rgba(107, 76, 230, 0.5);
+  font-family: 'Courier New', monospace;
+  background: linear-gradient(180deg, #ffffff 0%, var(--nebula-electric-violet) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.countdown-label {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--text-accent);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  margin-top: 0.5rem;
+}
+
+.countdown-separator {
+  font-size: 4rem;
+  font-weight: 900;
+  color: var(--nebula-electric-violet);
+  opacity: 0.6;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+.countdown-message {
+  font-size: 1.125rem;
+  color: var(--text-locked);
+  margin-top: 2rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  padding: 1rem 2rem;
+  border: 2px solid var(--text-locked);
+  border-radius: 12px;
+  display: inline-block;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+/* Compact Countdown */
+.countdown-clock.compact {
+  padding: 1rem;
+  margin: 0;
+}
+
+.countdown-compact-display {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  justify-content: center;
+}
+
+.countdown-compact-display .countdown-label {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.countdown-compact-display .countdown-time {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-accent);
+  font-family: 'Courier New', monospace;
+}
+
+/* Unveiled State */
+.countdown-clock.unveiled {
+  padding: 2rem;
+}
+
+.countdown-clock.unveiled .countdown-title {
+  font-size: 3.5rem;
+  margin-bottom: 1rem;
+}
+
+.countdown-clock.unveiled .countdown-status {
+  font-size: 2rem;
+  font-weight: 900;
+  color: #10b981;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  text-shadow: 0 0 30px rgba(16, 185, 129, 0.8);
+}
+
+/* ========================================================================
+   PAGE LAYOUT
+   ======================================================================== */
+
+.page-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem;
+  position: relative;
+  z-index: 10;
+}
+
+.page-header {
+  text-align: center;
+  margin-bottom: 4rem;
+}
+
+.page-title {
+  font-size: 3rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background: linear-gradient(135deg, var(--nebula-stardust-gold), var(--nebula-celestial-pink));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 1rem;
+}
+
+.page-subtitle {
+  font-size: 1.25rem;
+  color: var(--text-secondary);
+  font-weight: 400;
+  max-width: 800px;
+  margin: 0 auto;
+  line-height: 1.6;
+}
+
+/* ========================================================================
+   LEXICON PAGE
+   ======================================================================== */
+
+.lexicon-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+  gap: 2rem;
+  margin-bottom: 4rem;
+}
+
+.lexicon-card {
+  background: var(--card-bg);
+  border: 2px solid var(--card-border);
+  border-radius: 16px;
+  padding: 2rem;
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+}
+
+.lexicon-card:hover {
+  border-color: var(--nebula-electric-violet);
+  box-shadow: 0 0 30px rgba(107, 76, 230, 0.3);
+  transform: translateY(-4px);
+}
+
+.lexicon-card-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.lexicon-icon {
+  font-size: 3rem;
+}
+
+.lexicon-title-group {
+  flex: 1;
+}
+
+.lexicon-term {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.25rem 0;
+}
+
+.lexicon-acronym {
+  display: inline-block;
+  background: var(--nebula-electric-violet);
+  color: var(--text-primary);
+  padding: 0.25rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+.lexicon-definition {
+  font-size: 1.125rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 1.5rem;
+}
+
+.lexicon-details-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-accent);
+  margin-bottom: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.lexicon-details-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.lexicon-details-list li {
+  padding: 0.5rem 0;
+  padding-left: 1.5rem;
+  position: relative;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.lexicon-details-list li::before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  color: var(--nebula-electric-violet);
+  font-weight: 700;
+}
+
+.lexicon-footer {
+  text-align: center;
+  padding: 2rem;
+  border-top: 2px solid var(--card-border);
+}
+
+.lexicon-footer-text {
+  font-size: 1.125rem;
+  color: var(--text-secondary);
+}
+
+/* ========================================================================
+   VITALIZATION PAGE
+   ======================================================================== */
+
+.vitalization-hero {
+  margin-bottom: 4rem;
+}
+
+.cohesion-rule {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(217, 70, 239, 0.2));
+  border: 3px solid var(--text-locked);
+  border-radius: 16px;
+  padding: 2rem;
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  backdrop-filter: blur(10px);
+}
+
+.cohesion-icon {
+  font-size: 4rem;
+}
+
+.cohesion-title {
+  font-size: 2rem;
+  font-weight: 900;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.cohesion-description {
+  font-size: 1.125rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.handshake-timeline {
+  margin-bottom: 4rem;
+  position: relative;
+}
+
+.timeline-bar {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--card-border);
+  transform: translateX(-50%);
+  z-index: 0;
+}
+
+.handshake-phase {
+  position: relative;
+  margin-bottom: 3rem;
+  z-index: 1;
+}
+
+.phase-number {
+  text-align: center;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-accent);
+  margin-bottom: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.phase-card {
+  background: var(--card-bg);
+  border: 2px solid var(--phase-color, var(--card-border));
+  border-radius: 16px;
+  padding: 2rem;
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+}
+
+.phase-card:hover {
+  box-shadow: 0 0 30px var(--phase-color);
+  transform: translateY(-4px);
+}
+
+.phase-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.phase-icon {
+  font-size: 2.5rem;
+}
+
+.phase-name {
+  flex: 1;
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.phase-duration {
+  background: var(--phase-color);
+  color: var(--text-primary);
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-weight: 700;
+  font-family: 'Courier New', monospace;
+}
+
+.phase-description {
+  font-size: 1.125rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 1.5rem;
+}
+
+.phase-technical-title {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--text-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+}
+
+.phase-technical-details {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  font-style: italic;
+}
+
+.phase-connector {
+  text-align: center;
+  margin: 1rem 0;
+}
+
+.connector-arrow {
+  font-size: 2rem;
+  color: var(--nebula-electric-violet);
+  animation: bounce 2s ease-in-out infinite;
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(10px); }
+}
+
+.vitalization-security {
+  margin-bottom: 4rem;
+}
+
+.security-title {
+  font-size: 2rem;
+  font-weight: 900;
+  text-align: center;
+  color: var(--text-primary);
+  margin-bottom: 2rem;
+}
+
+.security-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 2rem;
+}
+
+.security-card {
+  background: var(--card-bg);
+  border: 2px solid var(--card-border);
+  border-radius: 16px;
+  padding: 2rem;
+  text-align: center;
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+}
+
+.security-card:hover {
+  border-color: var(--nebula-electric-violet);
+  box-shadow: 0 0 30px rgba(107, 76, 230, 0.3);
+}
+
+.security-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.security-card-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 0.75rem;
+}
+
+.security-card-description {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.vitalization-flow {
+  margin-bottom: 4rem;
+}
+
+.flow-title {
+  font-size: 2rem;
+  font-weight: 900;
+  text-align: center;
+  color: var(--text-primary);
+  margin-bottom: 2rem;
+}
+
+.flow-diagram {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 2rem;
+  background: var(--card-bg);
+  border: 2px solid var(--card-border);
+  border-radius: 16px;
+  backdrop-filter: blur(10px);
+}
+
+.flow-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 150px;
+}
+
+.flow-step-number {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--nebula-electric-violet);
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-size: 1.25rem;
+}
+
+.flow-step-content h4 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.25rem 0;
+  text-align: center;
+}
+
+.flow-step-content p {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin: 0;
+  text-align: center;
+}
+
+.flow-arrow {
+  font-size: 2rem;
+  color: var(--nebula-electric-violet);
+  font-weight: 900;
+}
+
+.vitalization-footer {
+  text-align: center;
+  padding: 2rem;
+  border-top: 2px solid var(--card-border);
+}
+
+.vitalization-footer-text {
+  font-size: 1.125rem;
+  color: var(--text-secondary);
+}
+
+/* ========================================================================
+   NATIONS PAGE
+   ======================================================================== */
+
+.projection-engine {
+  background: var(--card-bg);
+  border: 2px solid var(--card-border);
+  border-radius: 16px;
+  padding: 2rem;
+  margin-bottom: 3rem;
+  backdrop-filter: blur(10px);
+}
+
+.projection-title {
+  font-size: 2rem;
+  font-weight: 900;
+  color: var(--text-primary);
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+.population-slider-container {
+  margin-bottom: 2rem;
+}
+
+.slider-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.slider-label-text {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.slider-value {
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: var(--text-accent);
+  font-family: 'Courier New', monospace;
+}
+
+.population-slider {
+  width: 100%;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--card-border);
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.population-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--nebula-electric-violet);
+  cursor: pointer;
+  box-shadow: 0 0 10px rgba(107, 76, 230, 0.8);
+}
+
+.population-slider::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--nebula-electric-violet);
+  cursor: pointer;
+  box-shadow: 0 0 10px rgba(107, 76, 230, 0.8);
+  border: none;
+}
+
+.slider-markers {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.projection-formula {
+  margin-top: 2rem;
+}
+
+.formula-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-accent);
+  margin-bottom: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.formula-display {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.formula-display code {
+  font-family: 'Courier New', monospace;
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+

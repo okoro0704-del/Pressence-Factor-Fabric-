@@ -1,0 +1,799 @@
+/**
+ * PFF Frontend — Sovereign Portal Extended Styles
+ * Additional styles for Nations and Sentinel pages
+ * Architect: Isreal Okoro (mrfundzman)
+ */
+
+/* ========================================================================
+   NATIONS PAGE - WEALTH BREAKDOWN
+   ======================================================================== */
+
+.wealth-breakdown {
+  margin-bottom: 3rem;
+}
+
+.breakdown-title {
+  font-size: 2rem;
+  font-weight: 900;
+  text-align: center;
+  color: var(--text-primary);
+  margin-bottom: 2rem;
+}
+
+.breakdown-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
+}
+
+.breakdown-card {
+  background: var(--card-bg);
+  border: 2px solid var(--card-border);
+  border-radius: 16px;
+  padding: 2rem;
+  text-align: center;
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+}
+
+.breakdown-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 0 30px rgba(107, 76, 230, 0.3);
+}
+
+.breakdown-card.total {
+  border-color: var(--nebula-stardust-gold);
+}
+
+.breakdown-card.nation {
+  border-color: var(--nebula-electric-violet);
+}
+
+.breakdown-card.citizen {
+  border-color: var(--nebula-celestial-pink);
+}
+
+.breakdown-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.breakdown-card-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin-bottom: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.breakdown-value {
+  font-size: 3rem;
+  font-weight: 900;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+  font-family: 'Courier New', monospace;
+}
+
+.breakdown-exact {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  font-family: 'Courier New', monospace;
+}
+
+/* Vault Split */
+.vault-split {
+  margin-bottom: 3rem;
+}
+
+.vault-title {
+  font-size: 2rem;
+  font-weight: 900;
+  text-align: center;
+  color: var(--text-primary);
+  margin-bottom: 2rem;
+}
+
+.vault-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 2rem;
+}
+
+.vault-card {
+  background: var(--card-bg);
+  border: 2px solid var(--card-border);
+  border-radius: 16px;
+  padding: 2rem;
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+}
+
+.vault-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 0 30px rgba(107, 76, 230, 0.3);
+}
+
+.vault-card.reserve {
+  border-color: #10b981;
+}
+
+.vault-card.escrow {
+  border-color: #f59e0b;
+}
+
+.vault-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.vault-icon {
+  font-size: 2.5rem;
+}
+
+.vault-name {
+  flex: 1;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.vault-percentage {
+  background: var(--nebula-electric-violet);
+  color: var(--text-primary);
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-weight: 900;
+  font-size: 1.25rem;
+}
+
+.vault-amount {
+  font-size: 2.5rem;
+  font-weight: 900;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+  font-family: 'Courier New', monospace;
+  text-align: center;
+}
+
+.vault-exact {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  font-family: 'Courier New', monospace;
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.vault-description {
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--card-border);
+}
+
+.vault-description p {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* Per-Citizen Breakdown */
+.per-citizen {
+  margin-bottom: 3rem;
+}
+
+.per-citizen-title {
+  font-size: 2rem;
+  font-weight: 900;
+  text-align: center;
+  color: var(--text-primary);
+  margin-bottom: 2rem;
+}
+
+.per-citizen-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.5rem;
+}
+
+.per-citizen-card {
+  background: var(--card-bg);
+  border: 2px solid var(--card-border);
+  border-radius: 12px;
+  padding: 1.5rem;
+  text-align: center;
+  backdrop-filter: blur(10px);
+}
+
+.per-citizen-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.75rem;
+}
+
+.per-citizen-value {
+  font-size: 2rem;
+  font-weight: 900;
+  color: var(--text-accent);
+  font-family: 'Courier New', monospace;
+}
+
+.nations-footer {
+  text-align: center;
+  padding: 2rem;
+  border-top: 2px solid var(--card-border);
+}
+
+.nations-footer-text {
+  font-size: 1.125rem;
+  color: var(--text-secondary);
+}
+
+/* ========================================================================
+   SENTINEL PAGE
+   ======================================================================== */
+
+.sentinel-overview {
+  background: var(--card-bg);
+  border: 2px solid var(--card-border);
+  border-radius: 16px;
+  padding: 2rem;
+  margin-bottom: 3rem;
+  backdrop-filter: blur(10px);
+}
+
+.overview-title {
+  font-size: 2rem;
+  font-weight: 900;
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.overview-description {
+  font-size: 1.125rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  text-align: center;
+  max-width: 900px;
+  margin: 0 auto 2rem auto;
+}
+
+.overview-features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+.overview-feature {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+}
+
+.overview-feature-icon {
+  font-size: 2rem;
+}
+
+.overview-feature-text {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.overview-feature-text strong {
+  color: var(--text-primary);
+}
+
+/* Sentinel Tiers */
+.sentinel-tiers {
+  margin-bottom: 3rem;
+}
+
+.tiers-title {
+  font-size: 2rem;
+  font-weight: 900;
+  text-align: center;
+  color: var(--text-primary);
+  margin-bottom: 2rem;
+}
+
+.tiers-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 2rem;
+}
+
+.tier-card {
+  background: var(--card-bg);
+  border: 3px solid var(--tier-color, var(--card-border));
+  border-radius: 16px;
+  padding: 2rem;
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.tier-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 0 40px var(--tier-color);
+}
+
+.tier-header {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.tier-icon {
+  font-size: 3rem;
+  margin-bottom: 0.5rem;
+}
+
+.tier-name {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.tier-price {
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+.tier-price-currency {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-accent);
+  vertical-align: super;
+}
+
+.tier-price-amount {
+  font-size: 4rem;
+  font-weight: 900;
+  color: var(--text-primary);
+  font-family: 'Courier New', monospace;
+}
+
+.tier-price-label {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-left: 0.5rem;
+}
+
+.tier-devices {
+  text-align: center;
+  font-size: 1.25rem;
+  color: var(--text-accent);
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 2px solid var(--card-border);
+}
+
+.tier-features {
+  margin-bottom: 1.5rem;
+  flex: 1;
+}
+
+.tier-features-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.75rem;
+}
+
+.tier-features-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.tier-features-list li {
+  padding: 0.5rem 0;
+  padding-left: 1.5rem;
+  position: relative;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  font-size: 0.95rem;
+}
+
+.tier-features-list li::before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  color: var(--tier-color);
+  font-weight: 700;
+}
+
+.tier-revenue {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+}
+
+.tier-revenue-title {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--text-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.75rem;
+}
+
+.tier-revenue-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.tier-revenue-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.875rem;
+}
+
+.tier-revenue-label {
+  color: var(--text-secondary);
+}
+
+.tier-revenue-value {
+  color: var(--text-primary);
+  font-weight: 700;
+  font-family: 'Courier New', monospace;
+}
+
+.tier-activate-button {
+  width: 100%;
+  padding: 1rem 2rem;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  background: linear-gradient(135deg, var(--tier-color), var(--nebula-electric-violet));
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.tier-activate-button:hover:not(.locked) {
+  transform: translateY(-2px);
+  box-shadow: 0 0 20px var(--tier-color);
+}
+
+.tier-activate-button.locked {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* Sentinel Notice */
+.sentinel-notice {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(217, 70, 239, 0.2));
+  border: 2px solid var(--text-accent);
+  border-radius: 16px;
+  padding: 2rem;
+  margin-bottom: 3rem;
+  backdrop-filter: blur(10px);
+}
+
+.notice-title {
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.notice-description {
+  font-size: 1.125rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  text-align: center;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.sentinel-footer {
+  text-align: center;
+  padding: 2rem;
+  border-top: 2px solid var(--card-border);
+}
+
+.sentinel-footer-text {
+  font-size: 1.125rem;
+  color: var(--text-secondary);
+}
+
+/* ========================================================================
+   HOME PAGE
+   ======================================================================== */
+
+.home-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem;
+  position: relative;
+  z-index: 10;
+}
+
+.home-hero {
+  text-align: center;
+  margin-bottom: 4rem;
+}
+
+.home-logo {
+  margin-bottom: 3rem;
+}
+
+.logo-icon {
+  font-size: 6rem;
+  margin-bottom: 1rem;
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-20px); }
+}
+
+.logo-text {
+  font-size: 3.5rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  background: linear-gradient(135deg, var(--nebula-stardust-gold), var(--nebula-celestial-pink), var(--nebula-electric-violet));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin: 0 0 0.5rem 0;
+}
+
+.logo-tagline {
+  font-size: 1.5rem;
+  color: var(--text-secondary);
+  font-weight: 300;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+.stasis-notice {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(217, 70, 239, 0.2));
+  border: 3px solid var(--text-locked);
+  border-radius: 16px;
+  padding: 2rem;
+  margin-top: 3rem;
+  backdrop-filter: blur(10px);
+}
+
+.stasis-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+}
+
+.stasis-title {
+  font-size: 2rem;
+  font-weight: 900;
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+}
+
+.stasis-description {
+  font-size: 1.125rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+/* Home Navigation */
+.home-navigation {
+  margin-bottom: 4rem;
+}
+
+.navigation-title {
+  font-size: 2.5rem;
+  font-weight: 900;
+  text-align: center;
+  color: var(--text-primary);
+  margin-bottom: 2rem;
+}
+
+.navigation-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 2rem;
+}
+
+.nav-card {
+  background: var(--card-bg);
+  border: 2px solid var(--card-border);
+  border-radius: 16px;
+  padding: 2rem;
+  text-decoration: none;
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.nav-card:hover {
+  border-color: var(--nebula-electric-violet);
+  box-shadow: 0 0 30px rgba(107, 76, 230, 0.5);
+  transform: translateY(-8px);
+}
+
+.nav-card-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+}
+
+.nav-card-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 1rem 0;
+}
+
+.nav-card-description {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Home Features */
+.home-features {
+  margin-bottom: 4rem;
+}
+
+.features-title {
+  font-size: 2.5rem;
+  font-weight: 900;
+  text-align: center;
+  color: var(--text-primary);
+  margin-bottom: 2rem;
+}
+
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 2rem;
+}
+
+.feature-card {
+  background: var(--card-bg);
+  border: 2px solid var(--card-border);
+  border-radius: 16px;
+  padding: 2rem;
+  text-align: center;
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+}
+
+.feature-card:hover {
+  border-color: var(--nebula-electric-violet);
+  box-shadow: 0 0 30px rgba(107, 76, 230, 0.3);
+  transform: translateY(-4px);
+}
+
+.feature-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.feature-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 1rem 0;
+}
+
+.feature-description {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Home Footer */
+.home-footer {
+  text-align: center;
+  padding: 3rem 2rem;
+  border-top: 2px solid var(--card-border);
+}
+
+.footer-text {
+  font-size: 1.25rem;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.footer-subtext {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+/* ========================================================================
+   RESPONSIVE DESIGN
+   ======================================================================== */
+
+@media (max-width: 768px) {
+  .page-title {
+    font-size: 2rem;
+  }
+
+  .logo-text {
+    font-size: 2rem;
+  }
+
+  .logo-tagline {
+    font-size: 1rem;
+  }
+
+  .countdown-title {
+    font-size: 2rem;
+  }
+
+  .countdown-value {
+    font-size: 3rem;
+  }
+
+  .countdown-display {
+    gap: 1rem;
+  }
+
+  .countdown-unit {
+    min-width: 80px;
+  }
+
+  .lexicon-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tiers-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .vault-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .flow-diagram {
+    flex-direction: column;
+  }
+
+  .flow-arrow {
+    transform: rotate(90deg);
+  }
+
+  .navigation-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .features-grid {
+    grid-template-columns: 1fr;
+  }
+}
+

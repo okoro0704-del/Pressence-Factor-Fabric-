@@ -1,0 +1,28 @@
+// PresenceHandshake.js
+import { useEffect, useState } from 'react';
+
+const usePresenceHandshake = () => {
+  const [visitorName, setVisitorName] = useState(null);
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const pHash = urlParams.get('p_hash');
+
+    if (pHash) {
+      // 1. Decrypt the hash (In reality, this pings your Supabase to get the name)
+      // For testing, let's assume the hash contains the name
+      const decodedName = atob(pHash); // Simple base64 for MVP testing
+      setVisitorName(decodedName);
+      
+      // 2. Trigger the "Supreme" Greeting
+      triggerSovrynWow(decodedName);
+    }
+  }, []);
+
+  return visitorName;
+};
+
+const triggerSovrynWow = (name) => {
+  console.log(`SOVRYN: "Welcome, ${name}. I have been expecting your presence."`);
+  // This triggers your Chatbox animation/voice
+};

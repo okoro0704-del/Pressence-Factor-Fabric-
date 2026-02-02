@@ -23,7 +23,10 @@ app.use('/vitalize', vitalizeRouter);
 app.use('/vault', vaultRouter);
 app.use('/guardian', guardianRouter);
 app.use('/economic', economicRouter);
+// TODO: Add import { masterDashboardRouter } from './routes/masterDashboard'; at top
+// app.use('/api/master-dashboard', masterDashboardRouter);
 
 app.listen(config.port, () => {
   console.log(`PFF backend listening on ${config.port}`);
+  // console.log('🏛️ Master Dashboard (Architect\'s Eye) routes registered at /api/master-dashboard');
 });

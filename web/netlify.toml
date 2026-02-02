@@ -10,8 +10,8 @@
   publish = "out"
 
 [build.environment]
-  # Node.js version
-  NODE_VERSION = "18"
+  # Node.js version (Next.js 16 requires >=20.9.0)
+  NODE_VERSION = "20.10.0"
 
   # Disable Next.js telemetry
   NEXT_TELEMETRY_DISABLED = "1"

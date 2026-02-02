@@ -1,0 +1,44 @@
+// BusinessTerminal.js
+import React, { useState } from 'react';
+
+const BusinessTerminal = () => {
+  const [status, setStatus] = useState("Connect Scanner to Begin");
+
+  const connectScanner = async () => {
+    try {
+      // Connect to the USB Fingerprint Scanner
+      const device = await navigator.usb.requestDevice({ filters: [{ vendorId: 0xXXXX }] }); // Replace with your scanner's Vendor ID
+      await device.open();
+      await device.selectConfiguration(1);
+      await device.claimInterface(0);
+      setStatus("Scanner Connected. Awaiting Presence...");
+    } catch (err) {
+      setStatus("Connection Failed: " + err.message);
+    }
+  };
+
+  return (
+    <div style={{ padding: '40px', background: '#0a0a0a', color: '#fff', borderRadius: '20px' }}>
+      <h2>VITALIE BUSINESS TERMINAL</h2>
+      <p>Status: <span style={{ color: '#00ff00' }}>{status}</span></p>
+      
+      <div style={{ margin: '50px 0', border: '2px dashed #333', height: '200px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <button onClick={connectScanner} style={{ padding: '15px 30px', borderRadius: '10px', background: '#fbc02d', fontWeight: 'bold' }}>
+          ACTIVATE USB SCANNER
+        </button>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+        <div style={{ background: '#1a1a1a', padding: '20px', borderRadius: '10px' }}>
+          <h4>MINTING CAPACITY</h4>
+          <h1>50/50</h1>
+          <p>State/Citizen Split Active</p>
+        </div>
+        <div style={{ background: '#1a1a1a', padding: '20px', borderRadius: '10px' }}>
+          <h4>TERMINAL ID</h4>
+          <p>LAGOS-MAIN-001</p>
+        </div>
+      </div>
+    </div>
+  );
+};
