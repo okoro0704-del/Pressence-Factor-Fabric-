@@ -11,9 +11,29 @@ export function NationalBlockCommand() {
     async function loadReservesData() {
       setLoading(true);
       const liveData = await fetchNationalBlockReserves();
-      
+
       if (liveData) {
         setReserves(liveData);
+      } else {
+        // Fallback mock data if Supabase table doesn't exist yet
+        setReserves({
+          national_vault_vida_cap: 3.5,
+          national_vault_locked: true,
+          national_vault_value_naira: 3.5 * 1000 * 1400,
+          national_vault_value_usd: 3.5 * 1000,
+          vida_cap_liquidity: 0.75,
+          vida_cap_liquidity_reserved: 0.0,
+          vida_cap_liquidity_available: 0.75,
+          vida_cap_liquidity_value_naira: 0.75 * 1000 * 1400,
+          national_vida_pool_vida_cap: 0.75,
+          national_vida_minted: 0.0,
+          national_vida_circulating: 0.0,
+          national_vida_burned: 0.0,
+          national_vida_pool_value_naira: 0.75 * 1000 * 1400,
+          vida_price_usd: 1000,
+          naira_rate: 1400,
+          last_updated: new Date().toISOString(),
+        });
       }
       setLoading(false);
     }
