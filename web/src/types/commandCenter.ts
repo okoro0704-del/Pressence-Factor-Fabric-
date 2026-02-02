@@ -40,6 +40,8 @@ export interface SecurityStatus {
   genesisHashVerified: boolean;
   laptopDeviceUUID: string;
   mobileDeviceUUID: string;
+  genesisHash?: string;
+  hardwareTPMHash?: string;
   lastVerificationTimestamp?: string;
 }
 

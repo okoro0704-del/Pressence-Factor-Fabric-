@@ -119,9 +119,6 @@ export default function SecurityStatusBadge({ status }: SecurityStatusBadgeProps
                   <p className={`text-lg font-bold ${status.laptopBinded ? 'text-green-400' : 'text-gray-500'}`}>
                     {status.laptopBinded ? 'BINDED' : 'NOT BINDED'}
                   </p>
-                  <p className="text-xs text-gray-500" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                    {status.laptopDeviceUUID}
-                  </p>
                 </div>
                 {status.laptopBinded && (
                   <CheckCircle className="w-6 h-6 text-green-400" />
@@ -139,37 +136,88 @@ export default function SecurityStatusBadge({ status }: SecurityStatusBadgeProps
                   <p className={`text-lg font-bold ${status.mobileBinded ? 'text-green-400' : 'text-gray-500'}`}>
                     {status.mobileBinded ? 'BINDED' : 'NOT BINDED'}
                   </p>
-                  <p className="text-xs text-gray-500" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                    {status.mobileDeviceUUID}
-                  </p>
                 </div>
                 {status.mobileBinded && (
                   <CheckCircle className="w-6 h-6 text-green-400" />
                 )}
               </motion.div>
 
-              {/* Genesis Hash Status */}
+              {/* Genesis Hash Seal Status */}
               <motion.div
                 whileHover={{ scale: 1.02 }}
-                className={`flex items-center gap-3 px-6 py-4 rounded-xl ${status.genesisHashVerified ? 'bg-green-500/20 border border-green-500/30' : 'bg-gray-800/50 border border-gray-700'}`}
+                className={`flex items-center gap-3 px-6 py-4 rounded-xl relative ${status.genesisHashVerified ? 'bg-green-500/20 border border-green-500/30' : 'bg-gray-800/50 border border-gray-700'}`}
               >
-                <Lock className={`w-8 h-8 ${status.genesisHashVerified ? 'text-green-400' : 'text-gray-500'}`} />
-                <div>
-                  <p className="text-sm text-gray-400">Genesis Hash</p>
-                  <p className={`text-lg font-bold ${status.genesisHashVerified ? 'text-green-400' : 'text-gray-500'}`}>
-                    {status.genesisHashVerified ? 'VERIFIED' : 'PENDING'}
+                {/* Gold/Amber Glow for SEALED status */}
+                {status.genesisHashVerified && (
+                  <>
+                    <motion.div
+                      className="absolute inset-0 bg-amber-400 opacity-20 blur-xl rounded-xl"
+                      animate={{
+                        opacity: [0.2, 0.4, 0.2],
+                      }}
+                      transition={{
+                        duration: 2,
+                        repeat: Infinity,
+                        ease: 'easeInOut',
+                      }}
+                    />
+                    <motion.div
+                      className="absolute inset-0 bg-yellow-500 opacity-10 blur-lg rounded-xl"
+                      animate={{
+                        opacity: [0.1, 0.2, 0.1],
+                      }}
+                      transition={{
+                        duration: 2.5,
+                        repeat: Infinity,
+                        ease: 'easeInOut',
+                        delay: 0.5,
+                      }}
+                    />
+                  </>
+                )}
+
+                <Lock className={`w-8 h-8 relative z-10 ${status.genesisHashVerified ? 'text-amber-400' : 'text-gray-500'}`} />
+                <div className="relative z-10">
+                  <p className="text-sm text-gray-400">Genesis Hash Seal</p>
+                  <p className={`text-lg font-bold ${status.genesisHashVerified ? 'text-amber-400' : 'text-gray-500'}`}>
+                    {status.genesisHashVerified ? 'SEALED' : 'PENDING'}
                   </p>
+                  {status.genesisHash && status.genesisHashVerified && (
+                    <p className="text-xs text-amber-300 mt-1" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                      {status.genesisHash.substring(0, 12)}...
+                    </p>
+                  )}
                 </div>
                 {status.genesisHashVerified && (
-                  <CheckCircle className="w-6 h-6 text-green-400" />
+                  <CheckCircle className="w-6 h-6 text-amber-400 relative z-10" />
                 )}
               </motion.div>
             </div>
           </div>
 
+          {/* Genesis Hash Display */}
+          {status.genesisHash && (
+            <div className="mt-6 pt-6 border-t border-gray-700/50">
+              <p className="text-sm text-gray-400 mb-2">Genesis Authority Hash (2/2/2026)</p>
+              <p className="text-xs text-green-400 break-all" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                {status.genesisHash}
+              </p>
+            </div>
+          )}
+
+          {/* Hardware TPM Hash Display */}
+          {status.hardwareTPMHash && (
+            <div className="mt-4">
+              <p className="text-sm text-gray-400 mb-2">Hardware TPM Hash</p>
+              <p className="text-xs text-cyan-400 break-all" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                {status.hardwareTPMHash}
+              </p>
+            </div>
+          )}
+
           {/* Last Verification Timestamp */}
           {status.lastVerificationTimestamp && (
-            <div className="mt-6 pt-6 border-t border-gray-700/50">
+            <div className="mt-4">
               <p className="text-sm text-gray-400">
                 Last Verification: <span className="text-white" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{new Date(status.lastVerificationTimestamp).toLocaleString()}</span>
               </p>

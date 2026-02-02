@@ -7,6 +7,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
 import { Globe, TrendingUp, TrendingDown } from 'lucide-react';
+import { supabase, hasSupabase } from '../../../lib/supabase';
 
 interface NationalLiquidity {
   nationCode: string;
@@ -46,15 +47,46 @@ export default function NationalLiquidityGrid() {
 
   const fetchTopNations = async () => {
     try {
-      const response = await fetch('/api/command-center/top-nations');
-      const data = await response.json();
-      
-      if (data.success) {
-        setTopNations(data.nations);
+      if (!hasSupabase() || !supabase) {
+        console.error('[NATIONAL LIQUIDITY] Supabase not configured');
+        setLoading(false);
+        return;
+      }
+
+      console.log('[NATIONAL LIQUIDITY] Fetching from Supabase...');
+
+      // Fetch national liquidity vaults, ordered by balance_vida DESC, limit 10
+      const { data: vaultsData, error } = await supabase!
+        .from('national_liquidity_vaults')
+        .select('*')
+        .order('balance_vida', { ascending: false })
+        .limit(10);
+
+      if (error) {
+        console.error('[NATIONAL LIQUIDITY] Fetch error:', error);
+        setLoading(false);
+        return;
+      }
+
+      if (vaultsData) {
+        // Transform data to match NationalLiquidity interface
+        const transformedData: NationalLiquidity[] = vaultsData.map((vault, index) => ({
+          nationCode: vault.nation_code,
+          nationName: vault.nation_name,
+          reservesVIDA: Number(vault.balance_vida || 0),
+          reservesUSD: Number(vault.balance_usd || 0),
+          citizenCount: 0, // TODO: Add citizen count to database
+          avgReservePerCitizen: 0, // TODO: Calculate from citizen count
+          rank: index + 1,
+        }));
+
+        console.log('[NATIONAL LIQUIDITY] Fetched nations:', transformedData.length);
+        setTopNations(transformedData);
         setLoading(false);
       }
     } catch (err) {
-      console.error('Failed to fetch top nations:', err);
+      console.error('[NATIONAL LIQUIDITY] Failed to fetch:', err);
+      setLoading(false);
     }
   };
 
