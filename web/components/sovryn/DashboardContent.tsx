@@ -1,13 +1,27 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { DLLRBalanceTracker } from './DLLRBalanceTracker';
 import { LaunchSovereignVaultButton } from './LaunchSovereignVaultButton';
 import { NationalReserveCharts } from '../dashboard/NationalReserveCharts';
 import { NationalBlockCommand } from '../dashboard/NationalBlockCommand';
 import { UserProfileBalance } from '../dashboard/UserProfileBalance';
+import { PresenceOverrideModal } from '../dashboard/PresenceOverrideModal';
+import type { GlobalIdentity } from '@/lib/phoneIdentity';
 
 export function DashboardContent() {
+  const [showPresenceModal, setShowPresenceModal] = useState(false);
+
+  const handlePresenceVerified = (identity: GlobalIdentity) => {
+    // Show success notification
+    alert(`✓ SOVEREIGN IDENTITY VERIFIED: ${identity.full_name}\nAccess Granted`);
+    setShowPresenceModal(false);
+
+    // In production, this would switch the dashboard to show the sovereign's data
+    // For now, we'll just show the notification
+  };
+
   return (
     <div className="flex flex-col min-h-screen">
       <header className="shrink-0 border-b border-[#2a2a2e] bg-[#16161a]/90 backdrop-blur px-4 py-3">
@@ -20,12 +34,20 @@ export function DashboardContent() {
               National Reserve · Citizen Vault · Presence-Gated DeFi
             </p>
           </div>
-          <Link
-            href="/manifesto"
-            className="text-sm font-medium text-[#c9a227] hover:text-[#e8c547] transition-colors"
-          >
-            ← Manifesto
-          </Link>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setShowPresenceModal(true)}
+              className="px-4 py-2 bg-gradient-to-r from-[#c9a227] to-[#e8c547] hover:from-[#e8c547] hover:to-[#c9a227] text-black font-bold text-sm rounded-lg transition-all duration-300 shadow-lg"
+            >
+              🔐 Authenticate Dependent
+            </button>
+            <Link
+              href="/manifesto"
+              className="text-sm font-medium text-[#c9a227] hover:text-[#e8c547] transition-colors"
+            >
+              ← Manifesto
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -120,6 +142,13 @@ export function DashboardContent() {
       <footer className="shrink-0 border-t border-[#2a2a2e] px-4 py-2 text-center text-xs text-[#6b6b70]">
         PFF × Sovryn · Born in Lagos. Built for the World. · mrfundzman
       </footer>
+
+      {/* Presence Override Modal */}
+      <PresenceOverrideModal
+        isOpen={showPresenceModal}
+        onClose={() => setShowPresenceModal(false)}
+        onPresenceVerified={handlePresenceVerified}
+      />
     </div>
   );
 }

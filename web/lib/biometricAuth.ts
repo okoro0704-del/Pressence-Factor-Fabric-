@@ -340,3 +340,151 @@ export async function requestGuardianOverride(
   }
 }
 
+/**
+ * RESOLVE SOVEREIGN BY PRESENCE (DECOUPLED)
+ * Universal resolver that ignores local device phone number
+ * Uses 4 Security Layers to query sentinel_identities table
+ * Returns account_id of the person being scanned, not the device owner
+ *
+ * This enables "Guest Presence Scan" - elderly parent can authenticate on child's phone
+ */
+export async function resolveSovereignByPresence(
+  onProgress?: (layer: AuthLayer | null, status: AuthStatus) => void
+): Promise<BiometricAuthResult> {
+  const layersPassed: AuthLayer[] = [];
+
+  try {
+    // LAYER 1: BIOMETRIC SIGNATURE
+    onProgress?.(AuthLayer.BIOMETRIC_SIGNATURE, AuthStatus.SCANNING);
+    const biometricResult = await verifyBiometricSignature();
+
+    if (!biometricResult.success) {
+      return {
+        success: false,
+        status: AuthStatus.FAILED,
+        layer: AuthLayer.BIOMETRIC_SIGNATURE,
+        errorMessage: 'Biometric verification failed. Please try again.',
+        layersPassed,
+      };
+    }
+    layersPassed.push(AuthLayer.BIOMETRIC_SIGNATURE);
+
+    // LAYER 2: VOICE PRINT
+    onProgress?.(AuthLayer.VOICE_PRINT, AuthStatus.SCANNING);
+    const voiceResult = await verifyVoicePrint();
+
+    if (!voiceResult.success) {
+      return {
+        success: false,
+        status: AuthStatus.FAILED,
+        layer: AuthLayer.VOICE_PRINT,
+        errorMessage: 'Voice verification failed. Please say "I am Vitalized" clearly.',
+        layersPassed,
+      };
+    }
+    layersPassed.push(AuthLayer.VOICE_PRINT);
+
+    // LAYER 3: HARDWARE TPM (Current Device)
+    onProgress?.(AuthLayer.HARDWARE_TPM, AuthStatus.SCANNING);
+    const tpmResult = await verifyHardwareTPM();
+
+    if (!tpmResult.success) {
+      return {
+        success: false,
+        status: AuthStatus.FAILED,
+        layer: AuthLayer.HARDWARE_TPM,
+        errorMessage: 'Device verification failed.',
+        layersPassed,
+      };
+    }
+    layersPassed.push(AuthLayer.HARDWARE_TPM);
+
+    // LAYER 4: GENESIS HANDSHAKE
+    // This is where we query sentinel_identities table
+    // We use the biometric signature + voice print to find the SOVEREIGN IDENTITY
+    // NOT the device owner's identity
+    onProgress?.(AuthLayer.GENESIS_HANDSHAKE, AuthStatus.SCANNING);
+
+    // Generate composite biometric hash
+    const compositeBiometricHash = await generateCompositeBiometricHash(
+      biometricResult.credential,
+      voiceResult.voicePrint,
+      tpmResult.deviceHash
+    );
+
+    // Query sentinel_identities table for matching biometric signature
+    // TODO: Replace with actual Supabase query
+    // const { data: identity, error } = await supabase
+    //   .from('sentinel_identities')
+    //   .select('*')
+    //   .eq('biometric_hash', compositeBiometricHash)
+    //   .single();
+
+    // Mock identity resolution for now
+    // In production, this would return the SOVEREIGN's identity, not the device owner
+    const mockPhoneNumber = '+2348098765432'; // Parent's phone, not child's
+    const { resolvePhoneToIdentity } = await import('./phoneIdentity');
+    const identity = await resolvePhoneToIdentity(mockPhoneNumber);
+
+    if (!identity) {
+      return {
+        success: false,
+        status: AuthStatus.FAILED,
+        layer: AuthLayer.GENESIS_HANDSHAKE,
+        errorMessage: 'Sovereign identity not found in Genesis Vault.',
+        layersPassed,
+      };
+    }
+
+    layersPassed.push(AuthLayer.GENESIS_HANDSHAKE);
+
+    // ALL LAYERS PASSED - IDENTIFIED
+    onProgress?.(AuthLayer.GENESIS_HANDSHAKE, AuthStatus.IDENTIFIED);
+
+    // BANKING UNLOCKED
+    onProgress?.(null, AuthStatus.BANKING_UNLOCKED);
+
+    return {
+      success: true,
+      status: AuthStatus.BANKING_UNLOCKED,
+      layer: null,
+      phoneNumber: mockPhoneNumber,
+      identity,
+      layersPassed,
+    };
+  } catch (error) {
+    console.error('Sovereign presence resolution failed:', error);
+    return {
+      success: false,
+      status: AuthStatus.FAILED,
+      layer: null,
+      errorMessage: 'Authentication system error. Please try again.',
+      layersPassed,
+    };
+  }
+}
+
+/**
+ * Generate Composite Biometric Hash
+ * Combines biometric credential + voice print + device hash
+ * This creates a unique signature for the PERSON, not the device
+ */
+async function generateCompositeBiometricHash(
+  biometricCredential: any,
+  voicePrint?: string,
+  deviceHash?: string
+): Promise<string> {
+  const compositeData = {
+    biometric: biometricCredential?.id || 'unknown',
+    voice: voicePrint || 'unknown',
+    device: deviceHash || 'unknown',
+    timestamp: Date.now(),
+  };
+
+  const encoder = new TextEncoder();
+  const data = encoder.encode(JSON.stringify(compositeData));
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
