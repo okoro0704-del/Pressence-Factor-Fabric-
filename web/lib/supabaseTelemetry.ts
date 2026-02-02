@@ -47,10 +47,15 @@ export interface NationalReserve {
  */
 export async function fetchLiveTelemetry(): Promise<SentinelTelemetry | null> {
   try {
+    console.log('[TELEMETRY] 🔄 Fetching live sentinel telemetry...');
+
     if (!hasSupabase()) {
+      console.error('[TELEMETRY] ❌ Supabase client not available');
       return null;
     }
 
+    // Force fresh fetch - bypass any cache
+    const timestamp = Date.now();
     const { data, error } = await supabase
       .from('sentinel_telemetry')
       .select('*')
@@ -58,11 +63,39 @@ export async function fetchLiveTelemetry(): Promise<SentinelTelemetry | null> {
       .single();
 
     if (error) {
+      console.error('[TELEMETRY] ❌ Query failed');
+      console.error('[TELEMETRY] Error Code:', error.code);
+      console.error('[TELEMETRY] Error Message:', error.message);
+      console.error('[TELEMETRY] Error Details:', error.details);
+      console.error('[TELEMETRY] Error Hint:', error.hint);
+
+      // Specific error type detection
+      if (error.message.includes('Invalid API key') || error.message.includes('JWT')) {
+        console.error('[TELEMETRY] 🔑 INVALID API KEY ERROR');
+      } else if (error.message.includes('network') || error.message.includes('fetch')) {
+        console.error('[TELEMETRY] 🌐 NETWORK ERROR');
+      } else if (error.message.includes('CORS')) {
+        console.error('[TELEMETRY] 🚫 CORS ERROR');
+      } else if (error.code === 'PGRST116') {
+        console.error('[TELEMETRY] 📊 TABLE NOT FOUND OR NO ROWS');
+      }
+
       return null;
     }
 
+    console.log('[TELEMETRY] ✅ Live data fetched successfully');
+    console.log('[TELEMETRY] Active Sentinels:', data.active_sentinels_total);
+    console.log('[TELEMETRY] Total VIDA:', data.total_tributes_vida);
+    console.log('[TELEMETRY] Citizen Share (50%):', data.citizen_share_vida);
+    console.log('[TELEMETRY] State Share (50%):', data.state_share_vida);
+    console.log('[TELEMETRY] Fetch timestamp:', timestamp);
+
     return data as SentinelTelemetry;
   } catch (err) {
+    console.error('[TELEMETRY] ❌ Unexpected error during fetch');
+    console.error('[TELEMETRY] Error Type:', err instanceof Error ? err.constructor.name : typeof err);
+    console.error('[TELEMETRY] Error Message:', err instanceof Error ? err.message : String(err));
+    console.error('[TELEMETRY] Full Error:', err);
     return null;
   }
 }
