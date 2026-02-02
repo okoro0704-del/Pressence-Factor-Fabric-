@@ -16,6 +16,12 @@
   # Disable Next.js telemetry
   NEXT_TELEMETRY_DISABLED = "1"
 
+  # Disable Netlify Next.js plugin (incompatible with static export)
+  NETLIFY_NEXT_PLUGIN_SKIP = "true"
+
+  # Increase Node memory limit for build (4GB)
+  NODE_OPTIONS = "--max-old-space-size=4096"
+
 # Redirect root to Command Center
 [[redirects]]
   from = "/"

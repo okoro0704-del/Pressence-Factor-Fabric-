@@ -24,10 +24,23 @@ const nextConfig = {
   // Enable React strict mode for better development experience
   reactStrictMode: true,
 
+  // Disable experimental features that may cause issues
+  experimental: {
+    // Disable turbopack (use webpack instead for stability)
+    turbo: undefined,
+  },
+
   // Webpack configuration for module resolution
-  webpack: (config) => {
+  webpack: (config, { isServer }) => {
     config.resolve.modules = config.resolve.modules || [];
     config.resolve.modules.push(path.join(__dirname, 'node_modules'));
+
+    // Increase memory limit for build
+    if (!isServer) {
+      config.optimization = config.optimization || {};
+      config.optimization.minimize = true;
+    }
+
     return config;
   },
 };
