@@ -235,10 +235,10 @@ export async function fetchNationalReserve(): Promise<NationalReserve | null> {
     // Use SOVEREIGN_SHARE (5 VIDA) as the base for calculations
     const sovereignShareVida = SOVEREIGN_SHARE;
 
-    // 70/15/15 Liquidity Split
+    // 70/30 Liquidity Split
     const nationalVaultVida = sovereignShareVida * NATIONAL_VAULT_PERCENT; // 3.5 VIDA
-    const nationalLiquidityVida = sovereignShareVida * NATIONAL_LIQUIDITY_PERCENT; // 0.75 VIDA
-    const nairaVidaAmount = sovereignShareVida * NAIRA_VIDA_PERCENT; // 0.75 VIDA
+    const nationalLiquidityVida = sovereignShareVida * NATIONAL_LIQUIDITY_PERCENT; // 1.5 VIDA
+    const nairaVidaAmount = sovereignShareVida * NATIONAL_VIDA_POOL_PERCENT; // 0.75 VIDA (15% for display)
 
     // Calculate Naira values
     const nairaVidaValueNaira = nairaVidaAmount * VIDA_PRICE_USD * NAIRA_RATE; // 0.75 * 1000 * 1400
