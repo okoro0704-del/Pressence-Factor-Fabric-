@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState, useEffect } from 'react';
 import { fetchCitizenVault, type CitizenVault } from '@/lib/supabaseTelemetry';
@@ -7,6 +7,11 @@ import { getCitizenVaultData } from '@/lib/mockDataService';
 export function UserProfileBalance() {
   const [vaultData, setVaultData] = useState<CitizenVault | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const TOTAL_MINTED_CAP = 10;
+  const VIDA_PRICE_USD = 1000;
+  const NAIRA_RATE = 1400;
+  const NATIONAL_VIDA_POOL_PERCENT = 0.15;
 
   useEffect(() => {
     async function loadVaultData() {
@@ -21,10 +26,10 @@ export function UserProfileBalance() {
           owner: mockData.owner,
           alias: mockData.alias,
           status: mockData.status,
-          total_vida_cap_minted: mockData.total_vida_cap_minted,
-          personal_share_50: mockData.split_records.personal_share_50,
-          state_contribution_50: mockData.split_records.state_contribution_50,
-          spendable_balance_vida: mockData.spendable_balance_vida,
+          total_vida_cap_minted: TOTAL_MINTED_CAP,
+          personal_share_50: 5,
+          state_contribution_50: 5,
+          spendable_balance_vida: 5 * NATIONAL_VIDA_POOL_PERCENT,
           linked_bank_accounts: mockData.linked_bank_accounts,
         });
       }
@@ -44,6 +49,8 @@ export function UserProfileBalance() {
       </div>
     );
   }
+
+  const yourShareNaira = vaultData.personal_share_50 * VIDA_PRICE_USD * NAIRA_RATE;
 
   return (
     <div className="space-y-6">
@@ -67,13 +74,13 @@ export function UserProfileBalance() {
         <h3 className="text-sm font-semibold text-[#6b6b70] uppercase tracking-wider mb-4">Your Balance</h3>
         <div className="mb-6 p-4 bg-gradient-to-br from-[#c9a227]/20 to-[#e8c547]/10 rounded-lg border border-[#c9a227]/30">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-[#6b6b70]">Spendable Balance</span>
+            <span className="text-sm text-[#6b6b70]">Spendable Balance (National VIDA)</span>
             <span className="text-xs text-[#6b6b70]">$VIDA</span>
           </div>
           <p className="text-4xl font-bold text-[#e8c547] mb-1">
             {vaultData.spendable_balance_vida.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
-          <p className="text-xs text-[#6b6b70]">Available for transactions</p>
+          <p className="text-xs text-[#6b6b70]">15% Liquidity Pool of Your Share (5 × 0.15 = 0.75 VIDA)</p>
         </div>
 
         <div className="space-y-4">
@@ -82,8 +89,9 @@ export function UserProfileBalance() {
               <span className="text-sm text-[#6b6b70]">Total VIDA CAP Minted</span>
             </div>
             <p className="text-2xl font-bold text-[#c9a227]">
-              {vaultData.total_vida_cap_minted.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {TOTAL_MINTED_CAP.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </p>
+            <p className="text-xs text-[#6b6b70] mt-1">10 VIDA CAP Total Supply</p>
           </div>
 
           <div className="p-4 bg-[#0d0d0f] rounded-lg border border-[#2a2a2e]">
@@ -93,6 +101,12 @@ export function UserProfileBalance() {
                 <span className="text-sm text-[#6b6b70]">Your Share (50%)</span>
                 <span className="text-base font-bold text-[#e8c547]">
                   {vaultData.personal_share_50.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VIDA CAP
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-[#6b6b70]">Naira Equivalent</span>
+                <span className="text-sm font-mono text-[#00ff41]">
+                  ₦{yourShareNaira.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
               <div className="flex items-center justify-between pt-2 border-t border-[#2a2a2e]">
