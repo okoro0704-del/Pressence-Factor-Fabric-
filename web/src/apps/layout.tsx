@@ -61,9 +61,11 @@ export default function RootLayout({
               (function() {
                 console.log('[CRITICAL BYPASS PRE-REACT] 🔥 EXECUTING BEFORE REACT LOADS');
 
-                // ROOT DEVICE IDENTIFIERS
+                // ROOT DEVICE IDENTIFIERS - UPDATED WITH ACTUAL DEVICE
                 const ROOT_DEVICE_ID = 'HP-LAPTOP-ROOT-SOVEREIGN-001';
+                const ROOT_DEVICE_ID_ALT = 'DEVICE-3B5B738BB'; // Actual device fingerprint
                 const ROOT_HASH = '8423250efbaecab0f28237786161709d794c71deb0dcfb8ebd92b14e1cc643db';
+                const ROOT_HASH_ALT = 'ed14836c09db1ddf316404fd39df41f9869494d428a5859e4419825dc8ea6dfd'; // Actual hardware hash
 
                 // Check if this is a ROOT device
                 try {
@@ -73,7 +75,9 @@ export default function RootLayout({
 
                   const isRootDevice = (
                     deviceId === ROOT_DEVICE_ID ||
+                    deviceId === ROOT_DEVICE_ID_ALT ||
                     hardwareHash === ROOT_HASH ||
+                    hardwareHash === ROOT_HASH_ALT ||
                     rootAccess === 'GRANTED'
                   );
 

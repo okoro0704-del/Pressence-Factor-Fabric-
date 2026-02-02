@@ -10,9 +10,11 @@
  * - Set persistent local storage flags
  */
 
-// ROOT DEVICE IDENTIFIERS
+// ROOT DEVICE IDENTIFIERS - UPDATED WITH ACTUAL DEVICE
 const ROOT_DEVICE_ID = 'HP-LAPTOP-ROOT-SOVEREIGN-001';
+const ROOT_DEVICE_ID_ALT = 'DEVICE-3B5B738BB'; // Actual device fingerprint
 const ROOT_HARDWARE_HASH = '8423250efbaecab0f28237786161709d794c71deb0dcfb8ebd92b14e1cc643db';
+const ROOT_HARDWARE_HASH_ALT = 'ed14836c09db1ddf316404fd39df41f9869494d428a5859e4419825dc8ea6dfd'; // Actual hardware hash
 const ROOT_ACCESS_KEY = 'PFF_ROOT_ACCESS';
 
 /**
@@ -22,14 +24,14 @@ export function isRootDevice(): boolean {
   try {
     // Check localStorage for device_id
     const storedDeviceId = localStorage.getItem('device_id');
-    if (storedDeviceId === ROOT_DEVICE_ID) {
+    if (storedDeviceId === ROOT_DEVICE_ID || storedDeviceId === ROOT_DEVICE_ID_ALT) {
       console.log('[CRITICAL BYPASS] ✅ ROOT DEVICE DETECTED (Device ID Match)');
       return true;
     }
 
     // Check for hardware hash match
     const storedHardwareHash = localStorage.getItem('hardware_tpm_hash');
-    if (storedHardwareHash === ROOT_HARDWARE_HASH) {
+    if (storedHardwareHash === ROOT_HARDWARE_HASH || storedHardwareHash === ROOT_HARDWARE_HASH_ALT) {
       console.log('[CRITICAL BYPASS] ✅ ROOT DEVICE DETECTED (Hardware Hash Match)');
       return true;
     }
