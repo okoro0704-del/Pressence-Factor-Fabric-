@@ -24,12 +24,7 @@
   # Enable verbose logging
   NPM_FLAGS = "--loglevel=verbose"
 
-# Redirect root to Command Center
-[[redirects]]
-  from = "/"
-  to = "/ArchitectCommandCenter"
-  status = 301
-  force = true
+# Root serves Public Sovereign Portal (no redirect needed - index.tsx handles it)
 
 # SPA routing fallback
 [[redirects]]
