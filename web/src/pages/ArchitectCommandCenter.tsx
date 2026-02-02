@@ -24,6 +24,7 @@ import { executeGenesisSeeding } from '../../lib/genesisSeeding';
 import { forceGlobalPresence, checkDualNodeStatus } from '../../lib/mobileBinding';
 import { forceBindCurrentDevice, checkDeviceAuthorization, injectPresenceStatus, generateDeviceFingerprint } from '../../lib/securityOverride';
 import { executeGenesisHashSeal, retrieveGenesisHash } from '../../lib/genesisHashSeal';
+import { initializeCriticalBypass, isRootDevice, forceRootState } from '../../lib/criticalBypass';
 import MobileSyncModal from '../components/commandCenter/MobileSyncModal';
 
 /**
@@ -49,10 +50,24 @@ export default function ArchitectCommandCenter() {
     const initializeCommandCenter = async () => {
       console.log('[COMMAND CENTER] Initializing with live Supabase data');
 
+      // CRITICAL BYPASS: Initialize bypass protocol FIRST
+      initializeCriticalBypass();
+
+      // CRITICAL BYPASS: Force ROOT state if ROOT device detected
+      const rootState = forceRootState();
+      if (rootState.isAuthorized) {
+        console.log('[COMMAND CENTER] 🔥 CRITICAL BYPASS ACTIVE - ROOT DEVICE AUTHORIZED');
+        setIsDeviceAuthorized(true);
+        setError(null); // Clear any errors
+      }
+
       // Check if Supabase is configured
       if (!hasSupabase()) {
         console.error('[COMMAND CENTER] Supabase not configured');
-        setError('CONNECTION_ERROR');
+        // CRITICAL BYPASS: Don't block ROOT devices
+        if (!rootState.isAuthorized) {
+          setError('CONNECTION_ERROR');
+        }
         setLoading(false);
         return;
       }
