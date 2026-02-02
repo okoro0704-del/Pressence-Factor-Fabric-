@@ -14,13 +14,22 @@ function initSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '';
 
+  // DEBUG: Log environment variable detection
+  console.log('[SUPABASE INIT] Vault Endpoint:', url ? 'DETECTED' : 'MISSING');
+  console.log('[SUPABASE INIT] Anon Key:', anon ? 'DETECTED' : 'MISSING');
+  console.log('[SUPABASE INIT] URL Value:', url || 'EMPTY');
+  console.log('[SUPABASE INIT] URL Length:', url.length);
+
   if (url && anon) {
     try {
       _supabase = createClient(url, anon);
+      console.log('[SUPABASE INIT] ✅ Client created successfully');
     } catch (error) {
-      console.error('[SUPABASE] Failed to initialize client:', error);
+      console.error('[SUPABASE INIT] ❌ Failed to initialize client:', error);
       _supabase = null;
     }
+  } else {
+    console.error('[SUPABASE INIT] ❌ Missing credentials - URL or Anon Key not provided');
   }
 }
 

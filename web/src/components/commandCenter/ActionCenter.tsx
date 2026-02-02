@@ -83,15 +83,42 @@ export default function ActionCenter({ onBroadcastToMesh, onEmergencyStasis }: A
           initial={{ opacity: 0, x: -50 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.6 }}
+          whileHover={{ scale: 1.02 }}
           onClick={() => setShowBroadcastModal(true)}
-          className="group relative bg-gradient-to-br from-blue-900/90 to-cyan-900/90 backdrop-blur-xl border-2 border-blue-500/50 rounded-2xl p-8 shadow-2xl hover:shadow-blue-500/30 transition-all duration-300 hover:scale-105"
+          className="group relative bg-white/5 backdrop-blur-[10px] border border-white/10 rounded-2xl p-8 shadow-2xl hover:shadow-blue-500/30 transition-all duration-300"
         >
           {/* Glow Effect */}
           <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-cyan-500 opacity-0 group-hover:opacity-20 rounded-2xl transition-opacity duration-300" />
 
           <div className="relative flex flex-col items-center gap-4">
-            <div className="p-4 rounded-xl bg-blue-500/20">
-              <Radio className="w-12 h-12 text-blue-400" />
+            <div className="p-4 rounded-xl bg-blue-500/20 relative">
+              {/* Signal Wave Animation */}
+              <motion.div
+                className="absolute inset-0 rounded-xl border-2 border-blue-400"
+                animate={{
+                  scale: [1, 1.5, 2],
+                  opacity: [0.8, 0.4, 0],
+                }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  ease: 'easeOut',
+                }}
+              />
+              <motion.div
+                className="absolute inset-0 rounded-xl border-2 border-cyan-400"
+                animate={{
+                  scale: [1, 1.5, 2],
+                  opacity: [0.8, 0.4, 0],
+                }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  ease: 'easeOut',
+                  delay: 0.5,
+                }}
+              />
+              <Radio className="w-12 h-12 text-blue-400 relative z-10" />
             </div>
             <h3 className="text-2xl font-bold text-white">BROADCAST TO MESH</h3>
             <p className="text-gray-400 text-center">
@@ -105,11 +132,17 @@ export default function ActionCenter({ onBroadcastToMesh, onEmergencyStasis }: A
           initial={{ opacity: 0, x: 50 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.6 }}
+          whileHover={{ scale: 1.02 }}
           onClick={() => setShowStasisModal(true)}
-          className="group relative bg-gradient-to-br from-red-900/90 to-orange-900/90 backdrop-blur-xl border-2 border-red-500/50 rounded-2xl p-8 shadow-2xl hover:shadow-red-500/30 transition-all duration-300 hover:scale-105"
+          className="group relative bg-white/5 backdrop-blur-[10px] rounded-2xl p-8 shadow-2xl transition-all duration-300 overflow-hidden"
+          style={{
+            border: '4px solid',
+            borderImage: 'repeating-linear-gradient(45deg, #000 0, #000 10px, #facc15 10px, #facc15 20px) 1',
+            boxShadow: '0 0 30px rgba(239, 68, 68, 0.4), 0 20px 60px rgba(0, 0, 0, 0.5)',
+          }}
         >
-          {/* Glow Effect */}
-          <div className="absolute inset-0 bg-gradient-to-r from-red-500 to-orange-500 opacity-0 group-hover:opacity-20 rounded-2xl transition-opacity duration-300" />
+          {/* Red Glow Effect */}
+          <div className="absolute inset-0 bg-gradient-to-r from-red-500 to-orange-500 opacity-0 group-hover:opacity-20 transition-opacity duration-300" />
 
           <div className="relative flex flex-col items-center gap-4">
             <div className="p-4 rounded-xl bg-red-500/20">

@@ -35,23 +35,47 @@ export default function SecurityStatusBadge({ status }: SecurityStatusBadgeProps
     >
       {/* Main Badge Container */}
       <div className="relative">
-        {/* Glow Effect */}
+        {/* Enhanced Matrix Green Glow Effect */}
         {isFullyBinded && (
-          <motion.div
-            className="absolute inset-0 bg-gradient-to-r from-green-500 via-emerald-500 to-green-500 opacity-20 blur-3xl rounded-3xl"
-            animate={{
-              opacity: [0.2, 0.4, 0.2],
-              scale: [1, 1.05, 1],
-            }}
-            transition={{
-              duration: 3,
-              repeat: Infinity,
-            }}
-          />
+          <>
+            <motion.div
+              className="absolute inset-0 bg-green-400 opacity-30 blur-3xl rounded-3xl"
+              animate={{
+                opacity: [0.3, 0.6, 0.3],
+                scale: [1, 1.08, 1],
+              }}
+              transition={{
+                duration: 2,
+                repeat: Infinity,
+                ease: 'easeInOut',
+              }}
+            />
+            <motion.div
+              className="absolute inset-0 bg-emerald-500 opacity-20 blur-2xl rounded-3xl"
+              animate={{
+                opacity: [0.2, 0.4, 0.2],
+                scale: [1.05, 1.1, 1.05],
+              }}
+              transition={{
+                duration: 2.5,
+                repeat: Infinity,
+                ease: 'easeInOut',
+                delay: 0.5,
+              }}
+            />
+          </>
         )}
 
-        {/* Badge Content */}
-        <div className={`relative bg-gradient-to-br ${isFullyBinded ? 'from-green-900/90 to-emerald-900/90 border-green-500/50' : 'from-red-900/90 to-orange-900/90 border-red-500/50'} backdrop-blur-xl border-2 rounded-3xl p-8 shadow-2xl`}>
+        {/* Badge Content - Glassmorphism */}
+        <motion.div
+          whileHover={{ scale: 1.02 }}
+          className={`relative bg-white/5 backdrop-blur-[10px] border-2 ${isFullyBinded ? 'border-green-400/50' : 'border-red-500/50'} rounded-3xl p-8 shadow-2xl`}
+          style={{
+            boxShadow: isFullyBinded
+              ? '0 0 40px rgba(74, 222, 128, 0.4), 0 20px 60px rgba(0, 0, 0, 0.5)'
+              : '0 20px 60px rgba(0, 0, 0, 0.5)',
+          }}
+        >
           <div className="flex flex-col lg:flex-row items-center justify-between gap-8">
             {/* Left: Status Icon & Title */}
             <div className="flex items-center gap-6">
@@ -85,37 +109,50 @@ export default function SecurityStatusBadge({ status }: SecurityStatusBadgeProps
             {/* Right: Device Status */}
             <div className="flex flex-col lg:flex-row gap-6">
               {/* HP Laptop Status */}
-              <div className={`flex items-center gap-3 px-6 py-4 rounded-xl ${status.laptopBinded ? 'bg-green-500/20 border border-green-500/30' : 'bg-gray-800/50 border border-gray-700'}`}>
+              <motion.div
+                whileHover={{ scale: 1.02 }}
+                className={`flex items-center gap-3 px-6 py-4 rounded-xl ${status.laptopBinded ? 'bg-green-500/20 border border-green-500/30' : 'bg-gray-800/50 border border-gray-700'}`}
+              >
                 <Laptop className={`w-8 h-8 ${status.laptopBinded ? 'text-green-400' : 'text-gray-500'}`} />
                 <div>
                   <p className="text-sm text-gray-400">HP Laptop</p>
                   <p className={`text-lg font-bold ${status.laptopBinded ? 'text-green-400' : 'text-gray-500'}`}>
                     {status.laptopBinded ? 'BINDED' : 'NOT BINDED'}
                   </p>
-                  <p className="text-xs text-gray-500 font-mono">{status.laptopDeviceUUID}</p>
+                  <p className="text-xs text-gray-500" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                    {status.laptopDeviceUUID}
+                  </p>
                 </div>
                 {status.laptopBinded && (
                   <CheckCircle className="w-6 h-6 text-green-400" />
                 )}
-              </div>
+              </motion.div>
 
               {/* Mobile Device Status */}
-              <div className={`flex items-center gap-3 px-6 py-4 rounded-xl ${status.mobileBinded ? 'bg-green-500/20 border border-green-500/30' : 'bg-gray-800/50 border border-gray-700'}`}>
+              <motion.div
+                whileHover={{ scale: 1.02 }}
+                className={`flex items-center gap-3 px-6 py-4 rounded-xl ${status.mobileBinded ? 'bg-green-500/20 border border-green-500/30' : 'bg-gray-800/50 border border-gray-700'}`}
+              >
                 <Smartphone className={`w-8 h-8 ${status.mobileBinded ? 'text-green-400' : 'text-gray-500'}`} />
                 <div>
                   <p className="text-sm text-gray-400">Mobile Device</p>
                   <p className={`text-lg font-bold ${status.mobileBinded ? 'text-green-400' : 'text-gray-500'}`}>
                     {status.mobileBinded ? 'BINDED' : 'NOT BINDED'}
                   </p>
-                  <p className="text-xs text-gray-500 font-mono">{status.mobileDeviceUUID}</p>
+                  <p className="text-xs text-gray-500" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                    {status.mobileDeviceUUID}
+                  </p>
                 </div>
                 {status.mobileBinded && (
                   <CheckCircle className="w-6 h-6 text-green-400" />
                 )}
-              </div>
+              </motion.div>
 
               {/* Genesis Hash Status */}
-              <div className={`flex items-center gap-3 px-6 py-4 rounded-xl ${status.genesisHashVerified ? 'bg-green-500/20 border border-green-500/30' : 'bg-gray-800/50 border border-gray-700'}`}>
+              <motion.div
+                whileHover={{ scale: 1.02 }}
+                className={`flex items-center gap-3 px-6 py-4 rounded-xl ${status.genesisHashVerified ? 'bg-green-500/20 border border-green-500/30' : 'bg-gray-800/50 border border-gray-700'}`}
+              >
                 <Lock className={`w-8 h-8 ${status.genesisHashVerified ? 'text-green-400' : 'text-gray-500'}`} />
                 <div>
                   <p className="text-sm text-gray-400">Genesis Hash</p>
@@ -126,7 +163,7 @@ export default function SecurityStatusBadge({ status }: SecurityStatusBadgeProps
                 {status.genesisHashVerified && (
                   <CheckCircle className="w-6 h-6 text-green-400" />
                 )}
-              </div>
+              </motion.div>
             </div>
           </div>
 
@@ -134,11 +171,11 @@ export default function SecurityStatusBadge({ status }: SecurityStatusBadgeProps
           {status.lastVerificationTimestamp && (
             <div className="mt-6 pt-6 border-t border-gray-700/50">
               <p className="text-sm text-gray-400">
-                Last Verification: <span className="text-white font-mono">{new Date(status.lastVerificationTimestamp).toLocaleString()}</span>
+                Last Verification: <span className="text-white" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{new Date(status.lastVerificationTimestamp).toLocaleString()}</span>
               </p>
             </div>
           )}
-        </div>
+        </motion.div>
       </div>
     </motion.div>
   );

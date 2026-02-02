@@ -290,43 +290,47 @@ export default function ArchitectCommandCenter() {
   // The loading state is bypassed after 1 second maximum
 
   return (
-    <div className="min-h-screen relative overflow-hidden">
-      {/* Unicorn of Trust Nebula Background */}
-      <div 
-        className="fixed inset-0 z-0"
-        style={{
-          background: `
-            radial-gradient(ellipse at top, rgba(139, 92, 246, 0.3) 0%, transparent 50%),
-            radial-gradient(ellipse at bottom, rgba(236, 72, 153, 0.2) 0%, transparent 50%),
-            radial-gradient(ellipse at left, rgba(59, 130, 246, 0.2) 0%, transparent 50%),
-            radial-gradient(ellipse at right, rgba(168, 85, 247, 0.2) 0%, transparent 50%),
-            linear-gradient(to bottom, #0a0a0a 0%, #1a0a2e 50%, #0a0a0a 100%)
-          `,
-        }}
-      />
+    <>
+      {/* Google Fonts: JetBrains Mono */}
+      <link rel="preconnect" href="https://fonts.googleapis.com" />
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+      <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 
-      {/* Animated Stars */}
-      <div className="fixed inset-0 z-0 opacity-50">
-        {[...Array(50)].map((_, i) => (
-          <motion.div
-            key={i}
-            className="absolute w-1 h-1 bg-white rounded-full"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-            }}
-            animate={{
-              opacity: [0.2, 1, 0.2],
-              scale: [1, 1.5, 1],
-            }}
-            transition={{
-              duration: 2 + Math.random() * 3,
-              repeat: Infinity,
-              delay: Math.random() * 2,
-            }}
-          />
-        ))}
-      </div>
+      <div className="min-h-screen relative overflow-hidden">
+        {/* Deep Space Background */}
+        <div
+          className="fixed inset-0 z-0"
+          style={{
+            background: `
+              radial-gradient(ellipse at top, rgba(30, 30, 40, 0.4) 0%, transparent 60%),
+              radial-gradient(ellipse at bottom right, rgba(20, 20, 30, 0.3) 0%, transparent 50%),
+              #050505
+            `,
+          }}
+        />
+
+        {/* Animated Stars */}
+        <div className="fixed inset-0 z-0 opacity-30">
+          {[...Array(50)].map((_, i) => (
+            <motion.div
+              key={i}
+              className="absolute w-1 h-1 bg-white rounded-full"
+              style={{
+                left: `${Math.random() * 100}%`,
+                top: `${Math.random() * 100}%`,
+              }}
+              animate={{
+                opacity: [0.2, 1, 0.2],
+                scale: [1, 1.5, 1],
+              }}
+              transition={{
+                duration: 2 + Math.random() * 3,
+                repeat: Infinity,
+                delay: Math.random() * 2,
+              }}
+            />
+          ))}
+        </div>
 
       {/* Main Content */}
       <div className="relative z-10 container mx-auto px-4 py-8">
@@ -399,6 +403,7 @@ export default function ArchitectCommandCenter() {
         />
       </div>
     </div>
+    </>
   );
 }
 

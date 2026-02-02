@@ -8,6 +8,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Shield, DollarSign, Globe, TrendingUp, Users, Building2 } from 'lucide-react';
 import { CommandCenterTelemetry } from '../../types/commandCenter';
+import SovereignBalance from './SovereignBalance';
 
 interface LiveTelemetryPanelProps {
   telemetry: CommandCenterTelemetry | null;
@@ -41,11 +42,10 @@ export default function LiveTelemetryPanel({ telemetry }: LiveTelemetryPanelProp
       color: 'from-green-500 to-emerald-500',
       stats: [
         { label: 'Total Tributes (VIDA)', value: telemetry.totalTributes.deepTruthVIDA.toFixed(8) },
-        { label: 'State Share (50%)', value: `${(telemetry.totalTributes.stateShareVIDA || 0).toFixed(8)} VIDA`, highlight: true },
-        { label: 'Citizen Share (50%)', value: `${(telemetry.totalTributes.citizenShareVIDA || 0).toFixed(8)} VIDA`, highlight: true },
         { label: 'Total Businesses Connected', value: telemetry.totalTributes.businessCount },
         { label: 'Last 24h Tributes', value: `${telemetry.totalTributes.last24hVIDA.toFixed(8)} VIDA` },
       ],
+      showSovereignBalance: true,
     },
     {
       title: 'NATIONAL LIQUIDITY LEVELS',
@@ -83,10 +83,11 @@ export default function LiveTelemetryPanel({ telemetry }: LiveTelemetryPanelProp
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: index * 0.1 }}
+            whileHover={{ scale: 1.02 }}
             className="relative group"
           >
-            {/* Card Container */}
-            <div className="relative bg-gradient-to-br from-gray-900/90 to-gray-800/90 backdrop-blur-xl border border-gray-700/50 rounded-2xl p-6 shadow-2xl hover:shadow-purple-500/20 transition-all duration-300">
+            {/* Card Container - Glassmorphism */}
+            <div className="relative bg-white/5 backdrop-blur-[10px] border border-white/10 rounded-2xl p-6 shadow-2xl hover:shadow-purple-500/20 transition-all duration-300">
               {/* Glow Effect */}
               <div className={`absolute inset-0 bg-gradient-to-r ${card.color} opacity-0 group-hover:opacity-10 rounded-2xl transition-opacity duration-300`} />
 
@@ -108,39 +109,51 @@ export default function LiveTelemetryPanel({ telemetry }: LiveTelemetryPanelProp
                 {card.stats.map((stat: any, statIndex: any) => (
                   <div
                     key={statIndex}
-                    className={`flex items-center justify-between p-3 rounded-lg ${
-                      ((stat as any).highlight)
-                        ? 'bg-gradient-to-r from-purple-900/50 to-pink-900/50 border border-purple-500/30'
-                        : 'bg-gray-800/50'
-                    }`}
+                    className="flex items-center justify-between p-3 rounded-lg bg-black/20"
                   >
                     <div className="flex items-center gap-2">
                       {stat.icon && <stat.icon className="w-4 h-4 text-gray-400" />}
-                      <span className={`text-sm ${((stat as any).highlight) ? 'text-white font-bold' : 'text-gray-400'}`}>
+                      <span className="text-sm text-gray-300">
                         {stat.label}
                       </span>
                     </div>
-                    <span className={`font-mono ${((stat as any).highlight) ? 'text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400' : 'text-lg font-bold text-white'}`}>
+                    <span className="font-mono text-lg font-bold text-white">
                       {stat.value}
                     </span>
                   </div>
                 ))}
               </div>
 
-              {/* Live Indicator */}
+              {/* Sovereign Balance Component (50:50 Split) */}
+              {(card as any).showSovereignBalance && (
+                <div className="mt-6">
+                  <SovereignBalance
+                    citizenShareVIDA={telemetry.totalTributes.citizenShareVIDA || 0}
+                    stateShareVIDA={telemetry.totalTributes.stateShareVIDA || 0}
+                  />
+                </div>
+              )}
+
+              {/* Enhanced LIVE Indicator with Pulsing Animation */}
               <div className="mt-6 flex items-center gap-2">
                 <motion.div
-                  className="w-2 h-2 bg-green-400 rounded-full"
+                  className="w-3 h-3 bg-green-400 rounded-full shadow-lg shadow-green-400/50"
                   animate={{
-                    opacity: [1, 0.3, 1],
-                    scale: [1, 1.2, 1],
+                    opacity: [1, 0.4, 1],
+                    scale: [1, 1.3, 1],
+                    boxShadow: [
+                      '0 0 10px rgba(74, 222, 128, 0.5)',
+                      '0 0 20px rgba(74, 222, 128, 0.8)',
+                      '0 0 10px rgba(74, 222, 128, 0.5)',
+                    ],
                   }}
                   transition={{
-                    duration: 2,
+                    duration: 1.5,
                     repeat: Infinity,
+                    ease: 'easeInOut',
                   }}
                 />
-                <span className="text-xs text-green-400 font-semibold">LIVE</span>
+                <span className="text-xs text-green-400 font-bold tracking-wider">LIVE</span>
               </div>
             </div>
           </motion.div>
