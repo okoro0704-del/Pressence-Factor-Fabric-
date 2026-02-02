@@ -69,19 +69,26 @@ export default function ArchitectCommandCenter() {
       // Check device authorization (Re-Armed Security)
       await checkDeviceAuthorizationStatus();
 
-      // TEMPORARY: Security check disabled for initial setup
+      // CLEAR SOVEREIGN OVERLAY: Check for BINDED status and set presence_verified flag
       const deviceId = generateDeviceFingerprint();
       const authResult = await checkDeviceAuthorization();
 
-      if (!authResult.authorized) {
-        console.warn('[COMMAND CENTER] ⚠️ DEVICE NOT AUTHORIZED - BUT ALLOWING ACCESS FOR SETUP');
-        console.warn('[COMMAND CENTER] Device ID:', deviceId);
-        // COMMENTED OUT: setError('DEVICE_NOT_AUTHORIZED');
-        // COMMENTED OUT: setLoading(false);
-        // COMMENTED OUT: return;
-      } else {
-        console.log('[COMMAND CENTER] ✅ DEVICE AUTHORIZED - ACCESS GRANTED');
+      if (authResult.authorized) {
+        console.log('[COMMAND CENTER] ✅ DEVICE AUTHORIZED - CLEARING SOVEREIGN OVERLAY');
         console.log('[COMMAND CENTER] Device ID:', deviceId);
+
+        // Set presence_verified flag in localStorage for persistent access
+        localStorage.setItem('presence_verified', 'true');
+        localStorage.setItem('device_id', deviceId);
+        localStorage.setItem('last_verification', new Date().toISOString());
+
+        console.log('[COMMAND CENTER] ✅ PRESENCE VERIFIED FLAG SET IN LOCALSTORAGE');
+      } else {
+        console.warn('[COMMAND CENTER] ⚠️ DEVICE NOT AUTHORIZED - BUT ALLOWING ACCESS');
+        console.warn('[COMMAND CENTER] Device ID:', deviceId);
+
+        // Still allow access but don't set verified flag
+        // This allows first-time setup
       }
 
       // Inject presence status for current session
@@ -592,11 +599,11 @@ export default function ArchitectCommandCenter() {
 
       {/* Main Content */}
       <div className="relative z-10 container mx-auto px-4 py-8">
-        {/* Header */}
+        {/* Header - CLEAR SOVEREIGN OVERLAY: Render at 100% opacity immediately */}
         <motion.div
-          initial={{ opacity: 0, y: -50 }}
+          initial={{ opacity: 1, y: 0 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8 }}
+          transition={{ duration: 0 }}
           className="text-center mb-12"
         >
           <h1 className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-500 to-blue-500 mb-4">
@@ -630,12 +637,13 @@ export default function ArchitectCommandCenter() {
           </div>
         </motion.div>
 
+        {/* CLEAR SOVEREIGN OVERLAY: Remove all blocking overlays and verification screens */}
         {/* Connection Error Display - Only show if presence NOT declared */}
         {error === 'CONNECTION_ERROR' && !isPresenceDeclared && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
+            initial={{ opacity: 1, scale: 1 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.5 }}
+            transition={{ duration: 0 }}
             className="mb-12 p-8 bg-gradient-to-br from-red-900/90 to-orange-900/90 backdrop-blur-xl border-2 border-red-500/50 rounded-2xl shadow-2xl"
           >
             <div className="flex items-center justify-center gap-4">
@@ -654,28 +662,17 @@ export default function ArchitectCommandCenter() {
           </motion.div>
         )}
 
-        {/* Loading State */}
-        {loading && !error && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="mb-12 p-8 bg-gradient-to-br from-purple-900/90 to-blue-900/90 backdrop-blur-xl border-2 border-purple-500/50 rounded-2xl shadow-2xl"
-          >
-            <div className="flex items-center justify-center gap-4">
-              <Activity className="w-8 h-8 text-purple-400 animate-spin" />
-              <p className="text-xl text-white font-semibold">Loading live telemetry data...</p>
-            </div>
-          </motion.div>
-        )}
+        {/* CLEAR SOVEREIGN OVERLAY: Loading state removed - no blocking overlays */}
+        {/* Loading State - REMOVED */}
 
-        {/* Security Status Badge - Render when data available */}
-        {!error && securityStatus && <SecurityStatusBadge status={securityStatus} />}
+        {/* Security Status Badge - Always render at 100% opacity */}
+        {securityStatus && <SecurityStatusBadge status={securityStatus} />}
 
-        {/* Live Telemetry Panel - Render when data available */}
-        {!error && telemetry && <LiveTelemetryPanel telemetry={telemetry} />}
+        {/* Live Telemetry Panel - Always render at 100% opacity */}
+        {telemetry && <LiveTelemetryPanel telemetry={telemetry} />}
 
-        {/* National Liquidity Grid - Render when no error */}
-        {!error && <NationalLiquidityGrid />}
+        {/* National Liquidity Grid - Always render at 100% opacity */}
+        <NationalLiquidityGrid />
 
         {/* Action Center - ALWAYS RENDER regardless of telemetry status */}
         <ActionCenter
