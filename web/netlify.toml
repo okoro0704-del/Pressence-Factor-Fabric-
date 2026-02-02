@@ -1,26 +1,28 @@
-# PFF — Netlify Configuration (Continuous Deployment)
+# PFF — Netlify Configuration (Minimal & Stable)
 # Framework: Next.js 16 Static Export
-# Architect: Isreal Okoro (mrfundzman)
 
 [build]
-  # Build command for Next.js static export
-  command = "npm run build"
+  # Build command with verbose logging
+  command = "npm ci && npm run build"
 
-  # Publish directory for static export (NOT .next for static export!)
+  # Publish directory
   publish = "out"
 
 [build.environment]
-  # Node.js version (Next.js 16 requires >=20.9.0)
+  # Node.js version
   NODE_VERSION = "20.10.0"
 
-  # Disable Next.js telemetry
+  # Disable telemetry
   NEXT_TELEMETRY_DISABLED = "1"
 
-  # Disable Netlify Next.js plugin (incompatible with static export)
+  # Skip Netlify plugins
   NETLIFY_NEXT_PLUGIN_SKIP = "true"
 
-  # Increase Node memory limit for build (4GB)
+  # Memory limit
   NODE_OPTIONS = "--max-old-space-size=4096"
+
+  # Enable verbose logging
+  NPM_FLAGS = "--loglevel=verbose"
 
 # Redirect root to Command Center
 [[redirects]]
