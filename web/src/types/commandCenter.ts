@@ -19,6 +19,8 @@ export interface CommandCenterTelemetry {
     deepTruthUSD: number;
     businessCount: number;
     last24hVIDA: number;
+    stateShareVIDA?: number;      // 50% State allocation
+    citizenShareVIDA?: number;    // 50% Citizen allocation
   };
   nationalLiquidity: {
     totalReservesVIDA: number;

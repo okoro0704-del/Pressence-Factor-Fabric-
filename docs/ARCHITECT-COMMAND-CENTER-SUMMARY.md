@@ -89,16 +89,18 @@ I've successfully built the complete **Architect's Sentinel Command Center** - a
 ### Total Tributes Panel
 
 **Metrics Displayed:**
-- **Deep Truth Tributes (VIDA)** — Total VIDA collected from 10% tribute
-- **Deep Truth Tributes (USD)** — USD equivalent of tributes
+- **Total Tributes (VIDA)** — Total VIDA collected from Deep Truth Feed tributes
+- **State Share (50%)** — 50% allocation to State reserves (highlighted)
+- **Citizen Share (50%)** — 50% allocation to Citizen dividend pool (highlighted)
 - **Total Businesses Connected** — Count of businesses using Deep Truth Feed
 - **Last 24h Tributes** — Tributes collected in last 24 hours
 
 **Visual Features:**
 - Green-to-emerald gradient icon
-- "The 10% Stream" subtitle
+- "50:50 Economic Model" subtitle
 - Monospace font for currency values
 - Live indicator with pulsing green dot
+- Highlighted State and Citizen shares with gradient text
 
 ### National Liquidity Panel
 

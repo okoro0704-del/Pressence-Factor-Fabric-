@@ -36,12 +36,13 @@ export default function LiveTelemetryPanel({ telemetry }: LiveTelemetryPanelProp
     },
     {
       title: 'TOTAL TRIBUTES COLLECTED',
-      subtitle: 'The 10% Stream',
+      subtitle: '50:50 Economic Model',
       icon: DollarSign,
       color: 'from-green-500 to-emerald-500',
       stats: [
-        { label: 'Deep Truth Tributes (VIDA)', value: telemetry.totalTributes.deepTruthVIDA.toFixed(8) },
-        { label: 'Deep Truth Tributes (USD)', value: `$${telemetry.totalTributes.deepTruthUSD.toFixed(2)}` },
+        { label: 'Total Tributes (VIDA)', value: telemetry.totalTributes.deepTruthVIDA.toFixed(8) },
+        { label: 'State Share (50%)', value: `${(telemetry.totalTributes.stateShareVIDA || 0).toFixed(8)} VIDA`, highlight: true },
+        { label: 'Citizen Share (50%)', value: `${(telemetry.totalTributes.citizenShareVIDA || 0).toFixed(8)} VIDA`, highlight: true },
         { label: 'Total Businesses Connected', value: telemetry.totalTributes.businessCount },
         { label: 'Last 24h Tributes', value: `${telemetry.totalTributes.last24hVIDA.toFixed(8)} VIDA` },
       ],

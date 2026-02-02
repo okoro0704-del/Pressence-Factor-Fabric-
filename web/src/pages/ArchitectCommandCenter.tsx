@@ -112,6 +112,8 @@ export default function ArchitectCommandCenter() {
           deepTruthUSD: Number(telemetryData.total_tributes_usd || 0),
           businessCount: telemetryData.business_count || 0,
           last24hVIDA: Number(telemetryData.last_24h_tributes_vida || 0),
+          stateShareVIDA: Number(telemetryData.state_share_vida || 0),
+          citizenShareVIDA: Number(telemetryData.citizen_share_vida || 0),
         },
         nationalLiquidity: {
           totalReservesVIDA,
