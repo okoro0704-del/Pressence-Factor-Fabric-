@@ -11,6 +11,7 @@ export {
   getEth,
 } from './wallet';
 export { getDLLRBalance } from './dllr';
+export { sendDLLR, isValidAddress, type SendDLLRParams, type SendDLLRResult } from './sendDLLR';
 export {
   runMasterHandshake,
   isMasterHandshakeComplete,

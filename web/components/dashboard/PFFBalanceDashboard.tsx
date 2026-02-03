@@ -5,6 +5,7 @@ import { TotalPFFBalance } from './TotalPFFBalance';
 import { FundzmanUBAAccount } from './FundzmanUBAAccount';
 import { LegacyAccountsList } from './LegacyAccountsList';
 import { NationalScaleTicker } from './NationalScaleTicker';
+import { GlobalTradeCard } from './GlobalTradeCard';
 import { calculatePFFBalance, createFundzmanDefaultAccount, type BankAccount, AccountCategory } from '@/lib/pffAggregation';
 
 interface PFFBalanceDashboardProps {
@@ -98,6 +99,17 @@ export function PFFBalanceDashboard({ phoneNumber, spendableVida }: PFFBalanceDa
         {/* PRIMARY: Total PFF Balance */}
         <section>
           <TotalPFFBalance breakdown={pffBreakdown} />
+        </section>
+
+        {/* GLOBAL TRADE: DLLR Wallet & Trading HUD */}
+        <section>
+          <div className="mb-4">
+            <div className="flex items-center gap-2">
+              <div className="h-1 w-8 bg-gradient-to-r from-[#D4AF37] to-transparent" />
+              <h2 className="text-sm font-bold text-[#D4AF37] uppercase tracking-wider">Global Trade</h2>
+            </div>
+          </div>
+          <GlobalTradeCard />
         </section>
 
         {/* SECONDARY: Fundzman by UBA (Sovereign Default) */}
