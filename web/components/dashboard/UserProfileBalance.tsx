@@ -231,7 +231,7 @@ export function UserProfileBalance() {
               <div className="flex items-center justify-between">
                 <span className="text-xs text-[#6b6b70]">Naira Equivalent</span>
                 <span className="text-sm font-mono text-[#00ff41]">
-                  ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦{yourShareNaira.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  ₦{yourShareNaira.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
               <div className="flex items-center justify-between pt-2 border-t border-[#2a2a2e]">
