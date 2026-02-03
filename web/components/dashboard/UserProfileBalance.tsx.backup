@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState, useEffect } from 'react';
 import { fetchCitizenVault, type CitizenVault } from '@/lib/supabaseTelemetry';
@@ -6,7 +6,6 @@ import { getCitizenVaultData } from '@/lib/mockDataService';
 import { SendVidaModal } from './SendVidaModal';
 import { UBABrandingCard } from './UBABrandingCard';
 
-export function UserProfileBalance() {
   const [vaultData, setVaultData] = useState<CitizenVault | null>(null);
   const [loading, setLoading] = useState(true);
   const [showSendVida, setShowSendVida] = useState(false);
@@ -227,12 +226,6 @@ export function UserProfileBalance() {
 
       <UBABrandingCard linkedAccounts={vaultData.linked_bank_accounts} />
 
-      <SendVidaModal
-        isOpen={showSendVida}
-        onClose={() => setShowSendVida(false)}
-        senderPhone="+2348012345678"
-        maxAmount={1.0}
-      />
-    </div>
-  );
-}
+      <UBABrandingCard linkedAccounts={vaultData.linked_bank_accounts} />
+
+      <UBABrandingCard linkedAccounts={vaultData.linked_bank_accounts} />
