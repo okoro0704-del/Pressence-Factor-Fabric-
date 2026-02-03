@@ -1,0 +1,84 @@
+{
+  "language": {
+    "name": "Français",
+    "code": "fr",
+    "direction": "ltr"
+  },
+  "common": {
+    "loading": "Chargement...",
+    "error": "Erreur",
+    "success": "Succès",
+    "cancel": "Annuler",
+    "confirm": "Confirmer",
+    "close": "Fermer",
+    "save": "Enregistrer",
+    "delete": "Supprimer",
+    "edit": "Modifier",
+    "back": "Retour",
+    "next": "Suivant",
+    "submit": "Soumettre"
+  },
+  "pff": {
+    "totalPFFBalance": "Solde Total PFF",
+    "nationalVault": "Coffre National",
+    "spendableVIDA": "VIDA Dépensable",
+    "sovereignShare": "Part Souveraine",
+    "vidaCap": "VIDA CAP",
+    "presenceFactorFabric": "Tissu du Facteur de Présence",
+    "architectVault": "Coffre de l'Architecte",
+    "stateVault": "Coffre de l'État",
+    "lockedUntil1B": "Verrouillé Jusqu'à 1 Milliard"
+  },
+  "banking": {
+    "fundzmanByUBA": "Fundzman par UBA",
+    "sovereignDefault": "Souverain par Défaut",
+    "preActivated": "Pré-Activé",
+    "nationalBlockAccount": "Compte Bloc National",
+    "legacyAccounts": "Comptes Hérités",
+    "linkExternalInstitution": "Lier Institution Externe",
+    "accountNumber": "Numéro de Compte",
+    "accountName": "Nom du Compte",
+    "balance": "Solde",
+    "status": "Statut",
+    "active": "Actif",
+    "pending": "En Attente",
+    "inactive": "Inactif"
+  },
+  "features": {
+    "instantTransfers": "Transferts Instantanés",
+    "biometricLock": "Verrouillage Biométrique",
+    "globalAccess": "Accès Mondial",
+    "vidaBridge": "Pont VIDA",
+    "zeroFees": "Zéro Frais",
+    "fourLayerSecurity": "Sécurité à 4 Couches"
+  },
+  "ticker": {
+    "activeSovereignNodes": "Nœuds Souverains Actifs",
+    "poweredByUBA": "Alimenté par le Pont de Liquidité UBA",
+    "networkUptime": "Temps de Disponibilité du Réseau",
+    "transactionsPerSec": "Transactions/Sec",
+    "totalVolume24h": "Volume Total (24h)",
+    "live": "EN DIRECT"
+  },
+  "dashboard": {
+    "welcome": "Bienvenue",
+    "primaryAccount": "Compte Principal",
+    "secondaryAccount": "Compte Secondaire",
+    "tertiaryAccounts": "Comptes Tertiaires",
+    "nationalReserve": "Réserve Nationale",
+    "backedByUBA": "Soutenu par l'infrastructure de liquidité souveraine d'UBA",
+    "biometricProtection": "L'authentification biométrique protège chaque transaction",
+    "instantTransfersDesc": "Zéro frais entre Fundzman et les comptes hérités"
+  },
+  "companion": {
+    "greeting": "Bonjour, Citoyen Souverain",
+    "vitalized": "Je Suis Vitalisé",
+    "howCanIHelp": "Comment Puis-je Vous Aider Aujourd'hui?",
+    "processingRequest": "Traitement de Votre Demande...",
+    "requestComplete": "Demande Terminée"
+  },
+  "formula": {
+    "pffCalculation": "Solde PFF = Fundzman + Hérités + VIDA"
+  }
+}
+

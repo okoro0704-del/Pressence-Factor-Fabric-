@@ -1,0 +1,84 @@
+{
+  "language": {
+    "name": "中文",
+    "code": "zh",
+    "direction": "ltr"
+  },
+  "common": {
+    "loading": "加载中...",
+    "error": "错误",
+    "success": "成功",
+    "cancel": "取消",
+    "confirm": "确认",
+    "close": "关闭",
+    "save": "保存",
+    "delete": "删除",
+    "edit": "编辑",
+    "back": "返回",
+    "next": "下一步",
+    "submit": "提交"
+  },
+  "pff": {
+    "totalPFFBalance": "PFF 总余额",
+    "nationalVault": "国家金库",
+    "spendableVIDA": "可支配 VIDA",
+    "sovereignShare": "主权份额",
+    "vidaCap": "VIDA CAP",
+    "presenceFactorFabric": "存在因子结构",
+    "architectVault": "架构师金库",
+    "stateVault": "国家金库",
+    "lockedUntil1B": "锁定至10亿用户"
+  },
+  "banking": {
+    "fundzmanByUBA": "UBA Fundzman",
+    "sovereignDefault": "主权默认",
+    "preActivated": "预激活",
+    "nationalBlockAccount": "国家区块账户",
+    "legacyAccounts": "传统账户",
+    "linkExternalInstitution": "关联外部机构",
+    "accountNumber": "账号",
+    "accountName": "账户名称",
+    "balance": "余额",
+    "status": "状态",
+    "active": "活跃",
+    "pending": "待处理",
+    "inactive": "未激活"
+  },
+  "features": {
+    "instantTransfers": "即时转账",
+    "biometricLock": "生物识别锁",
+    "globalAccess": "全球访问",
+    "vidaBridge": "VIDA 桥接",
+    "zeroFees": "零手续费",
+    "fourLayerSecurity": "四层安全"
+  },
+  "ticker": {
+    "activeSovereignNodes": "活跃主权节点",
+    "poweredByUBA": "由 UBA 流动性桥接提供支持",
+    "networkUptime": "网络正常运行时间",
+    "transactionsPerSec": "每秒交易数",
+    "totalVolume24h": "总交易量（24小时）",
+    "live": "实时"
+  },
+  "dashboard": {
+    "welcome": "欢迎",
+    "primaryAccount": "主账户",
+    "secondaryAccount": "次账户",
+    "tertiaryAccounts": "第三账户",
+    "nationalReserve": "国家储备",
+    "backedByUBA": "由 UBA 主权流动性基础设施支持",
+    "biometricProtection": "生物识别认证保护每笔交易",
+    "instantTransfersDesc": "Fundzman 与传统账户之间零手续费"
+  },
+  "companion": {
+    "greeting": "您好，主权公民",
+    "vitalized": "我已激活",
+    "howCanIHelp": "今天我能为您做什么？",
+    "processingRequest": "正在处理您的请求...",
+    "requestComplete": "请求已完成"
+  },
+  "formula": {
+    "pffCalculation": "PFF 余额 = Fundzman + 传统 + VIDA"
+  }
+}
+

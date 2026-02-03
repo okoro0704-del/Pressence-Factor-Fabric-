@@ -1,0 +1,84 @@
+{
+  "language": {
+    "name": "Hausa",
+    "code": "ha",
+    "direction": "ltr"
+  },
+  "common": {
+    "loading": "Ana Lodi...",
+    "error": "Kuskure",
+    "success": "Nasara",
+    "cancel": "Soke",
+    "confirm": "Tabbatar",
+    "close": "Rufe",
+    "save": "Ajiye",
+    "delete": "Goge",
+    "edit": "Gyara",
+    "back": "Koma Baya",
+    "next": "Na Gaba",
+    "submit": "Aika"
+  },
+  "pff": {
+    "totalPFFBalance": "Jimlar Kudin PFF",
+    "nationalVault": "Ma'ajin Kasa",
+    "spendableVIDA": "VIDA Mai Kashewa",
+    "sovereignShare": "Rabon Mai Mulki",
+    "vidaCap": "VIDA CAP",
+    "presenceFactorFabric": "Masana'antar Kasancewar Mutum",
+    "architectVault": "Ma'ajin Mai Gini",
+    "stateVault": "Ma'ajin Gwamnati",
+    "lockedUntil1B": "An Kulle Har Biliyan 1"
+  },
+  "banking": {
+    "fundzmanByUBA": "Fundzman Ta UBA",
+    "sovereignDefault": "Mai Mulki Na Asali",
+    "preActivated": "An Riga An Kunna",
+    "nationalBlockAccount": "Asusun Toshe Na Kasa",
+    "legacyAccounts": "Asusun Gargajiya",
+    "linkExternalInstitution": "Haɗa Cibiyar Waje",
+    "accountNumber": "Lambar Asusun",
+    "accountName": "Sunan Asusun",
+    "balance": "Ma'auni",
+    "status": "Matsayi",
+    "active": "Mai Aiki",
+    "pending": "Ana Jira",
+    "inactive": "Ba Ya Aiki"
+  },
+  "features": {
+    "instantTransfers": "Canja Wurin Nan Take",
+    "biometricLock": "Kulle Na Halittar Jiki",
+    "globalAccess": "Samun Dama Na Duniya",
+    "vidaBridge": "Gada Na VIDA",
+    "zeroFees": "Babu Kudin Sabis",
+    "fourLayerSecurity": "Tsaro Mai Mataki Huɗu"
+  },
+  "ticker": {
+    "activeSovereignNodes": "Nodes Masu Mulki Masu Aiki",
+    "poweredByUBA": "Ana Samar Da Ƙarfi Ta Hanyar Gada Na Kuɗi Na UBA",
+    "networkUptime": "Lokacin Aiki Na Hanyar Sadarwa",
+    "transactionsPerSec": "Ma'amaloli/Daƙiƙa",
+    "totalVolume24h": "Jimlar Yawan (Awanni 24)",
+    "live": "KAI TSAYE"
+  },
+  "dashboard": {
+    "welcome": "Barka Da Zuwa",
+    "primaryAccount": "Asusun Farko",
+    "secondaryAccount": "Asusun Na Biyu",
+    "tertiaryAccounts": "Asusun Na Uku",
+    "nationalReserve": "Ajiyar Kasa",
+    "backedByUBA": "Ana Goyan Baya Ta Hanyar Tsarin Kuɗin Mai Mulki Na UBA",
+    "biometricProtection": "Kariyar Halittar Jiki Tana Kare Kowane Ma'amala",
+    "instantTransfersDesc": "Babu Kudin Sabis Tsakanin Fundzman Da Asusun Gargajiya"
+  },
+  "companion": {
+    "greeting": "Sannu, ɗan Ƙasa Mai Mulki",
+    "vitalized": "Na Sami Ƙarfi",
+    "howCanIHelp": "Ta Yaya Zan Iya Taimaka Maka Yau?",
+    "processingRequest": "Ana Aiwatar Da Buƙatarka...",
+    "requestComplete": "An Kammala Buƙata"
+  },
+  "formula": {
+    "pffCalculation": "Kudin PFF = Fundzman + Gargajiya + VIDA"
+  }
+}
+

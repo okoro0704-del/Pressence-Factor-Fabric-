@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import type { PFFBalanceBreakdown } from '@/lib/pffAggregation';
+import { useTranslation } from '@/lib/i18n/TranslationContext';
 
 interface TotalPFFBalanceProps {
   breakdown: PFFBalanceBreakdown;
@@ -13,6 +14,7 @@ interface TotalPFFBalanceProps {
  * Formula: (Fundzman by UBA) + (External Accounts) + (20% Spendable VIDA Value)
  */
 export function TotalPFFBalance({ breakdown }: TotalPFFBalanceProps) {
+  const { t } = useTranslation();
   const [isAnimating, setIsAnimating] = useState(false);
 
   useEffect(() => {
@@ -37,7 +39,7 @@ export function TotalPFFBalance({ breakdown }: TotalPFFBalanceProps) {
           <div className="flex items-center justify-center gap-3">
             <span className="text-4xl">⚡</span>
             <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-[#e8c547] via-[#ffd700] to-[#e8c547] uppercase tracking-wider">
-              TOTAL PFF BALANCE
+              {t('pff.totalPFFBalance')}
             </h2>
             <span className="text-4xl">⚡</span>
           </div>
