@@ -1,16 +1,19 @@
+'use client';
+
 import { DashboardContent } from '@/components/sovryn/DashboardContent';
-import type { Metadata } from 'next';
+import { ProtectedRoute } from '@/components/dashboard/ProtectedRoute';
 
-export const metadata: Metadata = {
-  title: 'Dashboard | PFF × Sovryn — Presence-Gated DeFi',
-  description:
-    'My wealth is secured by my presence. DLLR balance, presence-gated Sovryn actions on Rootstock.',
-};
-
+/**
+ * DASHBOARD PAGE - PROTECTED
+ * Requires 4-layer authentication to access
+ * Users without verified presence are redirected to gate
+ */
 export default function DashboardPage() {
   return (
-    <main className="min-h-screen bg-[#0d0d0f]">
-      <DashboardContent />
-    </main>
+    <ProtectedRoute>
+      <main className="min-h-screen bg-[#0d0d0f]">
+        <DashboardContent />
+      </main>
+    </ProtectedRoute>
   );
 }

@@ -118,10 +118,10 @@ export function DashboardContent() {
               National Pulse →
             </Link>
             <Link
-              href="/vitalize/register"
+              href="/registration"
               className="text-sm font-medium text-[#c9a227] hover:text-[#e8c547] transition-colors"
             >
-              Register device →
+              Registration Hub →
             </Link>
             <Link
               href="/vitalization"

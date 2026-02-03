@@ -102,8 +102,8 @@ export function ManifestoContent() {
       <footer className="mt-24 pt-8 border-t border-[#2a2a2e] text-center text-sm text-[#6b6b70]">
         <p className="mb-4">PFF — Presence Factor Fabric. Born in Lagos. Built for the World.</p>
         <p className="mb-2">
-          <Link href="/vitalize/register" className="text-[#c9a227] hover:text-[#e8c547] underline">
-            Register device
+          <Link href="/registration" className="text-[#c9a227] hover:text-[#e8c547] underline">
+            Registration Hub
           </Link>
           {' · '}
           <Link href="/pulse" className="text-[#c9a227] hover:text-[#e8c547] underline">

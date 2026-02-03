@@ -5,10 +5,17 @@ import { fetchCitizenVault, type CitizenVault } from '@/lib/supabaseTelemetry';
 import { getCitizenVaultData } from '@/lib/mockDataService';
 import { SendVidaModal } from './SendVidaModal';
 import { UBABrandingCard } from './UBABrandingCard';
+import { PresenceOverrideModal } from './PresenceOverrideModal';
+import { GenesisHandshakeIndicator } from './GenesisHandshakeIndicator';
+import { checkPresenceVerified } from '@/lib/withPresenceCheck';
+import type { GlobalIdentity } from '@/lib/phoneIdentity';
 
+export function UserProfileBalance() {
   const [vaultData, setVaultData] = useState<CitizenVault | null>(null);
   const [loading, setLoading] = useState(true);
   const [showSendVida, setShowSendVida] = useState(false);
+  const [showPresenceModal, setShowPresenceModal] = useState(false);
+  const [isPresenceVerified, setIsPresenceVerified] = useState(false);
 
   const TOTAL_MINTED_CAP = 10;
   const ARCHITECT_SHARE = 5;
@@ -42,6 +49,41 @@ import { UBABrandingCard } from './UBABrandingCard';
     loadVaultData();
   }, []);
 
+  // Check presence verification status
+  useEffect(() => {
+    const checkPresence = async () => {
+      const result = await checkPresenceVerified();
+      setIsPresenceVerified(result.verified);
+    };
+    checkPresence();
+    
+    // Recheck every 30 seconds
+    const interval = setInterval(checkPresence, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handlePresenceVerified = (identity: GlobalIdentity) => {
+    setShowPresenceModal(false);
+    setIsPresenceVerified(true);
+  };
+
+  const handleSwapClick = () => {
+    if (!isPresenceVerified) {
+      setShowPresenceModal(true);
+    } else {
+      // TODO: Implement swap functionality
+      console.log('Swap clicked');
+    }
+  };
+
+  const handleSendClick = () => {
+    if (!isPresenceVerified) {
+      setShowPresenceModal(true);
+    } else {
+      setShowSendVida(true);
+    }
+  };
+
   if (loading || !vaultData) {
     return (
       <div className="space-y-6">
@@ -64,6 +106,11 @@ import { UBABrandingCard } from './UBABrandingCard';
 
   return (
     <div className="space-y-6">
+      {/* Genesis Handshake Indicator */}
+      <div className="flex justify-end">
+        <GenesisHandshakeIndicator onTriggerScan={() => setShowPresenceModal(true)} />
+      </div>
+
       <div className="bg-[#16161a] rounded-xl p-6 border border-[#2a2a2e]">
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -81,9 +128,17 @@ import { UBABrandingCard } from './UBABrandingCard';
       </div>
 
       <div className="bg-[#16161a] rounded-xl p-6 border border-[#2a2a2e]">
-        <h3 className="text-sm font-semibold text-[#e8c547] uppercase tracking-wider mb-6 text-center">
-          ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¯ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â THE ARCHITECT'S TRIAD VAULT SYSTEM ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¯ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â
-        </h3>
+        <div className="flex items-center justify-center gap-3 mb-6">
+          <svg className="w-5 h-5 text-[#e8c547]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+          </svg>
+          <h3 className="text-sm font-semibold text-[#e8c547] uppercase tracking-wider">
+            THE ARCHITECT'S TRIAD VAULT SYSTEM
+          </h3>
+          <svg className="w-5 h-5 text-[#e8c547]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+          </svg>
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <div className="relative bg-gradient-to-br from-[#c9a227]/20 to-[#e8c547]/10 rounded-xl p-5 border-2 border-[#c9a227]/50 overflow-hidden group">
@@ -103,10 +158,10 @@ import { UBABrandingCard } from './UBABrandingCard';
                     USD: <span className="font-mono text-[#f5f5f5]">${liquidUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </p>
                   <p className="text-xs text-[#6b6b70]">
-                    Naira: <span className="font-mono text-[#00ff41]">ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦{liquidNaira.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    Naira: <span className="font-mono text-[#00ff41]">₦{liquidNaira.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </p>
                 </div>
-                <p className="text-[10px] text-[#6b6b70] mt-3 uppercase tracking-wide">ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â½ 20% Spendable Reserve</p>
+                <p className="text-[10px] text-[#6b6b70] mt-3 uppercase tracking-wide">20% Spendable Reserve</p>
               </div>
             </div>
           </div>
@@ -116,7 +171,12 @@ import { UBABrandingCard } from './UBABrandingCard';
             <div className="relative z-10">
               <div className="flex items-center justify-between mb-3">
                 <h4 className="text-xs font-bold text-red-400 uppercase tracking-wider">Vault 2: Sovereign Lock</h4>
-                <span className="text-xs font-mono text-red-400 bg-red-500/20 px-2 py-1 rounded animate-pulse">ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚ÂÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ LOCKED</span>
+                <span className="text-xs font-mono text-red-400 bg-red-500/20 px-2 py-1 rounded animate-pulse flex items-center gap-1">
+                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                  </svg>
+                  LOCKED
+                </span>
               </div>
               <div className="space-y-2">
                 <p className="text-4xl font-bold font-mono text-red-400 tracking-tight">
@@ -128,10 +188,10 @@ import { UBABrandingCard } from './UBABrandingCard';
                     USD: <span className="font-mono text-[#f5f5f5]">${lockedUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </p>
                   <p className="text-xs text-[#6b6b70]">
-                    Naira: <span className="font-mono text-[#00ff41]">ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦{lockedNaira.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    Naira: <span className="font-mono text-[#00ff41]">₦{lockedNaira.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </p>
                 </div>
-                <p className="text-[10px] text-[#6b6b70] mt-3 uppercase tracking-wide">ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚ÂºÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¯ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â 80% Sovereign Guarantee</p>
+                <p className="text-[10px] text-[#6b6b70] mt-3 uppercase tracking-wide">80% Sovereign Guarantee</p>
               </div>
             </div>
           </div>
@@ -143,7 +203,7 @@ import { UBABrandingCard } from './UBABrandingCard';
             <span className="text-xs font-mono text-[#6b6b70]">{CURRENT_USERS.toLocaleString()} / 1B Users</span>
           </div>
           <div className="relative w-full h-6 bg-[#16161a] rounded-full overflow-hidden border border-[#2a2a2e]">
-            <div 
+            <div
               className="absolute top-0 left-0 h-full bg-gradient-to-r from-[#c9a227] to-[#e8c547] rounded-full transition-all duration-1000"
               style={{ width: `${Math.max(progressPercent, 0.5)}%` }}
             >
@@ -155,17 +215,28 @@ import { UBABrandingCard } from './UBABrandingCard';
               </span>
             </div>
           </div>
-          <p className="text-[10px] text-[#6b6b70] mt-2 text-center uppercase tracking-wide">
-            ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â Locked Vault Releases at 1 Billion PFF Users
+          <p className="text-[10px] text-[#6b6b70] mt-2 text-center uppercase tracking-wide flex items-center justify-center gap-1">
+            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+            </svg>
+            Locked Vault Releases at 1 Billion PFF Users
           </p>
         </div>
 
         <div className="grid grid-cols-2 gap-3 mb-6">
-          <button className="relative bg-gradient-to-br from-[#c9a227]/30 to-[#e8c547]/20 hover:from-[#c9a227]/40 hover:to-[#e8c547]/30 text-[#e8c547] font-bold py-3 px-4 rounded-lg border border-[#c9a227]/50 transition-all duration-300 group">
-            <span className="relative z-10 text-sm uppercase tracking-wider">ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â± Swap</span>
+          <button
+            onClick={handleSwapClick}
+            disabled={!isPresenceVerified}
+            className={`relative bg-gradient-to-br from-[#c9a227]/30 to-[#e8c547]/20 hover:from-[#c9a227]/40 hover:to-[#e8c547]/30 text-[#e8c547] font-bold py-3 px-4 rounded-lg border border-[#c9a227]/50 transition-all duration-300 group ${!isPresenceVerified ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            <span className="relative z-10 text-sm uppercase tracking-wider">Swap</span>
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[#e8c547]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
           </button>
-          <button onClick={() => setShowSendVida(true)} className="relative bg-gradient-to-br from-[#c9a227]/30 to-[#e8c547]/20 hover:from-[#c9a227]/40 hover:to-[#e8c547]/30 text-[#e8c547] font-bold py-3 px-4 rounded-lg border border-[#c9a227]/50 transition-all duration-300 group">
+          <button
+            onClick={handleSendClick}
+            disabled={!isPresenceVerified}
+            className={`relative bg-gradient-to-br from-[#c9a227]/30 to-[#e8c547]/20 hover:from-[#c9a227]/40 hover:to-[#e8c547]/30 text-[#e8c547] font-bold py-3 px-4 rounded-lg border border-[#c9a227]/50 transition-all duration-300 group ${!isPresenceVerified ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
             <span className="relative z-10 text-sm uppercase tracking-wider">📤 Send</span>
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[#e8c547]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
           </button>
@@ -173,11 +244,15 @@ import { UBABrandingCard } from './UBABrandingCard';
 
         <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
           <div className="flex items-start gap-3">
-            <span className="text-2xl">ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¯ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â</span>
+            <div className="flex-shrink-0">
+              <svg className="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
             <div>
               <p className="text-xs font-bold text-red-400 uppercase tracking-wider mb-1">Transaction Limit Notice</p>
               <p className="text-xs text-[#6b6b70] leading-relaxed">
-                Swap and Send operations are limited to <span className="font-mono text-[#e8c547]">1.00 VIDA CAP</span> (Vault 1: Liquid). 
+                Swap and Send operations are limited to <span className="font-mono text-[#e8c547]">1.00 VIDA CAP</span> (Vault 1: Liquid).
                 Attempting to move more will trigger: <span className="font-mono text-red-400">"Asset Locked: Requires 1B User Milestone for Release."</span>
               </p>
             </div>
@@ -210,7 +285,7 @@ import { UBABrandingCard } from './UBABrandingCard';
               <div className="flex items-center justify-between">
                 <span className="text-xs text-[#6b6b70]">Naira Equivalent</span>
                 <span className="text-sm font-mono text-[#00ff41]">
-                  ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦{yourShareNaira.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  ₦{yourShareNaira.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
               <div className="flex items-center justify-between pt-2 border-t border-[#2a2a2e]">
@@ -226,6 +301,19 @@ import { UBABrandingCard } from './UBABrandingCard';
 
       <UBABrandingCard linkedAccounts={vaultData.linked_bank_accounts} />
 
-      <UBABrandingCard linkedAccounts={vaultData.linked_bank_accounts} />
+      <SendVidaModal
+        isOpen={showSendVida}
+        onClose={() => setShowSendVida(false)}
+        senderPhone="+2348012345678"
+        maxAmount={1.0}
+      />
 
-      <UBABrandingCard linkedAccounts={vaultData.linked_bank_accounts} />
+      <PresenceOverrideModal
+        isOpen={showPresenceModal}
+        onClose={() => setShowPresenceModal(false)}
+        onPresenceVerified={handlePresenceVerified}
+      />
+    </div>
+  );
+}
+

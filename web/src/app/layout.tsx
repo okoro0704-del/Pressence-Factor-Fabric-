@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { HowToInstallTooltip } from '@/components/HowToInstallTooltip';
+import { GlobalPresenceGatewayProvider } from '@/contexts/GlobalPresenceGateway';
 import Script from 'next/script';
 
 export const metadata: Metadata = {
@@ -214,8 +215,10 @@ export default function RootLayout({
         />
       </head>
       <body className="bg-[#0d0d0f] text-[#f5f5f5] antialiased">
-        {children}
-        <HowToInstallTooltip />
+        <GlobalPresenceGatewayProvider>
+          {children}
+          <HowToInstallTooltip />
+        </GlobalPresenceGatewayProvider>
       </body>
     </html>
   );

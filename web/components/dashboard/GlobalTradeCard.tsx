@@ -9,9 +9,6 @@ import {
   isMasterHandshakeComplete,
 } from '@/lib/sovryn';
 import { sendDLLR, isValidAddress } from '@/lib/sovryn/sendDLLR';
-import { checkPresenceVerified } from '@/lib/withPresenceCheck';
-import { PresenceOverrideModal } from './PresenceOverrideModal';
-import type { GlobalIdentity } from '@/lib/phoneIdentity';
 
 const jetbrains = JetBrains_Mono({ weight: ['400', '600', '700'], subsets: ['latin'] });
 
@@ -26,8 +23,7 @@ export function GlobalTradeCard() {
   const [balanceRaw, setBalanceRaw] = useState<bigint | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isPresenceVerified, setIsPresenceVerified] = useState(false);
-  
+
   // Send functionality
   const [showSendModal, setShowSendModal] = useState(false);
   const [recipientAddress, setRecipientAddress] = useState('');
@@ -35,22 +31,6 @@ export function GlobalTradeCard() {
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [sendSuccess, setSendSuccess] = useState<string | null>(null);
-  
-  // Presence modal
-  const [showPresenceModal, setShowPresenceModal] = useState(false);
-
-  // Check presence verification status
-  useEffect(() => {
-    const checkPresence = async () => {
-      const result = await checkPresenceVerified();
-      setIsPresenceVerified(result.verified);
-    };
-    checkPresence();
-
-    // Recheck every 30 seconds
-    const interval = setInterval(checkPresence, 30000);
-    return () => clearInterval(interval);
-  }, []);
 
   // Auto-refresh balance every 30 seconds
   useEffect(() => {
@@ -104,18 +84,9 @@ export function GlobalTradeCard() {
   }, []);
 
   const handleSendClick = () => {
-    if (!isPresenceVerified) {
-      setShowPresenceModal(true);
-    } else {
-      setShowSendModal(true);
-    }
-  };
-
-  const handlePresenceVerified = (identity: GlobalIdentity) => {
-    setShowPresenceModal(false);
-    setIsPresenceVerified(true);
-    // Open send modal after verification
-    setTimeout(() => setShowSendModal(true), 500);
+    // User is already authenticated via 4-layer gate
+    // No need for additional presence check
+    setShowSendModal(true);
   };
 
   const handleSendSubmit = async () => {
@@ -477,13 +448,6 @@ export function GlobalTradeCard() {
           </div>
         </div>
       )}
-
-      {/* Presence Override Modal */}
-      <PresenceOverrideModal
-        isOpen={showPresenceModal}
-        onClose={() => setShowPresenceModal(false)}
-        onPresenceVerified={handlePresenceVerified}
-      />
     </>
   );
 }
