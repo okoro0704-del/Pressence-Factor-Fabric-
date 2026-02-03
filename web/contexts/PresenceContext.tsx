@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { hasSupabase, getSupabase } from '@/lib/supabase';
+import { hasSupabase, supabase } from '@/lib/supabase';
 
 interface PresenceContextType {
   isPresenceVerified: boolean;
@@ -54,7 +54,6 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
         return false;
       }
 
-      const supabase = getSupabase();
       if (!supabase) return false;
 
       // Query for recent presence handshakes with liveness_score > 0.99

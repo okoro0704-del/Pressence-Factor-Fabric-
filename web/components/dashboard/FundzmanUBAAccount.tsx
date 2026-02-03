@@ -1,6 +1,10 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import type { BankAccount } from '@/lib/pffAggregation';
+import { PresenceOverrideModal } from './PresenceOverrideModal';
+import { checkPresenceVerified } from '@/lib/withPresenceCheck';
+import type { GlobalIdentity } from '@/lib/phoneIdentity';
 
 interface FundzmanUBAAccountProps {
   account: BankAccount;
@@ -12,6 +16,45 @@ interface FundzmanUBAAccountProps {
  * National Block Account with UBA Liquidity Bridge
  */
 export function FundzmanUBAAccount({ account }: FundzmanUBAAccountProps) {
+  const [showPresenceModal, setShowPresenceModal] = useState(false);
+  const [isPresenceVerified, setIsPresenceVerified] = useState(false);
+
+  // Check presence verification status
+  useEffect(() => {
+    const checkPresence = async () => {
+      const result = await checkPresenceVerified();
+      setIsPresenceVerified(result.verified);
+    };
+    checkPresence();
+
+    // Recheck every 30 seconds
+    const interval = setInterval(checkPresence, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handlePresenceVerified = (identity: GlobalIdentity) => {
+    setShowPresenceModal(false);
+    setIsPresenceVerified(true);
+  };
+
+  const handleFundClick = () => {
+    if (!isPresenceVerified) {
+      setShowPresenceModal(true);
+    } else {
+      // TODO: Implement fund account functionality
+      console.log('Fund Account clicked');
+    }
+  };
+
+  const handleSendMoneyClick = () => {
+    if (!isPresenceVerified) {
+      setShowPresenceModal(true);
+    } else {
+      // TODO: Implement send money functionality
+      console.log('Send Money clicked');
+    }
+  };
+
   return (
     <div className="relative bg-gradient-to-br from-[#1a1a1e] via-[#16161a] to-[#1a1a1e] rounded-2xl p-8 border-3 border-[#EE3124] shadow-2xl shadow-[#EE3124]/40 overflow-hidden">
       {/* UBA Red Glow Background */}
@@ -124,17 +167,31 @@ export function FundzmanUBAAccount({ account }: FundzmanUBAAccountProps) {
 
         {/* Action Buttons */}
         <div className="grid grid-cols-2 gap-3">
-          <button className="relative bg-gradient-to-r from-[#EE3124] to-[#ff4444] hover:from-[#ff4444] hover:to-[#EE3124] text-white font-bold py-4 px-6 rounded-lg transition-all duration-300 shadow-lg shadow-[#EE3124]/30 group">
+          <button
+            onClick={handleFundClick}
+            disabled={!isPresenceVerified}
+            className={`relative bg-gradient-to-r from-[#EE3124] to-[#ff4444] hover:from-[#ff4444] hover:to-[#EE3124] text-white font-bold py-4 px-6 rounded-lg transition-all duration-300 shadow-lg shadow-[#EE3124]/30 group ${!isPresenceVerified ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
             <span className="relative z-10 text-sm uppercase tracking-wider">💸 Fund Account</span>
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
           </button>
 
-          <button className="relative bg-gradient-to-r from-[#c9a227] to-[#e8c547] hover:from-[#e8c547] hover:to-[#c9a227] text-black font-bold py-4 px-6 rounded-lg transition-all duration-300 shadow-lg shadow-[#e8c547]/30 group">
+          <button
+            onClick={handleSendMoneyClick}
+            disabled={!isPresenceVerified}
+            className={`relative bg-gradient-to-r from-[#c9a227] to-[#e8c547] hover:from-[#e8c547] hover:to-[#c9a227] text-black font-bold py-4 px-6 rounded-lg transition-all duration-300 shadow-lg shadow-[#e8c547]/30 group ${!isPresenceVerified ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
             <span className="relative z-10 text-sm uppercase tracking-wider">📤 Send Money</span>
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
           </button>
         </div>
       </div>
+
+      <PresenceOverrideModal
+        isOpen={showPresenceModal}
+        onClose={() => setShowPresenceModal(false)}
+        onPresenceVerified={handlePresenceVerified}
+      />
     </div>
   );
 }

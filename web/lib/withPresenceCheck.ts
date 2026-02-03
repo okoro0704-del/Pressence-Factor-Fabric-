@@ -3,7 +3,7 @@
  * Verifies Presence_Verified signal from Supabase before enabling Send/Swap/Bank operations
  */
 
-import { hasSupabase, getSupabase } from './supabase';
+import { hasSupabase, supabase } from './supabase';
 
 const PRESENCE_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
 const STORAGE_KEY = 'pff_presence_verified';
@@ -40,13 +40,8 @@ export async function checkPresenceVerified(): Promise<PresenceCheckResult> {
     }
 
     // Query Supabase for recent presence handshake
-    if (!hasSupabase()) {
+    if (!hasSupabase() || !supabase) {
       return { verified: false, error: 'Supabase not available' };
-    }
-
-    const supabase = getSupabase();
-    if (!supabase) {
-      return { verified: false, error: 'Supabase client not initialized' };
     }
 
     const { data, error } = await supabase
