@@ -13,6 +13,14 @@ export {
 export { getDLLRBalance } from './dllr';
 export { sendDLLR, isValidAddress, type SendDLLRParams, type SendDLLRResult } from './sendDLLR';
 export {
+  executeSovereignSwap,
+  calculateDLLROutput,
+  calculateVIDAInput,
+  type SovereignSwapParams,
+  type SovereignSwapResult,
+  type SovereignLedgerEntry,
+} from './sovereignSwap';
+export {
   runMasterHandshake,
   isMasterHandshakeComplete,
   setMasterHandshakeComplete,
