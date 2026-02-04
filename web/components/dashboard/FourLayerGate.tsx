@@ -291,6 +291,7 @@ export function FourLayerGate() {
       navigator.vibrate([100, 50, 100, 50, 200]);
     }
 
+    // User-triggered: location request must happen immediately on click so browsers trust it
     startLocationRequestFromUserGesture();
 
     setAuthStatus(AuthStatus.SCANNING);
@@ -330,6 +331,7 @@ export function FourLayerGate() {
       {
         skipVoiceLayer: identityAnchor.vocalExempt === true,
         requireAllLayers: isNewDevice,
+        registeredCountryCode: 'NG',
         voiceOptions: identityAnchor.vocalExempt ? undefined : { onAudioLevel: (l) => setVoiceLevel(l) },
         onSilentMode: () => setSilentModeMessage('Noisy environment detected. Switching to Silent Presence Mode...'),
         onPillarComplete: (pillar: PresencePillar) => {
@@ -1037,8 +1039,10 @@ export function FourLayerGate() {
         {showLocationPermissionPopup && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80" onClick={() => setShowLocationPermissionPopup(false)}>
             <div className="bg-[#0d0d0f] border-2 rounded-xl p-6 max-w-md w-full shadow-xl text-center" style={{ borderColor: '#D4AF37', boxShadow: '0 0 40px rgba(212, 175, 55, 0.3)' }} onClick={(e) => e.stopPropagation()}>
-              <p className="text-lg font-bold mb-4" style={{ color: '#D4AF37' }}>The Mesh requires your Location to verify Presence.</p>
-              <p className="text-sm text-[#a0a0a5] mb-6">Allow access now in your browser settings, then tap Start again.</p>
+              <p className="text-lg font-bold mb-4" style={{ color: '#D4AF37' }}>Location Blocked by Browser</p>
+              <p className="text-sm text-[#a0a0a5] mb-6">
+                Please click the Lock icon in your address bar and select &quot;Allow Location&quot; to claim your $1,000.
+              </p>
               <button
                 type="button"
                 onClick={() => setShowLocationPermissionPopup(false)}

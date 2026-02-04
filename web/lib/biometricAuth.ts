@@ -310,64 +310,138 @@ const PFF_PILLAR_LOCATION_TS = 'pff_pillar_location_ts';
 const PILLAR_CACHE_MS = 24 * 60 * 60 * 1000;
 const MAXIMUM_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
+const GPS_HIGH_ACCURACY_TIMEOUT_MS = 3000;
+
 export type LocationResult = {
   success: boolean;
   coords?: { latitude: number; longitude: number };
   error?: string;
   permissionRequired?: boolean;
+  /** Set when location came from IP fallback (city/sector); pillar gold if country matches registered. */
+  fromIP?: boolean;
+  country_code?: string;
 };
 
 let pendingLocationFromUserGesture: Promise<LocationResult> | null = null;
 
-const GEO_OPTIONS: PositionOptions = {
-  enableHighAccuracy: false,
-  timeout: 5000,
-  maximumAge: MAXIMUM_AGE_MS,
-};
-
 /**
  * Call this directly from the Start Verification button onClick so the browser allows geolocation (user gesture).
- * Starts the location request immediately; verifyLocation() will use this result if available.
+ * Aggressive timeout: 3s with High Accuracy, then switch to enableHighAccuracy: false.
+ * On permission denied or system block, use IP-based fallback (ipapi.co); pillar gold if IP country matches registered.
  */
 export function startLocationRequestFromUserGesture(): void {
   if (typeof navigator === 'undefined' || !navigator.geolocation) return;
   if (pendingLocationFromUserGesture) return;
+
   pendingLocationFromUserGesture = new Promise<LocationResult>((resolve) => {
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const coords = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+    const saveAndResolve = (coords: { latitude: number; longitude: number }, fromIP = false, country_code?: string) => {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(PFF_PILLAR_LOCATION, JSON.stringify(coords));
+        localStorage.setItem(PFF_PILLAR_LOCATION_TS, String(Date.now()));
+      }
+      resolve({ success: true, coords, ...(fromIP && { fromIP: true, country_code }) });
+    };
+
+    const onDeniedOrUnavailable = async (permissionDenied: boolean) => {
+      const ipLoc = await getLocationByIP();
+      if (ipLoc) {
         if (typeof localStorage !== 'undefined') {
-          localStorage.setItem(PFF_PILLAR_LOCATION, JSON.stringify(coords));
+          localStorage.setItem(PFF_PILLAR_LOCATION, JSON.stringify({ latitude: ipLoc.latitude, longitude: ipLoc.longitude }));
           localStorage.setItem(PFF_PILLAR_LOCATION_TS, String(Date.now()));
         }
-        resolve({ success: true, coords });
+        resolve({
+          success: true,
+          coords: { latitude: ipLoc.latitude, longitude: ipLoc.longitude },
+          fromIP: true,
+          country_code: ipLoc.country_code,
+          permissionRequired: permissionDenied,
+        });
+      } else {
+        resolve({ success: false, error: 'Location denied or unavailable', permissionRequired: true });
+      }
+    };
+
+    // First try: High Accuracy, 3s timeout
+    const optionsHigh: PositionOptions = {
+      enableHighAccuracy: true,
+      timeout: GPS_HIGH_ACCURACY_TIMEOUT_MS,
+      maximumAge: 0,
+    };
+
+    const timeoutId = setTimeout(() => {
+      // Aggressive timeout (3s): stop High Accuracy, retry with enableHighAccuracy: false
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          if (typeof alert !== 'undefined') alert(JSON.stringify(pos.coords));
+          const coords = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+          saveAndResolve(coords);
+        },
+        () => onDeniedOrUnavailable(false),
+        { enableHighAccuracy: false, timeout: 5000, maximumAge: MAXIMUM_AGE_MS }
+      );
+    }, GPS_HIGH_ACCURACY_TIMEOUT_MS);
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        clearTimeout(timeoutId);
+        if (typeof alert !== 'undefined') alert(JSON.stringify(pos.coords));
+        const coords = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+        saveAndResolve(coords);
       },
       (err: GeolocationPositionError) => {
+        clearTimeout(timeoutId);
         if (err?.code === 1) {
-          resolve({ success: false, error: 'LOCATION_PERMISSION_REQUIRED', permissionRequired: true });
+          onDeniedOrUnavailable(true);
         } else {
-          resolve({ success: false, error: 'Location denied or unavailable' });
+          navigator.geolocation.getCurrentPosition(
+            (pos2) => {
+              if (typeof alert !== 'undefined') alert(JSON.stringify(pos2.coords));
+              saveAndResolve({ latitude: pos2.coords.latitude, longitude: pos2.coords.longitude });
+            },
+            () => onDeniedOrUnavailable(false),
+            { enableHighAccuracy: false, timeout: 5000, maximumAge: MAXIMUM_AGE_MS }
+          );
         }
       },
-      GEO_OPTIONS
+      optionsHigh
     );
   });
 }
 
-/** IP-based location fallback when GPS doesn't respond in 4s. */
-async function getLocationByIP(): Promise<{ latitude: number; longitude: number } | null> {
+/** IP-based location fallback when GPS is denied or unavailable. Returns coords + country for pillar gold if IP matches registered country. */
+export interface IPLocationResult {
+  latitude: number;
+  longitude: number;
+  country_code?: string;
+  country_name?: string;
+  city?: string;
+}
+
+async function getLocationByIP(): Promise<IPLocationResult | null> {
   try {
     const res = await fetch('https://ipapi.co/json/', { signal: AbortSignal.timeout(3000) });
     const data = await res.json();
     if (data?.latitude != null && data?.longitude != null) {
-      return { latitude: data.latitude, longitude: data.longitude };
+      return {
+        latitude: data.latitude,
+        longitude: data.longitude,
+        country_code: data.country_code,
+        country_name: data.country_name,
+        city: data.city,
+      };
     }
   } catch {
     try {
-      const res = await fetch('https://ip-api.com/json/?fields=lat,lon', { signal: AbortSignal.timeout(3000) });
+      const res = await fetch('https://ip-api.com/json/?fields=lat,lon,countryCode,country,city', { signal: AbortSignal.timeout(3000) });
       const data = await res.json();
       if (data?.lat != null && data?.lon != null) {
-        return { latitude: data.lat, longitude: data.lon };
+        return {
+          latitude: data.lat,
+          longitude: data.lon,
+          country_code: data.countryCode,
+          country_name: data.country,
+          city: data.city,
+        };
       }
     } catch {
       // ignore
@@ -378,9 +452,10 @@ async function getLocationByIP(): Promise<{ latitude: number; longitude: number 
 
 /**
  * GPS LOCATION — Sovereign Indoor Protocol
- * Relaxed: enableHighAccuracy false, timeout 5000, maximumAge 30 days (cell/Wi‑Fi). Uses request started from button click if available.
+ * Uses request started from Start Verification button click if available (user gesture).
+ * Otherwise: 3s High Accuracy → enableHighAccuracy: false → IP fallback. Pillar gold if IP matches registered country.
  */
-export async function verifyLocation(): Promise<LocationResult> {
+export async function verifyLocation(registeredCountryCode?: string): Promise<LocationResult> {
   try {
     if (typeof localStorage !== 'undefined') {
       const cached = localStorage.getItem(PFF_PILLAR_LOCATION);
@@ -397,13 +472,16 @@ export async function verifyLocation(): Promise<LocationResult> {
     }
 
     if (!navigator.geolocation) {
-      const ipCoords = await getLocationByIP();
-      if (ipCoords) {
-        if (typeof localStorage !== 'undefined') {
-          localStorage.setItem(PFF_PILLAR_LOCATION, JSON.stringify(ipCoords));
+      const ipLoc = await getLocationByIP();
+      if (ipLoc) {
+        const match = !registeredCountryCode || ipLoc.country_code === registeredCountryCode;
+        if (match && typeof localStorage !== 'undefined') {
+          localStorage.setItem(PFF_PILLAR_LOCATION, JSON.stringify({ latitude: ipLoc.latitude, longitude: ipLoc.longitude }));
           localStorage.setItem(PFF_PILLAR_LOCATION_TS, String(Date.now()));
         }
-        return { success: true, coords: ipCoords };
+        return match
+          ? { success: true, coords: { latitude: ipLoc.latitude, longitude: ipLoc.longitude }, fromIP: true, country_code: ipLoc.country_code }
+          : { success: false, error: 'Geolocation not available; IP country does not match.' };
       }
       return { success: false, error: 'Geolocation not available' };
     }
@@ -411,47 +489,55 @@ export async function verifyLocation(): Promise<LocationResult> {
     if (pendingLocationFromUserGesture) {
       const result = await pendingLocationFromUserGesture;
       pendingLocationFromUserGesture = null;
+      if (result.success && result.fromIP && registeredCountryCode && result.country_code !== registeredCountryCode) {
+        return { success: false, error: 'IP location country does not match registered country.', permissionRequired: false };
+      }
       return result;
     }
 
-    const gpsPromise = new Promise<LocationResult>((resolve) => {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const coords = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
-          if (typeof localStorage !== 'undefined') {
-            localStorage.setItem(PFF_PILLAR_LOCATION, JSON.stringify(coords));
-            localStorage.setItem(PFF_PILLAR_LOCATION_TS, String(Date.now()));
-          }
-          resolve({ success: true, coords });
-        },
-        (err: GeolocationPositionError) => {
-          if (err?.code === 1) {
-            resolve({ success: false, error: 'LOCATION_PERMISSION_REQUIRED', permissionRequired: true });
-          } else {
-            resolve({ success: false, error: 'Location denied or unavailable' });
-          }
-        },
-        GEO_OPTIONS
-      );
-    });
+    const tryGPS = (highAccuracy: boolean): Promise<LocationResult> =>
+      new Promise<LocationResult>((resolve) => {
+        const opts: PositionOptions = {
+          enableHighAccuracy: highAccuracy,
+          timeout: highAccuracy ? GPS_HIGH_ACCURACY_TIMEOUT_MS : 5000,
+          maximumAge: highAccuracy ? 0 : MAXIMUM_AGE_MS,
+        };
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            if (typeof alert !== 'undefined') alert(JSON.stringify(pos.coords));
+            const coords = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+            if (typeof localStorage !== 'undefined') {
+              localStorage.setItem(PFF_PILLAR_LOCATION, JSON.stringify(coords));
+              localStorage.setItem(PFF_PILLAR_LOCATION_TS, String(Date.now()));
+            }
+            resolve({ success: true, coords });
+          },
+          async () => {
+            if (highAccuracy) {
+              const low = await tryGPS(false);
+              if (low.success) return resolve(low);
+            }
+            const ipLoc = await getLocationByIP();
+            if (ipLoc) {
+              const match = !registeredCountryCode || ipLoc.country_code === registeredCountryCode;
+              if (match && typeof localStorage !== 'undefined') {
+                localStorage.setItem(PFF_PILLAR_LOCATION, JSON.stringify({ latitude: ipLoc.latitude, longitude: ipLoc.longitude }));
+                localStorage.setItem(PFF_PILLAR_LOCATION_TS, String(Date.now()));
+              }
+              resolve(
+                match
+                  ? { success: true, coords: { latitude: ipLoc.latitude, longitude: ipLoc.longitude }, fromIP: true, country_code: ipLoc.country_code }
+                  : { success: false, error: 'IP country does not match registered country.' }
+              );
+            } else {
+              resolve({ success: false, error: 'Location timeout or denied', permissionRequired: true });
+            }
+          },
+          opts
+        );
+      });
 
-    const fourSecTimeout = new Promise<LocationResult>((resolve) => {
-      setTimeout(async () => {
-        const ipCoords = await getLocationByIP();
-        if (ipCoords) {
-          if (typeof localStorage !== 'undefined') {
-            localStorage.setItem(PFF_PILLAR_LOCATION, JSON.stringify(ipCoords));
-            localStorage.setItem(PFF_PILLAR_LOCATION_TS, String(Date.now()));
-          }
-          resolve({ success: true, coords: ipCoords });
-        } else {
-          resolve({ success: false, error: 'Location timeout' });
-        }
-      }, 4000);
-    });
-
-    const result = await Promise.race([gpsPromise, fourSecTimeout]);
-    return result;
+    return tryGPS(true);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return { success: false, error: msg };
@@ -754,6 +840,8 @@ export interface ResolveSovereignOptions {
   onSilentMode?: () => void;
   /** Called when each pillar completes (Device → Location → Face → Voice) for Progress Ring */
   onPillarComplete?: (pillar: PresencePillar) => void;
+  /** ISO country code for IP fallback: pillar gold only if IP country matches (e.g. "NG") */
+  registeredCountryCode?: string;
 }
 
 /** SOVEREIGN THRESHOLD: minimum layers that must pass to grant access (3-out-of-4 quorum) */
@@ -770,6 +858,7 @@ export async function resolveSovereignByPresence(
   const voiceOptions = options?.voiceOptions;
   const onSilentMode = options?.onSilentMode;
   const onPillarComplete = options?.onPillarComplete;
+  const registeredCountryCode = options?.registeredCountryCode;
 
   const fail = (layer: AuthLayer | null, message: string, timedOut?: boolean, twoPillarsOnly?: boolean): BiometricAuthResult => ({
     success: false,
@@ -820,7 +909,7 @@ export async function resolveSovereignByPresence(
       if (r.success) onPillarComplete?.('device');
       return r;
     });
-    const locationP = verifyLocation().then((r) => {
+    const locationP = verifyLocation(registeredCountryCode).then((r) => {
       state.location = r;
       if (r.success) onPillarComplete?.('location');
       return r;
