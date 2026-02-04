@@ -11,7 +11,9 @@ import {
 import {
   verifyUniversalIdentity,
   type IdentityAnchor,
+  type BiometricLayerResults,
 } from '@/lib/universalIdentityComparison';
+import { VIDA_TO_DLLR_RATE } from '@/lib/sovereignInternalWallet';
 
 const jetbrains = JetBrains_Mono({ weight: ['400', '600', '700'], subsets: ['latin'] });
 
@@ -24,9 +26,11 @@ const BORDER = 'rgba(212, 175, 55, 0.3)';
 export interface SovereignWalletProps {
   /** User phone number (E.164). Used for wallet fetch and biometric verification before conversion. */
   phoneNumber: string;
+  /** 3-of-4 biometric layer results. Conversion is blocked until quorum is satisfied. */
+  layerResults?: BiometricLayerResults | null;
 }
 
-export function SovereignWallet({ phoneNumber }: SovereignWalletProps) {
+export function SovereignWallet({ phoneNumber, layerResults }: SovereignWalletProps) {
   const [wallet, setWallet] = useState<SovereignInternalWalletRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [convertAmount, setConvertAmount] = useState('');
@@ -58,13 +62,26 @@ export function SovereignWallet({ phoneNumber }: SovereignWalletProps) {
     return () => { cancelled = true; };
   }, [phoneNumber]);
 
+  const quorumSatisfied =
+    layerResults &&
+    (layerResults.handshake ? 1 : 0) +
+      (layerResults.face ? 1 : 0) +
+      (layerResults.voice ? 1 : 0) +
+      (layerResults.fingerprint ? 1 : 0) >= 3;
+
   const handleConvertVidaToDllr = async () => {
     const amount = parseFloat(convertAmount);
     if (!wallet || isNaN(amount) || amount <= 0 || amount > wallet.vida_cap_balance) {
       setConvertError('Enter a valid amount not exceeding your VIDA CAP.');
       return;
     }
+    if (!quorumSatisfied || !layerResults) {
+      setBiometricError('Complete 3-of-4 biometric scan (Handshake, Face, Voice, Fingerprint) before converting.');
+      setConvertStatus('error');
+      return;
+    }
     setConvertError(null);
+    setBiometricError(null);
     setConvertStatus('verify');
 
     const anchor: IdentityAnchor = {
@@ -72,26 +89,25 @@ export function SovereignWallet({ phoneNumber }: SovereignWalletProps) {
       anchor_type: 'PHONE_INPUT',
       timestamp: new Date().toISOString(),
     };
-    const mockBiometricData = { id: 'convert-verify-' + Date.now() };
-    const result = await verifyUniversalIdentity(anchor, mockBiometricData);
+    const result = await verifyUniversalIdentity(anchor, layerResults);
 
     if (!result.success) {
       setBiometricError(result.error ?? 'Identity verification failed.');
       setConvertStatus('error');
       return;
     }
-    setBiometricError(null);
     setConvertStatus('converting');
 
     try {
-      const ok = await updateSovereignWalletConvertVidaToDllr(phoneNumber, amount, amount);
+      const ok = await updateSovereignWalletConvertVidaToDllr(phoneNumber, amount);
       if (ok) {
+        const dllrCredited = amount * VIDA_TO_DLLR_RATE;
         setWallet((prev) =>
           prev
             ? {
                 ...prev,
                 vida_cap_balance: prev.vida_cap_balance - amount,
-                dllr_balance: prev.dllr_balance + amount,
+                dllr_balance: prev.dllr_balance + dllrCredited,
               }
             : null
         );
@@ -165,12 +181,14 @@ export function SovereignWallet({ phoneNumber }: SovereignWalletProps) {
           Convert VIDA to DLLR
         </h3>
         <p className="text-xs mb-4" style={{ color: '#6b6b70' }}>
-          Identity verification is required before any conversion.
+          {quorumSatisfied
+            ? '3-of-4 biometric quorum satisfied. 1 VIDA = 1,000 DLLR.'
+            : 'Complete 3-of-4 biometric scan (Handshake, Face, Voice, Fingerprint) before converting.'}
         </p>
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex-1 min-w-[120px]">
             <label className="block text-xs font-medium mb-1" style={{ color: GOLD_DIM }}>
-              Amount (VIDA CAP)
+              Amount (VIDA) → {convertAmount ? (parseFloat(convertAmount) * VIDA_TO_DLLR_RATE).toLocaleString() : '0'} DLLR
             </label>
             <input
               type="number"
@@ -193,6 +211,7 @@ export function SovereignWallet({ phoneNumber }: SovereignWalletProps) {
             onClick={handleConvertVidaToDllr}
             disabled={
               !convertAmount ||
+              !quorumSatisfied ||
               convertStatus === 'verify' ||
               convertStatus === 'converting' ||
               (wallet?.vida_cap_balance ?? 0) <= 0

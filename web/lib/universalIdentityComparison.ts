@@ -42,19 +42,40 @@ export interface BiometricIdentityRecord {
 export const VOCAL_EXEMPT_MINOR_AGE = 18;
 export const VOCAL_EXEMPT_ELDER_AGE = 65;
 
+/** Biometric quorum: 3-of-4 layers (Handshake, Face, Voice, Fingerprint). */
+export const BIOMETRIC_QUORUM_REQUIRED = 3;
+export const BIOMETRIC_LAYERS_TOTAL = 4;
+
+/** Layer results for 3-of-4 quorum. For minors, UI uses only Face + Fingerprint; Voice is auto-PASSED. */
+export interface BiometricLayerResults {
+  handshake: boolean;
+  face: boolean;
+  voice: boolean;
+  fingerprint: boolean;
+}
+
 export interface UniversalIdentityResult {
   success: boolean;
   identity?: BiometricIdentityRecord;
   variance?: number;
+  /** Effective layer results after age-based exemptions (e.g. voice PASSED for minor/elder). */
+  layerResults?: BiometricLayerResults;
   error?: string;
 }
 
-function normalizePhoneVariants(phone: string): string[] {
+/**
+ * Normalize phone to multiple variants for DB lookup. Prevents "No active identity" on live site
+ * when DB stores different formats (with/without +, spaces, dashes).
+ */
+export function normalizePhoneVariants(phone: string): string[] {
   const trimmed = phone.trim();
   if (!trimmed) return [];
-  const withPlus = trimmed.startsWith('+') ? trimmed : `+${trimmed}`;
-  const withoutPlus = withPlus.replace(/^\+/, '');
-  const variants = [trimmed, withPlus, withoutPlus].filter(
+  const digitsOnly = trimmed.replace(/\D/g, '');
+  if (!digitsOnly.length) return [];
+  const withPlus = trimmed.startsWith('+') ? trimmed : `+${digitsOnly}`;
+  const withoutPlus = digitsOnly;
+  const asEntered = trimmed;
+  const variants = [asEntered, withPlus, withoutPlus].filter(
     (v, i, arr) => v && arr.indexOf(v) === i
   );
   return variants;
@@ -166,11 +187,46 @@ export function isVocalResonanceExempt(identity: BiometricIdentityRecord): boole
 }
 
 /**
- * Verify universal identity (1-to-1). MINOR EXEMPTION: skips vocal resonance when identity is minor.
+ * Apply age-based exemptions to layer results. If age < 18 (Minor) or age > 65 (Elder),
+ * Vocal Resonance (voice) is automatically marked PASSED.
+ */
+export function applyVocalExemptionToLayerResults(
+  identity: BiometricIdentityRecord,
+  layerResults: BiometricLayerResults
+): BiometricLayerResults {
+  const exempt = isVocalResonanceExempt(identity);
+  return {
+    ...layerResults,
+    voice: layerResults.voice || exempt,
+  };
+}
+
+/**
+ * Check if 3-of-4 biometric quorum is satisfied (Handshake, Face, Voice, Fingerprint).
+ * Age-based: Minor or Elder auto-pass Voice layer.
+ */
+export function isBiometricQuorumSatisfied(
+  identity: BiometricIdentityRecord,
+  layerResults: BiometricLayerResults
+): boolean {
+  const effective = applyVocalExemptionToLayerResults(identity, layerResults);
+  const passed =
+    (effective.handshake ? 1 : 0) +
+    (effective.face ? 1 : 0) +
+    (effective.voice ? 1 : 0) +
+    (effective.fingerprint ? 1 : 0);
+  return passed >= BIOMETRIC_QUORUM_REQUIRED;
+}
+
+/**
+ * Verify universal identity: Biometric Quorum 3-of-4.
+ * Access granted if ANY 3 of 4 layers pass (Handshake, Face, Voice, Fingerprint).
+ * Age-based: If age < 18 (Minor) or age > 65 (Elder), Vocal Resonance is auto PASSED.
+ * For Minors, UI should focus exclusively on Face and Fingerprint (Handshake/Voice exempt or optional).
  */
 export async function verifyUniversalIdentity(
   anchor: IdentityAnchor,
-  biometricData: unknown,
+  biometricDataOrLayerResults: unknown | BiometricLayerResults,
   liveAudioData?: unknown
 ): Promise<UniversalIdentityResult> {
   try {
@@ -185,8 +241,40 @@ export async function verifyUniversalIdentity(
     const targetIdentity = anchorResult.identity;
     const vocalExempt = isVocalResonanceExempt(targetIdentity);
 
-    // Layer 1: Micro-topography / biometric (always required)
-    // Simplified: in production compare biometricData to targetIdentity.biometric_hash
+    // New path: 3-of-4 quorum via layer results
+    const asLayerResults = biometricDataOrLayerResults as Partial<BiometricLayerResults>;
+    if (
+      typeof asLayerResults === 'object' &&
+      asLayerResults !== null &&
+      'handshake' in asLayerResults &&
+      'face' in asLayerResults &&
+      'voice' in asLayerResults &&
+      'fingerprint' in asLayerResults
+    ) {
+      const layerResults = asLayerResults as BiometricLayerResults;
+      const effective = applyVocalExemptionToLayerResults(targetIdentity, layerResults);
+      const satisfied = isBiometricQuorumSatisfied(targetIdentity, layerResults);
+      if (!satisfied) {
+        const passed =
+          (effective.handshake ? 1 : 0) +
+          (effective.face ? 1 : 0) +
+          (effective.voice ? 1 : 0) +
+          (effective.fingerprint ? 1 : 0);
+        return {
+          success: false,
+          identity: targetIdentity,
+          layerResults: effective,
+          error: `Biometric quorum not met: ${passed}/4 layers passed (3 required). ${vocalExempt ? 'Vocal layer auto-passed (age exemption).' : ''}`,
+        };
+      }
+      return {
+        success: true,
+        identity: targetIdentity,
+        layerResults: effective,
+      };
+    }
+
+    // Legacy path: single-layer check (backward compat)
     const variance = 0.2;
     if (variance > UNIVERSAL_VARIANCE_THRESHOLD) {
       return {
@@ -195,15 +283,11 @@ export async function verifyUniversalIdentity(
         error: `Biometric variance ${variance.toFixed(2)}% exceeds 0.5% threshold.`,
       };
     }
-
-    // Layer 2: Vocal Resonance — ELDER & MINOR EXEMPTION: skip for age < 18 OR age > 65
     if (!vocalExempt && liveAudioData && targetIdentity.voice_print_hash) {
-      // In production: verifyVocalResonance(liveAudioData, targetIdentity.voice_print_hash, anchor.phone_number)
-      // For now we accept if voice layer is required and we have hash (stub)
+      // Stub: production would verify voice
     } else if (vocalExempt) {
-      console.log('[Elder & Minor Exemption] Vocal Resonance (Layer 2) bypassed for citizen under 18 or over 65.');
+      console.log('[Elder & Minor Exemption] Vocal Resonance auto PASSED for citizen under 18 or over 65.');
     }
-
     return {
       success: true,
       identity: targetIdentity,

@@ -42,8 +42,8 @@ export function IdentityAnchorInput({
     setIsVerifying(true);
 
     try {
-      // Fetch identity anchor from database
-      const result = await fetchIdentityAnchor(phoneNumber);
+      // fetchIdentityAnchor uses normalizePhoneVariants internally to prevent "No active identity" on live site
+      const result = await fetchIdentityAnchor(phoneNumber.trim());
 
       if (!result.success || !result.identity) {
         setError(result.error || 'Identity not found. Please register first.');

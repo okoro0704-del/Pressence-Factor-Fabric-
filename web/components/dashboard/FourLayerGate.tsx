@@ -10,7 +10,7 @@ import {
   type BiometricAuthResult,
 } from '@/lib/biometricAuth';
 import type { GlobalIdentity } from '@/lib/phoneIdentity';
-import { isVocalResonanceExempt, type BiometricIdentityRecord } from '@/lib/universalIdentityComparison';
+import { isVocalResonanceExempt, isIdentityMinor, type BiometricIdentityRecord } from '@/lib/universalIdentityComparison';
 import type { LanguageCode } from '@/lib/i18n/config';
 import { ConfirmLanguageScreen } from '@/components/auth/ConfirmLanguageScreen';
 import { VocalInstructionScreen } from '@/components/auth/VocalInstructionScreen';
@@ -51,7 +51,7 @@ export function FourLayerGate() {
   const [currentLayer, setCurrentLayer] = useState<AuthLayer | null>(null);
   const [result, setResult] = useState<BiometricAuthResult | null>(null);
   const [showVaultAnimation, setShowVaultAnimation] = useState(false);
-  const [identityAnchor, setIdentityAnchor] = useState<{ phone: string; name: string; vocalExempt?: boolean } | null>(null);
+  const [identityAnchor, setIdentityAnchor] = useState<{ phone: string; name: string; vocalExempt?: boolean; isMinor?: boolean } | null>(null);
   /** PRE-VITALIZATION: Confirm Language → Vocal Instruction → Identity Anchor (always show before login) */
   const [languageConfirmed, setLanguageConfirmed] = useState<LanguageCode | null>(null);
   const [showVocalInstruction, setShowVocalInstruction] = useState(false);
@@ -133,10 +133,12 @@ export function FourLayerGate() {
     }
   };
 
-  /** ELDER & MINOR EXEMPTION: skip VOICE_PRINT when age < 18 or > 65 */
-  const requiredLayers = identityAnchor?.vocalExempt
-    ? [AuthLayer.BIOMETRIC_SIGNATURE, AuthLayer.HARDWARE_TPM, AuthLayer.GENESIS_HANDSHAKE]
-    : [AuthLayer.BIOMETRIC_SIGNATURE, AuthLayer.VOICE_PRINT, AuthLayer.HARDWARE_TPM, AuthLayer.GENESIS_HANDSHAKE];
+  /** MINOR: UI focuses exclusively on Face and Fingerprint (2 layers). ELDER: skip Voice (3 layers). Default: 4 layers. */
+  const requiredLayers = identityAnchor?.isMinor
+    ? [AuthLayer.BIOMETRIC_SIGNATURE, AuthLayer.HARDWARE_TPM]
+    : identityAnchor?.vocalExempt
+      ? [AuthLayer.BIOMETRIC_SIGNATURE, AuthLayer.HARDWARE_TPM, AuthLayer.GENESIS_HANDSHAKE]
+      : [AuthLayer.BIOMETRIC_SIGNATURE, AuthLayer.VOICE_PRINT, AuthLayer.HARDWARE_TPM, AuthLayer.GENESIS_HANDSHAKE];
 
   const getLayerStatus = (layer: AuthLayer) => {
     if (!currentLayer) return 'pending';
@@ -151,10 +153,12 @@ export function FourLayerGate() {
   /** KILL AUTO-VERIFY: Only transition to biometric scan step. Verification happens only after real-time hardware scan. */
   const handleAnchorVerified = (payload: { phoneNumber: string; fullName: string; identity?: BiometricIdentityRecord }) => {
     const vocalExempt = payload.identity ? isVocalResonanceExempt(payload.identity) : false;
+    const isMinor = payload.identity ? isIdentityMinor(payload.identity) : false;
     setIdentityAnchor({
       phone: payload.phoneNumber,
       name: payload.fullName,
       vocalExempt,
+      isMinor,
     });
   };
 
