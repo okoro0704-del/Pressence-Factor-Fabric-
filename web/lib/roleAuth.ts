@@ -8,7 +8,7 @@ import { getSupabase } from './supabase';
 
 export { getIdentityAnchorPhone } from './sentinelActivation';
 
-export const ROLES = ['CITIZEN', 'GOVERNMENT_ADMIN', 'SENTINEL_OFFICER', 'MASTER_ARCHITECT'] as const;
+export const ROLES = ['CITIZEN', 'GOVERNMENT_ADMIN', 'SENTINEL_OFFICER', 'MASTER_ARCHITECT', 'SENTINEL_STAFF'] as const;
 export type Role = (typeof ROLES)[number];
 
 const ROLE_COOKIE_NAME = 'pff_role';
@@ -147,7 +147,12 @@ export function canAccessGovernment(role: Role): boolean {
 
 /** Can access /sentinel admin routes. */
 export function canAccessSentinel(role: Role): boolean {
-  return role === 'SENTINEL_OFFICER' || role === 'MASTER_ARCHITECT' || role === 'GOVERNMENT_ADMIN';
+  return role === 'SENTINEL_OFFICER' || role === 'MASTER_ARCHITECT' || role === 'GOVERNMENT_ADMIN' || role === 'SENTINEL_STAFF';
+}
+
+/** Can access Staff Portal (citizens onboarded, monthly bonus, Sovereign Sentinel Staff ID). */
+export function canAccessStaffPortal(role: Role): boolean {
+  return role === 'SENTINEL_STAFF' || role === 'MASTER_ARCHITECT' || role === 'GOVERNMENT_ADMIN';
 }
 
 /** Can access /master dashboard (only MASTER_ARCHITECT can change roles). */

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { DLLRBalanceTracker } from './DLLRBalanceTracker';
 import { LaunchSovereignVaultButton } from './LaunchSovereignVaultButton';
@@ -10,14 +10,35 @@ import { UserProfileBalance } from '../dashboard/UserProfileBalance';
 import { PresenceOverrideModal } from '../dashboard/PresenceOverrideModal';
 import { SentinelAccessBanner } from '../dashboard/SentinelAccessBanner';
 import { FamilyVault } from '../dashboard/FamilyVault';
+import { MerchantModeSection } from '../dashboard/MerchantModeSection';
+import { MerchantSalesTab } from '../dashboard/MerchantSalesTab';
 import type { GlobalIdentity } from '@/lib/phoneIdentity';
 import { getIdentityAnchorPhone } from '@/lib/sentinelActivation';
+import { getCurrentUserRole, canAccessStaffPortal } from '@/lib/roleAuth';
 import { resetBiometrics } from '@/lib/resetBiometrics';
+import { isMerchantMode, getMerchantWalletAddress } from '@/lib/merchantMode';
 
 export function DashboardContent() {
   const [showPresenceModal, setShowPresenceModal] = useState(false);
   const [resettingBiometrics, setResettingBiometrics] = useState(false);
   const [resetBiometricsMessage, setResetBiometricsMessage] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'overview' | 'sales'>('overview');
+  const [merchantWallet, setMerchantWallet] = useState<string | null>(null);
+  const [merchantModeOn, setMerchantModeOn] = useState(false);
+  const [showStaffPortal, setShowStaffPortal] = useState(false);
+  useEffect(() => {
+    setMerchantModeOn(isMerchantMode());
+    setMerchantWallet(getMerchantWalletAddress() ?? getIdentityAnchorPhone());
+  }, []);
+  useEffect(() => {
+    const phone = getIdentityAnchorPhone();
+    if (!phone) return;
+    getCurrentUserRole(phone).then((role) => setShowStaffPortal(canAccessStaffPortal(role)));
+  }, []);
+  const handleMerchantModeChange = (enabled: boolean, wallet: string | null) => {
+    setMerchantModeOn(enabled);
+    setMerchantWallet(wallet);
+  };
 
   const handlePresenceVerified = (identity: GlobalIdentity) => {
     // Show success notification
@@ -49,6 +70,14 @@ export function DashboardContent() {
             >
               🔐 Authenticate Dependent
             </button>
+            {showStaffPortal && (
+            <Link
+              href="/staff-portal"
+              className="relative z-50 text-sm font-medium text-[#c9a227] hover:text-[#e8c547] transition-colors cursor-pointer"
+            >
+              Staff Portal
+            </Link>
+            )}
             <Link
               href="/manifesto"
               className="relative z-50 text-sm font-medium text-[#c9a227] hover:text-[#e8c547] transition-colors cursor-pointer"
@@ -60,6 +89,39 @@ export function DashboardContent() {
       </header>
 
       <div className="flex-1 p-4 md:p-6 max-w-6xl mx-auto w-full">
+        {/* Tabs: Overview | Sales (for merchants) */}
+        {merchantModeOn && (
+          <div className="flex gap-2 mb-4 border-b border-[#2a2a2e] pb-2">
+            <button
+              type="button"
+              onClick={() => setActiveTab('overview')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                activeTab === 'overview'
+                  ? 'bg-[#e8c547]/20 text-[#e8c547] border border-[#e8c547]/50'
+                  : 'text-[#6b6b70] hover:text-[#a0a0a5] border border-transparent'
+              }`}
+            >
+              Overview
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('sales')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                activeTab === 'sales'
+                  ? 'bg-[#e8c547]/20 text-[#e8c547] border border-[#e8c547]/50'
+                  : 'text-[#6b6b70] hover:text-[#a0a0a5] border border-transparent'
+              }`}
+            >
+              Sales
+            </button>
+          </div>
+        )}
+        {activeTab === 'sales' && merchantWallet ? (
+          <div className="mb-6">
+            <MerchantSalesTab walletAddress={merchantWallet} />
+          </div>
+        ) : (
+          <>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           {/* User Profile & Balance */}
           <div>
@@ -123,6 +185,8 @@ export function DashboardContent() {
             </p>
           </section>
 
+          <MerchantModeSection onMerchantModeChange={handleMerchantModeChange} />
+
           <section className="rounded-xl border border-[#2a2a2e] bg-[#16161a] p-4 mt-6">
             <h2 className="text-sm font-semibold text-[#c9a227] mb-2">Settings</h2>
             <p className="text-xs text-[#6b6b70] mb-3">
@@ -182,6 +246,8 @@ export function DashboardContent() {
             </Link>
           </div>
         </div>
+          </>
+        )}
       </div>
 
       <footer className="shrink-0 border-t border-[#2a2a2e] px-4 py-2 text-center text-xs text-[#6b6b70]">

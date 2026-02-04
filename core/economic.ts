@@ -12,6 +12,11 @@ export const GOVERNMENT_TREASURY_VIDA = 5.0;   // 50% → government_treasury_va
 export const USER_WALLET_VIDA = 4.98;            // 49.8% → user_wallet (Net Spendable)
 export const SENTINEL_BUSINESS_VIDA = 0.02;     // 0.2% → sentinel_business_ledger (Security Activation)
 
+/** Sovereign Hub Access Fee — 0.1 VIDA ($100 USD). Deducted from the $1,000 Liquid of the person registered via Guest Mode; transferred to the device owner's vault. */
+export const HUB_SERVICE_FEE_VIDA = 0.1;
+/** Minimum new-user balance (VIDA) required before the hub fee transfer runs (ensures grant was issued). */
+export const MIN_BALANCE_FOR_HUB_FEE_VIDA = 1.0;
+
 // Legacy 50/50 ratios (kept for backward compatibility; prefer Sovereign Handshake constants above)
 export const VIDA_CAP_MINT_AMOUNT = GROSS_SOVEREIGN_GRANT_VIDA;
 export const MINTING_SPLIT_CITIZEN = USER_WALLET_VIDA / GROSS_SOVEREIGN_GRANT_VIDA;  // 0.498

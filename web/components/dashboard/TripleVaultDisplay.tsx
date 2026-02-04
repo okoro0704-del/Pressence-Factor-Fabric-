@@ -16,18 +16,24 @@ export interface TripleVaultDisplayProps {
   globalUserCount?: number;
   /** Optional custom summary; if not provided, derived from sentinelFeePaidUsd. */
   summary?: TripleVaultSummary;
+  /** Face-First Security: when false, vault amounts are hidden until face match >= 95%. */
+  faceVerified?: boolean;
 }
+
+const BALANCE_MASK = '••••••';
 
 export function TripleVaultDisplay({
   sentinelFeePaidUsd,
   globalUserCount = 0,
   summary: summaryProp,
+  faceVerified = true,
 }: TripleVaultDisplayProps) {
   const summary = summaryProp ?? getTripleVaultSummary(sentinelFeePaidUsd);
   const progressPercent = Math.min(100, (globalUserCount / GLOBAL_UNLOCK_COUNT) * 100);
 
   const formatUsd = (n: number) =>
     n.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  const showAmount = (n: number) => (faceVerified ? formatUsd(n) : BALANCE_MASK);
 
   return (
     <div className="space-y-4">
@@ -51,8 +57,8 @@ export function TripleVaultDisplay({
             <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-1">Vault A — National Reserve</h4>
             <p className="text-[10px] text-amber-200/80 uppercase tracking-wide">Contribution to the Nation</p>
           </div>
-          <span className="text-2xl font-bold font-mono text-amber-300 tracking-tight">
-            {formatUsd(summary.nationalReserveUsd)}
+          <span className="text-2xl font-bold font-mono text-amber-300 tracking-tight" title={!faceVerified ? 'Verify face to view' : undefined}>
+            {showAmount(summary.nationalReserveUsd)}
           </span>
         </div>
         <p className="text-[10px] text-[#6b6b70] mt-2 uppercase tracking-wide">Not spendable; visible as your contribution</p>
@@ -71,8 +77,8 @@ export function TripleVaultDisplay({
               Locked
             </span>
           </div>
-          <span className="text-2xl font-bold font-mono text-[#a0a0a8] tracking-tight">
-            {formatUsd(summary.futureWealthUsd)}
+          <span className="text-2xl font-bold font-mono text-[#a0a0a8] tracking-tight" title={!faceVerified ? 'Verify face to view' : undefined}>
+            {showAmount(summary.futureWealthUsd)}
           </span>
         </div>
         <p className="text-[10px] text-[#6b6b70] mt-2 uppercase tracking-wide">Unlocks at 1 billion PFF users</p>
@@ -87,10 +93,10 @@ export function TripleVaultDisplay({
             <span className="text-xs font-mono text-emerald-400 bg-emerald-500/20 px-2 py-1 rounded">AVAILABLE NOW</span>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-bold font-mono text-emerald-300 tracking-tight">
-              {formatUsd(summary.availableCashUsd)}
+            <span className="text-2xl font-bold font-mono text-emerald-300 tracking-tight" title={!faceVerified ? 'Verify face to view' : undefined}>
+              {showAmount(summary.availableCashUsd)}
             </span>
-            {summary.sentinelFeeUsd > 0 && (
+            {faceVerified && summary.sentinelFeeUsd > 0 && (
               <span className="text-xs text-[#6b6b70]">
                 ({formatUsd(LIQUID_TIER_USD)} − {formatUsd(summary.sentinelFeeUsd)} Sentinel)
               </span>

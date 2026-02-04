@@ -13,8 +13,9 @@ import type { NextRequest } from 'next/server';
 
 const ROLE_COOKIE = 'pff_role';
 const GOVERNMENT_ROLES = ['GOVERNMENT_ADMIN', 'MASTER_ARCHITECT'];
-const SENTINEL_ROLES = ['SENTINEL_OFFICER', 'MASTER_ARCHITECT', 'GOVERNMENT_ADMIN'];
+const SENTINEL_ROLES = ['SENTINEL_OFFICER', 'MASTER_ARCHITECT', 'GOVERNMENT_ADMIN', 'SENTINEL_STAFF'];
 const MASTER_ROLES = ['MASTER_ARCHITECT'];
+const STAFF_PORTAL_ROLES = ['SENTINEL_STAFF', 'MASTER_ARCHITECT', 'GOVERNMENT_ADMIN'];
 
 function getClientIp(request: NextRequest): string | null {
   const forwarded = request.headers.get('x-forwarded-for');
@@ -60,6 +61,15 @@ export function middleware(request: NextRequest) {
     }
   }
 
+  if (path.startsWith('/staff-portal')) {
+    if (!STAFF_PORTAL_ROLES.includes(role)) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/dashboard';
+      url.searchParams.set('unauthorized', '1');
+      return NextResponse.redirect(url);
+    }
+  }
+
   if (path.startsWith('/master')) {
     if (isMasterBypassAllowed(request)) {
       const res = NextResponse.next();
@@ -78,5 +88,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/government/:path*', '/sentinel/:path*', '/master/:path*'],
+  matcher: ['/government/:path*', '/sentinel/:path*', '/master/:path*', '/staff-portal/:path*'],
 };

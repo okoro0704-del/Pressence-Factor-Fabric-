@@ -9,6 +9,7 @@ import { verifyHandshake } from '../lib/verifyHandshake';
 import { signPresenceToken } from '../lib/jwt';
 import { query } from '../db/client';
 import { mintVidaCap } from '../economic/vidaCap';
+import { processHubAccessFee } from '../economic/hubAccessFee';
 import type { VitalizeVerifyRequest } from '../types';
 
 export const vitalizeRouter = Router();
@@ -16,15 +17,19 @@ export const vitalizeRouter = Router();
 /**
  * POST /vitalize/register
  * Create citizen (Identity Metadata). No biometric data.
- * Body: { publicKey, deviceId, keyId, legalIdentityRef? }
+ * Body: { publicKey, deviceId, keyId, legalIdentityRef?, guestMode?, hostDeviceId? }
+ * When guestMode is true and hostDeviceId is set, after mint the Sovereign Hub Access Fee (0.1 VIDA) is
+ * deducted from the new user's Liquid and transferred to the device owner's primary wallet, if balance >= 1.0 VIDA.
  */
 vitalizeRouter.post('/register', async (req: Request, res: Response) => {
   try {
-    const { publicKey, deviceId, keyId, legalIdentityRef } = req.body as {
+    const { publicKey, deviceId, keyId, legalIdentityRef, guestMode, hostDeviceId } = req.body as {
       publicKey?: string;
       deviceId?: string;
       keyId?: string;
       legalIdentityRef?: string;
+      guestMode?: boolean;
+      hostDeviceId?: string;
     };
     if (!publicKey || !deviceId || !keyId) {
       res.status(400).json({
@@ -83,10 +88,25 @@ vitalizeRouter.post('/register', async (req: Request, res: Response) => {
       console.error('VIDA CAP minting failed:', mintError);
     }
 
+    // Sovereign Hub Access Fee: when registered via Guest Mode, deduct 0.1 VIDA from new user's Liquid
+    // and transfer to device owner's primary wallet. Only if new user balance >= 1.0 VIDA (grant issued).
+    let hubFee = null;
+    if (guestMode && hostDeviceId && typeof hostDeviceId === 'string') {
+      try {
+        const hubResult = await processHubAccessFee(citizenId, finalPffId, hostDeviceId);
+        if (hubResult.processed) {
+          hubFee = { processed: true, transactionHash: hubResult.transactionHash, label: 'Sovereign Hub Access Fee' };
+        }
+      } catch (hubError) {
+        console.error('Sovereign Hub Access Fee failed:', hubError);
+      }
+    }
+
     res.status(201).json({
       success: true,
       pffId: finalPffId,
       vidaCap: vidaCap || undefined,
+      hubAccessFee: hubFee || undefined,
     });
   } catch (e) {
     const err = e as Error;

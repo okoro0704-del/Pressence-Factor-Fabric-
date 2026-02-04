@@ -22,6 +22,7 @@ import {
   NAIRA_RATE,
 } from '@/lib/sovereignHandshakeConstants';
 import { LIQUID_TIER_USD } from '@/lib/economic';
+import { isFaceVerifiedForBalance } from '@/lib/biometricAuth';
 
 export function UserProfileBalance() {
   const [vaultData, setVaultData] = useState<CitizenVault | null>(null);
@@ -29,6 +30,7 @@ export function UserProfileBalance() {
   const [showSendVida, setShowSendVida] = useState(false);
   const [showPresenceModal, setShowPresenceModal] = useState(false);
   const [isPresenceVerified, setIsPresenceVerified] = useState(false);
+  const [faceVerifiedForBalance, setFaceVerifiedForBalance] = useState(false);
   const [hasLicense, setHasLicense] = useState(false);
   const [tokenVerified, setTokenVerified] = useState(false);
   const [sentinelFeePaidUsd, setSentinelFeePaidUsd] = useState(0);
@@ -67,6 +69,18 @@ export function UserProfileBalance() {
     checkPresence();
     const interval = setInterval(checkPresence, 30000);
     return () => clearInterval(interval);
+  }, []);
+
+  // Face-First Security: balance hidden until face match >= 95%
+  useEffect(() => {
+    const check = () => setFaceVerifiedForBalance(isFaceVerifiedForBalance());
+    check();
+    window.addEventListener('focus', check);
+    const interval = setInterval(check, 10000);
+    return () => {
+      window.removeEventListener('focus', check);
+      clearInterval(interval);
+    };
   }, []);
 
   // Sentinel Verified = active license + security token verified; fee from license tier (deducted from Liquid)
@@ -153,9 +167,18 @@ export function UserProfileBalance() {
       </div>
 
       <div className="bg-[#16161a] rounded-xl p-6 border border-[#2a2a2e]">
+        {!faceVerifiedForBalance && (
+          <div className="mb-4 p-3 bg-amber-500/15 border border-amber-500/40 rounded-lg flex items-center gap-2">
+            <span className="text-amber-400 text-lg" aria-hidden>🔒</span>
+            <p className="text-sm text-amber-200/90">
+              Face-First Security: Verify face (95%+ match) to view balance and National Reserve data.
+            </p>
+          </div>
+        )}
         <TripleVaultDisplay
           sentinelFeePaidUsd={sentinelFeePaidUsd}
           globalUserCount={CURRENT_USERS}
+          faceVerified={faceVerifiedForBalance}
         />
 
         <div className={`relative rounded-xl mt-6 mb-6 transition-all duration-300 ${!sentinelVerified ? 'select-none' : ''}`}>
@@ -194,7 +217,8 @@ export function UserProfileBalance() {
             <div>
               <p className="text-xs font-bold text-red-400 uppercase tracking-wider mb-1">Transaction Limit Notice</p>
               <p className="text-xs text-[#6b6b70] leading-relaxed">
-                Swap and Send are limited to <span className="font-mono text-emerald-400">Vault C — Available Cash</span> ({availableCashUsd.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 })}).
+                Swap and Send are limited to <span className="font-mono text-emerald-400">Vault C — Available Cash</span>{' '}
+                ({faceVerifiedForBalance ? availableCashUsd.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }) : '••••••'}).
                 Vault B (Future Wealth) unlocks at 1B users: <span className="font-mono text-red-400">"Asset Locked: Requires 1B User Milestone for Release."</span>
               </p>
             </div>
@@ -209,10 +233,12 @@ export function UserProfileBalance() {
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-[#6b6b70]">Gross Sovereign Grant</span>
               <span className="text-xl font-bold text-[#c9a227]">
-                {GROSS_SOVEREIGN_GRANT_VIDA.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VIDA · $10,000
+                {faceVerifiedForBalance
+                  ? `${GROSS_SOVEREIGN_GRANT_VIDA.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VIDA · $10,000`
+                  : '•••••• VIDA · ••••••'}
               </span>
             </div>
-            <p className="text-xs text-[#6b6b70] mt-1">$10,000 grant upon vitalization</p>
+            <p className="text-xs text-[#6b6b70] mt-1">{faceVerifiedForBalance ? '$10,000 grant upon vitalization' : 'Verify face to view'}</p>
           </div>
 
           <div className="p-4 bg-[#0d0d0f] rounded-lg border border-[#2a2a2e]">
@@ -220,7 +246,9 @@ export function UserProfileBalance() {
             <div className="flex items-center justify-between">
               <span className="text-sm text-[#6b6b70]">Contribution to the Nation (not spendable)</span>
               <span className="text-base font-bold text-amber-400">
-                {NATIONAL_CONTRIBUTION_VIDA.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VIDA · $5,000
+                {faceVerifiedForBalance
+                  ? `${NATIONAL_CONTRIBUTION_VIDA.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VIDA · $5,000`
+                  : '•••••• VIDA · ••••••'}
               </span>
             </div>
           </div>
@@ -230,11 +258,13 @@ export function UserProfileBalance() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-[#6b6b70]">Liquid (available after Sentinel)</span>
-                <span className="text-base font-mono text-emerald-400">$1,000 − ${sentinelFeePaidUsd} = ${availableCashUsd.toLocaleString('en-US', { minimumFractionDigits: 0 })}</span>
+                <span className="text-base font-mono text-emerald-400">
+                  {faceVerifiedForBalance ? `$1,000 − $${sentinelFeePaidUsd} = $${availableCashUsd.toLocaleString('en-US', { minimumFractionDigits: 0 })}` : '••••••'}
+                </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-[#6b6b70]">Sovereign Lock (until 1B users)</span>
-                <span className="text-base font-bold text-[#6b6b70]">$4,000</span>
+                <span className="text-base font-bold text-[#6b6b70]">{faceVerifiedForBalance ? '$4,000' : '••••••'}</span>
               </div>
             </div>
           </div>
@@ -242,18 +272,18 @@ export function UserProfileBalance() {
           <div className="p-4 bg-gradient-to-br from-emerald-900/20 to-emerald-800/10 rounded-lg border-2 border-emerald-500/50">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-bold text-emerald-400 uppercase tracking-wider">= Available Cash (Vault C)</span>
-              <span className="text-2xl font-bold text-emerald-300">
-                ${availableCashUsd.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+              <span className="text-2xl font-bold text-emerald-300" title={!faceVerifiedForBalance ? 'Verify face to view' : undefined}>
+                {faceVerifiedForBalance ? `$${availableCashUsd.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : '••••••'}
               </span>
             </div>
-            <p className="text-xs text-[#6b6b70] mt-1">$1,000 Liquid minus Sentinel Activation fee</p>
+            <p className="text-xs text-[#6b6b70] mt-1">{faceVerifiedForBalance ? '$1,000 Liquid minus Sentinel Activation fee' : 'Verify face (95%+ match) to view'}</p>
           </div>
 
           <div className="p-4 bg-[#0d0d0f] rounded-lg border border-[#2a2a2e]">
             <div className="flex items-center justify-between">
               <span className="text-xs text-[#6b6b70]">Naira Equivalent (Citizen share)</span>
               <span className="text-sm font-mono text-[#00ff41]">
-                ₦{yourShareNaira.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {faceVerifiedForBalance ? `₦${yourShareNaira.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '••••••'}
               </span>
             </div>
           </div>

@@ -51,6 +51,21 @@ import { setIdentityAnchorForSession, isSentinelActive } from '@/lib/sentinelAct
 import { getCurrentUserRole, setRoleCookie, canAccessMaster, canAccessGovernment, getProfileWithPrimarySentinel } from '@/lib/roleAuth';
 import { ensureGenesisIfEmpty } from '@/lib/auth';
 import { SovereignConstitution } from '@/components/auth/SovereignConstitution';
+import { setSessionIdentity } from '@/lib/sessionIsolation';
+import { enterGuestMode, isGuestMode, logGuestAccessIfNeeded } from '@/lib/guestMode';
+import { NewDeviceAuthorizationScreen } from '@/components/auth/NewDeviceAuthorizationScreen';
+import { updatePrimarySentinelDeviceForMigration, sendDeviceMigrationSecurityAlert } from '@/lib/deviceMigration';
+import { SacredRecordScreen } from '@/components/auth/SacredRecordScreen';
+import { SeedVerificationStep } from '@/components/auth/SeedVerificationStep';
+import {
+  generateMnemonic12,
+  mnemonicToWords,
+  pick3RandomIndices,
+  verify3Words,
+} from '@/lib/recoverySeed';
+import { storeRecoverySeed, hasRecoverySeed } from '@/lib/recoverySeedStorage';
+import type { DeviceInfo } from '@/lib/multiDeviceVitalization';
+import { RecoverMyAccountScreen } from '@/components/auth/RecoverMyAccountScreen';
 
 const jetbrains = JetBrains_Mono({ weight: ['400', '600', '700'], subsets: ['latin'] });
 
@@ -124,6 +139,20 @@ export function FourLayerGate() {
   /** First-time MASTER_ARCHITECT: role is Master but device ID empty — show Enrollment Mode to capture Master Key */
   const [showEnrollmentModeForMaster, setShowEnrollmentModeForMaster] = useState(false);
   const [enrollmentCapturing, setEnrollmentCapturing] = useState(false);
+  /** New Device Authorization: device_fingerprint does not match primary_sentinel_device_id — require 5s Face Pulse then update binding */
+  const [showNewDeviceAuthorization, setShowNewDeviceAuthorization] = useState(false);
+  const [newDeviceMigrationScanning, setNewDeviceMigrationScanning] = useState(false);
+  const [newDeviceMigrationError, setNewDeviceMigrationError] = useState<string | null>(null);
+  /** Sovereign Recovery Key (Master Seed): first device enrollment — Sacred Record + 3-word verification */
+  const [showSacredRecord, setShowSacredRecord] = useState(false);
+  const [generatedSeed, setGeneratedSeed] = useState<string | null>(null);
+  const [showSeedVerification, setShowSeedVerification] = useState(false);
+  const [verificationIndices, setVerificationIndices] = useState<number[]>([]);
+  const [seedVerificationError, setSeedVerificationError] = useState<string | null>(null);
+  const [sacredRecordDeviceContext, setSacredRecordDeviceContext] = useState<{
+    deviceInfo: DeviceInfo;
+    compositeDeviceId: string;
+  } | null>(null);
   const router = useRouter();
   const { setPresenceVerified } = useGlobalPresenceGateway();
 
@@ -307,8 +336,7 @@ export function FourLayerGate() {
       navigator.vibrate([100, 50, 100, 50, 200]);
     }
 
-    // User-triggered: location request must happen immediately on click so browsers trust it
-    startLocationRequestFromUserGesture();
+    startLocationRequestFromUserGesture(identityAnchor.phone);
 
     setAuthStatus(AuthStatus.SCANNING);
     setResult(null);
@@ -338,6 +366,17 @@ export function FourLayerGate() {
 
       const deviceInfo = getCurrentDeviceInfo();
     const compositeDeviceId = await getCompositeDeviceFingerprint();
+
+    // New Hardware Detection: if verified user's device_fingerprint does not match stored primary_sentinel_device_id → New Device Authorization
+    const profile = await getProfileWithPrimarySentinel(identityAnchor.phone);
+    const storedPrimaryId = profile?.primary_sentinel_device_id?.trim() ?? '';
+    if (storedPrimaryId && compositeDeviceId !== storedPrimaryId) {
+      setShowNewDeviceAuthorization(true);
+      setAuthStatus(AuthStatus.IDLE);
+      biometricPendingRef.current = false;
+      return;
+    }
+
     const isNewDevice = !(await isDeviceAuthorized(identityAnchor.phone, compositeDeviceId));
     const authResult = await resolveSovereignByPresence(
       identityAnchor.phone,
@@ -383,13 +422,23 @@ export function FourLayerGate() {
 
         if (!primaryDevice) {
           // No primary device found - this is the FIRST DEVICE
-          // Assign as PRIMARY_SENTINEL
+          const hasSeed = await hasRecoverySeed(identityAnchor.phone);
+          if (!hasSeed) {
+            // Sovereign Recovery Key: generate 12-word phrase, show Sacred Record, then 3-word verification
+            console.log('✅ First device detected - generating Master Key (Sacred Record)');
+            const seed = generateMnemonic12();
+            setGeneratedSeed(seed);
+            setSacredRecordDeviceContext({ deviceInfo, compositeDeviceId });
+            setShowSacredRecord(true);
+            setAuthStatus(AuthStatus.IDLE);
+            biometricPendingRef.current = false;
+            return;
+          }
+
+          // Already has recovery seed — assign as PRIMARY_SENTINEL
           console.log('✅ First device detected - assigning as PRIMARY_SENTINEL');
 
-          // Get IP address (simplified - in production use a proper IP detection service)
           const ipAddress = 'unknown';
-
-          // Get geolocation (simplified - in production use browser Geolocation API)
           const geolocation = {
             city: 'Lagos',
             country: 'Nigeria',
@@ -416,6 +465,8 @@ export function FourLayerGate() {
           setIdentityAnchorForSession(identityAnchor.phone);
           ensureGenesisIfEmpty(identityAnchor.phone, identityAnchor.name).catch(() => {});
           setPresenceVerified(true);
+          setSessionIdentity(identityAnchor.phone);
+          await logGuestAccessIfNeeded();
           setShowVaultAnimation(true);
           return;
         }
@@ -464,6 +515,8 @@ export function FourLayerGate() {
       setIdentityAnchorForSession(identityAnchor.phone);
       ensureGenesisIfEmpty(identityAnchor.phone, identityAnchor.name).catch(() => {});
       setPresenceVerified(true);
+      setSessionIdentity(identityAnchor.phone);
+      await logGuestAccessIfNeeded();
       setShowVaultAnimation(true);
     } else {
       setAuthStatus(AuthStatus.FAILED);
@@ -542,6 +595,7 @@ export function FourLayerGate() {
     await mintFoundationSeigniorage(identityAnchor.phone);
     setIdentityAnchorForSession(identityAnchor.phone);
     setPresenceVerified(true);
+    setSessionIdentity(identityAnchor.phone);
     setShowVaultAnimation(true);
   };
 
@@ -646,6 +700,7 @@ export function FourLayerGate() {
     setIdentityAnchorForSession(identityAnchor.phone);
     ensureGenesisIfEmpty(identityAnchor.phone, identityAnchor.name).catch(() => {});
     setPresenceVerified(true);
+    setSessionIdentity(identityAnchor.phone);
     setShowVaultAnimation(true);
   };
 
@@ -696,6 +751,7 @@ export function FourLayerGate() {
       setIdentityAnchorForSession(identityAnchor.phone);
       ensureGenesisIfEmpty(identityAnchor.phone, identityAnchor.name).catch(() => {});
       setPresenceVerified(true);
+      setSessionIdentity(identityAnchor.phone);
       setShowVaultAnimation(true);
     } catch (e) {
       console.error('[Enrollment Mode] Capture failed:', e);
@@ -703,6 +759,123 @@ export function FourLayerGate() {
     } finally {
       setEnrollmentCapturing(false);
     }
+  };
+
+  /** New Device Authorization: 5-second Face Pulse then update primary_sentinel_device_id and send Security Alert */
+  const handleNewDeviceAuthorize = async () => {
+    if (!identityAnchor) return;
+    if (newDeviceMigrationScanning) return;
+    setNewDeviceMigrationError(null);
+    setNewDeviceMigrationScanning(true);
+    startLocationRequestFromUserGesture(identityAnchor.phone);
+    try {
+      const compositeDeviceId = await getCompositeDeviceFingerprint();
+      const authResult = await resolveSovereignByPresence(
+        identityAnchor.phone,
+        (layer, status) => {
+          setCurrentLayer(layer);
+          setAuthStatus(status);
+        },
+        {
+          skipVoiceLayer: identityAnchor.vocalExempt === true,
+          requireAllLayers: true,
+          migrationMode: true,
+          registeredCountryCode: 'NG',
+          voiceOptions: identityAnchor.vocalExempt ? undefined : { onAudioLevel: (l) => setVoiceLevel(l) },
+          onPillarComplete: (pillar: PresencePillar) => {
+            if (pillar === 'device') setPillarDevice(true);
+            if (pillar === 'location') setPillarLocation(true);
+            if (pillar === 'face') setPillarFace(true);
+            if (pillar === 'voice') setPillarVoice(true);
+          },
+        }
+      );
+      if (!authResult.success || !authResult.identity) {
+        setNewDeviceMigrationError(authResult.errorMessage ?? 'Face Pulse verification failed. Try again.');
+        return;
+      }
+      const updateResult = await updatePrimarySentinelDeviceForMigration(identityAnchor.phone, compositeDeviceId);
+      if (!updateResult.ok) {
+        setNewDeviceMigrationError(updateResult.error ?? 'Failed to update device binding.');
+        return;
+      }
+      await sendDeviceMigrationSecurityAlert(identityAnchor.phone);
+      setShowNewDeviceAuthorization(false);
+      const signed = await hasSignedConstitution(identityAnchor.phone);
+      if (!signed) {
+        setShowConstitutionGate(true);
+        return;
+      }
+      await mintFoundationSeigniorage(identityAnchor.phone);
+      setIdentityAnchorForSession(identityAnchor.phone);
+      ensureGenesisIfEmpty(identityAnchor.phone, identityAnchor.name).catch(() => {});
+      setPresenceVerified(true);
+      setSessionIdentity(identityAnchor.phone);
+      setShowVaultAnimation(true);
+    } catch (e) {
+      setNewDeviceMigrationError(e instanceof Error ? e.message : 'Verification failed. Try again.');
+    } finally {
+      setNewDeviceMigrationScanning(false);
+      setAuthStatus(AuthStatus.IDLE);
+      setCurrentLayer(null);
+    }
+  };
+
+  const handleNewDeviceCancel = () => {
+    setShowNewDeviceAuthorization(false);
+    setNewDeviceMigrationError(null);
+    setAuthStatus(AuthStatus.IDLE);
+  };
+
+  /** Sacred Record: user acknowledged — show 3-word verification. */
+  const handleSacredRecordAcknowledged = () => {
+    setShowSacredRecord(false);
+    setVerificationIndices(pick3RandomIndices());
+    setSeedVerificationError(null);
+    setShowSeedVerification(true);
+  };
+
+  /** Seed verification passed — store recovery seed then assign primary sentinel and proceed. */
+  const handleSeedVerificationPassed = async (answers: string[]) => {
+    if (!identityAnchor || !generatedSeed || verificationIndices.length !== 3 || !sacredRecordDeviceContext) return;
+    if (!verify3Words(generatedSeed, verificationIndices, answers)) {
+      setSeedVerificationError('Words do not match. Check your Master Key and try again.');
+      return;
+    }
+    setSeedVerificationError(null);
+    const storeResult = await storeRecoverySeed(identityAnchor.phone, generatedSeed, identityAnchor.name);
+    if (!storeResult.ok) {
+      setSeedVerificationError(storeResult.error ?? 'Failed to save recovery seed.');
+      return;
+    }
+    const ctx = sacredRecordDeviceContext;
+    setGeneratedSeed(null);
+    setShowSeedVerification(false);
+    setSacredRecordDeviceContext(null);
+
+    const { deviceInfo, compositeDeviceId } = ctx;
+    const ipAddress = 'unknown';
+    const geolocation = { city: 'Lagos', country: 'Nigeria', latitude: 6.5244, longitude: 3.3792 };
+    await assignPrimarySentinel(
+      identityAnchor.phone,
+      identityAnchor.name,
+      deviceInfo,
+      ipAddress,
+      geolocation,
+      compositeDeviceId
+    );
+    const signed = await hasSignedConstitution(identityAnchor.phone);
+    if (!signed) {
+      setShowConstitutionGate(true);
+      return;
+    }
+    await mintFoundationSeigniorage(identityAnchor.phone);
+    setIdentityAnchorForSession(identityAnchor.phone);
+    ensureGenesisIfEmpty(identityAnchor.phone, identityAnchor.name).catch(() => {});
+    setPresenceVerified(true);
+    setSessionIdentity(identityAnchor.phone);
+    await logGuestAccessIfNeeded();
+    setShowVaultAnimation(true);
   };
 
   /** Dependent flow: user confirmed "Guardian Authorization Detected. Sentinel Secure." — proceed to dashboard. */
@@ -718,6 +891,7 @@ export function FourLayerGate() {
     setIdentityAnchorForSession(identityAnchor.phone);
     ensureGenesisIfEmpty(identityAnchor.phone, identityAnchor.name).catch(() => {});
     setPresenceVerified(true);
+    setSessionIdentity(identityAnchor.phone);
     setShowVaultAnimation(true);
   };
 
@@ -729,6 +903,7 @@ export function FourLayerGate() {
     setIdentityAnchorForSession(identityAnchor.phone);
     ensureGenesisIfEmpty(identityAnchor.phone, identityAnchor.name).catch(() => {});
     setPresenceVerified(true);
+    setSessionIdentity(identityAnchor.phone);
     setShowVaultAnimation(true);
   };
 
@@ -822,6 +997,63 @@ export function FourLayerGate() {
     return <VaultDoorAnimation onComplete={handleVaultAnimationComplete} />;
   }
 
+  // Sovereign Recovery Key: Sacred Record (12 words) — first device enrollment
+  if (showSacredRecord && identityAnchor && generatedSeed) {
+    const words = mnemonicToWords(generatedSeed);
+    return (
+      <div className="min-h-screen bg-[#050505] flex items-center justify-center p-4">
+        <div
+          className="absolute inset-0 opacity-20 pointer-events-none"
+          style={{ background: 'radial-gradient(circle at center, rgba(212, 175, 55, 0.2) 0%, rgba(5, 5, 5, 0) 70%)' }}
+          aria-hidden
+        />
+        <SacredRecordScreen words={words} onAcknowledged={handleSacredRecordAcknowledged} />
+      </div>
+    );
+  }
+
+  // Seed Verification — 3 random words before finishing registration
+  if (showSeedVerification && identityAnchor && verificationIndices.length === 3) {
+    return (
+      <div className="min-h-screen bg-[#050505] flex items-center justify-center p-4">
+        <div
+          className="absolute inset-0 opacity-20 pointer-events-none"
+          style={{ background: 'radial-gradient(circle at center, rgba(212, 175, 55, 0.2) 0%, rgba(5, 5, 5, 0) 70%)' }}
+          aria-hidden
+        />
+        <SeedVerificationStep
+          indices={verificationIndices}
+          onVerify={handleSeedVerificationPassed}
+          onBack={() => {
+            setShowSeedVerification(false);
+            setShowSacredRecord(true);
+            setSeedVerificationError(null);
+          }}
+          error={seedVerificationError}
+        />
+      </div>
+    );
+  }
+
+  // New Device Authorization: device_fingerprint !== primary_sentinel_device_id — 5s Face Pulse then update binding + Security Alert
+  if (showNewDeviceAuthorization && identityAnchor) {
+    return (
+      <div className="min-h-screen bg-[#050505] flex items-center justify-center p-4">
+        <div
+          className="absolute inset-0 opacity-20 pointer-events-none"
+          style={{ background: 'radial-gradient(circle at center, rgba(212, 175, 55, 0.2) 0%, rgba(5, 5, 5, 0) 70%)' }}
+          aria-hidden
+        />
+        <NewDeviceAuthorizationScreen
+          onAuthorize={handleNewDeviceAuthorize}
+          onCancel={handleNewDeviceCancel}
+          loading={newDeviceMigrationScanning}
+          error={newDeviceMigrationError}
+        />
+      </div>
+    );
+  }
+
   // First-time MASTER_ARCHITECT: device ID empty — Enrollment Mode (bypass verification, capture Master Key)
   if (showEnrollmentModeForMaster && identityAnchor) {
     return (
@@ -907,6 +1139,23 @@ export function FourLayerGate() {
     );
   }
 
+  // Recover My Account — enter phone + 12 words to unbind from lost device
+  if (showRecoverFlow) {
+    return (
+      <div className="min-h-screen bg-[#050505] flex items-center justify-center p-4">
+        <div
+          className="absolute inset-0 opacity-20 pointer-events-none"
+          style={{ background: 'radial-gradient(circle at center, rgba(212, 175, 55, 0.2) 0%, rgba(5, 5, 5, 0) 70%)' }}
+          aria-hidden
+        />
+        <RecoverMyAccountScreen
+          onComplete={() => setShowRecoverFlow(false)}
+          onCancel={() => setShowRecoverFlow(false)}
+        />
+      </div>
+    );
+  }
+
   // Identity Anchor Input (after language + vocal instruction)
   if (!identityAnchor) {
     return (
@@ -919,6 +1168,13 @@ export function FourLayerGate() {
             subtitle="Enter your phone number to proceed to hardware biometric scan. Verification occurs only after the scan."
           />
         </div>
+        <button
+          type="button"
+          onClick={() => setShowRecoverFlow(true)}
+          className="mt-3 text-sm font-medium text-[#e8c547] hover:text-[#c9a227] transition-colors underline"
+        >
+          Recover My Account (lost device)
+        </button>
         <button
           type="button"
           onClick={handleDebugInfo}

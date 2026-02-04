@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { sendVidaToPhone, validatePhoneNumber, resolvePhoneToIdentity } from '@/lib/phoneIdentity';
+import { BiometricReceipt } from './BiometricReceipt';
 
 interface SendVidaModalProps {
   isOpen: boolean;
@@ -17,6 +18,8 @@ export function SendVidaModal({ isOpen, onClose, senderPhone, maxAmount }: SendV
   const [resolving, setResolving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [showReceipt, setShowReceipt] = useState(false);
+  const [successAmount, setSuccessAmount] = useState(0);
   const [recipientName, setRecipientName] = useState('');
 
   if (!isOpen) return null;
@@ -64,13 +67,9 @@ export function SendVidaModal({ isOpen, onClose, senderPhone, maxAmount }: SendV
 
     if (result.success) {
       setSuccess(true);
-      setTimeout(() => {
-        onClose();
-        setSuccess(false);
-        setRecipientPhone('');
-        setAmount('');
-        setRecipientName('');
-      }, 2000);
+      setSuccessAmount(amountNum);
+      setShowReceipt(true);
+      // In production, backend would notify merchant (push + voice) when recording the payment
     } else {
       setError(result.message);
     }
@@ -100,12 +99,28 @@ export function SendVidaModal({ isOpen, onClose, senderPhone, maxAmount }: SendV
           </p>
         </div>
 
-        {/* Success Message */}
-        {success && (
+        {/* Success: show biometric receipt for customer to show merchant */}
+        {success && showReceipt && (
+          <div className="mb-6">
+            <p className="text-sm text-green-400 text-center font-semibold mb-3">✓ VIDA sent successfully!</p>
+            <BiometricReceipt
+              amountVida={successAmount}
+              merchantLabel={recipientName || recipientPhone}
+              transactionId={`tx-${Date.now()}`}
+              onClose={() => {
+                setShowReceipt(false);
+                onClose();
+                setSuccess(false);
+                setRecipientPhone('');
+                setAmount('');
+                setRecipientName('');
+              }}
+            />
+          </div>
+        )}
+        {success && !showReceipt && (
           <div className="mb-6 p-4 bg-green-500/20 border border-green-500/50 rounded-lg">
-            <p className="text-sm text-green-400 text-center font-semibold">
-              ✓ VIDA sent successfully!
-            </p>
+            <p className="text-sm text-green-400 text-center font-semibold">✓ VIDA sent successfully!</p>
           </div>
         )}
 

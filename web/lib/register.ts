@@ -1,8 +1,11 @@
 /**
  * PFF — Biometric registration. Hardware-bound key via WebAuthn, stored via /vitalize/register.
+ * When in Guest Mode, sends guestMode and hostDeviceId so the Sovereign Hub Access Fee (0.1 VIDA)
+ * is transferred to the device owner's primary wallet after the grant is issued.
  */
 
 import { createCredential, isWebAuthnSupported, isSecureContext } from './webauthn';
+import { isGuestMode } from './guestMode';
 
 const DEVICE_ID_KEY = 'pff_device_id';
 const REG_API = '/api/vitalize/register';
@@ -60,6 +63,7 @@ export async function registerBiometric(userId: string, userName: string): Promi
   const attestationObject = bufferToBase64Url(response.attestationObject);
   const clientDataJSON = bufferToBase64Url(response.clientDataJSON);
   const deviceId = getOrCreateDeviceId();
+  const guestMode = typeof sessionStorage !== 'undefined' && isGuestMode();
   try {
     const res = await fetch(REG_API, {
       method: 'POST',
@@ -70,6 +74,7 @@ export async function registerBiometric(userId: string, userName: string): Promi
         clientDataJSON,
         deviceId,
         userName,
+        ...(guestMode && { guestMode: true, hostDeviceId: deviceId }),
       }),
     });
     const data = (await res.json()) as { success?: boolean; pffId?: string; message?: string };

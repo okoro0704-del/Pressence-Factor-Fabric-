@@ -58,32 +58,55 @@ async function executePhase1VisualLiveness(): Promise<VisualLivenessData> {
 
 /**
  * Phase 2: Tactile Identity (Fingerprint)
- * - Triggered immediately upon Face-Lock
- * - Activate biometric sensor
- * - Match fingerprint against Sovereign Template
+ * - Triggers native fingerprint (LocalAuthentication / BiometricPrompt).
+ * - If device has no fingerprint sensor, falls back to Face Pulse (Face ID / face unlock).
+ * - Only listens for success: true; no raw biometric data requested.
  */
 async function executePhase2TactileIdentity(): Promise<TactileIdentityData> {
-  // TODO: Integrate with react-native-fingerprint-scanner or react-native-biometrics
-  // This is a placeholder implementation showing the expected structure
-  
-  // In production, this would:
-  // 1. Activate fingerprint sensor
-  // 2. Capture fingerprint
-  // 3. Match against stored template
-  // 4. Return match confidence
-  
-  return new Promise((resolve, reject) => {
-    // Placeholder: Replace with actual fingerprint scanning
-    setTimeout(() => {
-      // Mock data - replace with real sensor data
-      resolve({
-        fingerprintMatched: true,
-        matchConfidence: 0.98,
-        templateId: 'SOVEREIGN_TEMPLATE_001',
-        sensorType: 'capacitive',
-      });
-    }, 300); // Simulated processing time
+  const {
+    getDeviceCapabilities,
+    getBiometricPromptMessage,
+    hasSigningKey,
+    signPresenceProof,
+    PFF_SIGNING_KEY_ALIAS,
+  } = await import('./secureEnclaveService');
+  const { getDeviceId } = await import('./deviceId');
+  const { generateNonce } = await import('./nonce');
+
+  const caps = await getDeviceCapabilities();
+  const promptMessage = getBiometricPromptMessage(caps);
+
+  const hasKey = await hasSigningKey();
+  if (!hasKey) {
+    return {
+      fingerprintMatched: false,
+      matchConfidence: 0,
+      templateId: '',
+      sensorType: 'none',
+    };
+  }
+
+  const deviceId = await getDeviceId();
+  const payload = {
+    nonce: generateNonce(),
+    timestamp: Date.now(),
+    keyId: PFF_SIGNING_KEY_ALIAS,
+    deviceId,
+    livenessOk: true,
+  };
+
+  const outcome = await signPresenceProof(payload, {
+    promptMessage,
+    cancelButtonText: 'Cancel',
   });
+
+  const success = outcome.success === true;
+  return {
+    fingerprintMatched: success,
+    matchConfidence: success ? 1 : 0,
+    templateId: success ? 'PFF_SIGNING_KEY' : '',
+    sensorType: caps.biometryType === 'TouchID' ? 'capacitive' : caps.biometryType === 'FaceID' ? 'face' : 'Biometrics',
+  };
 }
 
 /**

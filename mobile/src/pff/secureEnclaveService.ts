@@ -25,6 +25,12 @@ import type {
   SigningError,
 } from './types';
 
+/** Options for the native biometric prompt (message only; no raw data requested). */
+export interface BiometricPromptOptions {
+  promptMessage?: string;
+  cancelButtonText?: string;
+}
+
 const rnBiometrics = new ReactNativeBiometrics();
 
 /** Key alias used in Keychain/KeyStore. Must be unique per PFF identity. */
@@ -90,17 +96,21 @@ export async function createSigningKey(): Promise<KeyGenerationOutcome> {
 /**
  * Sign a Presence Proof payload with the hardware-backed key. Requires
  * biometric authentication (TouchID / FaceID / Android Biometrics).
+ * Only the success boolean and signature are used; no raw biometric data.
  * Used for Digital Handshake and Heartbeat.
  */
 export async function signPresenceProof(
-  payload: PresenceProofPayload
+  payload: PresenceProofPayload,
+  options?: BiometricPromptOptions
 ): Promise<SigningOutcome> {
   const payloadString = JSON.stringify(payload);
+  const promptMessage = options?.promptMessage ?? 'Confirm your presence';
+  const cancelButtonText = options?.cancelButtonText ?? 'Cancel';
   try {
     const { success, signature } = await rnBiometrics.createSignature({
-      promptMessage: 'Confirm your presence',
+      promptMessage,
       payload: payloadString,
-      cancelButtonText: 'Cancel',
+      cancelButtonText,
     });
     if (!success || !signature) {
       return {
@@ -121,6 +131,27 @@ export async function signPresenceProof(
       code: 'SIGN_ERROR',
       message: err?.message ?? 'Unknown error signing presence proof',
     } satisfies SigningError;
+  }
+}
+
+/**
+ * Prompt message for native biometric (LocalAuthentication / BiometricPrompt).
+ * Fingerprint-first; if device has no fingerprint sensor, use face messaging
+ * so the user knows they can use Face ID / face unlock and aren't locked out.
+ */
+export function getBiometricPromptMessage(caps: DeviceCapabilities): string {
+  if (!caps.hasBiometrics || !caps.biometryType) {
+    return 'Verify your identity';
+  }
+  switch (caps.biometryType) {
+    case 'TouchID':
+      return 'Verify with fingerprint';
+    case 'FaceID':
+      return 'Verify with face';
+    case 'Biometrics':
+      return 'Verify with fingerprint or face';
+    default:
+      return 'Verify your identity';
   }
 }
 

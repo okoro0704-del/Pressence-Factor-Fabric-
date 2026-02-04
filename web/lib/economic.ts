@@ -26,6 +26,14 @@ export const SENTINEL_SINGLE_USD = 50;
 /** Sentinel Activation: Multi device. Deducted from Liquid $1,000. */
 export const SENTINEL_MULTI_USD = 100;
 
+/** Sovereign Hub Access Fee — 0.1 VIDA = $100 USD. Deducted from the $1,000 Liquid of the person registered via Guest Mode; transferred to the device owner's primary wallet. */
+export const HUB_SERVICE_FEE_VIDA = 0.1;
+export const HUB_SERVICE_FEE_USD = 100;
+/** Minimum new-user balance (VIDA) before hub fee transfer (transaction only after grant is issued). */
+export const MIN_BALANCE_FOR_HUB_FEE_VIDA = 1.0;
+/** Transaction history label for the hub fee. */
+export const SOVEREIGN_HUB_ACCESS_FEE_LABEL = 'Sovereign Hub Access Fee';
+
 /** Global user count required to unlock Sovereign Lock vault. */
 export const GLOBAL_UNLOCK_COUNT = 1_000_000_000;
 

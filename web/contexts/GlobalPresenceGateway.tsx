@@ -6,6 +6,8 @@ import { checkPresenceVerified, markPresenceVerified, clearPresenceVerification 
 import { getIdentityAnchorPhone } from '@/lib/sentinelActivation';
 import { hasActiveSentinelLicense } from '@/lib/sentinelLicensing';
 import { getCurrentUserRole, setRoleCookie } from '@/lib/roleAuth';
+import { checkSessionIsolation, setSessionIdentity } from '@/lib/sessionIsolation';
+import { getSupabase } from '@/lib/supabase';
 
 interface GlobalPresenceGatewayContextType {
   isPresenceVerified: boolean;
@@ -87,8 +89,12 @@ export function GlobalPresenceGatewayProvider({ children }: { children: ReactNod
       markPresenceVerified();
       const identityAnchor = getIdentityAnchorPhone();
       if (identityAnchor) {
+        setSessionIdentity(identityAnchor);
         getCurrentUserRole(identityAnchor).then((role) => setRoleCookie(role));
       }
+      getSupabase()?.auth?.getUser?.().then(({ data }) => {
+        if (data?.user?.id && identityAnchor) setSessionIdentity(identityAnchor, data.user.id);
+      }).catch(() => {});
     } else {
       setIsPresenceVerified(false);
       setPresenceTimestamp(null);
@@ -120,6 +126,22 @@ export function GlobalPresenceGatewayProvider({ children }: { children: ReactNod
         setLoading(false);
       }, SAFETY_TIMEOUT_MS);
       try {
+        const phone = getIdentityAnchorPhone();
+        let uid: string | null = null;
+        try {
+          const supabase = getSupabase();
+          if (supabase?.auth?.getUser) {
+            const { data } = await supabase.auth.getUser();
+            uid = data?.user?.id ?? null;
+          }
+        } catch {
+          // ignore
+        }
+        if (checkSessionIsolation(phone, uid)) {
+          setPresenceVerifiedHandler(false);
+          router.push('/');
+          return;
+        }
         const verified = await checkAndRefreshPresence();
         if (cancelled) return;
         if (!verified && !PUBLIC_ROUTES.includes(pathname)) {

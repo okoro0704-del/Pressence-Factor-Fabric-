@@ -2,9 +2,17 @@
  * PFF — Presence Factor Fabric
  * The Handshake: biometric verification → sign Presence Proof (nonce + timestamp).
  * Only the signed proof is sent to backend; raw biometric data never leaves device.
+ * Uses native fingerprint (LocalAuthentication / BiometricPrompt); falls back to
+ * face when the device has no fingerprint sensor.
  */
 
-import { hasSigningKey, signPresenceProof, PFF_SIGNING_KEY_ALIAS } from './secureEnclaveService';
+import {
+  hasSigningKey,
+  signPresenceProof,
+  getDeviceCapabilities,
+  getBiometricPromptMessage,
+  PFF_SIGNING_KEY_ALIAS,
+} from './secureEnclaveService';
 import { getDeviceId } from './deviceId';
 import { generateNonce } from './nonce';
 import type { PresenceProofPayload, HandshakeResult, HandshakeSuccess, HandshakeFailure } from './types';
@@ -13,10 +21,11 @@ import type { PresenceProofPayload, HandshakeResult, HandshakeSuccess, Handshake
  * Perform the PFF Handshake:
  * 1. Ensure Secure Enclave key exists.
  * 2. Build Presence Proof payload (nonce + timestamp + deviceId + keyId).
- * 3. Trigger native biometric auth (TouchID / FaceID / Android Biometrics).
- * 4. Sign payload with hardware key; return SignedPresenceProof for backend.
+ * 3. Trigger native biometric (fingerprint first; fallback to face if no fingerprint).
+ * 4. Only listen for success: true; then cryptographically sign the session using the Device Fingerprint.
+ * 5. Return SignedPresenceProof for backend.
  *
- * Raw biometric data never leaves the device. Only the signed proof is sent.
+ * Raw biometric data never leaves the device. Only the success boolean and signed proof are used.
  */
 export async function performHandshake(): Promise<HandshakeResult> {
   const exists = await hasSigningKey();
@@ -40,7 +49,14 @@ export async function performHandshake(): Promise<HandshakeResult> {
     livenessOk: true,
   };
 
-  const outcome = await signPresenceProof(payload);
+  const caps = await getDeviceCapabilities();
+  const promptMessage = getBiometricPromptMessage(caps);
+
+  const outcome = await signPresenceProof(payload, {
+    promptMessage,
+    cancelButtonText: 'Cancel',
+  });
+
   if (!outcome.success) {
     return {
       success: false,
