@@ -18,6 +18,7 @@ import { PresenceProgressRing } from './PresenceProgressRing';
 import type { GlobalIdentity } from '@/lib/phoneIdentity';
 import { isVocalResonanceExempt, isIdentityMinor, type BiometricIdentityRecord } from '@/lib/universalIdentityComparison';
 import type { LanguageCode } from '@/lib/i18n/config';
+import { getStoredLanguage } from '@/lib/i18n/config';
 import { ConfirmLanguageScreen } from '@/components/auth/ConfirmLanguageScreen';
 import { VaultDoorAnimation } from './VaultDoorAnimation';
 import { useGlobalPresenceGateway } from '@/contexts/GlobalPresenceGateway';
@@ -89,10 +90,12 @@ export function FourLayerGate() {
   } | null>(null);
   /** Dependent flow: show "Guardian Authorization Detected. Sentinel Secure." and skip full biometric. */
   const [showGuardianAuthorizationBypass, setShowGuardianAuthorizationBypass] = useState(false);
-  /** PRE-VITALIZATION: Confirm Language → Identity Anchor (Voice step removed — Triple-Pillar only) */
+  /** PRE-VITALIZATION: Confirm Language → Identity Anchor (Voice step removed — Triple-Pillar only). Restored from storage so remount doesn't bounce back. */
   const [languageConfirmed, setLanguageConfirmed] = useState<LanguageCode | null>(null);
   /** Recover My Account: enter phone + 12 words to unbind from lost device */
   const [showRecoverFlow, setShowRecoverFlow] = useState(false);
+
+  const GATE_IDENTITY_STORAGE_KEY = 'pff_gate_identity_anchor';
   const [showMismatchScreen, setShowMismatchScreen] = useState(false);
   const [mismatchData, setMismatchData] = useState<{
     type: MismatchEventType;
@@ -167,10 +170,31 @@ export function FourLayerGate() {
     }
   }, [identityAnchor?.phone]);
 
-  // Hydration sync: only become interactive after client has fully mounted
+  // Hydration sync + restore language/identity from storage so remount doesn't bounce back to language (e.g. during "Verifying presence")
   useEffect(() => {
     setMounted(true);
     console.log('Interaction Layer Active', '(FourLayerGate)');
+    if (typeof window === 'undefined') return;
+    const storedLang = getStoredLanguage();
+    if (storedLang) setLanguageConfirmed(storedLang);
+    try {
+      const raw = sessionStorage.getItem(GATE_IDENTITY_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as { phone: string; name: string; vocalExempt?: boolean; isMinor?: boolean; guardianPhone?: string; isDependent?: boolean };
+        if (parsed?.phone && parsed?.name) {
+          setIdentityAnchor({
+            phone: parsed.phone,
+            name: parsed.name,
+            vocalExempt: parsed.vocalExempt,
+            isMinor: parsed.isMinor,
+            guardianPhone: parsed.guardianPhone,
+            isDependent: parsed.isDependent,
+          });
+        }
+      }
+    } catch {
+      // ignore invalid stored identity
+    }
   }, []);
 
   // First-time flag: MASTER_ARCHITECT with empty device ID → Enrollment Mode (bypass verification)
@@ -300,14 +324,20 @@ export function FourLayerGate() {
   }) => {
     const vocalExempt = payload.identity ? isVocalResonanceExempt(payload.identity) : false;
     const isMinor = payload.identity ? isIdentityMinor(payload.identity) : false;
-    setIdentityAnchor({
+    const anchor = {
       phone: payload.phoneNumber,
       name: payload.fullName,
       vocalExempt,
       isMinor,
       guardianPhone: payload.guardianPhone,
       isDependent: payload.isDependent === true,
-    });
+    };
+    setIdentityAnchor(anchor);
+    try {
+      sessionStorage.setItem(GATE_IDENTITY_STORAGE_KEY, JSON.stringify(anchor));
+    } catch {
+      // ignore
+    }
   };
 
   const biometricPendingRef = useRef(false);
