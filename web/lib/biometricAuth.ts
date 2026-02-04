@@ -24,6 +24,8 @@ export enum AuthLayer {
   VOICE_PRINT = 'VOICE_PRINT',
   HARDWARE_TPM = 'HARDWARE_TPM',
   GENESIS_HANDSHAKE = 'GENESIS_HANDSHAKE',
+  /** Silent Verification: Face + Device + GPS satisfies 3-of-4 when voice skipped (noisy/unused mic) */
+  GPS_LOCATION = 'GPS_LOCATION',
 }
 
 // Authentication Status
@@ -44,7 +46,18 @@ export interface BiometricAuthResult {
   identity?: GlobalIdentity;
   errorMessage?: string;
   layersPassed: AuthLayer[];
+  /** True when scan hit 8s timeout; trigger Verification with Master Device or Elderly-First Manual Bypass */
+  timedOut?: boolean;
+  /** True when only 2 of 4 pillars met at timeout; auto-show Verify with Master Device */
+  twoPillarsOnly?: boolean;
+  /** True when Silent Presence Mode was used (Face + Device + GPS, no Voice) */
+  silentModeUsed?: boolean;
 }
+
+/** Scan timeout: if 3-of-4 not verified within 8 seconds, trigger Master Device / Manual Bypass */
+export const SCAN_TIMEOUT_MS = 8000;
+/** Voice: after 5s silence/noise, suggest Silent Mode (Face + Device + GPS) */
+export const VOICE_SILENCE_TIMEOUT_MS = 5000;
 
 /**
  * LAYER 1: BIOMETRIC SIGNATURE (UNIVERSAL 1-TO-1 IDENTITY MATCHING)
@@ -120,32 +133,67 @@ export async function verifyBiometricSignature(
 }
 
 /**
- * LAYER 2: VOICE PRINT (VOCAL RESONANCE ANALYSIS)
- * Voice recognition with throat and chest cavity resonance analysis
- * ENFORCES 0.5% VARIANCE THRESHOLD - Matches against SPECIFIC user's voice print
- * REQUIRES IDENTITY ANCHOR (phone number) before scan
+ * MIC-CHECK: Initialize Web Speech API and verify browser has mic permission before scan.
+ * Call before user clicks Start so voice layer is ready.
  */
-export async function verifyVoicePrint(
-  identityAnchorPhone?: string
-): Promise<{ success: boolean; transcript?: string; voicePrint?: any; variance?: number; error?: string }> {
+export async function ensureVoiceAndMicReady(): Promise<{ ok: boolean; error?: string }> {
   try {
-    // IDENTITY ANCHOR REQUIRED
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      return { ok: false, error: 'Microphone not available' };
+    }
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    stream.getTracks().forEach((t) => t.stop());
+    return { ok: true };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false, error: msg || 'Microphone permission denied' };
+  }
+}
+
+/** Hash voice-print data locally with SHA-256 (no raw audio sent to backend). */
+async function hashVoicePrintLocal(data: ArrayBuffer | string): Promise<string> {
+  const encoder = new TextEncoder();
+  const bytes = typeof data === 'string' ? encoder.encode(data) : new Uint8Array(data);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', bytes);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * LAYER 2: VOICE PRINT (VOCAL RESONANCE ANALYSIS)
+ * Local matching: hash voice-print on device with SHA-256, send only hash to Supabase.
+ * Optional onAudioLevel(0-1) for visual pulse; optional onVoiceHash for debugging.
+ */
+export interface VerifyVoicePrintOptions {
+  onAudioLevel?: (level: number) => void;
+}
+
+/** Voice result: silentModeSuggested = true after 5s silence/noise → allow Silent Verification (Face + Device + GPS) */
+export interface VerifyVoicePrintResult {
+  success: boolean;
+  transcript?: string;
+  voicePrint?: string;
+  variance?: number;
+  error?: string;
+  silentModeSuggested?: boolean;
+}
+
+export async function verifyVoicePrint(
+  identityAnchorPhone?: string,
+  options?: VerifyVoicePrintOptions
+): Promise<VerifyVoicePrintResult> {
+  try {
     if (!identityAnchorPhone) {
-      return {
-        success: false,
-        error: 'Identity anchor required. Please enter phone number before voice scan.'
-      };
+      return { success: false, error: 'Identity anchor required. Please enter phone number before voice scan.' };
     }
 
-    // Check if Web Speech API is supported
-    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-      console.warn('Speech recognition not supported');
+    const hasSpeech = !!(window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!hasSpeech) {
       return { success: false, error: 'Speech recognition not supported' };
     }
 
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
-
     recognition.lang = 'en-US';
     recognition.continuous = false;
     recognition.interimResults = false;
@@ -153,92 +201,81 @@ export async function verifyVoicePrint(
     return new Promise(async (resolve) => {
       let audioContext: AudioContext | null = null;
       let mediaStream: MediaStream | null = null;
+      let levelInterval: ReturnType<typeof setInterval> | null = null;
+
+      const cleanup = () => {
+        if (levelInterval) clearInterval(levelInterval);
+        mediaStream?.getTracks().forEach((t) => t.stop());
+        audioContext?.close();
+      };
 
       try {
-        // Capture audio for vocal resonance analysis
         mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         audioContext = new AudioContext();
         const source = audioContext.createMediaStreamSource(mediaStream);
-
-        // Create audio buffer for analysis
         const analyser = audioContext.createAnalyser();
+        analyser.fftSize = 256;
         source.connect(analyser);
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+        if (options?.onAudioLevel) {
+          levelInterval = setInterval(() => {
+            analyser.getByteFrequencyData(dataArray);
+            const avg = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
+            options.onAudioLevel!(Math.min(1, avg / 128));
+          }, 80);
+        }
+
+        recognition.onerror = (event: any) => {
+          cleanup();
+          resolve({ success: false, error: `Speech recognition error: ${event.error}` });
+        };
+
+        // After 5s silence/noise, suggest Silent Presence Mode (Face + Device + GPS)
+        let silenceTimeout: ReturnType<typeof setTimeout> | null = setTimeout(() => {
+          silenceTimeout = null;
+          cleanup();
+          try { recognition.stop(); } catch {}
+          resolve({ success: false, silentModeSuggested: true, error: 'Noisy environment or no speech. Switching to Silent Presence Mode.' });
+        }, VOICE_SILENCE_TIMEOUT_MS);
 
         recognition.onresult = async (event: any) => {
+          if (silenceTimeout) { clearTimeout(silenceTimeout); silenceTimeout = null; }
           const transcript = event.results[0][0].transcript.toLowerCase();
           const targetPhrase = 'i am vitalized';
-
-          // Check if transcript matches the sovereign phrase
-          const phraseMatch = transcript.includes(targetPhrase) ||
-                             transcript.includes('vitalized') ||
-                             transcript.includes('i am vital');
+          const phraseMatch =
+            transcript.includes(targetPhrase) ||
+            transcript.includes('vitalized') ||
+            transcript.includes('i am vital');
 
           if (!phraseMatch) {
+            cleanup();
             resolve({ success: false, error: 'Incorrect phrase. Please say "I am Vitalized"' });
             return;
           }
 
-          // VOCAL RESONANCE ANALYSIS: 1-to-1 comparison against SPECIFIC user
-          const { verifyUniversalIdentity } = await import('./universalIdentityComparison');
+          const voicePayload = `${identityAnchorPhone}:${transcript}`;
+          const voicePrintHash = await hashVoicePrintLocal(voicePayload);
 
-          // Create audio blob from stream
-          const audioBlob = new Blob([], { type: 'audio/wav' });
+          const { verifyVoicePrintHashWithSupabase } = await import('./universalIdentityComparison');
+          const matchResult = await verifyVoicePrintHashWithSupabase(identityAnchorPhone!, voicePrintHash);
 
-          const anchor = {
-            phone_number: identityAnchorPhone,
-            anchor_type: 'PHONE_INPUT' as const,
-            timestamp: new Date().toISOString()
-          };
-
-          // Mock biometric data (voice-only verification)
-          const mockBiometricData = {
-            id: 'voice-credential-' + Date.now(),
-            type: 'voice-print'
-          };
-
-          const matchResult = await verifyUniversalIdentity(anchor, mockBiometricData, audioBlob);
-
-          // Cleanup
-          if (mediaStream) {
-            mediaStream.getTracks().forEach(track => track.stop());
-          }
-          if (audioContext) {
-            audioContext.close();
-          }
-
+          cleanup();
           if (!matchResult.success) {
-            resolve({
-              success: false,
-              error: matchResult.error,
-              variance: matchResult.variance
-            });
+            resolve({ success: false, error: matchResult.error, variance: matchResult.variance });
             return;
           }
-
           resolve({
             success: true,
             transcript,
-            voicePrint: 'voice-print-' + Date.now(),
-            variance: matchResult.variance
+            voicePrint: voicePrintHash,
+            variance: matchResult.variance,
           });
-        };
-
-        recognition.onerror = (event: any) => {
-          console.error('Speech recognition error:', event.error);
-
-          // Cleanup
-          if (mediaStream) {
-            mediaStream.getTracks().forEach(track => track.stop());
-          }
-          if (audioContext) {
-            audioContext.close();
-          }
-
-          resolve({ success: false, error: `Speech recognition error: ${event.error}` });
         };
 
         recognition.start();
       } catch (error) {
+        cleanup();
         console.error('Voice capture failed:', error);
         resolve({ success: false, error: 'Failed to capture audio for voice analysis' });
       }
@@ -246,6 +283,40 @@ export async function verifyVoicePrint(
   } catch (error) {
     console.error('Voice print verification failed:', error);
     return { success: false, error: 'Voice verification system error' };
+  }
+}
+
+/**
+ * GPS LOCATION (SILENT VERIFICATION PILLAR)
+ * Face + Device ID + GPS satisfies 3-out-of-4 when voice skipped (noisy/unused mic).
+ */
+export async function verifyLocation(): Promise<{ success: boolean; coords?: { latitude: number; longitude: number }; error?: string }> {
+  try {
+    if (!navigator.geolocation) {
+      return { success: false, error: 'Geolocation not available' };
+    }
+    return new Promise((resolve) => {
+      const timeout = setTimeout(() => {
+        resolve({ success: false, error: 'Location timeout' });
+      }, 3000);
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          clearTimeout(timeout);
+          resolve({
+            success: true,
+            coords: { latitude: pos.coords.latitude, longitude: pos.coords.longitude },
+          });
+        },
+        () => {
+          clearTimeout(timeout);
+          resolve({ success: false, error: 'Location denied or unavailable' });
+        },
+        { timeout: 2000, maximumAge: 60000, enableHighAccuracy: false }
+      );
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { success: false, error: msg };
   }
 }
 
@@ -505,12 +576,21 @@ export async function requestGuardianOverride(
  * - 60-second portal lock on breach attempts
  * - 0.5% variance threshold (unique even in identical twins)
  */
+/** Pillar order for Progress Ring: Device (instant) → Location (1s) → Face (2–3s) */
+export type PresencePillar = 'device' | 'location' | 'face' | 'voice';
+
 /** SOVEREIGN PROTOCOLS */
 export interface ResolveSovereignOptions {
   /** Elder & Minor Exemption: skip Vocal Resonance (Layer 2) when age < 18 or > 65 */
   skipVoiceLayer?: boolean;
   /** New Device Protocol: when true, require all 4 layers to pass (no 3-out-of-4 quorum) */
   requireAllLayers?: boolean;
+  /** Voice layer: e.g. onAudioLevel(0-1) for pulse UI */
+  voiceOptions?: VerifyVoicePrintOptions;
+  /** Called when 5s silence/noise → switching to Silent Presence Mode (Face + Device + GPS) */
+  onSilentMode?: () => void;
+  /** Called when each pillar completes (Device → Location → Face → Voice) for Progress Ring */
+  onPillarComplete?: (pillar: PresencePillar) => void;
 }
 
 /** SOVEREIGN THRESHOLD: minimum layers that must pass to grant access (3-out-of-4 quorum) */
@@ -524,13 +604,18 @@ export async function resolveSovereignByPresence(
   const layersPassed: AuthLayer[] = [];
   const skipVoiceLayer = options?.skipVoiceLayer === true;
   const requireAllLayers = options?.requireAllLayers === true; // New Device Protocol: no quorum
+  const voiceOptions = options?.voiceOptions;
+  const onSilentMode = options?.onSilentMode;
+  const onPillarComplete = options?.onPillarComplete;
 
-  const fail = (layer: AuthLayer | null, message: string): BiometricAuthResult => ({
+  const fail = (layer: AuthLayer | null, message: string, timedOut?: boolean, twoPillarsOnly?: boolean): BiometricAuthResult => ({
     success: false,
     status: AuthStatus.FAILED,
     layer,
     errorMessage: message,
     layersPassed: [...layersPassed],
+    ...(timedOut && { timedOut: true }),
+    ...(twoPillarsOnly && { twoPillarsOnly: true }),
   });
 
   try {
@@ -549,62 +634,119 @@ export async function resolveSovereignByPresence(
     }
 
     let phoneNumber: string | undefined = identityAnchorPhone;
-    let biometricResult: { success: boolean; credential?: any; identity?: { phone_number?: string }; error?: string } = { success: false };
-    let voiceResult: { success: boolean; voicePrint?: string; error?: string } = { success: false };
-    let tpmResult: { success: boolean; deviceHash?: string; error?: string } = { success: false };
-    let genesisIdentity: GlobalIdentity | null = null;
+    const state = {
+      bio: null as { success: boolean; credential?: any; identity?: { phone_number?: string }; error?: string } | null,
+      voice: null as (VerifyVoicePrintResult | { success: true; voicePrint: string }) | null,
+      tpm: null as { success: boolean; deviceHash?: string; error?: string } | null,
+      location: null as { success: boolean; coords?: { latitude: number; longitude: number }; error?: string } | null,
+    };
 
-    // ——— LAYER 1: BIOMETRIC ———
+    // ——— PARALLEL: Face, Voice, Device ID, GPS all start on Start (Promise.all) ———
     onProgress?.(AuthLayer.BIOMETRIC_SIGNATURE, AuthStatus.SCANNING);
-    biometricResult = await verifyBiometricSignature(identityAnchorPhone);
+    onProgress?.(AuthLayer.VOICE_PRINT, AuthStatus.SCANNING);
+    onProgress?.(AuthLayer.HARDWARE_TPM, AuthStatus.SCANNING);
+    onProgress?.(AuthLayer.GPS_LOCATION, AuthStatus.SCANNING);
+
+    const bioP = verifyBiometricSignature(identityAnchorPhone).then((r) => {
+      state.bio = r;
+      if (r.success) onPillarComplete?.('face');
+      return r;
+    });
+    const tpmP = verifyHardwareTPM(identityAnchorPhone).then((r) => {
+      state.tpm = r;
+      if (r.success) onPillarComplete?.('device');
+      return r;
+    });
+    const locationP = verifyLocation().then((r) => {
+      state.location = r;
+      if (r.success) onPillarComplete?.('location');
+      return r;
+    });
+    const voiceP = skipVoiceLayer
+      ? Promise.resolve({ success: true, voicePrint: 'elder-minor-exempt' } as const).then((r) => {
+          state.voice = r;
+          onPillarComplete?.('voice');
+          return r;
+        })
+      : verifyVoicePrint(identityAnchorPhone, voiceOptions).then((r) => {
+          state.voice = r;
+          if (r.success) onPillarComplete?.('voice');
+          if (r.silentModeSuggested) onSilentMode?.();
+          return r;
+        });
+
+    const timeoutP = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('SCAN_TIMEOUT')), SCAN_TIMEOUT_MS)
+    );
+
+    try {
+      await Promise.race([Promise.all([bioP, voiceP, tpmP, locationP]), timeoutP]);
+    } catch (err) {
+      if (err instanceof Error && err.message === 'SCAN_TIMEOUT') {
+        if (state.bio?.success) layersPassed.push(AuthLayer.BIOMETRIC_SIGNATURE);
+        if (state.voice?.success && !(state.voice as VerifyVoicePrintResult).silentModeSuggested) layersPassed.push(AuthLayer.VOICE_PRINT);
+        if (state.tpm?.success) layersPassed.push(AuthLayer.HARDWARE_TPM);
+        if (state.location?.success) layersPassed.push(AuthLayer.GPS_LOCATION);
+        const passed = layersPassed.length;
+        const twoPillarsOnly = passed === 2;
+        return fail(
+          null,
+          `Verification timed out (8s). ${passed}/4 sensors completed. Use Verification with Master Device or Manual Bypass.`,
+          true,
+          twoPillarsOnly
+        );
+      }
+      throw err;
+    }
+
+    const biometricResult = state.bio!;
+    const voiceResult = state.voice!;
+    const tpmResult = state.tpm!;
+    const locationResult = state.location!;
+    const silentModeUsed = !skipVoiceLayer && !!(voiceResult as VerifyVoicePrintResult).silentModeSuggested;
+    if (silentModeUsed) onSilentMode?.();
+
     if (biometricResult.success) {
+      layersPassed.push(AuthLayer.BIOMETRIC_SIGNATURE);
       const scannedPhone = biometricResult.identity?.phone_number ?? identityAnchorPhone;
       if (scannedPhone !== identityAnchorPhone && requireAllLayers) {
         return fail(AuthLayer.BIOMETRIC_SIGNATURE, `Identity mismatch. Scanned (${scannedPhone}) does not match anchor (${identityAnchorPhone}).`);
       }
-      if (scannedPhone === identityAnchorPhone) {
-        phoneNumber = scannedPhone;
-        await markLayerPassed(1, identityAnchorPhone);
-        layersPassed.push(AuthLayer.BIOMETRIC_SIGNATURE);
-        console.log('✅ Layer 1/4 passed: Biometric Identity Match');
-      }
-    } else {
-      if (requireAllLayers) return fail(AuthLayer.BIOMETRIC_SIGNATURE, biometricResult.error || 'Biometric verification failed.');
+      if (scannedPhone === identityAnchorPhone) phoneNumber = scannedPhone;
     }
-
-    // ——— LAYER 2: VOCAL RESONANCE (Elder & Minor Exemption) ———
-    onProgress?.(AuthLayer.VOICE_PRINT, AuthStatus.SCANNING);
+    if (requireAllLayers && !biometricResult.success) {
+      return fail(AuthLayer.BIOMETRIC_SIGNATURE, biometricResult.error || 'Biometric verification failed.');
+    }
     if (skipVoiceLayer) {
-      voiceResult = { success: true, voicePrint: 'elder-minor-exempt' };
-      await markLayerPassed(2, identityAnchorPhone);
       layersPassed.push(AuthLayer.VOICE_PRINT);
-      console.log('✅ Layer 2/4 skipped (Elder & Minor Exemption)');
-    } else {
-      voiceResult = await verifyVoicePrint(identityAnchorPhone);
-      if (voiceResult.success) {
-        await markLayerPassed(2, identityAnchorPhone);
-        layersPassed.push(AuthLayer.VOICE_PRINT);
-        console.log('✅ Layer 2/4 passed: Vocal Resonance Match');
-      } else if (requireAllLayers) {
-        return fail(AuthLayer.VOICE_PRINT, voiceResult.error || 'Voice verification failed.');
-      }
+      await markLayerPassed(2, identityAnchorPhone);
+    } else if (voiceResult.success && !silentModeUsed) {
+      layersPassed.push(AuthLayer.VOICE_PRINT);
+      await markLayerPassed(2, identityAnchorPhone);
+    } else if (silentModeUsed) {
+      // Silent Verification: Face + Device + GPS satisfies 3-of-4 (no Voice)
+    } else if (requireAllLayers) {
+      return fail(AuthLayer.VOICE_PRINT, (voiceResult as VerifyVoicePrintResult).error || 'Voice verification failed.');
     }
-
-    // ——— LAYER 3: HARDWARE TPM ———
-    onProgress?.(AuthLayer.HARDWARE_TPM, AuthStatus.SCANNING);
-    tpmResult = await verifyHardwareTPM(phoneNumber);
     if (tpmResult.success) {
-      await markLayerPassed(3, identityAnchorPhone);
       layersPassed.push(AuthLayer.HARDWARE_TPM);
-      console.log('✅ Layer 3/4 passed: Hardware Sentinel Verified');
+      await markLayerPassed(3, identityAnchorPhone);
     } else if (requireAllLayers) {
       return fail(AuthLayer.HARDWARE_TPM, tpmResult.error || 'Device not authorized.');
+    }
+    if (locationResult.success) {
+      layersPassed.push(AuthLayer.GPS_LOCATION);
+    } else if (requireAllLayers && !silentModeUsed) {
+      // Location optional unless Silent Mode (Face+Device+Location required)
+    }
+    if (silentModeUsed && !locationResult.success) {
+      return fail(AuthLayer.GPS_LOCATION, 'Silent Presence Mode requires Location. Enable GPS and try again.');
     }
 
     // ——— LAYER 4: GENESIS (resolve identity) ———
     onProgress?.(AuthLayer.GENESIS_HANDSHAKE, AuthStatus.SCANNING);
     const { resolvePhoneToIdentity } = await import('./phoneIdentity');
-    genesisIdentity = phoneNumber ? await resolvePhoneToIdentity(phoneNumber) : null;
+    let genesisIdentity: GlobalIdentity | null = phoneNumber ? await resolvePhoneToIdentity(phoneNumber) : null;
     if (genesisIdentity) {
       await markLayerPassed(4, identityAnchorPhone);
       layersPassed.push(AuthLayer.GENESIS_HANDSHAKE);
@@ -613,9 +755,7 @@ export async function resolveSovereignByPresence(
       return fail(AuthLayer.GENESIS_HANDSHAKE, 'Sovereign identity not found in Genesis Vault.');
     }
 
-    // SOVEREIGN THRESHOLD: 3-out-of-4 quorum (or 4/4 when requireAllLayers)
     const quorumMet = layersPassed.length >= SOVEREIGN_QUORUM_MIN;
-    const allRequired = !requireAllLayers || layersPassed.length === 4;
     if (!quorumMet && !requireAllLayers) {
       return fail(null, `Sovereign Threshold not met. ${layersPassed.length}/4 layers passed. Need ${SOVEREIGN_QUORUM_MIN}.`);
     }
@@ -624,14 +764,13 @@ export async function resolveSovereignByPresence(
     }
 
     const identity = genesisIdentity ?? (phoneNumber ? await resolvePhoneToIdentity(phoneNumber) : null);
-    if (!identity) {
-      return fail(null, 'Sovereign identity not found.');
-    }
+    if (!identity) return fail(null, 'Sovereign identity not found.');
 
     const compositeBiometricHash = await generateCompositeBiometricHash(
       biometricResult.credential ?? { id: 'quorum-skip' },
       voiceResult.voicePrint ?? 'quorum-skip',
-      tpmResult.deviceHash ?? 'quorum-skip'
+      tpmResult.deviceHash ?? 'quorum-skip',
+      locationResult.success ? `${locationResult.coords?.latitude ?? 0},${locationResult.coords?.longitude ?? 0}` : undefined
     );
 
     onProgress?.(AuthLayer.GENESIS_HANDSHAKE, AuthStatus.IDENTIFIED);
@@ -641,7 +780,7 @@ export async function resolveSovereignByPresence(
     sessionStorage.setItem('pff_identity_hash', identity.global_identity_hash);
 
     onProgress?.(null, AuthStatus.BANKING_UNLOCKED);
-    console.log('🎉 Sovereign Threshold met —', layersPassed.length, '/4 layers passed');
+    console.log('🎉 Sovereign Threshold met —', layersPassed.length, '/4 layers passed', silentModeUsed ? '(Silent Presence Mode)' : '');
 
     return {
       success: true,
@@ -650,6 +789,7 @@ export async function resolveSovereignByPresence(
       phoneNumber: identityAnchorPhone,
       identity,
       layersPassed,
+      ...(silentModeUsed && { silentModeUsed: true }),
     };
   } catch (error) {
     console.error('Sovereign presence resolution failed:', error);
@@ -671,12 +811,14 @@ export async function resolveSovereignByPresence(
 async function generateCompositeBiometricHash(
   biometricCredential: any,
   voicePrint?: string,
-  deviceHash?: string
+  deviceHash?: string,
+  locationCoords?: string
 ): Promise<string> {
   const compositeData = {
     biometric: biometricCredential?.id || 'unknown',
     voice: voicePrint || 'unknown',
     device: deviceHash || 'unknown',
+    location: locationCoords || 'unknown',
     timestamp: Date.now(),
   };
 

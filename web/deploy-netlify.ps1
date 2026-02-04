@@ -26,16 +26,32 @@ if (Test-Path (Join-Path $repoRoot ".git")) {
   Write-Host "No .git found; skipping push. Connect this folder to Git and link the repo in Netlify." -ForegroundColor Yellow
 }
 
-# 2. Trigger deploy on Netlify (build runs on Netlify; no local blob upload)
+# 2. Deploy to Netlify
 Set-Location $webDir
-Write-Host "Triggering Netlify production deploy..." -ForegroundColor Cyan
-npx netlify deploy --prod --trigger
+
+# Option A: Non-interactive deploy with token/site (e.g. from Netlify UI -> Site settings -> API)
+$auth = $env:NETLIFY_AUTH_TOKEN
+$siteId = $env:NETLIFY_SITE_ID
+if ($auth -and $siteId) {
+  Write-Host "Building and deploying to Netlify (NETLIFY_SITE_ID set)..." -ForegroundColor Cyan
+  npm run build 2>$null
+  if (Test-Path "out") {
+    npx netlify-cli deploy --prod --dir=out --auth="$auth" --site="$siteId"
+  } else {
+    Write-Host "Build output 'out' not found. Run: npm run build" -ForegroundColor Yellow
+    npx netlify-cli deploy --prod --trigger --auth="$auth" --site="$siteId"
+  }
+} else {
+  Write-Host "Triggering Netlify production deploy (build on Netlify)..." -ForegroundColor Cyan
+  npx netlify deploy --prod --trigger
+}
+
 if ($LASTEXITCODE -ne 0) {
   Write-Host ""
-  Write-Host "If you see 'Project not found' or 'CI configured':" -ForegroundColor Yellow
-  Write-Host "  1. Run: npx netlify link   (in the web folder) and pick your site." -ForegroundColor Yellow
-  Write-Host "  2. In Netlify: Site settings -> Build & deploy -> Link repository (connect your Git repo)." -ForegroundColor Yellow
-  Write-Host "  3. Set Base directory to: web" -ForegroundColor Yellow
+  Write-Host "To push to Netlify:" -ForegroundColor Yellow
+  Write-Host "  A) Link once: cd web && npx netlify link   (pick your site), then run this script again." -ForegroundColor Yellow
+  Write-Host "  B) Or in Netlify: connect this repo (Base directory = web). Every git push will deploy." -ForegroundColor Yellow
+  Write-Host "  C) Or set NETLIFY_AUTH_TOKEN + NETLIFY_SITE_ID (from Netlify -> Site settings -> API) and run again." -ForegroundColor Yellow
   exit $LASTEXITCODE
 }
 Write-Host "Done." -ForegroundColor Green

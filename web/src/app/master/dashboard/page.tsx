@@ -11,6 +11,7 @@ import {
   type Role,
 } from '@/lib/roleAuth';
 import { maskPhoneForDisplay } from '@/lib/phoneMask';
+import { LegacySection } from '@/components/master/LegacySection';
 
 /**
  * Master Architect Dashboard — only place where user roles can be changed.
@@ -118,6 +119,11 @@ function MasterDashboardContent() {
           >
             {message.text}
           </div>
+        )}
+
+        {/* Legacy — Primary + 2 Secondary Beneficiaries; Family Tree; Proof of Life */}
+        {actorPhone && (
+          <LegacySection ownerIdentityAnchor={actorPhone} ownerDisplayName="You" />
         )}
 
         {/* User result + role dropdown */}

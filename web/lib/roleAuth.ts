@@ -16,7 +16,10 @@ const ROLE_COOKIE_MAX_AGE_DAYS = 1;
 
 /** Get current user's role from Supabase user_profiles by Identity Anchor (phone). */
 export async function getCurrentUserRole(identityAnchor: string): Promise<Role> {
-  if (!identityAnchor?.trim()) return 'CITIZEN';
+  if (!identityAnchor?.trim()) {
+    console.error('[ROLE_AUTH] getCurrentUserRole: identityAnchor is null or empty (e.g. localStorage pff_identity_anchor_phone missing on Netlify)');
+    return 'CITIZEN';
+  }
   const supabase = getSupabase();
   try {
     const { data, error } = await (supabase as any)
@@ -24,10 +27,18 @@ export async function getCurrentUserRole(identityAnchor: string): Promise<Role> 
       .select('role')
       .eq('phone_number', identityAnchor.trim())
       .maybeSingle();
-    if (error || !data) return 'CITIZEN';
+    if (error) {
+      console.error('[ROLE_AUTH] getCurrentUserRole: Supabase error', { identityAnchor: identityAnchor.slice(0, 6) + '…', error: error?.message ?? error });
+      return 'CITIZEN';
+    }
+    if (!data) {
+      console.error('[ROLE_AUTH] getCurrentUserRole: no user_profiles row for identityAnchor (user may not exist)', { identityAnchor: identityAnchor.slice(0, 6) + '…' });
+      return 'CITIZEN';
+    }
     const role = (data.role || 'CITIZEN').toUpperCase();
     return ROLES.includes(role as Role) ? (role as Role) : 'CITIZEN';
-  } catch {
+  } catch (e) {
+    console.error('[ROLE_AUTH] getCurrentUserRole: exception', e);
     return 'CITIZEN';
   }
 }

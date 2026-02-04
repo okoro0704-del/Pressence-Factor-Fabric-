@@ -192,3 +192,60 @@ CREATE INDEX IF NOT EXISTS idx_vlt_type ON vlt_transactions(transaction_type);
 CREATE INDEX IF NOT EXISTS idx_vlt_hash ON vlt_transactions(transaction_hash);
 CREATE INDEX IF NOT EXISTS idx_vlt_citizen ON vlt_transactions(citizen_id);
 CREATE INDEX IF NOT EXISTS idx_vlt_date ON vlt_transactions(created_at);
+
+-- -----------------------------------------------------------------------------
+-- BENEFICIARY VAULT — Legacy nominations (Primary + 2 Secondary)
+-- Links owner (citizen_id or identity anchor) to beneficiary_anchor (phone/identity hash).
+-- Proof of Life: 365 days without 3-of-4 → Presence Check; 30 days no response → Inheritance Protocol.
+-- Governance: 50% National Reserve remains with Government on transfer; family keeps personal wealth.
+-- -----------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS legacy_beneficiaries (
+  id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  citizen_id            UUID REFERENCES citizens(id) ON DELETE CASCADE,
+  owner_identity_anchor TEXT NOT NULL,                  -- E.164 phone or identity hash (Master Device)
+  beneficiary_anchor    TEXT NOT NULL,                  -- Nominee phone or identity hash
+  rank                  TEXT NOT NULL CHECK (rank IN ('primary', 'secondary_1', 'secondary_2')),
+  display_name          TEXT,                            -- Optional label for Family Tree
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(owner_identity_anchor, rank)
+);
+
+CREATE INDEX IF NOT EXISTS idx_legacy_beneficiaries_owner ON legacy_beneficiaries(owner_identity_anchor);
+CREATE INDEX IF NOT EXISTS idx_legacy_beneficiaries_beneficiary ON legacy_beneficiaries(beneficiary_anchor);
+CREATE INDEX IF NOT EXISTS idx_legacy_beneficiaries_citizen ON legacy_beneficiaries(citizen_id);
+
+-- Proof of Life: last 3-of-4 verification per citizen; 365 days → Presence Check; +30 days → Inheritance Protocol
+CREATE TABLE IF NOT EXISTS proof_of_life_checks (
+  id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  citizen_id            UUID NOT NULL REFERENCES citizens(id) ON DELETE CASCADE,
+  owner_identity_anchor TEXT NOT NULL,
+  last_3of4_verified_at TIMESTAMPTZ NOT NULL,            -- Last time 3-out-of-4 verification succeeded
+  presence_check_sent_at TIMESTAMPTZ,                     -- When Presence Check notification was sent
+  inheritance_activated_at TIMESTAMPTZ,                  -- When Inheritance Protocol activated (30 days no response)
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(citizen_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_proof_of_life_owner ON proof_of_life_checks(owner_identity_anchor);
+CREATE INDEX IF NOT EXISTS idx_proof_of_life_last_verified ON proof_of_life_checks(last_3of4_verified_at);
+
+-- Inheritance Protocol activations: claim by beneficiary (3-of-4 scan → match anchor → transfer spendable VIDA)
+CREATE TABLE IF NOT EXISTS inheritance_activations (
+  id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  citizen_id            UUID NOT NULL REFERENCES citizens(id) ON DELETE CASCADE,
+  beneficiary_anchor    TEXT NOT NULL,
+  beneficiary_citizen_id UUID REFERENCES citizens(id),  -- New owner after claim
+  status                TEXT NOT NULL DEFAULT 'pending',  -- pending | claimed | transferred | expired
+  spendable_transferred NUMERIC(20, 8) NOT NULL DEFAULT 0, -- Citizen share transferred; 50% National Reserve preserved
+  national_reserve_preserved NUMERIC(20, 8) NOT NULL DEFAULT 0,
+  claimed_at            TIMESTAMPTZ,
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_inheritance_citizen ON inheritance_activations(citizen_id);
+CREATE INDEX IF NOT EXISTS idx_inheritance_beneficiary ON inheritance_activations(beneficiary_anchor);
+CREATE INDEX IF NOT EXISTS idx_inheritance_status ON inheritance_activations(status);

@@ -91,8 +91,9 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
   };
 
   /**
-   * Trigger presence verification
-   * This should be called after successful biometric scan
+   * Trigger presence verification (checks Supabase / storage).
+   * Silent Verification (Face + Device ID + GPS, no Voice) is handled in the biometric
+   * gate (resolveSovereignByPresence) when mic is unused or environment is too noisy.
    */
   const verifyPresence = async (): Promise<boolean> => {
     setLoading(true);

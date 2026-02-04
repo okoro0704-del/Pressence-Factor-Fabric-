@@ -9,7 +9,11 @@ import {
   AuthLayer,
   AuthStatus,
   type BiometricAuthResult,
+  type PresencePillar,
+  ensureVoiceAndMicReady,
+  SCAN_TIMEOUT_MS,
 } from '@/lib/biometricAuth';
+import { PresenceProgressRing } from './PresenceProgressRing';
 import type { GlobalIdentity } from '@/lib/phoneIdentity';
 import { isVocalResonanceExempt, isIdentityMinor, type BiometricIdentityRecord } from '@/lib/universalIdentityComparison';
 import type { LanguageCode } from '@/lib/i18n/config';
@@ -43,6 +47,7 @@ import { mintFoundationSeigniorage } from '@/lib/foundationSeigniorage';
 import { hasSignedConstitution } from '@/lib/legalApprovals';
 import { setIdentityAnchorForSession, isSentinelActive } from '@/lib/sentinelActivation';
 import { getCurrentUserRole, setRoleCookie, canAccessMaster, canAccessGovernment } from '@/lib/roleAuth';
+import { ensureGenesisIfEmpty } from '@/lib/auth';
 import { SovereignConstitution } from '@/components/auth/SovereignConstitution';
 
 const jetbrains = JetBrains_Mono({ weight: ['400', '600', '700'], subsets: ['latin'] });
@@ -96,8 +101,30 @@ export function FourLayerGate() {
   const [adminPortalError, setAdminPortalError] = useState<string | null>(null);
   /** Sovereign Constitution Entry Gate: must sign constitution before 10 VIDA mint; re-sign if version changed */
   const [showConstitutionGate, setShowConstitutionGate] = useState(false);
+  /** 8s scan timeout: show Verification with Master Device / Manual Bypass */
+  const [showTimeoutBypass, setShowTimeoutBypass] = useState(false);
+  /** Voice pulse: 0–1 from onAudioLevel during voice scan */
+  const [voiceLevel, setVoiceLevel] = useState(0);
+  /** Debug Info: show current user UUID for manual SQL promotion */
+  const [showDebugModal, setShowDebugModal] = useState(false);
+  const [debugUuid, setDebugUuid] = useState<string>('');
+  /** Progress Ring: Device → Location → Face (→ Voice). Updated by onPillarComplete. */
+  const [pillarDevice, setPillarDevice] = useState(false);
+  const [pillarLocation, setPillarLocation] = useState(false);
+  const [pillarFace, setPillarFace] = useState(false);
+  const [pillarVoice, setPillarVoice] = useState(false);
+  /** "Noisy environment detected. Switching to Silent Presence Mode..." */
+  const [silentModeMessage, setSilentModeMessage] = useState<string | null>(null);
   const router = useRouter();
   const { setPresenceVerified } = useGlobalPresenceGateway();
+
+  // Mic-check: initialize Web Speech and verify mic permission before user clicks Start
+  useEffect(() => {
+    if (!identityAnchor || identityAnchor.vocalExempt) return;
+    ensureVoiceAndMicReady().then((r) => {
+      if (!r.ok) console.warn('[FourLayerGate] Mic-check:', r.error);
+    });
+  }, [identityAnchor?.phone, identityAnchor?.vocalExempt]);
 
   // Hydration sync: only become interactive after client has fully mounted
   useEffect(() => {
@@ -142,6 +169,8 @@ export function FourLayerGate() {
         return '🔐';
       case AuthLayer.GENESIS_HANDSHAKE:
         return '🤝';
+      case AuthLayer.GPS_LOCATION:
+        return '📍';
       default:
         return '🔒';
     }
@@ -157,6 +186,8 @@ export function FourLayerGate() {
         return 'Hardware ID';
       case AuthLayer.GENESIS_HANDSHAKE:
         return 'Genesis Handshake';
+      case AuthLayer.GPS_LOCATION:
+        return 'GPS Location';
       default:
         return 'Unknown';
     }
@@ -212,6 +243,13 @@ export function FourLayerGate() {
     setAuthStatus(AuthStatus.SCANNING);
     setResult(null);
     setShowVerifyFromAuthorizedDevice(false);
+    setShowTimeoutBypass(false);
+    setVoiceLevel(0);
+    setSilentModeMessage(null);
+    setPillarDevice(false);
+    setPillarLocation(false);
+    setPillarFace(false);
+    setPillarVoice(false);
 
     try {
       // DEPENDENT BYPASS: Guardian Authorization — skip Voice/Face resonance; inherit Sentinel from Guardian.
@@ -238,10 +276,26 @@ export function FourLayerGate() {
       {
         skipVoiceLayer: identityAnchor.vocalExempt === true,
         requireAllLayers: isNewDevice,
+        voiceOptions: identityAnchor.vocalExempt ? undefined : { onAudioLevel: (l) => setVoiceLevel(l) },
+        onSilentMode: () => setSilentModeMessage('Noisy environment detected. Switching to Silent Presence Mode...'),
+        onPillarComplete: (pillar: PresencePillar) => {
+          if (pillar === 'device') setPillarDevice(true);
+          if (pillar === 'location') setPillarLocation(true);
+          if (pillar === 'face') setPillarFace(true);
+          if (pillar === 'voice') setPillarVoice(true);
+        },
       }
     );
 
     setResult(authResult);
+    setVoiceLevel(0);
+
+    if (authResult.timedOut) {
+      setAuthStatus(AuthStatus.FAILED);
+      setShowTimeoutBypass(true);
+      setShowVerifyFromAuthorizedDevice(true);
+      return;
+    }
 
     if (authResult.success && authResult.identity) {
       const isAuthorized = !isNewDevice;
@@ -286,6 +340,7 @@ export function FourLayerGate() {
           }
           await mintFoundationSeigniorage(identityAnchor.phone);
           setIdentityAnchorForSession(identityAnchor.phone);
+          ensureGenesisIfEmpty(identityAnchor.phone, identityAnchor.name).catch(() => {});
           setPresenceVerified(true);
           setShowVaultAnimation(true);
           return;
@@ -334,6 +389,7 @@ export function FourLayerGate() {
 
       // Proceed to dashboard
       setIdentityAnchorForSession(identityAnchor.phone);
+      ensureGenesisIfEmpty(identityAnchor.phone, identityAnchor.name).catch(() => {});
       setPresenceVerified(true);
       setShowVaultAnimation(true);
     } else {
@@ -379,11 +435,25 @@ export function FourLayerGate() {
     setCurrentLayer(null);
     setResult(null);
     setShowVerifyFromAuthorizedDevice(false);
+    setShowTimeoutBypass(false);
   };
 
   const handleVaultAnimationComplete = () => {
     // Redirect to dashboard after vault animation
     router.push('/dashboard');
+  };
+
+  const handleDebugInfo = async () => {
+    try {
+      const supabase = (await import('@/lib/supabase')).getSupabase();
+      const { data: { user } } = await supabase.auth.getUser();
+      const uuid = user?.id ?? 'Not signed in';
+      setDebugUuid(uuid);
+      setShowDebugModal(true);
+    } catch (e) {
+      setDebugUuid('Error: ' + (e instanceof Error ? e.message : String(e)));
+      setShowDebugModal(true);
+    }
   };
 
   const handleVitalizationApproved = async () => {
@@ -500,6 +570,7 @@ export function FourLayerGate() {
     }
     await mintFoundationSeigniorage(identityAnchor.phone);
     setIdentityAnchorForSession(identityAnchor.phone);
+    ensureGenesisIfEmpty(identityAnchor.phone, identityAnchor.name).catch(() => {});
     setPresenceVerified(true);
     setShowVaultAnimation(true);
   };
@@ -535,6 +606,7 @@ export function FourLayerGate() {
     }
     await mintFoundationSeigniorage(identityAnchor.phone);
     setIdentityAnchorForSession(identityAnchor.phone);
+    ensureGenesisIfEmpty(identityAnchor.phone, identityAnchor.name).catch(() => {});
     setPresenceVerified(true);
     setShowVaultAnimation(true);
   };
@@ -545,6 +617,7 @@ export function FourLayerGate() {
     setShowConstitutionGate(false);
     await mintFoundationSeigniorage(identityAnchor.phone);
     setIdentityAnchorForSession(identityAnchor.phone);
+    ensureGenesisIfEmpty(identityAnchor.phone, identityAnchor.name).catch(() => {});
     setPresenceVerified(true);
     setShowVaultAnimation(true);
   };
@@ -566,9 +639,9 @@ export function FourLayerGate() {
   // DEPENDENT BYPASS: Guardian Authorization Detected — skip Voice/Face; Sentinel inherited from Guardian.
   if (showGuardianAuthorizationBypass && identityAnchor) {
     return (
-      <div className="min-h-screen bg-[#050505] flex items-center justify-center p-4">
+      <div className="min-h-screen bg-[#050505] flex items-center justify-center p-4 transition-all duration-200">
         <div
-          className="rounded-2xl border p-8 max-w-md w-full text-center"
+          className="rounded-2xl border p-8 max-w-md w-full text-center transition-all duration-200"
           style={{
             background: 'linear-gradient(135deg, rgba(212, 175, 55, 0.08) 0%, rgba(0, 0, 0, 0.9) 100%)',
             borderColor: 'rgba(212, 175, 55, 0.4)',
@@ -680,22 +753,49 @@ export function FourLayerGate() {
   // Identity Anchor Input (after language + vocal instruction)
   if (!identityAnchor) {
     return (
-      <div className="min-h-screen bg-[#050505] flex items-center justify-center p-4">
+      <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center p-4">
         {screenBg}
-        <div className="relative max-w-2xl w-full">
+        <div className="relative max-w-2xl w-full flex-1 flex flex-col justify-center">
           <IdentityAnchorInput
             onAnchorVerified={handleAnchorVerified}
             title="Identity Anchor Required"
             subtitle="Enter your phone number to proceed to hardware biometric scan. Verification occurs only after the scan."
           />
         </div>
+        <button
+          type="button"
+          onClick={handleDebugInfo}
+          className="mt-4 text-xs font-mono border rounded px-3 py-1.5 transition-colors"
+          style={{ color: '#6b6b70', borderColor: 'rgba(212, 175, 55, 0.3)' }}
+        >
+          Debug Info
+        </button>
+        {showDebugModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80" onClick={() => setShowDebugModal(false)}>
+            <div className="bg-[#0d0d0f] border rounded-lg p-6 max-w-md w-full shadow-xl" style={{ borderColor: 'rgba(212, 175, 55, 0.3)' }} onClick={(e) => e.stopPropagation()}>
+              <p className="text-xs font-bold mb-1" style={{ color: '#D4AF37' }}>Current user UUID (for SQL promotion)</p>
+              <p className="font-mono text-sm break-all mb-4" style={{ color: '#a0a0a5' }}>{debugUuid}</p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => { try { navigator.clipboard.writeText(debugUuid); } catch {} setShowDebugModal(false); }}
+                  className="px-4 py-2 rounded font-bold text-black"
+                  style={{ background: '#D4AF37' }}
+                >
+                  Copy &amp; Close
+                </button>
+                <button type="button" onClick={() => setShowDebugModal(false)} className="px-4 py-2 rounded border" style={{ borderColor: 'rgba(212, 175, 55, 0.5)', color: '#a0a0a5' }}>Close</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#050505] flex items-center justify-center p-4 relative">
-      {/* 4/4 Layers Verified Status Bar */}
+    <div className="min-h-screen bg-[#050505] flex items-center justify-center p-4 relative transition-all duration-200">
+      {/* 4/4 Layers Verified Status Bar — 200ms for instant feedback */}
       <LayerStatusBar />
 
       {/* Background Glow — pointer-events-none so it does not block clicks */}
@@ -734,7 +834,7 @@ export function FourLayerGate() {
         </div>
 
         {/* Header */}
-        <div className="text-center mb-12">
+        <div className="text-center mb-8">
           <div className="text-6xl mb-4 animate-pulse">🔐</div>
           <h1
             className={`text-4xl font-bold text-[#D4AF37] uppercase tracking-wider mb-4 ${jetbrains.className}`}
@@ -743,54 +843,76 @@ export function FourLayerGate() {
             1-to-1 Identity Verification
           </h1>
           <p className="text-lg text-[#6b6b70]">
-            Complete 4-Layer Biometric Authentication (0.5% Variance Threshold)
+            {authStatus === AuthStatus.SCANNING
+              ? 'Device → Location → Face (8s max)'
+              : 'Complete 3-of-4 pillars (Face + Device + Location or Voice)'}
           </p>
         </div>
 
-        {/* 4-Layer Status Display (MINOR EXEMPTION: 3 layers when isMinor — no Voice) */}
-        <div className="mb-8 space-y-4">
-          {requiredLayers.map((layer, index) => {
-            const status = getLayerStatus(layer);
-            return (
-              <div
-                key={layer}
-                className={`p-4 rounded-lg border-2 transition-all duration-300 ${
-                  status === 'complete'
-                    ? 'border-green-500 bg-green-500/10'
-                    : status === 'active'
-                    ? 'border-[#D4AF37] bg-[#D4AF37]/10 animate-pulse'
-                    : 'border-[#2a2a2e] bg-[#1a1a1e]'
-                }`}
-                style={{
-                  boxShadow: status === 'active' ? '0 0 30px rgba(212, 175, 55, 0.4)' : 'none',
-                }}
-              >
-                <div className="flex items-center gap-4">
-                  <div className="text-3xl">{getLayerIcon(layer)}</div>
-                  <div className="flex-1">
-                    <h3 className={`font-bold ${jetbrains.className} ${
-                      status === 'complete' ? 'text-green-500' : status === 'active' ? 'text-[#D4AF37]' : 'text-[#6b6b70]'
-                    }`}>
-                      Layer {index + 1}: {getLayerName(layer)}
-                    </h3>
-                    <p className="text-xs text-[#6b6b70]">
-                      {status === 'complete' && '✅ Verified'}
-                      {status === 'active' && '🔄 Scanning...'}
-                      {status === 'pending' && '⏳ Waiting'}
-                    </p>
+        {/* Progress Ring: Device (instant) → Location (1s) → Face (2–3s). 200ms transition. */}
+        {authStatus === AuthStatus.SCANNING && (
+          <div className="mb-8 transition-all duration-200">
+            <PresenceProgressRing
+              deviceVerified={pillarDevice}
+              locationVerified={pillarLocation}
+              faceVerified={pillarFace}
+              voiceVerified={pillarVoice}
+              showVoice={!identityAnchor?.vocalExempt}
+            />
+            {silentModeMessage && (
+              <p className="mt-3 text-xs text-[#e8c547] text-center animate-pulse transition-opacity duration-200">
+                {silentModeMessage}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* 4-Layer Status Display when not scanning (summary) */}
+        {authStatus !== AuthStatus.SCANNING && (
+          <div className="mb-8 space-y-4 transition-all duration-200">
+            {requiredLayers.map((layer, index) => {
+              const status = getLayerStatus(layer);
+              return (
+                <div
+                  key={layer}
+                  className={`p-4 rounded-lg border-2 transition-all duration-200 ${
+                    status === 'complete'
+                      ? 'border-green-500 bg-green-500/10'
+                      : status === 'active'
+                      ? 'border-[#D4AF37] bg-[#D4AF37]/10 animate-pulse'
+                      : 'border-[#2a2a2e] bg-[#1a1a1e]'
+                  }`}
+                  style={{
+                    boxShadow: status === 'active' ? '0 0 30px rgba(212, 175, 55, 0.4)' : 'none',
+                  }}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="text-3xl">{getLayerIcon(layer)}</div>
+                    <div className="flex-1">
+                      <h3 className={`font-bold ${jetbrains.className} ${
+                        status === 'complete' ? 'text-green-500' : status === 'active' ? 'text-[#D4AF37]' : 'text-[#6b6b70]'
+                      }`}>
+                        Layer {index + 1}: {getLayerName(layer)}
+                      </h3>
+                      <p className="text-xs text-[#6b6b70]">
+                        {status === 'complete' && '✅ Verified'}
+                        {status === 'active' && '🔄 Scanning...'}
+                        {status === 'pending' && '⏳ Waiting'}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
 
-        {/* Authentication Button — spinner inside on first click (debounced); z-50 above mesh */}
+        {/* Authentication Button — z-50 above mesh; 200ms transition */}
         <motion.button
           type="button"
           onClick={handleStartAuthentication}
           disabled={authStatus === AuthStatus.SCANNING}
-          className="relative z-50 w-full min-h-[48px] py-4 px-6 rounded-lg bg-gradient-to-r from-[#D4AF37] to-[#C9A227] hover:from-[#e8c547] hover:to-[#D4AF37] text-black font-bold text-xl uppercase tracking-wider transition-all duration-300 disabled:opacity-90 disabled:pointer-events-none flex items-center justify-center gap-3 touch-manipulation cursor-pointer"
+          className="relative z-50 w-full min-h-[48px] py-4 px-6 rounded-lg bg-gradient-to-r from-[#D4AF37] to-[#C9A227] hover:from-[#e8c547] hover:to-[#D4AF37] text-black font-bold text-xl uppercase tracking-wider transition-all duration-200 disabled:opacity-90 disabled:pointer-events-none flex items-center justify-center gap-3 touch-manipulation cursor-pointer"
           style={{ boxShadow: '0 0 40px rgba(212, 175, 55, 0.6)' }}
           whileTap={{ scale: 0.98 }}
           transition={{ type: 'spring', stiffness: 400, damping: 17 }}
@@ -808,23 +930,83 @@ export function FourLayerGate() {
           )}
         </motion.button>
 
+        {/* Voice pulse: gold ring when scanning and voice required */}
+        {authStatus === AuthStatus.SCANNING && identityAnchor && !identityAnchor.vocalExempt && !silentModeMessage && (
+          <div className="mb-6 flex flex-col items-center gap-2 transition-all duration-200">
+            <div
+              className="rounded-full border-4 transition-transform duration-75 ease-out"
+              style={{
+                borderColor: 'rgba(212, 175, 55, 0.8)',
+                width: 72,
+                height: 72,
+                transform: `scale(${1 + voiceLevel * 0.4})`,
+                boxShadow: voiceLevel > 0.05 ? '0 0 24px rgba(212, 175, 55, 0.6)' : 'none',
+              }}
+              aria-hidden
+            />
+            {voiceLevel < 0.05 && (
+              <p className="text-xs text-[#e8c547] animate-pulse">Speak clearly into the microphone.</p>
+            )}
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={handleDebugInfo}
+          className="mt-6 text-xs font-mono border rounded px-3 py-1.5 transition-colors"
+          style={{ color: '#6b6b70', borderColor: 'rgba(212, 175, 55, 0.3)' }}
+        >
+          Debug Info
+        </button>
+
+        {showDebugModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80" onClick={() => setShowDebugModal(false)}>
+            <div className="bg-[#0d0d0f] border rounded-lg p-6 max-w-md w-full shadow-xl" style={{ borderColor: 'rgba(212, 175, 55, 0.3)' }} onClick={(e) => e.stopPropagation()}>
+              <p className="text-xs font-bold mb-1" style={{ color: '#D4AF37' }}>Current user UUID (for SQL promotion)</p>
+              <p className="font-mono text-sm break-all mb-4" style={{ color: '#a0a0a5' }}>{debugUuid}</p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => { try { navigator.clipboard.writeText(debugUuid); } catch {} setShowDebugModal(false); }}
+                  className="px-4 py-2 rounded font-bold text-black"
+                  style={{ background: '#D4AF37' }}
+                >
+                  Copy &amp; Close
+                </button>
+                <button type="button" onClick={() => setShowDebugModal(false)} className="px-4 py-2 rounded border" style={{ borderColor: 'rgba(212, 175, 55, 0.5)', color: '#a0a0a5' }}>Close</button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {authStatus === AuthStatus.FAILED && result && (
-          <div className="p-6 rounded-lg bg-red-500/10 border-2 border-red-500">
-            <p className="text-red-500 font-bold text-center mb-4">❌ Authentication Failed</p>
+          <div className="p-6 rounded-lg bg-red-500/10 border-2 border-red-500 transition-all duration-200">
+            <p className="text-red-500 font-bold text-center mb-4">
+              {result.timedOut ? '⏱️ Verification Timed Out (8s)' : '❌ Authentication Failed'}
+              {result.twoPillarsOnly && ' — Only 2/4 pillars met'}
+            </p>
             <p className="text-sm text-[#6b6b70] text-center mb-4">{result.errorMessage}</p>
+            {(result.timedOut || result.twoPillarsOnly) && (
+              <p className="text-xs text-[#e8c547] text-center mb-4">
+                Use Verification with Master Device or Elderly-First Manual Bypass.
+              </p>
+            )}
             <div className="flex flex-col gap-3">
               <button
                 type="button"
-                onClick={handleStartAuthentication}
-                className="relative z-50 w-full py-3 rounded-lg bg-red-500 hover:bg-red-600 text-white font-bold uppercase tracking-wider transition-all duration-300 cursor-pointer"
+                onClick={() => {
+                  setShowTimeoutBypass(false);
+                  handleStartAuthentication();
+                }}
+                className="relative z-50 w-full py-3 rounded-lg bg-red-500 hover:bg-red-600 text-white font-bold uppercase tracking-wider transition-all duration-200 cursor-pointer"
               >
                 Retry
               </button>
-              {showVerifyFromAuthorizedDevice && (
+              {(showVerifyFromAuthorizedDevice || result.timedOut || result.twoPillarsOnly) && (
                 <button
                   type="button"
                   onClick={handleVerifyFromAuthorizedDevice}
-                  className="relative z-50 w-full py-3 rounded-lg border-2 border-[#D4AF37] text-[#D4AF37] font-bold uppercase tracking-wider transition-all duration-300 hover:bg-[#D4AF37]/10 cursor-pointer"
+                  className="relative z-50 w-full py-3 rounded-lg border-2 border-[#D4AF37] text-[#D4AF37] font-bold uppercase tracking-wider transition-all duration-200 hover:bg-[#D4AF37]/10 cursor-pointer"
                 >
                   Verify from an authorized device
                 </button>

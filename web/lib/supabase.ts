@@ -43,9 +43,10 @@ function initSupabase() {
   const anon = (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)?.trim() ?? '';
 
   if (!url || !anon) {
-    console.warn(
-      '[SUPABASE] Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY. Using mock client so the app does not crash. Add env vars to .env.local for real data.'
-    );
+    const msg =
+      '[SUPABASE] Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY. Using mock client. Add env vars to .env.local or Netlify.';
+    console.warn(msg);
+    console.error('[SUPABASE] initSupabase: URL present=', !!url, 'anon present=', !!anon);
     _supabase = getMockClient();
     _isMock = true;
     return;
@@ -66,6 +67,7 @@ function initSupabase() {
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     console.warn('[SUPABASE] Failed to create client (using mock):', msg);
+    console.error('[SUPABASE] createClient error:', error);
     _supabase = getMockClient();
     _isMock = true;
   }

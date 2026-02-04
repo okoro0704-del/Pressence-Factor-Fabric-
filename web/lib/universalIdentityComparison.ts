@@ -313,3 +313,31 @@ export async function verifyUniversalIdentity(
     };
   }
 }
+
+/**
+ * Local voice matching: compare client-computed SHA-256 voice hash to stored voice_print_hash.
+ * No raw audio is sent to the backend; hash is computed on device.
+ */
+export async function verifyVoicePrintHashWithSupabase(
+  phoneNumber: string,
+  voicePrintHash: string
+): Promise<{ success: boolean; variance?: number; error?: string }> {
+  try {
+    const result = await fetchIdentityAnchor(phoneNumber);
+    if (!result.success || !result.identity) {
+      return { success: false, error: result.error ?? 'Identity not found.' };
+    }
+    const stored = result.identity.voice_print_hash;
+    if (!stored) {
+      // First-time enrollment: accept and optionally store hash (caller or RPC can upsert)
+      return { success: true, variance: 0 };
+    }
+    if (stored !== voicePrintHash) {
+      return { success: false, error: 'Voice print does not match. Speak clearly and try again.', variance: 1 };
+    }
+    return { success: true, variance: 0 };
+  } catch (error) {
+    console.error('Voice hash verification failed:', error);
+    return { success: false, error: 'Voice verification failed. Please try again.' };
+  }
+}
