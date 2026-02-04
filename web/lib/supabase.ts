@@ -10,11 +10,15 @@ let _supabase: any = null;
 let _initialized = false;
 let _isMock = false;
 
-/** Custom fetch: no cache so Supabase never uses a cached schema (avoids Schema Cache errors). */
+/** Schema cache-bust: new value each page load so Supabase/PostgREST gets fresh schema. */
+const SCHEMA_REFRESH_TS = typeof window !== 'undefined' ? String(Date.now()) : '0';
+
+/** Custom fetch: no cache + cache-busting header to force fresh schema (avoids recovery_seed_encrypted Schema Cache errors). */
 function noCacheFetch(url: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const headers = new Headers(init?.headers ?? undefined);
   headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
   headers.set('Pragma', 'no-cache');
+  headers.set('X-PFF-Schema-Refresh', SCHEMA_REFRESH_TS);
   return fetch(url, {
     ...init,
     cache: 'no-store',

@@ -23,10 +23,26 @@ export interface StoredRecoverySeed {
   recoverySeedSalt: string;
 }
 
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 800;
+
+function isSchemaCacheError(message: string): boolean {
+  const lower = message.toLowerCase();
+  return (
+    lower.includes('schema') ||
+    lower.includes('reload') ||
+    lower.includes('recovery_seed') ||
+    lower.includes('column') && (lower.includes('does not exist') || lower.includes('unknown'))
+  );
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
 /**
- * Store recovery seed: hash (for recovery flow) + encrypted seed (AES-256).
- * Call after user passes 3-word verification during enrollment.
- * If profile does not exist, inserts with fullName (e.g. from identity anchor).
+ * Store recovery seed via direct .update()/.insert(); on schema-cache-like failure, retry up to 3 times then fallback to RPC save_recovery_seed.
+ * Only surfaces "Schema Cache" to user after all retries and RPC fallback fail.
  */
 export async function storeRecoverySeed(
   phoneNumber: string,
@@ -41,54 +57,86 @@ export async function storeRecoverySeed(
   const supabase = getSupabase();
   if (!supabase) return { ok: false, error: 'Supabase not available' };
 
+  let lastError: string = '';
+
   try {
     const [recoverySeedHash, encrypted] = await Promise.all([
       hashSeedForStorage(normalized),
       encryptSeed(normalized, phoneNumber.trim()),
     ]);
 
-    const { data: existing } = await (supabase as any)
-      .from('user_profiles')
-      .select('id, phone_number')
-      .eq('phone_number', phoneNumber.trim())
-      .maybeSingle();
+    const payload = {
+      recovery_seed_hash: recoverySeedHash,
+      recovery_seed_encrypted: encrypted.encryptedHex,
+      recovery_seed_iv: encrypted.ivHex,
+      recovery_seed_salt: encrypted.saltHex,
+      updated_at: new Date().toISOString(),
+    };
+    const fullNameVal = fullName?.trim() || '—';
 
-    if (existing) {
-      const profileId = existing.id;
-      if (!profileId) {
-        return { ok: false, error: 'Profile has no id' };
-      }
-      const updatePayload: UserProfileRecoverySeedUpdate = {
-        recovery_seed_hash: recoverySeedHash,
-        recovery_seed_encrypted: encrypted.encryptedHex,
-        recovery_seed_iv: encrypted.ivHex,
-        recovery_seed_salt: encrypted.saltHex,
-        updated_at: new Date().toISOString(),
-      };
-      const { error } = await (supabase as any)
-        .from('user_profiles')
-        .update(updatePayload)
-        .eq('id', profileId);
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      lastError = '';
+      try {
+        const { data: existing } = await (supabase as any)
+          .from('user_profiles')
+          .select('id, phone_number')
+          .eq('phone_number', phoneNumber.trim())
+          .maybeSingle();
 
-      if (error) return { ok: false, error: error.message ?? 'Failed to store recovery seed' };
-    } else {
-      const { error: insertError } = await (supabase as any)
-        .from('user_profiles')
-        .insert({
-          phone_number: phoneNumber.trim(),
-          full_name: fullName?.trim() || '—',
-          recovery_seed_hash: recoverySeedHash,
-          recovery_seed_encrypted: encrypted.encryptedHex,
-          recovery_seed_iv: encrypted.ivHex,
-          recovery_seed_salt: encrypted.saltHex,
-          updated_at: new Date().toISOString(),
-        });
-      if (insertError) {
-        return { ok: false, error: insertError.message ?? 'Failed to create profile with recovery seed' };
+        if (existing?.id) {
+          const { error } = await (supabase as any)
+            .from('user_profiles')
+            .update(payload)
+            .eq('id', existing.id);
+          if (error) {
+            lastError = error.message ?? 'Update failed';
+            if (isSchemaCacheError(lastError) && attempt < MAX_RETRIES) {
+              await sleep(RETRY_DELAY_MS);
+              continue;
+            }
+            break;
+          }
+          return { ok: true };
+        }
+
+        const { error: insertError } = await (supabase as any)
+          .from('user_profiles')
+          .insert({
+            phone_number: phoneNumber.trim(),
+            full_name: fullNameVal,
+            ...payload,
+          });
+        if (insertError) {
+          lastError = insertError.message ?? 'Insert failed';
+          if (isSchemaCacheError(lastError) && attempt < MAX_RETRIES) {
+            await sleep(RETRY_DELAY_MS);
+            continue;
+          }
+          break;
+        }
+        return { ok: true };
+      } catch (e) {
+        lastError = e instanceof Error ? e.message : String(e);
+        if (attempt < MAX_RETRIES) await sleep(RETRY_DELAY_MS);
       }
     }
 
-    return { ok: true };
+    if (lastError && isSchemaCacheError(lastError)) {
+      const { data: rpcData, error: rpcError } = await (supabase as any).rpc('save_recovery_seed', {
+        p_phone_number: phoneNumber.trim(),
+        p_recovery_seed_hash: payload.recovery_seed_hash,
+        p_recovery_seed_encrypted: payload.recovery_seed_encrypted,
+        p_recovery_seed_iv: payload.recovery_seed_iv,
+        p_recovery_seed_salt: payload.recovery_seed_salt,
+        p_full_name: fullNameVal,
+      });
+      const out = rpcData ?? (rpcError ? null : undefined);
+      if (out && typeof out === 'object' && (out as any).ok === true) return { ok: true };
+      if (rpcError?.message) lastError = rpcError.message;
+      else if (out && typeof out === 'object' && (out as any).error) lastError = (out as any).error;
+    }
+
+    return { ok: false, error: lastError || 'Failed to store recovery seed' };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return { ok: false, error: msg };

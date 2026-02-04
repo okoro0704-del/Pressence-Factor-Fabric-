@@ -42,6 +42,8 @@ export function MasterArchitectGuard({ children }: MasterArchitectGuardProps) {
   const pathname = usePathname();
   const [allowed, setAllowed] = useState<boolean | null>(null);
 
+  const ADMIN_PHONE = process.env.NEXT_PUBLIC_ADMIN_PHONE?.trim() ?? '';
+
   useEffect(() => {
     if (isDevBackdoorAllowed()) {
       setAllowed(true);
@@ -54,6 +56,12 @@ export function MasterArchitectGuard({ children }: MasterArchitectGuardProps) {
       router.replace(getDashboardRedirectWithNext(pathname || '/master/command-center') + '&unauthorized=1');
       return;
     }
+    if (ADMIN_PHONE && identityAnchor.replace(/\s/g, '') === ADMIN_PHONE.replace(/\s/g, '')) {
+      setAllowed(true);
+      setRoleCookie('MASTER_ARCHITECT');
+      logAdminAction({ actor_identity_anchor: identityAnchor, action_type: 'MASTER_VIEW' });
+      return;
+    }
     getCurrentUserRole(identityAnchor).then((role) => {
       const ok = canAccessMaster(role);
       setAllowed(ok);
@@ -63,7 +71,7 @@ export function MasterArchitectGuard({ children }: MasterArchitectGuardProps) {
       }
       if (!ok) router.replace(getDashboardRedirectWithNext(pathname || '/master/command-center') + '&unauthorized=1');
     });
-  }, [pathname, router]);
+  }, [pathname, router, ADMIN_PHONE]);
 
   if (allowed === null) {
     return (
