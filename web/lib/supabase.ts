@@ -1,6 +1,7 @@
 /**
  * Supabase client for National Pulse realtime (presence_handshakes).
  * When NEXT_PUBLIC_SUPABASE_URL is missing, returns a mock client so the app does not crash.
+ * Client uses non-cached fetch to avoid Schema Cache errors (e.g. recovery_seed_encrypted).
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -8,6 +9,18 @@ import { createClient } from '@supabase/supabase-js';
 let _supabase: any = null;
 let _initialized = false;
 let _isMock = false;
+
+/** Custom fetch: no cache so Supabase never uses a cached schema (avoids Schema Cache errors). */
+function noCacheFetch(url: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const headers = new Headers(init?.headers ?? undefined);
+  headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+  headers.set('Pragma', 'no-cache');
+  return fetch(url, {
+    ...init,
+    cache: 'no-store',
+    headers,
+  });
+}
 
 /** Cached mock client — single instance so we never re-run or create new refs during render/SSR. */
 let _cachedMock: any = null;
@@ -62,7 +75,11 @@ function initSupabase() {
   }
 
   try {
-    _supabase = createClient(url, anon);
+    _supabase = createClient(url, anon, {
+      global: {
+        fetch: noCacheFetch,
+      },
+    });
     _isMock = false;
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);

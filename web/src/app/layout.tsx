@@ -221,6 +221,31 @@ export default function RootLayout({
             `,
           }}
         />
+        {/* Schema cache clear: on next reload, clear local state so app fetches new 5 VIDA MINTING CAP structure */}
+        <Script
+          id="pff-schema-cache-clear"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                var PFF_APP_SCHEMA_VERSION = '5-VIDA-MINTING-1';
+                try {
+                  var stored = typeof localStorage !== 'undefined' ? localStorage.getItem('PFF_APP_SCHEMA_VERSION') : null;
+                  if (stored !== PFF_APP_SCHEMA_VERSION) {
+                    if (typeof localStorage !== 'undefined') {
+                      localStorage.clear();
+                      localStorage.setItem('PFF_APP_SCHEMA_VERSION', PFF_APP_SCHEMA_VERSION);
+                    }
+                    if (typeof sessionStorage !== 'undefined') sessionStorage.clear();
+                    console.log('[PFF] Local app cache cleared for schema', PFF_APP_SCHEMA_VERSION);
+                  }
+                } catch (e) {
+                  console.warn('[PFF] Schema version check failed:', e);
+                }
+              })();
+            `,
+          }}
+        />
       </head>
       <body className="bg-[#0d0d0f] text-[#f5f5f5] antialiased">
         <GlobalPresenceGatewayProvider>

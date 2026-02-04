@@ -7,6 +7,15 @@
 import { getSupabase } from './supabase';
 import { hashSeedForStorage, encryptSeed, validateMnemonic, normalizeMnemonic } from './recoverySeed';
 
+/** Explicit column mapping for user_profiles recovery seed update (avoids Schema Cache issues). */
+export interface UserProfileRecoverySeedUpdate {
+  recovery_seed_hash: string;
+  recovery_seed_encrypted: string;
+  recovery_seed_iv: string;
+  recovery_seed_salt: string;
+  updated_at: string;
+}
+
 export interface StoredRecoverySeed {
   recoverySeedHash: string;
   recoverySeedEncrypted: string;
@@ -40,21 +49,26 @@ export async function storeRecoverySeed(
 
     const { data: existing } = await (supabase as any)
       .from('user_profiles')
-      .select('phone_number')
+      .select('id, phone_number')
       .eq('phone_number', phoneNumber.trim())
       .maybeSingle();
 
     if (existing) {
+      const profileId = existing.id;
+      if (!profileId) {
+        return { ok: false, error: 'Profile has no id' };
+      }
+      const updatePayload: UserProfileRecoverySeedUpdate = {
+        recovery_seed_hash: recoverySeedHash,
+        recovery_seed_encrypted: encrypted.encryptedHex,
+        recovery_seed_iv: encrypted.ivHex,
+        recovery_seed_salt: encrypted.saltHex,
+        updated_at: new Date().toISOString(),
+      };
       const { error } = await (supabase as any)
         .from('user_profiles')
-        .update({
-          recovery_seed_hash: recoverySeedHash,
-          recovery_seed_encrypted: encrypted.encryptedHex,
-          recovery_seed_iv: encrypted.ivHex,
-          recovery_seed_salt: encrypted.saltHex,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('phone_number', phoneNumber.trim());
+        .update(updatePayload)
+        .eq('id', profileId);
 
       if (error) return { ok: false, error: error.message ?? 'Failed to store recovery seed' };
     } else {
