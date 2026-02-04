@@ -1,13 +1,23 @@
+# Dependencies and build
 node_modules
 .next
 out
+
+# Hosting
 .vercel
 .netlify
-.DS_Store
-*.pem
+
+# Environment (never commit secrets)
 .env
 .env*.local
+!.env.example
+
+# OS and misc
+.DS_Store
+*.pem
 *.log
+
+# PWA / service worker generated
 public/sw.js
 public/workbox-*.js
 public/worker-*.js

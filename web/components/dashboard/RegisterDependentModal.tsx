@@ -12,6 +12,7 @@ interface RegisterDependentModalProps {
 export function RegisterDependentModal({ isOpen, onClose, guardianPhone }: RegisterDependentModalProps) {
   const [fullName, setFullName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
@@ -30,8 +31,24 @@ export function RegisterDependentModal({ isOpen, onClose, guardianPhone }: Regis
       return;
     }
 
-    // Register dependent
-    const result = await registerDependent(phoneNumber, fullName, guardianPhone);
+    // Validate date of birth
+    if (!dateOfBirth) {
+      setError('Date of birth is required');
+      setLoading(false);
+      return;
+    }
+
+    // Ensure DOB is not in the future
+    const today = new Date();
+    const dob = new Date(dateOfBirth);
+    if (dob > today) {
+      setError('Date of birth cannot be in the future');
+      setLoading(false);
+      return;
+    }
+
+    // Register dependent with date of birth
+    const result = await registerDependent(phoneNumber, fullName, guardianPhone, dateOfBirth);
 
     if (result) {
       setSuccess(true);
@@ -40,6 +57,7 @@ export function RegisterDependentModal({ isOpen, onClose, guardianPhone }: Regis
         setSuccess(false);
         setFullName('');
         setPhoneNumber('');
+        setDateOfBirth('');
       }, 2000);
     } else {
       setError('Failed to register dependent. Please try again.');
@@ -118,6 +136,24 @@ export function RegisterDependentModal({ isOpen, onClose, guardianPhone }: Regis
             />
             <p className="text-xs text-[#6b6b70] mt-2">
               Use E.164 format with country code (e.g., +234 for Nigeria)
+            </p>
+          </div>
+
+          {/* Date of Birth */}
+          <div>
+            <label className="block text-sm font-semibold text-[#6b6b70] mb-2 uppercase tracking-wider">
+              Date of Birth
+            </label>
+            <input
+              type="date"
+              value={dateOfBirth}
+              onChange={(e) => setDateOfBirth(e.target.value)}
+              required
+              max={new Date().toISOString().split('T')[0]} // Cannot be future date
+              className="w-full px-4 py-4 bg-[#0d0d0f] border border-[#2a2a2e] rounded-lg text-[#f5f5f5] text-lg font-mono focus:border-[#3b82f6] focus:outline-none transition-colors"
+            />
+            <p className="text-xs text-[#6b6b70] mt-2">
+              Required for age-based auto-promotion to Sovereign at 18 years
             </p>
           </div>
 

@@ -15,6 +15,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 export enum AccountType {
   SOVEREIGN_OPERATOR = 'SOVEREIGN_OPERATOR', // Full-access business/active users
   DEPENDENT = 'DEPENDENT', // Simplified managed account (family/elderly)
+  PROMOTED_SOVEREIGN = 'PROMOTED_SOVEREIGN', // Dependent who turned 18 and gained full control
 }
 
 // Global Identity Interface
@@ -24,7 +25,11 @@ export interface GlobalIdentity {
   global_identity_hash: string; // SHA-256 hash of phone number
   account_type: AccountType;
   full_name: string;
+  date_of_birth?: string; // ISO 8601 date string (YYYY-MM-DD) - MANDATORY for family tree
+  age_years?: number; // Calculated from DOB
   guardian_phone?: string; // For DEPENDENT accounts - links to Sovereign Operator
+  spouse_phone?: string; // For family tree - links to spouse
+  ancestral_root_phone?: string; // For nested sovereignty - links to family tree root
   virtual_bridge_id?: string; // Maps to traditional banking systems
   linked_bank_accounts: string[];
   vida_balance: number;
@@ -32,7 +37,9 @@ export interface GlobalIdentity {
   locked_vida: number; // 80% locked until 1B users
   created_at: string;
   last_active: string;
-  status: 'ACTIVE' | 'SUSPENDED' | 'PENDING';
+  status: 'ACTIVE' | 'SUSPENDED' | 'PENDING' | 'INACTIVE' | 'DECEASED';
+  promoted_at?: string; // When dependent became sovereign (auto-promotion)
+  promotion_triggered_by?: 'AUTO_AGE_18' | 'MANUAL';
 }
 
 // Virtual Bridge for Banking Integration
@@ -150,16 +157,26 @@ export async function registerSovereignOperator(
 /**
  * Register Dependent (Simplified Managed Account for Family/Elderly)
  * Must be linked to a Guardian (Sovereign Operator)
+ * REQUIRES: Date of Birth for age-based auto-promotion
  */
 export async function registerDependent(
   phoneNumber: string,
   fullName: string,
-  guardianPhone: string
+  guardianPhone: string,
+  dateOfBirth: string // ISO 8601 format (YYYY-MM-DD)
 ): Promise<GlobalIdentity | null> {
   try {
     if (!validatePhoneNumber(phoneNumber) || !validatePhoneNumber(guardianPhone)) {
       throw new Error('Invalid phone number format');
     }
+
+    // Validate date of birth
+    if (!dateOfBirth || !isValidDate(dateOfBirth)) {
+      throw new Error('Invalid date of birth. Use YYYY-MM-DD format');
+    }
+
+    // Calculate age
+    const age = calculateAge(dateOfBirth);
 
     // Verify guardian exists and is a Sovereign Operator
     // TODO: Check Supabase for guardian account
@@ -177,6 +194,8 @@ export async function registerDependent(
       global_identity_hash: identityHash,
       account_type: AccountType.DEPENDENT,
       full_name: fullName,
+      date_of_birth: dateOfBirth,
+      age_years: age,
       guardian_phone: guardianPhone,
       linked_bank_accounts: [],
       vida_balance: 0.0, // Dependents start with 0, receive from guardian
@@ -187,14 +206,51 @@ export async function registerDependent(
       status: 'PENDING', // Requires guardian approval
     };
 
-    // TODO: Insert into Supabase global_identities table
-    // const { data, error } = await supabase.from('global_identities').insert(identity);
+    // TODO: Insert into Supabase family_members table
+    // const { data, error } = await supabase.from('family_members').insert({
+    //   phone_number: identity.phone_number,
+    //   full_name: identity.full_name,
+    //   date_of_birth: identity.date_of_birth,
+    //   account_type: identity.account_type,
+    //   guardian_phone: identity.guardian_phone,
+    //   vida_balance: identity.vida_balance,
+    //   spendable_vida: identity.spendable_vida,
+    //   locked_vida: identity.locked_vida,
+    //   status: 'ACTIVE',
+    // });
 
     return identity;
   } catch (error) {
     console.error('Error registering Dependent:', error);
     return null;
   }
+}
+
+/**
+ * Validate date string (YYYY-MM-DD format)
+ */
+export function isValidDate(dateString: string): boolean {
+  const regex = /^\d{4}-\d{2}-\d{2}$/;
+  if (!regex.test(dateString)) return false;
+
+  const date = new Date(dateString);
+  return date instanceof Date && !isNaN(date.getTime());
+}
+
+/**
+ * Calculate age from date of birth
+ */
+export function calculateAge(dateOfBirth: string): number {
+  const today = new Date();
+  const birthDate = new Date(dateOfBirth);
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+
+  return age;
 }
 
 /**

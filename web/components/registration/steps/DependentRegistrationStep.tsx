@@ -11,15 +11,16 @@ interface DependentRegistrationStepProps {
   onComplete: () => void;
 }
 
-export function DependentRegistrationStep({ 
-  parentIdentity, 
-  onDependentAdded, 
-  onSkip, 
-  onComplete 
+export function DependentRegistrationStep({
+  parentIdentity,
+  onDependentAdded,
+  onSkip,
+  onComplete
 }: DependentRegistrationStepProps) {
   const [showForm, setShowForm] = useState(false);
   const [dependentName, setDependentName] = useState('');
   const [dependentPhone, setDependentPhone] = useState('');
+  const [dependentDOB, setDependentDOB] = useState('');
   const [scanning, setScanning] = useState(false);
   const [addedDependents, setAddedDependents] = useState<GlobalIdentity[]>([]);
 
@@ -34,6 +35,19 @@ export function DependentRegistrationStep({
       return;
     }
 
+    if (!dependentDOB) {
+      alert('Please enter date of birth');
+      return;
+    }
+
+    // Validate DOB is not in the future
+    const today = new Date();
+    const dob = new Date(dependentDOB);
+    if (dob > today) {
+      alert('Date of birth cannot be in the future');
+      return;
+    }
+
     setScanning(true);
 
     // Simulate 4-layer scan for dependent
@@ -44,12 +58,17 @@ export function DependentRegistrationStep({
     setScanning(false);
 
     if (authResult.success) {
+      // Calculate age
+      const age = Math.floor((today.getTime() - dob.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+
       const dependent: GlobalIdentity = {
         id: crypto.randomUUID(),
         phone_number: dependentPhone,
         global_identity_hash: await generateIdentityHash(dependentPhone),
         account_type: AccountType.DEPENDENT,
         full_name: dependentName.trim(),
+        date_of_birth: dependentDOB,
+        age_years: age,
         guardian_phone: parentIdentity.phone_number, // KEY: Link to parent
         linked_bank_accounts: [],
         vida_balance: 0,
@@ -62,10 +81,11 @@ export function DependentRegistrationStep({
 
       onDependentAdded(dependent);
       setAddedDependents([...addedDependents, dependent]);
-      
+
       // Reset form
       setDependentName('');
       setDependentPhone('');
+      setDependentDOB('');
       setShowForm(false);
     } else {
       alert('Biometric scan failed. Please try again.');
@@ -155,6 +175,28 @@ export function DependentRegistrationStep({
                 outline: 'none'
               }}
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold mb-2" style={{ color: '#D4AF37' }}>
+              Date of Birth
+            </label>
+            <input
+              type="date"
+              value={dependentDOB}
+              onChange={(e) => setDependentDOB(e.target.value)}
+              max={new Date().toISOString().split('T')[0]}
+              className="w-full px-4 py-3 rounded-lg font-mono text-sm"
+              style={{
+                background: 'rgba(0, 0, 0, 0.6)',
+                border: '2px solid #2a2a2e',
+                color: '#ffffff',
+                outline: 'none'
+              }}
+            />
+            <p className="text-xs mt-1" style={{ color: '#6b6b70' }}>
+              Required for age-based auto-promotion at 18 years
+            </p>
           </div>
 
           <div className="flex gap-3">

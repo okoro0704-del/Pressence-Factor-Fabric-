@@ -1,9 +1,12 @@
 /**
- * PFF Web — CRITICAL BYPASS MODULE
- * Terminates all lock overlays for ROOT devices
+ * PFF Web — CRITICAL BYPASS MODULE (DISABLED FOR ZERO-PERSISTENCE)
  * Architect: Isreal Okoro (mrfundzman)
- * 
- * Purpose:
+ *
+ * IMPORTANT: This module is DISABLED to enforce mandatory 4-layer re-authentication
+ * Even ROOT devices must complete all 4 layers on every entry
+ * Zero-persistence rule applies to ALL users, including the Architect
+ *
+ * Purpose (LEGACY - NOW DISABLED):
  * - Force immediate access for ROOT_SOVEREIGN_PAIR devices
  * - Bypass all authentication checks
  * - Purge DOM overlays and lock screens
@@ -72,8 +75,14 @@ function hasSovereignCookie(): boolean {
 
 /**
  * Check if current device is ROOT_SOVEREIGN_PAIR
+ * DISABLED: Always returns false to enforce mandatory 4-layer authentication
  */
 export function isRootDevice(): boolean {
+  // ZERO-PERSISTENCE ENFORCEMENT: Even ROOT devices must complete 4 layers
+  console.log('[CRITICAL BYPASS] ⚠️ DISABLED - All users must complete 4-layer authentication');
+  return false;
+
+  /* LEGACY CODE - DISABLED FOR ZERO-PERSISTENCE
   try {
     // Check for valid Sovereign Cookie first (fastest path)
     if (hasSovereignCookie()) {
@@ -116,6 +125,7 @@ export function isRootDevice(): boolean {
     console.error('[CRITICAL BYPASS] Error checking root device:', err);
     return false;
   }
+  */
 }
 
 /**
@@ -216,15 +226,22 @@ export function forceRootState(): { isLocked: boolean; isAuthorized: boolean } {
 
 /**
  * Initialize CRITICAL BYPASS on page load
+ * DISABLED: No bypass allowed - all users must complete 4-layer authentication
  */
 export function initializeCriticalBypass(): void {
-  console.log('[CRITICAL BYPASS] 🔥 INITIALIZING CRITICAL BYPASS PROTOCOL');
-  
+  console.log('[CRITICAL BYPASS] ⚠️ DISABLED - ZERO-PERSISTENCE ENFORCEMENT ACTIVE');
+  console.log('[CRITICAL BYPASS] 🔐 All users (including Architect) must complete 4-layer authentication');
+  console.log('[CRITICAL BYPASS] 🔥 Session destroyed on tab close, phone lock, or background');
+
+  // ZERO-PERSISTENCE ENFORCEMENT: No bypass allowed
+  // All users must complete 4 layers on every entry
+
+  /* LEGACY CODE - DISABLED FOR ZERO-PERSISTENCE
   const state = forceRootState();
-  
+
   if (state.isAuthorized) {
     console.log('[CRITICAL BYPASS] ✅ ROOT DEVICE AUTHORIZED - ALL LOCKS TERMINATED');
-    
+
     // Run DOM purge after a short delay to catch dynamically rendered overlays
     setTimeout(() => purgeLockOverlays(), 100);
     setTimeout(() => purgeLockOverlays(), 500);
@@ -232,5 +249,6 @@ export function initializeCriticalBypass(): void {
   } else {
     console.log('[CRITICAL BYPASS] ⚠️ NON-ROOT DEVICE - STANDARD AUTHENTICATION REQUIRED');
   }
+  */
 }
 

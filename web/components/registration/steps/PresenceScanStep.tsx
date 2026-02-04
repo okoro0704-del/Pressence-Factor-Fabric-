@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { AccountType, type GlobalIdentity, generateIdentityHash } from '@/lib/phoneIdentity';
 import { resolveSovereignByPresence, AuthStatus, AuthLayer, type BiometricAuthResult } from '@/lib/biometricAuth';
+import { IdentityAnchorInput } from '@/components/auth/IdentityAnchorInput';
 
 interface PresenceScanStepProps {
   accountType: AccountType;
@@ -15,15 +16,28 @@ export function PresenceScanStep({ accountType, guardianPhone, onComplete, onCan
   const [authStatus, setAuthStatus] = useState<AuthStatus>(AuthStatus.IDLE);
   const [currentLayer, setCurrentLayer] = useState<AuthLayer | null>(null);
   const [result, setResult] = useState<BiometricAuthResult | null>(null);
+  const [identityAnchor, setIdentityAnchor] = useState<{ phone: string; name: string } | null>(null);
+
+  const handleAnchorVerified = (payload: { phoneNumber: string; fullName: string }) => {
+    setIdentityAnchor({ phone: payload.phoneNumber, name: payload.fullName });
+  };
 
   const handleStartScan = async () => {
+    if (!identityAnchor) {
+      alert('Identity anchor required. Please enter phone number first.');
+      return;
+    }
+
     setAuthStatus(AuthStatus.SCANNING);
     setResult(null);
 
-    const authResult = await resolveSovereignByPresence((layer, status) => {
-      setCurrentLayer(layer);
-      setAuthStatus(status);
-    });
+    const authResult = await resolveSovereignByPresence(
+      identityAnchor.phone,
+      (layer, status) => {
+        setCurrentLayer(layer);
+        setAuthStatus(status);
+      }
+    );
 
     setResult(authResult);
 
