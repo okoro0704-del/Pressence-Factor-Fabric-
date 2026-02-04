@@ -601,6 +601,11 @@ export async function verifyHardwareTPM(_phoneNumber?: string): Promise<{ succes
     }
 
     const canvasStr = canvasFingerprint();
+    if (!canvasStr || canvasStr.length === 0) {
+      console.warn('[HW Fingerprint] Canvas fingerprint returned empty string. Browser may be blocking or unavailable.');
+    } else {
+      console.warn('[HW Fingerprint] Generated string (length=', canvasStr.length, '):', JSON.stringify(canvasStr.substring(0, 200)) + (canvasStr.length > 200 ? '…' : ''));
+    }
     let deviceHash: string;
     try {
       const encoder = new TextEncoder();
@@ -612,6 +617,7 @@ export async function verifyHardwareTPM(_phoneNumber?: string): Promise<{ succes
     } catch {
       deviceHash = 'cf-' + simpleHash(canvasStr);
     }
+    console.warn('[HW Fingerprint] deviceHash (Device ID):', deviceHash ? `${deviceHash.substring(0, 16)}…` : '(empty)');
 
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(PFF_PILLAR_HW_HASH, deviceHash);
@@ -623,6 +629,28 @@ export async function verifyHardwareTPM(_phoneNumber?: string): Promise<{ succes
     console.error('Canvas fingerprint failed:', error);
     return { success: false, error: 'Hardware fingerprint unavailable' };
   }
+}
+
+/** Device UUID from localStorage (same as multiDeviceVitalization) for composite. */
+function getOrCreateDeviceUuid(): string {
+  if (typeof localStorage === 'undefined') return 'ssr';
+  let id = localStorage.getItem('device_id');
+  if (!id) {
+    id = `DEVICE-${crypto.randomUUID().substring(0, 8).toUpperCase()}`;
+    localStorage.setItem('device_id', id);
+  }
+  return id;
+}
+
+/**
+ * Composite Device ID: Canvas Fingerprint + Hardware UUID.
+ * Saved to primary_sentinel_device_id and used for device authorization (not thumbprint).
+ */
+export async function getCompositeDeviceFingerprint(): Promise<string> {
+  const tpm = await verifyHardwareTPM();
+  const deviceHash = tpm.success ? tpm.deviceHash! : 'unknown';
+  const uuid = getOrCreateDeviceUuid();
+  return `${deviceHash}|${uuid}`;
 }
 
 /**

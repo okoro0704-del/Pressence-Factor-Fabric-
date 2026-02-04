@@ -166,16 +166,19 @@ export async function getPrimaryDevice(phoneNumber: string): Promise<{ device_id
 }
 
 /**
- * Assign Primary Sentinel Device (First Device)
+ * Assign Primary Sentinel Device (First Device).
+ * Uses compositeDeviceId (Canvas Fingerprint | Hardware UUID) when provided — this is the Device ID, not thumbprint.
  */
 export async function assignPrimarySentinel(
   phoneNumber: string,
   fullName: string,
   deviceInfo: DeviceInfo,
   ipAddress: string,
-  geolocation: VitalizationRequest['geolocation']
+  geolocation: VitalizationRequest['geolocation'],
+  compositeDeviceId?: string
 ): Promise<void> {
-  // Create user profile if it doesn't exist
+  const deviceIdToStore = compositeDeviceId ?? deviceInfo.deviceId;
+
   const { data: existingProfile } = await supabase
     .from('user_profiles')
     .select('*')
@@ -186,25 +189,23 @@ export async function assignPrimarySentinel(
     await supabase.from('user_profiles').insert({
       phone_number: phoneNumber,
       full_name: fullName,
-      primary_sentinel_device_id: deviceInfo.deviceId,
+      primary_sentinel_device_id: deviceIdToStore,
       primary_sentinel_assigned_at: new Date().toISOString(),
       guardian_recovery_enabled: false,
     });
   } else {
-    // Update existing profile with primary sentinel
     await supabase
       .from('user_profiles')
       .update({
-        primary_sentinel_device_id: deviceInfo.deviceId,
+        primary_sentinel_device_id: deviceIdToStore,
         primary_sentinel_assigned_at: new Date().toISOString(),
       })
       .eq('phone_number', phoneNumber);
   }
 
-  // Add device to authorized_devices as primary
   await supabase.from('authorized_devices').insert({
     phone_number: phoneNumber,
-    device_id: deviceInfo.deviceId,
+    device_id: deviceIdToStore,
     device_name: deviceInfo.deviceName,
     device_type: deviceInfo.deviceType,
     hardware_hash: deviceInfo.hardwareHash,
@@ -220,23 +221,26 @@ export async function assignPrimarySentinel(
     geolocation,
   });
 
-  console.log('✅ Primary Sentinel Device assigned:', deviceInfo.deviceId);
+  console.log('✅ Primary Sentinel Device assigned (Device ID):', deviceIdToStore.substring(0, 24) + '…');
 }
 
 /**
- * Create Vitalization Request
+ * Create Vitalization Request.
+ * When compositeDeviceId is provided (Canvas | UUID), store it as device_id so approval grants this device.
  */
 export async function createVitalizationRequest(
   phoneNumber: string,
   deviceInfo: DeviceInfo,
   ipAddress: string,
-  geolocation: VitalizationRequest['geolocation']
+  geolocation: VitalizationRequest['geolocation'],
+  compositeDeviceId?: string
 ): Promise<string> {
+  const deviceIdToStore = compositeDeviceId ?? deviceInfo.deviceId;
   const { data, error } = await supabase
     .from('vitalization_requests')
     .insert({
       phone_number: phoneNumber,
-      device_id: deviceInfo.deviceId,
+      device_id: deviceIdToStore,
       device_type: deviceInfo.deviceType,
       device_name: deviceInfo.deviceName,
       hardware_hash: deviceInfo.hardwareHash,

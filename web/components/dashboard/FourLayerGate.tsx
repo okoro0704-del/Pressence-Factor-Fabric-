@@ -12,6 +12,7 @@ import {
   type PresencePillar,
   ensureVoiceAndMicReady,
   startLocationRequestFromUserGesture,
+  getCompositeDeviceFingerprint,
   SCAN_TIMEOUT_MS,
 } from '@/lib/biometricAuth';
 import { PresenceProgressRing } from './PresenceProgressRing';
@@ -47,7 +48,7 @@ import { maskPhoneForDisplay } from '@/lib/phoneMask';
 import { mintFoundationSeigniorage } from '@/lib/foundationSeigniorage';
 import { hasSignedConstitution } from '@/lib/legalApprovals';
 import { setIdentityAnchorForSession, isSentinelActive } from '@/lib/sentinelActivation';
-import { getCurrentUserRole, setRoleCookie, canAccessMaster, canAccessGovernment } from '@/lib/roleAuth';
+import { getCurrentUserRole, setRoleCookie, canAccessMaster, canAccessGovernment, getProfileWithPrimarySentinel } from '@/lib/roleAuth';
 import { ensureGenesisIfEmpty } from '@/lib/auth';
 import { SovereignConstitution } from '@/components/auth/SovereignConstitution';
 
@@ -120,6 +121,9 @@ export function FourLayerGate() {
   const [showLocationPermissionPopup, setShowLocationPermissionPopup] = useState(false);
   /** GPS taking >3s — show "Syncing with Local Mesh..." (indoor mode) */
   const [gpsTakingLong, setGpsTakingLong] = useState(false);
+  /** First-time MASTER_ARCHITECT: role is Master but device ID empty — show Enrollment Mode to capture Master Key */
+  const [showEnrollmentModeForMaster, setShowEnrollmentModeForMaster] = useState(false);
+  const [enrollmentCapturing, setEnrollmentCapturing] = useState(false);
   const router = useRouter();
   const { setPresenceVerified } = useGlobalPresenceGateway();
 
@@ -149,6 +153,18 @@ export function FourLayerGate() {
     setMounted(true);
     console.log('Interaction Layer Active', '(FourLayerGate)');
   }, []);
+
+  // First-time flag: MASTER_ARCHITECT with empty device ID → Enrollment Mode (bypass verification)
+  useEffect(() => {
+    if (!identityAnchor?.phone) return;
+    getProfileWithPrimarySentinel(identityAnchor.phone).then((profile) => {
+      if (!profile) return;
+      const emptyDevice = !profile.primary_sentinel_device_id || profile.primary_sentinel_device_id.trim() === '';
+      if (profile.role === 'MASTER_ARCHITECT' && emptyDevice) {
+        setShowEnrollmentModeForMaster(true);
+      }
+    });
+  }, [identityAnchor?.phone]);
 
   // ZERO-PERSISTENCE SESSION INITIALIZATION
   // Reset to Layer 1 on every entry (app initialization or foreground)
@@ -321,7 +337,8 @@ export function FourLayerGate() {
       }
 
       const deviceInfo = getCurrentDeviceInfo();
-    const isNewDevice = !(await isDeviceAuthorized(identityAnchor.phone, deviceInfo.deviceId));
+    const compositeDeviceId = await getCompositeDeviceFingerprint();
+    const isNewDevice = !(await isDeviceAuthorized(identityAnchor.phone, compositeDeviceId));
     const authResult = await resolveSovereignByPresence(
       identityAnchor.phone,
       (layer, status) => {
@@ -380,13 +397,13 @@ export function FourLayerGate() {
             longitude: 3.3792,
           };
 
-          // Assign as primary sentinel
           await assignPrimarySentinel(
             identityAnchor.phone,
             identityAnchor.name,
             deviceInfo,
             ipAddress,
-            geolocation
+            geolocation,
+            compositeDeviceId
           );
 
           console.log('✅ PRIMARY_SENTINEL assigned - check constitution then proceed');
@@ -414,12 +431,12 @@ export function FourLayerGate() {
           longitude: 3.3792,
         };
 
-        // Create vitalization request for secondary device
         const requestId = await createVitalizationRequest(
           identityAnchor.phone,
           deviceInfo,
           ipAddress,
-          geolocation
+          geolocation,
+          compositeDeviceId
         );
 
         // Show "Awaiting Master Authorization" screen
@@ -432,8 +449,7 @@ export function FourLayerGate() {
         return;
       }
 
-      // Device is authorized - update last used timestamp
-      await updateDeviceLastUsed(deviceInfo.deviceId);
+      await updateDeviceLastUsed(compositeDeviceId);
 
       // Constitution must be signed before grant
       const signed = await hasSignedConstitution(identityAnchor.phone);
@@ -452,7 +468,8 @@ export function FourLayerGate() {
     } else {
       setAuthStatus(AuthStatus.FAILED);
       const deviceInfo = getCurrentDeviceInfo();
-      const unrecognized = identityAnchor ? !(await isDeviceAuthorized(identityAnchor.phone, deviceInfo.deviceId)) : false;
+      const compositeForCheck = await getCompositeDeviceFingerprint();
+      const unrecognized = identityAnchor ? !(await isDeviceAuthorized(identityAnchor.phone, compositeForCheck)) : false;
       setShowVerifyFromAuthorizedDevice(unrecognized);
 
       // Check if this is a biological mismatch (high similarity but not exact match)
@@ -652,6 +669,42 @@ export function FourLayerGate() {
     setResult(null);
   };
 
+  /** Enrollment Mode: MASTER_ARCHITECT with empty device — capture current device as Master Key (bypass full verification). */
+  const handleEnrollmentCaptureMasterKey = async () => {
+    if (!identityAnchor) return;
+    setEnrollmentCapturing(true);
+    try {
+      const compositeDeviceId = await getCompositeDeviceFingerprint();
+      const deviceInfo = getCurrentDeviceInfo();
+      const ipAddress = 'unknown';
+      const geolocation = { city: 'Lagos', country: 'Nigeria', latitude: 6.5244, longitude: 3.3792 };
+      await assignPrimarySentinel(
+        identityAnchor.phone,
+        identityAnchor.name,
+        deviceInfo,
+        ipAddress,
+        geolocation,
+        compositeDeviceId
+      );
+      setShowEnrollmentModeForMaster(false);
+      const signed = await hasSignedConstitution(identityAnchor.phone);
+      if (!signed) {
+        setShowConstitutionGate(true);
+        return;
+      }
+      await mintFoundationSeigniorage(identityAnchor.phone);
+      setIdentityAnchorForSession(identityAnchor.phone);
+      ensureGenesisIfEmpty(identityAnchor.phone, identityAnchor.name).catch(() => {});
+      setPresenceVerified(true);
+      setShowVaultAnimation(true);
+    } catch (e) {
+      console.error('[Enrollment Mode] Capture failed:', e);
+      alert('Failed to save Master Key. Try again.');
+    } finally {
+      setEnrollmentCapturing(false);
+    }
+  };
+
   /** Dependent flow: user confirmed "Guardian Authorization Detected. Sentinel Secure." — proceed to dashboard. */
   const handleGuardianAuthorizationConfirm = async () => {
     if (!identityAnchor) return;
@@ -767,6 +820,53 @@ export function FourLayerGate() {
 
   if (showVaultAnimation) {
     return <VaultDoorAnimation onComplete={handleVaultAnimationComplete} />;
+  }
+
+  // First-time MASTER_ARCHITECT: device ID empty — Enrollment Mode (bypass verification, capture Master Key)
+  if (showEnrollmentModeForMaster && identityAnchor) {
+    return (
+      <div className="min-h-screen bg-[#050505] flex items-center justify-center p-4">
+        <div
+          className="absolute inset-0 opacity-20 pointer-events-none"
+          style={{
+            background: 'radial-gradient(circle at center, rgba(212, 175, 55, 0.2) 0%, rgba(5, 5, 5, 0) 70%)',
+          }}
+          aria-hidden="true"
+        />
+        <div
+          className="relative z-10 rounded-2xl border-2 p-8 max-w-md w-full text-center"
+          style={{
+            background: 'linear-gradient(135deg, rgba(212, 175, 55, 0.08) 0%, rgba(0, 0, 0, 0.9) 100%)',
+            borderColor: 'rgba(212, 175, 55, 0.4)',
+            boxShadow: '0 0 60px rgba(212, 175, 55, 0.2)',
+          }}
+        >
+          <div className="text-5xl mb-4">🔑</div>
+          <h2 className={`text-xl font-bold text-[#D4AF37] uppercase tracking-wider mb-3 ${jetbrains.className}`}>
+            Enrollment Mode — Master Key
+          </h2>
+          <p className="text-sm text-[#a0a0a5] mb-6">
+            Your device ID is empty. Capture your current phone&apos;s fingerprint (Canvas + Hardware UUID) as the Master Key. This is not a thumbprint — it&apos;s the Device ID.
+          </p>
+          <button
+            type="button"
+            onClick={handleEnrollmentCaptureMasterKey}
+            disabled={enrollmentCapturing}
+            className="relative z-50 w-full py-4 rounded-lg bg-gradient-to-r from-[#D4AF37] to-[#C9A227] hover:from-[#e8c547] hover:to-[#D4AF37] text-black font-bold text-lg uppercase tracking-wider transition-all duration-300 cursor-pointer disabled:opacity-70"
+            style={{ boxShadow: '0 0 30px rgba(212, 175, 55, 0.5)' }}
+          >
+            {enrollmentCapturing ? 'Capturing…' : 'Capture Master Key'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowEnrollmentModeForMaster(false)}
+            className="mt-4 w-full py-2 rounded-lg border border-[#D4AF37]/50 text-[#a0a0a5] hover:bg-[#D4AF37]/10 text-sm transition-colors"
+          >
+            Skip — Do full verification
+          </button>
+        </div>
+      </div>
+    );
   }
 
   const screenBg = (

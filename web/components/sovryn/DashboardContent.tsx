@@ -11,9 +11,13 @@ import { PresenceOverrideModal } from '../dashboard/PresenceOverrideModal';
 import { SentinelAccessBanner } from '../dashboard/SentinelAccessBanner';
 import { FamilyVault } from '../dashboard/FamilyVault';
 import type { GlobalIdentity } from '@/lib/phoneIdentity';
+import { getIdentityAnchorPhone } from '@/lib/sentinelActivation';
+import { resetBiometrics } from '@/lib/resetBiometrics';
 
 export function DashboardContent() {
   const [showPresenceModal, setShowPresenceModal] = useState(false);
+  const [resettingBiometrics, setResettingBiometrics] = useState(false);
+  const [resetBiometricsMessage, setResetBiometricsMessage] = useState<string | null>(null);
 
   const handlePresenceVerified = (identity: GlobalIdentity) => {
     // Show success notification
@@ -117,6 +121,38 @@ export function DashboardContent() {
             <p className="mt-3 text-xs text-[#6b6b70]">
               Use MetaMask, Defiant, or a hardware wallet on Rootstock.
             </p>
+          </section>
+
+          <section className="rounded-xl border border-[#2a2a2e] bg-[#16161a] p-4 mt-6">
+            <h2 className="text-sm font-semibold text-[#c9a227] mb-2">Settings</h2>
+            <p className="text-xs text-[#6b6b70] mb-3">
+              Clear primary sentinel device and stored face hashes so you can re-enroll (e.g. new device or re-scan).
+            </p>
+            {resetBiometricsMessage && (
+              <p className={`text-sm mb-3 ${resetBiometricsMessage.startsWith('✓') ? 'text-green-400' : 'text-red-400'}`}>
+                {resetBiometricsMessage}
+              </p>
+            )}
+            <button
+              type="button"
+              disabled={resettingBiometrics}
+              onClick={async () => {
+                const phone = getIdentityAnchorPhone();
+                if (!phone) {
+                  setResetBiometricsMessage('No identity anchor in session. Complete the gate first.');
+                  return;
+                }
+                if (!confirm('Reset My Biometrics will clear your primary device and face hashes. You will need to complete verification again. Continue?')) return;
+                setResettingBiometrics(true);
+                setResetBiometricsMessage(null);
+                const result = await resetBiometrics(phone);
+                setResettingBiometrics(false);
+                setResetBiometricsMessage(result.ok ? '✓ Biometrics reset. Re-verify at the gate to re-enroll.' : (result.error ?? 'Reset failed.'));
+              }}
+              className="px-4 py-2 rounded-lg border border-amber-500/50 text-amber-400 hover:bg-amber-500/10 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {resettingBiometrics ? 'Resetting…' : 'Reset My Biometrics'}
+            </button>
           </section>
 
           <div className="mt-6 flex flex-wrap gap-3">

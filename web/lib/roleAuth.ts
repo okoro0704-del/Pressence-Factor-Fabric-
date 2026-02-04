@@ -92,6 +92,30 @@ export async function findUserByIdentityAnchor(identityAnchor: string): Promise<
   }
 }
 
+/** Profile including primary_sentinel_device_id — for first-time MASTER_ARCHITECT enrollment bypass. */
+export async function getProfileWithPrimarySentinel(identityAnchor: string): Promise<{
+  role: Role;
+  primary_sentinel_device_id: string | null;
+} | null> {
+  if (!identityAnchor?.trim()) return null;
+  const supabase = getSupabase();
+  try {
+    const { data, error } = await (supabase as any)
+      .from('user_profiles')
+      .select('role, primary_sentinel_device_id')
+      .eq('phone_number', identityAnchor.trim())
+      .maybeSingle();
+    if (error || !data) return null;
+    const role = (data.role || 'CITIZEN').toUpperCase();
+    return {
+      role: ROLES.includes(role as Role) ? (role as Role) : 'CITIZEN',
+      primary_sentinel_device_id: data.primary_sentinel_device_id ?? null,
+    };
+  } catch {
+    return null;
+  }
+}
+
 /** Master dashboard: search user by phone via RPC (MASTER_ARCHITECT only). */
 export async function findUserByIdentityAnchorForMaster(
   actorIdentityAnchor: string,
