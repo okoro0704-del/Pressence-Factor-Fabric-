@@ -338,58 +338,34 @@ export async function verifyLocation(): Promise<{ success: boolean; coords?: { l
 }
 
 /**
- * LAYER 3: HARDWARE SENTINEL TETHERING (STRICT DEVICE MATCHING)
- * Checks if device UUID matches authorized devices for the identity
- * Triggers Secondary Guardian Approval for new devices
+ * LAYER 3: PASSIVE DEVICE FINGERPRINT (INSTANT, NO WEBAUTHN/TOUCH)
+ * Uses only passive signals: userAgent, colorDepth, hardwareConcurrency, deviceMemory.
+ * Hashed with SubtleCrypto SHA-256 into a 'Sovereign ID' locally (<100ms).
+ * No popup, no user touch — presence is device in hand + face in camera.
  */
-export async function verifyHardwareTPM(phoneNumber?: string): Promise<{ success: boolean; deviceHash?: string; requiresApproval?: boolean; error?: string }> {
+export async function verifyHardwareTPM(_phoneNumber?: string): Promise<{ success: boolean; deviceHash?: string; requiresApproval?: boolean; error?: string }> {
   try {
-    // Generate device fingerprint from available hardware info
-    const deviceInfo = {
-      userAgent: navigator.userAgent,
-      platform: navigator.platform,
-      language: navigator.language,
-      hardwareConcurrency: navigator.hardwareConcurrency,
-      deviceMemory: (navigator as any).deviceMemory || 'unknown',
-      screenResolution: `${screen.width}x${screen.height}`,
-      colorDepth: screen.colorDepth,
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    };
+    if (typeof navigator === 'undefined' || typeof screen === 'undefined') {
+      return { success: false, error: 'Environment not available' };
+    }
 
-    // Create device hash
-    const deviceString = JSON.stringify(deviceInfo);
+    const passiveString = [
+      navigator.userAgent,
+      String(screen.colorDepth),
+      String(navigator.hardwareConcurrency ?? ''),
+      String((navigator as any).deviceMemory ?? 'unknown'),
+    ].join('|');
+
     const encoder = new TextEncoder();
-    const data = encoder.encode(deviceString);
+    const data = encoder.encode(passiveString);
     const hashBuffer = await crypto.subtle.digest('SHA-256', data);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const deviceHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-
-    // Get or create device UUID
-    let deviceUUID = localStorage.getItem('pff_device_uuid');
-    if (!deviceUUID) {
-      deviceUUID = crypto.randomUUID();
-      localStorage.setItem('pff_device_uuid', deviceUUID);
-    }
-
-    // STRICT HARDWARE TETHERING: Verify device is authorized
-    if (phoneNumber) {
-      const { verifyHardwareTethering } = await import('./strictBiometricMatching');
-      const tetheringResult = await verifyHardwareTethering(deviceUUID, phoneNumber);
-
-      if (!tetheringResult.success) {
-        return {
-          success: false,
-          deviceHash,
-          requiresApproval: tetheringResult.requiresApproval,
-          error: tetheringResult.error
-        };
-      }
-    }
+    const deviceHash = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
 
     return { success: true, deviceHash };
   } catch (error) {
-    console.error('Hardware TPM verification failed:', error);
-    return { success: false, error: 'Hardware verification system error' };
+    console.error('Passive fingerprint failed:', error);
+    return { success: false, error: 'Hardware fingerprint unavailable' };
   }
 }
 
