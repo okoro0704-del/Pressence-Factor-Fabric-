@@ -10,18 +10,18 @@ import { GenesisHandshakeIndicator } from './GenesisHandshakeIndicator';
 import { checkPresenceVerified } from '@/lib/withPresenceCheck';
 import type { GlobalIdentity } from '@/lib/phoneIdentity';
 import { getIdentityAnchorPhone } from '@/lib/sentinelActivation';
-import { hasActiveSentinelLicense } from '@/lib/sentinelLicensing';
+import { hasActiveSentinelLicense, getActiveLicense, SENTINEL_TIERS } from '@/lib/sentinelLicensing';
 import { getSentinelTokenVerified } from '@/lib/sentinelSecurityToken';
 import { SentinelActivationOverlay } from './SentinelActivationOverlay';
+import { TripleVaultDisplay } from './TripleVaultDisplay';
 import {
   GROSS_SOVEREIGN_GRANT_VIDA,
   NATIONAL_CONTRIBUTION_VIDA,
-  SECURITY_ACTIVATION_VIDA,
   NET_SPENDABLE_VIDA,
   VIDA_PRICE_USD,
   NAIRA_RATE,
-  NET_SPENDABLE_USD,
 } from '@/lib/sovereignHandshakeConstants';
+import { LIQUID_TIER_USD } from '@/lib/economic';
 
 export function UserProfileBalance() {
   const [vaultData, setVaultData] = useState<CitizenVault | null>(null);
@@ -31,11 +31,9 @@ export function UserProfileBalance() {
   const [isPresenceVerified, setIsPresenceVerified] = useState(false);
   const [hasLicense, setHasLicense] = useState(false);
   const [tokenVerified, setTokenVerified] = useState(false);
+  const [sentinelFeePaidUsd, setSentinelFeePaidUsd] = useState(0);
   const sentinelVerified = hasLicense && tokenVerified;
 
-  const SPENDABLE_PERCENT = 0.20;
-  const LOCKED_PERCENT = 0.80;
-  const MILESTONE_TARGET = 1000000000;
   const CURRENT_USERS = 1247;
 
   useEffect(() => {
@@ -51,7 +49,7 @@ export function UserProfileBalance() {
         total_vida_cap_minted: GROSS_SOVEREIGN_GRANT_VIDA,
         personal_share_50: NET_SPENDABLE_VIDA,
         state_contribution_50: NATIONAL_CONTRIBUTION_VIDA,
-        spendable_balance_vida: NET_SPENDABLE_VIDA * SPENDABLE_PERCENT,
+        spendable_balance_vida: LIQUID_TIER_USD / VIDA_PRICE_USD,
         linked_bank_accounts: mockData.linked_bank_accounts || [],
       });
       setLoading(false);
@@ -71,12 +69,23 @@ export function UserProfileBalance() {
     return () => clearInterval(interval);
   }, []);
 
-  // Sentinel Verified = active license + security token verified (re-check on focus)
+  // Sentinel Verified = active license + security token verified; fee from license tier (deducted from Liquid)
   useEffect(() => {
-    const check = () => {
+    const check = async () => {
       setTokenVerified(getSentinelTokenVerified());
       const phone = getIdentityAnchorPhone();
-      if (phone) hasActiveSentinelLicense(phone).then(setHasLicense);
+      if (phone) {
+        const active = await hasActiveSentinelLicense(phone);
+        setHasLicense(!!active);
+        const license = await getActiveLicense(phone);
+        if (license && SENTINEL_TIERS[license.tier_type]) {
+          setSentinelFeePaidUsd(SENTINEL_TIERS[license.tier_type].priceUsd);
+        } else {
+          setSentinelFeePaidUsd(0);
+        }
+      } else {
+        setSentinelFeePaidUsd(0);
+      }
     };
     check();
     window.addEventListener('focus', check);
@@ -117,14 +126,8 @@ export function UserProfileBalance() {
     );
   }
 
-  const liquidVida = NET_SPENDABLE_VIDA * SPENDABLE_PERCENT;
-  const lockedVida = NET_SPENDABLE_VIDA * LOCKED_PERCENT;
-  const liquidUSD = liquidVida * VIDA_PRICE_USD;
-  const liquidNaira = liquidVida * VIDA_PRICE_USD * NAIRA_RATE;
-  const lockedUSD = lockedVida * VIDA_PRICE_USD;
-  const lockedNaira = lockedVida * VIDA_PRICE_USD * NAIRA_RATE;
+  const availableCashUsd = Math.max(0, LIQUID_TIER_USD - sentinelFeePaidUsd);
   const yourShareNaira = vaultData.personal_share_50 * VIDA_PRICE_USD * NAIRA_RATE;
-  const progressPercent = (CURRENT_USERS / MILESTONE_TARGET) * 100;
 
   return (
     <div className="space-y-6">
@@ -150,102 +153,12 @@ export function UserProfileBalance() {
       </div>
 
       <div className="bg-[#16161a] rounded-xl p-6 border border-[#2a2a2e]">
-        <div className="flex items-center justify-center gap-3 mb-6">
-          <svg className="w-5 h-5 text-[#e8c547]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-          </svg>
-          <h3 className="text-sm font-semibold text-[#e8c547] uppercase tracking-wider">
-            THE ARCHITECT'S TRIAD VAULT SYSTEM
-          </h3>
-          <svg className="w-5 h-5 text-[#e8c547]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-          </svg>
-        </div>
+        <TripleVaultDisplay
+          sentinelFeePaidUsd={sentinelFeePaidUsd}
+          globalUserCount={CURRENT_USERS}
+        />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          <div className="relative bg-gradient-to-br from-[#c9a227]/20 to-[#e8c547]/10 rounded-xl p-5 border-2 border-[#c9a227]/50 overflow-hidden group">
-            <div className="absolute -top-10 -right-10 w-32 h-32 bg-[#e8c547]/20 rounded-full blur-3xl animate-pulse" />
-            <div className="relative z-10">
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="text-xs font-bold text-[#e8c547] uppercase tracking-wider">Vault 1: Liquid</h4>
-                <span className="text-xs font-mono text-green-400 bg-green-500/20 px-2 py-1 rounded">AVAILABLE NOW</span>
-              </div>
-              <div className="space-y-2">
-                <p className="text-4xl font-bold font-mono text-[#e8c547] tracking-tight">
-                  {liquidVida.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </p>
-                <p className="text-sm font-semibold text-[#e8c547]">VIDA CAP</p>
-                <div className="pt-3 border-t border-[#c9a227]/30 space-y-1">
-                  <p className="text-xs text-[#6b6b70]">
-                    USD: <span className="font-mono text-[#f5f5f5]">${liquidUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                  </p>
-                  <p className="text-xs text-[#6b6b70]">
-                    Naira: <span className="font-mono text-[#00ff41]">₦{liquidNaira.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                  </p>
-                </div>
-                <p className="text-[10px] text-[#6b6b70] mt-3 uppercase tracking-wide">20% Spendable Reserve</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="relative bg-gradient-to-br from-red-500/10 to-red-600/5 rounded-xl p-5 border-2 border-red-500/30 overflow-hidden group">
-            <div className="absolute -top-10 -right-10 w-32 h-32 bg-red-500/10 rounded-full blur-3xl" />
-            <div className="relative z-10">
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="text-xs font-bold text-red-400 uppercase tracking-wider">Vault 2: Sovereign Lock</h4>
-                <span className="text-xs font-mono text-red-400 bg-red-500/20 px-2 py-1 rounded animate-pulse flex items-center gap-1">
-                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-                  </svg>
-                  LOCKED
-                </span>
-              </div>
-              <div className="space-y-2">
-                <p className="text-4xl font-bold font-mono text-red-400 tracking-tight">
-                  {lockedVida.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </p>
-                <p className="text-sm font-semibold text-red-400">VIDA CAP</p>
-                <div className="pt-3 border-t border-red-500/30 space-y-1">
-                  <p className="text-xs text-[#6b6b70]">
-                    USD: <span className="font-mono text-[#f5f5f5]">${lockedUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                  </p>
-                  <p className="text-xs text-[#6b6b70]">
-                    Naira: <span className="font-mono text-[#00ff41]">₦{lockedNaira.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                  </p>
-                </div>
-                <p className="text-[10px] text-[#6b6b70] mt-3 uppercase tracking-wide">80% Sovereign Guarantee</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-[#0d0d0f] rounded-xl p-5 border border-[#2a2a2e] mb-6">
-          <div className="flex items-center justify-between mb-3">
-            <h4 className="text-xs font-bold text-[#e8c547] uppercase tracking-wider">Progress to Global Release</h4>
-            <span className="text-xs font-mono text-[#6b6b70]">{CURRENT_USERS.toLocaleString()} / 1B Users</span>
-          </div>
-          <div className="relative w-full h-6 bg-[#16161a] rounded-full overflow-hidden border border-[#2a2a2e]">
-            <div
-              className="absolute top-0 left-0 h-full bg-gradient-to-r from-[#c9a227] to-[#e8c547] rounded-full transition-all duration-1000"
-              style={{ width: `${Math.max(progressPercent, 0.5)}%` }}
-            >
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-pulse" />
-            </div>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-[10px] font-bold text-[#f5f5f5] drop-shadow-lg">
-                {progressPercent.toFixed(6)}%
-              </span>
-            </div>
-          </div>
-          <p className="text-[10px] text-[#6b6b70] mt-2 text-center uppercase tracking-wide flex items-center justify-center gap-1">
-            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-            </svg>
-            Locked Vault Releases at 1 Billion PFF Users
-          </p>
-        </div>
-
-        <div className={`relative rounded-xl mb-6 transition-all duration-300 ${!sentinelVerified ? 'select-none' : ''}`}>
+        <div className={`relative rounded-xl mt-6 mb-6 transition-all duration-300 ${!sentinelVerified ? 'select-none' : ''}`}>
           <SentinelActivationOverlay
             show={!sentinelVerified}
             subtitle="Activate your Sentinel at the Sentinel Vault to enable Swap and Send."
@@ -281,8 +194,8 @@ export function UserProfileBalance() {
             <div>
               <p className="text-xs font-bold text-red-400 uppercase tracking-wider mb-1">Transaction Limit Notice</p>
               <p className="text-xs text-[#6b6b70] leading-relaxed">
-                Swap and Send operations are limited to <span className="font-mono text-[#e8c547]">1.00 VIDA CAP</span> (Vault 1: Liquid).
-                Attempting to move more will trigger: <span className="font-mono text-red-400">"Asset Locked: Requires 1B User Milestone for Release."</span>
+                Swap and Send are limited to <span className="font-mono text-emerald-400">Vault C — Available Cash</span> ({availableCashUsd.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 })}).
+                Vault B (Future Wealth) unlocks at 1B users: <span className="font-mono text-red-400">"Asset Locked: Requires 1B User Milestone for Release."</span>
               </p>
             </div>
           </div>
@@ -290,52 +203,55 @@ export function UserProfileBalance() {
       </div>
 
       <div className="bg-[#16161a] rounded-xl p-6 border border-[#2a2a2e]">
-        <h3 className="text-sm font-semibold text-[#6b6b70] uppercase tracking-wider mb-4">Sovereign Grant Breakdown</h3>
+        <h3 className="text-sm font-semibold text-[#6b6b70] uppercase tracking-wider mb-4">50/50 National Handshake — Grant Breakdown</h3>
         <div className="space-y-4">
           <div className="p-4 bg-[#0d0d0f] rounded-lg border border-[#2a2a2e]">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-[#6b6b70]">Gross Sovereign Grant</span>
               <span className="text-xl font-bold text-[#c9a227]">
-                {GROSS_SOVEREIGN_GRANT_VIDA.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VIDA
+                {GROSS_SOVEREIGN_GRANT_VIDA.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VIDA · $10,000
               </span>
             </div>
-            <p className="text-xs text-[#6b6b70] mt-1">10 VIDA grant ($10,000) upon verification</p>
+            <p className="text-xs text-[#6b6b70] mt-1">$10,000 grant upon vitalization</p>
           </div>
 
           <div className="p-4 bg-[#0d0d0f] rounded-lg border border-[#2a2a2e]">
-            <p className="text-xs text-[#6b6b70] mb-3 uppercase tracking-wider">Deductions</p>
+            <p className="text-xs text-[#6b6b70] mb-3 uppercase tracking-wider">50% National Cut → National Reserve</p>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-[#6b6b70]">Contribution to the Nation (not spendable)</span>
+              <span className="text-base font-bold text-amber-400">
+                {NATIONAL_CONTRIBUTION_VIDA.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VIDA · $5,000
+              </span>
+            </div>
+          </div>
+
+          <div className="p-4 bg-[#0d0d0f] rounded-lg border border-[#2a2a2e]">
+            <p className="text-xs text-[#6b6b70] mb-3 uppercase tracking-wider">Citizen&apos;s $5,000 — Tier 1 (Liquid) & Tier 2 (Sovereign Lock)</p>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-[#6b6b70]">− National Contribution</span>
-                <span className="text-base font-bold text-[#6b6b70]">
-                  {NATIONAL_CONTRIBUTION_VIDA.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VIDA
-                </span>
+                <span className="text-sm text-[#6b6b70]">Liquid (available after Sentinel)</span>
+                <span className="text-base font-mono text-emerald-400">$1,000 − ${sentinelFeePaidUsd} = ${availableCashUsd.toLocaleString('en-US', { minimumFractionDigits: 0 })}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-[#6b6b70]">− Security Activation</span>
-                <span className="text-base font-bold text-[#6b6b70]">
-                  {SECURITY_ACTIVATION_VIDA.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VIDA
-                </span>
+                <span className="text-sm text-[#6b6b70]">Sovereign Lock (until 1B users)</span>
+                <span className="text-base font-bold text-[#6b6b70]">$4,000</span>
               </div>
             </div>
           </div>
 
-          <div className="p-4 bg-gradient-to-br from-[#c9a227]/20 to-[#e8c547]/10 rounded-lg border-2 border-[#c9a227]/50">
+          <div className="p-4 bg-gradient-to-br from-emerald-900/20 to-emerald-800/10 rounded-lg border-2 border-emerald-500/50">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-bold text-[#e8c547] uppercase tracking-wider">= Net Spendable</span>
-              <span className="text-2xl font-bold text-[#e8c547]">
-                {NET_SPENDABLE_VIDA.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VIDA
+              <span className="text-sm font-bold text-emerald-400 uppercase tracking-wider">= Available Cash (Vault C)</span>
+              <span className="text-2xl font-bold text-emerald-300">
+                ${availableCashUsd.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
               </span>
             </div>
-            <p className="text-sm font-mono text-[#e8c547]">
-              ${NET_SPENDABLE_USD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </p>
-            <p className="text-xs text-[#6b6b70] mt-1">Your share after National Contribution and Security Activation</p>
+            <p className="text-xs text-[#6b6b70] mt-1">$1,000 Liquid minus Sentinel Activation fee</p>
           </div>
 
           <div className="p-4 bg-[#0d0d0f] rounded-lg border border-[#2a2a2e]">
             <div className="flex items-center justify-between">
-              <span className="text-xs text-[#6b6b70]">Naira Equivalent (Net Spendable)</span>
+              <span className="text-xs text-[#6b6b70]">Naira Equivalent (Citizen share)</span>
               <span className="text-sm font-mono text-[#00ff41]">
                 ₦{yourShareNaira.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>

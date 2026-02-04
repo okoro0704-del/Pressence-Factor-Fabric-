@@ -52,6 +52,8 @@ export interface BiometricAuthResult {
   twoPillarsOnly?: boolean;
   /** True when Silent Presence Mode was used (Face + Device + GPS, no Voice) */
   silentModeUsed?: boolean;
+  /** True when location failed due to permission — show gold popup to allow access */
+  locationPermissionRequired?: boolean;
 }
 
 /** Scan timeout: all three pillars must resolve in under 5 seconds total */
@@ -303,68 +305,236 @@ export async function verifyVoicePrint(
   }
 }
 
+const PFF_PILLAR_LOCATION = 'pff_pillar_location';
+const PFF_PILLAR_LOCATION_TS = 'pff_pillar_location_ts';
+const PILLAR_CACHE_MS = 24 * 60 * 60 * 1000;
+const MAXIMUM_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+
+export type LocationResult = {
+  success: boolean;
+  coords?: { latitude: number; longitude: number };
+  error?: string;
+  permissionRequired?: boolean;
+};
+
+let pendingLocationFromUserGesture: Promise<LocationResult> | null = null;
+
+const GEO_OPTIONS: PositionOptions = {
+  enableHighAccuracy: false,
+  timeout: 5000,
+  maximumAge: MAXIMUM_AGE_MS,
+};
+
 /**
- * GPS LOCATION (SILENT VERIFICATION PILLAR)
- * Face + Device ID + GPS satisfies 3-out-of-4 when voice skipped (noisy/unused mic).
+ * Call this directly from the Start Verification button onClick so the browser allows geolocation (user gesture).
+ * Starts the location request immediately; verifyLocation() will use this result if available.
  */
-export async function verifyLocation(): Promise<{ success: boolean; coords?: { latitude: number; longitude: number }; error?: string }> {
+export function startLocationRequestFromUserGesture(): void {
+  if (typeof navigator === 'undefined' || !navigator.geolocation) return;
+  if (pendingLocationFromUserGesture) return;
+  pendingLocationFromUserGesture = new Promise<LocationResult>((resolve) => {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const coords = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem(PFF_PILLAR_LOCATION, JSON.stringify(coords));
+          localStorage.setItem(PFF_PILLAR_LOCATION_TS, String(Date.now()));
+        }
+        resolve({ success: true, coords });
+      },
+      (err: GeolocationPositionError) => {
+        if (err?.code === 1) {
+          resolve({ success: false, error: 'LOCATION_PERMISSION_REQUIRED', permissionRequired: true });
+        } else {
+          resolve({ success: false, error: 'Location denied or unavailable' });
+        }
+      },
+      GEO_OPTIONS
+    );
+  });
+}
+
+/** IP-based location fallback when GPS doesn't respond in 4s. */
+async function getLocationByIP(): Promise<{ latitude: number; longitude: number } | null> {
   try {
+    const res = await fetch('https://ipapi.co/json/', { signal: AbortSignal.timeout(3000) });
+    const data = await res.json();
+    if (data?.latitude != null && data?.longitude != null) {
+      return { latitude: data.latitude, longitude: data.longitude };
+    }
+  } catch {
+    try {
+      const res = await fetch('https://ip-api.com/json/?fields=lat,lon', { signal: AbortSignal.timeout(3000) });
+      const data = await res.json();
+      if (data?.lat != null && data?.lon != null) {
+        return { latitude: data.lat, longitude: data.lon };
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return null;
+}
+
+/**
+ * GPS LOCATION — Sovereign Indoor Protocol
+ * Relaxed: enableHighAccuracy false, timeout 5000, maximumAge 30 days (cell/Wi‑Fi). Uses request started from button click if available.
+ */
+export async function verifyLocation(): Promise<LocationResult> {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const cached = localStorage.getItem(PFF_PILLAR_LOCATION);
+      const ts = localStorage.getItem(PFF_PILLAR_LOCATION_TS);
+      if (cached && ts) {
+        const t = parseInt(ts, 10);
+        if (!isNaN(t) && Date.now() - t < PILLAR_CACHE_MS) {
+          const coords = JSON.parse(cached) as { latitude: number; longitude: number };
+          if (coords?.latitude != null && coords?.longitude != null) {
+            return { success: true, coords };
+          }
+        }
+      }
+    }
+
     if (!navigator.geolocation) {
+      const ipCoords = await getLocationByIP();
+      if (ipCoords) {
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem(PFF_PILLAR_LOCATION, JSON.stringify(ipCoords));
+          localStorage.setItem(PFF_PILLAR_LOCATION_TS, String(Date.now()));
+        }
+        return { success: true, coords: ipCoords };
+      }
       return { success: false, error: 'Geolocation not available' };
     }
-    return new Promise((resolve) => {
-      const timeout = setTimeout(() => {
-        resolve({ success: false, error: 'Location timeout' });
-      }, 3000);
+
+    if (pendingLocationFromUserGesture) {
+      const result = await pendingLocationFromUserGesture;
+      pendingLocationFromUserGesture = null;
+      return result;
+    }
+
+    const gpsPromise = new Promise<LocationResult>((resolve) => {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          clearTimeout(timeout);
-          resolve({
-            success: true,
-            coords: { latitude: pos.coords.latitude, longitude: pos.coords.longitude },
-          });
+          const coords = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem(PFF_PILLAR_LOCATION, JSON.stringify(coords));
+            localStorage.setItem(PFF_PILLAR_LOCATION_TS, String(Date.now()));
+          }
+          resolve({ success: true, coords });
         },
-        () => {
-          clearTimeout(timeout);
-          resolve({ success: false, error: 'Location denied or unavailable' });
+        (err: GeolocationPositionError) => {
+          if (err?.code === 1) {
+            resolve({ success: false, error: 'LOCATION_PERMISSION_REQUIRED', permissionRequired: true });
+          } else {
+            resolve({ success: false, error: 'Location denied or unavailable' });
+          }
         },
-        { timeout: 2000, maximumAge: 60000, enableHighAccuracy: false }
+        GEO_OPTIONS
       );
     });
+
+    const fourSecTimeout = new Promise<LocationResult>((resolve) => {
+      setTimeout(async () => {
+        const ipCoords = await getLocationByIP();
+        if (ipCoords) {
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem(PFF_PILLAR_LOCATION, JSON.stringify(ipCoords));
+            localStorage.setItem(PFF_PILLAR_LOCATION_TS, String(Date.now()));
+          }
+          resolve({ success: true, coords: ipCoords });
+        } else {
+          resolve({ success: false, error: 'Location timeout' });
+        }
+      }, 4000);
+    });
+
+    const result = await Promise.race([gpsPromise, fourSecTimeout]);
+    return result;
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return { success: false, error: msg };
   }
 }
 
+const PFF_PILLAR_HW_HASH = 'pff_pillar_hw_hash';
+const PFF_PILLAR_HW_TS = 'pff_pillar_hw_ts';
+
+/** Simple non-crypto hash for canvas fallback when SubtleCrypto unavailable. */
+function simpleHash(str: string): string {
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) h = ((h << 5) + h) ^ str.charCodeAt(i);
+  return (h >>> 0).toString(16);
+}
+
 /**
- * LAYER 3: PASSIVE DEVICE FINGERPRINT (INSTANT, NO WEBAUTHN/TOUCH)
- * Uses only passive signals: userAgent, colorDepth, hardwareConcurrency, deviceMemory.
- * Hashed with SubtleCrypto SHA-256 into a 'Sovereign ID' locally (<100ms).
- * No popup, no user touch — presence is device in hand + face in camera.
+ * Canvas fingerprint — Sovereign Indoor Protocol.
+ * Draw an invisible gold line, read pixel data. Works 100% without permission.
+ */
+function canvasFingerprint(): string {
+  if (typeof document === 'undefined') return 'ssr';
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = 20;
+    canvas.height = 20;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return 'no-2d';
+    ctx.strokeStyle = 'rgba(212, 175, 55, 0.01)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(20, 20);
+    ctx.stroke();
+    const data = ctx.getImageData(0, 0, 20, 20).data;
+    return Array.from(data).join(',');
+  } catch {
+    return 'canvas-err';
+  }
+}
+
+/**
+ * LAYER 3: HARDWARE FINGERPRINT — Canvas method only.
+ * Unique ID from drawing an invisible gold line; no permissions, works everywhere.
  */
 export async function verifyHardwareTPM(_phoneNumber?: string): Promise<{ success: boolean; deviceHash?: string; requiresApproval?: boolean; error?: string }> {
   try {
-    if (typeof navigator === 'undefined' || typeof screen === 'undefined') {
+    if (typeof document === 'undefined') {
       return { success: false, error: 'Environment not available' };
     }
 
-    const passiveString = [
-      navigator.userAgent,
-      String(screen.colorDepth),
-      String(navigator.hardwareConcurrency ?? ''),
-      String((navigator as any).deviceMemory ?? 'unknown'),
-    ].join('|');
+    if (typeof localStorage !== 'undefined') {
+      const cached = localStorage.getItem(PFF_PILLAR_HW_HASH);
+      const ts = localStorage.getItem(PFF_PILLAR_HW_TS);
+      if (cached && ts) {
+        const t = parseInt(ts, 10);
+        if (!isNaN(t) && Date.now() - t < PILLAR_CACHE_MS) {
+          return { success: true, deviceHash: cached };
+        }
+      }
+    }
 
-    const encoder = new TextEncoder();
-    const data = encoder.encode(passiveString);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const deviceHash = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+    const canvasStr = canvasFingerprint();
+    let deviceHash: string;
+    try {
+      const encoder = new TextEncoder();
+      const data = encoder.encode(canvasStr);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      deviceHash = Array.from(new Uint8Array(hashBuffer))
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('');
+    } catch {
+      deviceHash = 'cf-' + simpleHash(canvasStr);
+    }
+
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(PFF_PILLAR_HW_HASH, deviceHash);
+      localStorage.setItem(PFF_PILLAR_HW_TS, String(Date.now()));
+    }
 
     return { success: true, deviceHash };
   } catch (error) {
-    console.error('Passive fingerprint failed:', error);
+    console.error('Canvas fingerprint failed:', error);
     return { success: false, error: 'Hardware fingerprint unavailable' };
   }
 }
@@ -700,12 +870,16 @@ export async function resolveSovereignByPresence(
         if (state.location?.success) layersPassed.push(AuthLayer.GPS_LOCATION);
         const passed = layersPassed.length;
         const twoPillarsOnly = passed === 2;
-        return fail(
-          null,
-          `Verification timed out (5s). ${passed}/4 sensors completed. Use Retry or Master Device Bypass.`,
-          true,
-          twoPillarsOnly
-        );
+        const locPerm = state.location && (state.location as LocationResult).permissionRequired === true;
+        return {
+          ...fail(
+            null,
+            `Verification timed out (5s). ${passed}/4 sensors completed. Use Retry or Master Device Bypass.`,
+            true,
+            twoPillarsOnly
+          ),
+          ...(locPerm && { locationPermissionRequired: true }),
+        };
       }
       throw err;
     }
@@ -716,8 +890,14 @@ export async function resolveSovereignByPresence(
     const voiceResult = state.voice!;
     const tpmResult = state.tpm!;
     const locationResult = state.location!;
+    const gpsData = locationResult.success ? locationResult.coords : null;
+    const hwHash = tpmResult.deviceHash ?? null;
+    console.log('Sensor Status', { GPS: gpsData, HW: hwHash });
+
     const silentModeUsed = !skipVoiceLayer && !!(voiceResult as VerifyVoicePrintResult).silentModeSuggested;
     if (silentModeUsed) onSilentMode?.();
+
+    const locationPermissionRequired = (locationResult as LocationResult).permissionRequired === true;
 
     if (biometricResult.success) {
       layersPassed.push(AuthLayer.BIOMETRIC_SIGNATURE);
@@ -753,7 +933,10 @@ export async function resolveSovereignByPresence(
       // Location optional unless Silent Mode (Face+Device+Location required)
     }
     if (silentModeUsed && !locationResult.success) {
-      return fail(AuthLayer.GPS_LOCATION, 'Silent Presence Mode requires Location. Enable GPS and try again.');
+      return {
+        ...fail(AuthLayer.GPS_LOCATION, 'Silent Presence Mode requires Location. Enable GPS and try again.'),
+        ...(locationPermissionRequired && { locationPermissionRequired: true }),
+      };
     }
 
     // ——— LAYER 4: GENESIS (resolve identity) ———
@@ -803,6 +986,7 @@ export async function resolveSovereignByPresence(
       identity,
       layersPassed,
       ...(silentModeUsed && { silentModeUsed: true }),
+      ...(locationPermissionRequired && { locationPermissionRequired: true }),
     };
   } catch (error) {
     console.error('Sovereign presence resolution failed:', error);

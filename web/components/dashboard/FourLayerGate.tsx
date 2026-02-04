@@ -11,6 +11,7 @@ import {
   type BiometricAuthResult,
   type PresencePillar,
   ensureVoiceAndMicReady,
+  startLocationRequestFromUserGesture,
   SCAN_TIMEOUT_MS,
 } from '@/lib/biometricAuth';
 import { PresenceProgressRing } from './PresenceProgressRing';
@@ -115,8 +116,26 @@ export function FourLayerGate() {
   const [pillarVoice, setPillarVoice] = useState(false);
   /** "Noisy environment detected. Switching to Silent Presence Mode..." */
   const [silentModeMessage, setSilentModeMessage] = useState<string | null>(null);
+  /** Location permission required — show gold popup to allow access */
+  const [showLocationPermissionPopup, setShowLocationPermissionPopup] = useState(false);
+  /** GPS taking >3s — show "Syncing with Local Mesh..." (indoor mode) */
+  const [gpsTakingLong, setGpsTakingLong] = useState(false);
   const router = useRouter();
   const { setPresenceVerified } = useGlobalPresenceGateway();
+
+  // Restore pillar state from localStorage so refresh doesn't require re-verifying HW/GPS
+  useEffect(() => {
+    if (!identityAnchor) return;
+    const PILLAR_CACHE_MS = 24 * 60 * 60 * 1000;
+    try {
+      const hwTs = localStorage.getItem('pff_pillar_hw_ts');
+      const locTs = localStorage.getItem('pff_pillar_location_ts');
+      if (hwTs && Date.now() - parseInt(hwTs, 10) < PILLAR_CACHE_MS) setPillarDevice(true);
+      if (locTs && Date.now() - parseInt(locTs, 10) < PILLAR_CACHE_MS) setPillarLocation(true);
+    } catch {
+      // ignore
+    }
+  }, [identityAnchor?.phone]);
 
   // Instant audio: start microphone listening the millisecond the gate page loads (zero lag on Start)
   useEffect(() => {
@@ -158,6 +177,13 @@ export function FourLayerGate() {
     return () => clearInterval(interval);
   }, []);
 
+  // When GPS pillar is active and scanning, after 3s show "Syncing with Local Mesh..." (indoor mode)
+  useEffect(() => {
+    if (currentLayer !== AuthLayer.GPS_LOCATION || authStatus !== AuthStatus.SCANNING) return;
+    const t = setTimeout(() => setGpsTakingLong(true), 3000);
+    return () => clearTimeout(t);
+  }, [currentLayer, authStatus]);
+
   const getLayerIcon = (layer: AuthLayer) => {
     switch (layer) {
       case AuthLayer.BIOMETRIC_SIGNATURE:
@@ -193,8 +219,11 @@ export function FourLayerGate() {
     }
   };
 
-  /** Scanning-state copy for Triple-Pillar sequence */
+  /** Scanning-state copy for Triple-Pillar sequence; GPS >3s shows indoor mode. */
   const getLayerScanningLabel = (layer: AuthLayer) => {
+    if (layer === AuthLayer.GPS_LOCATION && gpsTakingLong) {
+      return 'Syncing with Local Mesh...';
+    }
     switch (layer) {
       case AuthLayer.HARDWARE_TPM:
         return 'Scanning Device Signature...';
@@ -262,12 +291,15 @@ export function FourLayerGate() {
       navigator.vibrate([100, 50, 100, 50, 200]);
     }
 
+    startLocationRequestFromUserGesture();
+
     setAuthStatus(AuthStatus.SCANNING);
     setResult(null);
     setShowVerifyFromAuthorizedDevice(false);
     setShowTimeoutBypass(false);
     setVoiceLevel(0);
     setSilentModeMessage(null);
+    setGpsTakingLong(false);
     setPillarDevice(false);
     setPillarLocation(false);
     setPillarFace(false);
@@ -311,6 +343,7 @@ export function FourLayerGate() {
 
     setResult(authResult);
     setVoiceLevel(0);
+    if (authResult.locationPermissionRequired) setShowLocationPermissionPopup(true);
 
     if (authResult.timedOut) {
       setAuthStatus(AuthStatus.FAILED);
@@ -997,6 +1030,23 @@ export function FourLayerGate() {
                 </button>
                 <button type="button" onClick={() => setShowDebugModal(false)} className="px-4 py-2 rounded border" style={{ borderColor: 'rgba(212, 175, 55, 0.5)', color: '#a0a0a5' }}>Close</button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {showLocationPermissionPopup && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80" onClick={() => setShowLocationPermissionPopup(false)}>
+            <div className="bg-[#0d0d0f] border-2 rounded-xl p-6 max-w-md w-full shadow-xl text-center" style={{ borderColor: '#D4AF37', boxShadow: '0 0 40px rgba(212, 175, 55, 0.3)' }} onClick={(e) => e.stopPropagation()}>
+              <p className="text-lg font-bold mb-4" style={{ color: '#D4AF37' }}>The Mesh requires your Location to verify Presence.</p>
+              <p className="text-sm text-[#a0a0a5] mb-6">Allow access now in your browser settings, then tap Start again.</p>
+              <button
+                type="button"
+                onClick={() => setShowLocationPermissionPopup(false)}
+                className="w-full py-3 rounded-lg font-bold text-black uppercase tracking-wider"
+                style={{ background: '#D4AF37', boxShadow: '0 0 20px rgba(212, 175, 55, 0.5)' }}
+              >
+                OK
+              </button>
             </div>
           </div>
         )}
