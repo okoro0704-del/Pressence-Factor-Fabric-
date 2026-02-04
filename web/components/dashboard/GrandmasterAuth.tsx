@@ -143,7 +143,7 @@ export function GrandmasterAuth({ onAuthSuccess }: GrandmasterAuthProps) {
             <p className="text-3xl text-[#f5f5f5] font-semibold">{result.identity.full_name}</p>
             <p className="text-2xl text-[#6b6b70] font-mono">{result.phoneNumber}</p>
             <div className="pt-4">
-              <p className="text-xl text-green-400">Banking Access Granted</p>
+              <p className="text-xl text-green-400">Banking Access Authorized</p>
               <p className="text-5xl font-bold text-[#e8c547] mt-2">
                 {result.identity.spendable_vida.toFixed(2)} VIDA
               </p>

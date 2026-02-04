@@ -95,6 +95,23 @@ export async function storeRecoverySeed(
   }
 }
 
+/**
+ * Confirm that recovery_seed_encrypted was persisted (database has the column set).
+ * Call after storeRecoverySeed to ensure Success screen only shows once DB is updated.
+ */
+export async function confirmRecoverySeedStored(phoneNumber: string): Promise<boolean> {
+  const supabase = getSupabase();
+  if (!supabase) return false;
+  const { data, error } = await (supabase as any)
+    .from('user_profiles')
+    .select('recovery_seed_encrypted')
+    .eq('phone_number', phoneNumber.trim())
+    .maybeSingle();
+  if (error || !data) return false;
+  const val = data.recovery_seed_encrypted;
+  return typeof val === 'string' && val.length > 0;
+}
+
 /** Check if user has a recovery seed stored (hash present). */
 export async function hasRecoverySeed(phoneNumber: string): Promise<boolean> {
   const supabase = getSupabase();

@@ -61,7 +61,7 @@ import {
   pick3RandomIndices,
   verify3Words,
 } from '@/lib/recoverySeed';
-import { storeRecoverySeed, hasRecoverySeed } from '@/lib/recoverySeedStorage';
+import { storeRecoverySeed, hasRecoverySeed, confirmRecoverySeedStored } from '@/lib/recoverySeedStorage';
 import type { DeviceInfo } from '@/lib/multiDeviceVitalization';
 import { RecoverMyAccountScreen } from '@/components/auth/RecoverMyAccountScreen';
 
@@ -143,6 +143,7 @@ export function FourLayerGate() {
   const [showSeedVerification, setShowSeedVerification] = useState(false);
   const [verificationIndices, setVerificationIndices] = useState<number[]>([]);
   const [seedVerificationError, setSeedVerificationError] = useState<string | null>(null);
+  const [seedVerificationLoading, setSeedVerificationLoading] = useState(false);
   const [sacredRecordDeviceContext, setSacredRecordDeviceContext] = useState<{
     deviceInfo: DeviceInfo;
     compositeDeviceId: string;
@@ -805,28 +806,36 @@ export function FourLayerGate() {
     setShowSeedVerification(true);
   };
 
-  /** Seed verification passed — show Success shield "5 VIDA CAP SUCCESSFULLY MINTED" then on Continue store + assign + goToDashboard. */
-  const handleSeedVerificationPassed = (answers: string[]) => {
+  /** Seed verification passed — store seed, confirm DB has recovery_seed_encrypted, then show Success shield. */
+  const handleSeedVerificationPassed = async (answers: string[]) => {
     if (!identityAnchor || !generatedSeed || verificationIndices.length !== 3 || !sacredRecordDeviceContext) return;
     if (!verify3Words(generatedSeed, verificationIndices, answers)) {
       setSeedVerificationError('Words do not match. Check your Master Key and try again.');
       return;
     }
     setSeedVerificationError(null);
-    setShowSeedVerification(false);
-    setShowSeedSuccessShield(true);
+    setSeedVerificationLoading(true);
+    try {
+      const storeResult = await storeRecoverySeed(identityAnchor.phone, generatedSeed, identityAnchor.name);
+      if (!storeResult.ok) {
+        setSeedVerificationError(storeResult.error ?? 'Failed to save recovery seed.');
+        return;
+      }
+      const confirmed = await confirmRecoverySeedStored(identityAnchor.phone);
+      if (!confirmed) {
+        setSeedVerificationError('Recovery seed was not confirmed in the database. Try again or use Admin Schema Refresh.');
+        return;
+      }
+      setShowSeedVerification(false);
+      setShowSeedSuccessShield(true);
+    } finally {
+      setSeedVerificationLoading(false);
+    }
   };
 
-  /** After Success shield — store recovery seed, assign primary sentinel, proceed to dashboard. */
+  /** After Success shield — assign primary sentinel and proceed to dashboard (seed already stored and confirmed). */
   const handleSeedSuccessContinue = async () => {
-    if (!identityAnchor || !generatedSeed || !sacredRecordDeviceContext) return;
-    const storeResult = await storeRecoverySeed(identityAnchor.phone, generatedSeed, identityAnchor.name);
-    if (!storeResult.ok) {
-      setSeedVerificationError(storeResult.error ?? 'Failed to save recovery seed.');
-      setShowSeedSuccessShield(false);
-      setShowSeedVerification(true);
-      return;
-    }
+    if (!identityAnchor || !sacredRecordDeviceContext) return;
     const ctx = sacredRecordDeviceContext;
     setGeneratedSeed(null);
     setSacredRecordDeviceContext(null);
@@ -1058,6 +1067,7 @@ export function FourLayerGate() {
             setSeedVerificationError(null);
           }}
           error={seedVerificationError}
+          loading={seedVerificationLoading}
         />
       </div>
     );

@@ -42,7 +42,7 @@ export function DashboardContent() {
 
   const handlePresenceVerified = (identity: GlobalIdentity) => {
     // Show success notification
-    alert(`✓ SOVEREIGN IDENTITY VERIFIED: ${identity.full_name}\nAccess Granted`);
+    alert(`✓ SOVEREIGN IDENTITY VERIFIED: ${identity.full_name}\nAccess Authorized`);
     setShowPresenceModal(false);
 
     // In production, this would switch the dashboard to show the sovereign's data

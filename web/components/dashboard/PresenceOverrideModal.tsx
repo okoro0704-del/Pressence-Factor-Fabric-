@@ -122,7 +122,7 @@ export function PresenceOverrideModal({
             🔐 AUTHENTICATE DEPENDENT PRESENCE
           </h2>
           <p className="text-xl text-[#6b6b70]">
-            Scan biometric signature to grant temporary access
+            Scan biometric signature to authorize temporary access
           </p>
           {currentDeviceOwner && (
             <p className="text-sm text-[#3b82f6] font-mono">

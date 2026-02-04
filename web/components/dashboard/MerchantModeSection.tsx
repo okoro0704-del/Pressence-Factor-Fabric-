@@ -61,7 +61,7 @@ export function MerchantModeSection({ onMerchantModeChange }: MerchantModeSectio
     <section className="rounded-xl border border-[#2a2a2e] bg-[#16161a] p-4 mt-6">
       <h2 className="text-sm font-semibold text-[#c9a227] mb-2">Merchant Mode</h2>
       <p className="text-xs text-[#6b6b70] mb-3">
-        Accept VIDA payments from citizens. When on, a permanent QR linked to your wallet is shown; customers scan to pay from their $1,000 Liquid grant.
+        Accept VIDA payments from citizens. When on, a permanent QR linked to your wallet is shown; customers scan to pay from their Sovereign Liquidity (5 VIDA cap).
       </p>
       <div className="flex items-center gap-3 mb-3">
         <button

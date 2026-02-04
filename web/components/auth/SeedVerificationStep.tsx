@@ -7,12 +7,13 @@ interface SeedVerificationStepProps {
   onVerify: (answers: string[]) => void;
   onBack?: () => void;
   error?: string | null;
+  loading?: boolean;
 }
 
 /**
  * Verification Test — user must re-enter 3 random words from their seed to prove they wrote it down.
  */
-export function SeedVerificationStep({ indices, onVerify, onBack, error }: SeedVerificationStepProps) {
+export function SeedVerificationStep({ indices, onVerify, onBack, error, loading = false }: SeedVerificationStepProps) {
   const [answers, setAnswers] = useState<string[]>(['', '', '']);
 
   const handleChange = (i: number, value: string) => {
@@ -73,10 +74,10 @@ export function SeedVerificationStep({ indices, onVerify, onBack, error }: SeedV
           )}
           <button
             type="submit"
-            disabled={!allFilled}
+            disabled={!allFilled || loading}
             className="flex-1 py-3 rounded-xl bg-gradient-to-r from-[#c9a227] to-[#e8c547] text-black font-bold text-sm uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
           >
-            Verify
+            {loading ? 'Saving…' : 'Verify'}
           </button>
         </div>
       </form>
