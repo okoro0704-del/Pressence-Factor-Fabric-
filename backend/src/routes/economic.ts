@@ -8,6 +8,9 @@ import { requirePresenceToken, getPff } from '../middleware/pffAuth';
 import {
   getCitizenVidaCapBalance,
   getNationalReserve,
+  getTotalNationalReserveAccumulated,
+  getCitizenImpactFeed,
+  getTreasuryGrowthLastNDays,
 } from '../economic/vidaCap';
 import { issueVida, getCitizenVidaHistory, getTotalVidaInCirculation } from '../economic/vidaCurrency';
 import { processRecovery, getRecoveryHistory } from '../economic/recovery';
@@ -78,6 +81,102 @@ economicRouter.get('/vida-cap/reserve', async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       code: 'RESERVE_FETCH_FAILED',
+      message: err.message,
+    });
+  }
+});
+
+/**
+ * GET /economic/vida-cap/national-reserve-accumulated
+ * Government view: Total National Reserve Accumulated — sum of all 5 VIDA splits from every citizen (sovereign_mint_ledger).
+ */
+economicRouter.get('/vida-cap/national-reserve-accumulated', async (req: Request, res: Response) => {
+  try {
+    const total = await getTotalNationalReserveAccumulated();
+    res.status(200).json({
+      success: true,
+      totalNationalReserveAccumulated: total,
+    });
+  } catch (e) {
+    const err = e as Error;
+    res.status(500).json({
+      success: false,
+      code: 'RESERVE_ACCUMULATED_FETCH_FAILED',
+      message: err.message,
+    });
+  }
+});
+
+/**
+ * GET /economic/treasury/citizen-impact
+ * Government view: recent government_treasury_vault entries (3-of-4 verified → +5 VIDA).
+ */
+economicRouter.get('/treasury/citizen-impact', async (req: Request, res: Response) => {
+  try {
+    const limit = Math.min(parseInt((req.query.limit as string) || '50', 10), 100);
+    const rows = await getCitizenImpactFeed(limit);
+    res.status(200).json({
+      success: true,
+      entries: rows.map((r) => ({
+        id: r.id,
+        pffId: r.pff_id,
+        amountVida: r.amount_vida,
+        createdAt: r.created_at,
+        message: 'New Citizen Verified → +5.00 VIDA to Treasury',
+      })),
+    });
+  } catch (e) {
+    const err = e as Error;
+    res.status(500).json({
+      success: false,
+      code: 'CITIZEN_IMPACT_FETCH_FAILED',
+      message: err.message,
+    });
+  }
+});
+
+/**
+ * GET /economic/treasury/growth?days=30
+ * Treasury growth over last N days (daily cumulative).
+ */
+economicRouter.get('/treasury/growth', async (req: Request, res: Response) => {
+  try {
+    const days = Math.min(Math.max(parseInt((req.query.days as string) || '30', 10), 1), 365);
+    const rows = await getTreasuryGrowthLastNDays(days);
+    res.status(200).json({
+      success: true,
+      days: rows.map((r) => ({
+        date: r.date,
+        totalVida: r.total_vida,
+        cumulativeVida: r.cumulative_vida,
+      })),
+    });
+  } catch (e) {
+    const err = e as Error;
+    res.status(500).json({
+      success: false,
+      code: 'TREASURY_GROWTH_FETCH_FAILED',
+      message: err.message,
+    });
+  }
+});
+
+/**
+ * GET /economic/treasury/dllr-converted
+ * Placeholder: total DLLR converted by citizens in block (Sovryn bridge).
+ */
+economicRouter.get('/treasury/dllr-converted', async (req: Request, res: Response) => {
+  try {
+    // TODO: integrate Sovryn / bridge for real total
+    res.status(200).json({
+      success: true,
+      totalDllr: null,
+    });
+  } catch (e) {
+    const err = e as Error;
+    res.status(500).json({
+      success: false,
+      code: 'DLLR_FETCH_FAILED',
       message: err.message,
     });
   }
