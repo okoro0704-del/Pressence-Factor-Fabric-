@@ -217,7 +217,7 @@ export function UserProfileBalance() {
             <div>
               <p className="text-xs font-bold text-red-400 uppercase tracking-wider mb-1">Transaction Limit Notice</p>
               <p className="text-xs text-[#6b6b70] leading-relaxed">
-                Swap and Send are limited to <span className="font-mono text-emerald-400">Vault C — Available Cash</span>{' '}
+                Swap and Send are limited to <span className="font-mono text-emerald-400">Vault C — Sovereign Liquidity</span>{' '}
                 ({faceVerifiedForBalance ? availableCashUsd.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }) : '••••••'}).
                 Vault B (Future Wealth) unlocks at 1B users: <span className="font-mono text-red-400">"Asset Locked: Requires 1B User Milestone for Release."</span>
               </p>
@@ -227,56 +227,56 @@ export function UserProfileBalance() {
       </div>
 
       <div className="bg-[#16161a] rounded-xl p-6 border border-[#2a2a2e]">
-        <h3 className="text-sm font-semibold text-[#6b6b70] uppercase tracking-wider mb-4">50/50 National Handshake — Grant Breakdown</h3>
+        <h3 className="text-sm font-semibold text-[#6b6b70] uppercase tracking-wider mb-4">5 VIDA Minted Cap — Sovereign Liquidity</h3>
         <div className="space-y-4">
           <div className="p-4 bg-[#0d0d0f] rounded-lg border border-[#2a2a2e]">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-[#6b6b70]">Gross Sovereign Grant</span>
+              <span className="text-sm text-[#6b6b70]">Active Minting Cap (5 VIDA · $5,000)</span>
               <span className="text-xl font-bold text-[#c9a227]">
                 {faceVerifiedForBalance
-                  ? `${GROSS_SOVEREIGN_GRANT_VIDA.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VIDA · $10,000`
+                  ? `${GROSS_SOVEREIGN_GRANT_VIDA.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VIDA · $5,000`
                   : '•••••• VIDA · ••••••'}
               </span>
             </div>
-            <p className="text-xs text-[#6b6b70] mt-1">{faceVerifiedForBalance ? '$10,000 grant upon vitalization' : 'Verify face to view'}</p>
+            <p className="text-xs text-[#6b6b70] mt-1">{faceVerifiedForBalance ? '5 VIDA cap minted upon vitalization' : 'Verify face to view'}</p>
           </div>
 
           <div className="p-4 bg-[#0d0d0f] rounded-lg border border-[#2a2a2e]">
-            <p className="text-xs text-[#6b6b70] mb-3 uppercase tracking-wider">50% National Cut → National Reserve</p>
+            <p className="text-xs text-[#6b6b70] mb-3 uppercase tracking-wider">National Reserve</p>
             <div className="flex items-center justify-between">
               <span className="text-sm text-[#6b6b70]">Contribution to the Nation (not spendable)</span>
               <span className="text-base font-bold text-amber-400">
                 {faceVerifiedForBalance
-                  ? `${NATIONAL_CONTRIBUTION_VIDA.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VIDA · $5,000`
+                  ? `${NATIONAL_CONTRIBUTION_VIDA.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VIDA · $0`
                   : '•••••• VIDA · ••••••'}
               </span>
             </div>
           </div>
 
           <div className="p-4 bg-[#0d0d0f] rounded-lg border border-[#2a2a2e]">
-            <p className="text-xs text-[#6b6b70] mb-3 uppercase tracking-wider">Citizen&apos;s $5,000 — Tier 1 (Liquid) & Tier 2 (Sovereign Lock)</p>
+            <p className="text-xs text-[#6b6b70] mb-3 uppercase tracking-wider">5 VIDA split — Sovereign Liquidity & Secured</p>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-[#6b6b70]">Liquid (available after Sentinel)</span>
+                <span className="text-sm text-[#6b6b70]">Liquid (after Sentinel Network Fee 0.1 VIDA)</span>
                 <span className="text-base font-mono text-emerald-400">
                   {faceVerifiedForBalance ? `$1,000 − $${sentinelFeePaidUsd} = $${availableCashUsd.toLocaleString('en-US', { minimumFractionDigits: 0 })}` : '••••••'}
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-[#6b6b70]">Sovereign Lock (until 1B users)</span>
-                <span className="text-base font-bold text-[#6b6b70]">{faceVerifiedForBalance ? '$4,000' : '••••••'}</span>
+                <span className="text-sm text-[#6b6b70]">Secured/National (until 1B users)</span>
+                <span className="text-base font-bold text-[#6b6b70]">{faceVerifiedForBalance ? '$4,100' : '••••••'}</span>
               </div>
             </div>
           </div>
 
           <div className="p-4 bg-gradient-to-br from-emerald-900/20 to-emerald-800/10 rounded-lg border-2 border-emerald-500/50">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-bold text-emerald-400 uppercase tracking-wider">= Available Cash (Vault C)</span>
+              <span className="text-sm font-bold text-emerald-400 uppercase tracking-wider">= Sovereign Liquidity (Vault C)</span>
               <span className="text-2xl font-bold text-emerald-300" title={!faceVerifiedForBalance ? 'Verify face to view' : undefined}>
                 {faceVerifiedForBalance ? `$${availableCashUsd.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : '••••••'}
               </span>
             </div>
-            <p className="text-xs text-[#6b6b70] mt-1">{faceVerifiedForBalance ? '$1,000 Liquid minus Sentinel Activation fee' : 'Verify face (95%+ match) to view'}</p>
+            <p className="text-xs text-[#6b6b70] mt-1">{faceVerifiedForBalance ? 'Sentinel Network Fee: 0.1 VIDA to authorize minting protocol. Liquid after fee: $900.' : 'Verify face (95%+ match) to view'}</p>
           </div>
 
           <div className="p-4 bg-[#0d0d0f] rounded-lg border border-[#2a2a2e]">

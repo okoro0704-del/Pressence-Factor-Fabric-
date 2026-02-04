@@ -3,7 +3,7 @@
 import { useState } from 'react';
 
 const WARNING_TEXT =
-  "This is your Master Key. If you lose these 12 words, you lose access to your $10,000 forever. Never share this with anyone, including Hub owners.";
+  "These 12 words are the only way to recover your 5 VIDA Minted Cap if your device is lost. Never share this with anyone, including Hub owners.";
 
 interface SacredRecordScreenProps {
   words: string[];
@@ -57,7 +57,7 @@ export function SacredRecordScreen({ words, onAcknowledged }: SacredRecordScreen
           className="mt-1 rounded border-[#2a2a2e] text-[#e8c547] focus:ring-[#e8c547]"
         />
         <span className="text-sm text-[#a0a0a5]">
-          I have written these 12 words down in a safe place. I understand that losing them means losing access to my $10,000 forever and I will never share them with anyone.
+          I have written these 12 words down in a safe place. I understand that losing them means losing access to my 5 VIDA Minted Cap and I will never share them with anyone.
         </span>
       </label>
 

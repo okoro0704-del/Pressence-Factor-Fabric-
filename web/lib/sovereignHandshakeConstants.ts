@@ -1,6 +1,6 @@
 /**
- * Sovereign Handshake — 50/50 National Handshake model.
- * Aligns with lib/economic.ts: $10k grant → National $5k, Citizen $5k (Liquid $1k + Lock $4k).
+ * Sovereign Handshake — $5,000 Security Milestone.
+ * Aligns with lib/economic.ts: $5k grant → National $0, Citizen $5k (Liquid $1k → $900 after $100 Sentinel + Lock $4,100).
  * Sentinel Activation ($50/$100) deducted from Liquid; not a separate VIDA line.
  */
 

@@ -85,7 +85,7 @@ export function MerchantStoreSign({ walletAddress, onDownload }: MerchantStoreSi
       // Subtext
       ctx.fillStyle = '#6b6b70';
       ctx.font = '18px system-ui, sans-serif';
-      ctx.fillText('Scan to pay with VIDA from your Liquid Grant', W / 2, 620);
+      ctx.fillText('Scan to pay with VIDA from your Sovereign Liquidity', W / 2, 620);
 
       // Footer
       ctx.fillStyle = '#3d3d45';

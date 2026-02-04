@@ -123,7 +123,7 @@ export function DashboardContent() {
         ) : (
           <>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          {/* User Profile & Balance */}
+          {/* User Profile & Minted Cap / Sovereign Liquidity */}
           <div>
             <UserProfileBalance />
           </div>

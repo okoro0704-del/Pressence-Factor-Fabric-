@@ -147,6 +147,8 @@ export function FourLayerGate() {
     deviceInfo: DeviceInfo;
     compositeDeviceId: string;
   } | null>(null);
+  /** Success shield after 3-word verification: "5 VIDA CAP SUCCESSFULLY MINTED" in gold (minting press visual) */
+  const [showSeedSuccessShield, setShowSeedSuccessShield] = useState(false);
   const router = useRouter();
   const { setPresenceVerified } = useGlobalPresenceGateway();
 
@@ -309,6 +311,23 @@ export function FourLayerGate() {
 
   const biometricPendingRef = useRef(false);
 
+  /** Triple-Pillar success: Device + GPS + Face verified (no Voice). Transition to Success/Dashboard. */
+  const goToDashboard = useCallback(async () => {
+    if (!identityAnchor) return;
+    const signed = await hasSignedConstitution(identityAnchor.phone);
+    if (!signed) {
+      setShowConstitutionGate(true);
+      return;
+    }
+    await mintFoundationSeigniorage(identityAnchor.phone);
+    setIdentityAnchorForSession(identityAnchor.phone);
+    ensureGenesisIfEmpty(identityAnchor.phone, identityAnchor.name).catch(() => {});
+    setPresenceVerified(true);
+    setSessionIdentity(identityAnchor.phone);
+    await logGuestAccessIfNeeded();
+    setShowVaultAnimation(true);
+  }, [identityAnchor]);
+
   const handleStartAuthentication = useCallback(async () => {
     if (!identityAnchor) {
       alert('Identity anchor required. Please enter phone number first.');
@@ -388,6 +407,7 @@ export function FourLayerGate() {
       return;
     }
 
+    // Triple-Pillar success: Device + GPS + Face verified (no Voice). → goToDashboard().
     if (authResult.success && authResult.identity) {
       const isAuthorized = !isNewDevice;
 
@@ -434,18 +454,7 @@ export function FourLayerGate() {
           );
 
           console.log('✅ PRIMARY_SENTINEL assigned - check constitution then proceed');
-          const signed = await hasSignedConstitution(identityAnchor.phone);
-          if (!signed) {
-            setShowConstitutionGate(true);
-            return;
-          }
-          await mintFoundationSeigniorage(identityAnchor.phone);
-          setIdentityAnchorForSession(identityAnchor.phone);
-          ensureGenesisIfEmpty(identityAnchor.phone, identityAnchor.name).catch(() => {});
-          setPresenceVerified(true);
-          setSessionIdentity(identityAnchor.phone);
-          await logGuestAccessIfNeeded();
-          setShowVaultAnimation(true);
+          await goToDashboard();
           return;
         }
 
@@ -480,22 +489,8 @@ export function FourLayerGate() {
 
       await updateDeviceLastUsed(compositeDeviceId);
 
-      // Constitution must be signed before grant
-      const signed = await hasSignedConstitution(identityAnchor.phone);
-      if (!signed) {
-        setShowConstitutionGate(true);
-        return;
-      }
-      // Foundation Seigniorage: dual-mint (10 VIDA user, 1 VIDA foundation) when gate clears
-      await mintFoundationSeigniorage(identityAnchor.phone);
-
-      // Proceed to dashboard
-      setIdentityAnchorForSession(identityAnchor.phone);
-      ensureGenesisIfEmpty(identityAnchor.phone, identityAnchor.name).catch(() => {});
-      setPresenceVerified(true);
-      setSessionIdentity(identityAnchor.phone);
-      await logGuestAccessIfNeeded();
-      setShowVaultAnimation(true);
+      // Triple-Pillar success (Device + GPS + Face): go to dashboard — no Voice step
+      await goToDashboard();
     } else {
       setAuthStatus(AuthStatus.FAILED);
       const deviceInfo = getCurrentDeviceInfo();
@@ -531,7 +526,7 @@ export function FourLayerGate() {
     } finally {
       biometricPendingRef.current = false;
     }
-  }, [identityAnchor]);
+  }, [identityAnchor, goToDashboard]);
 
   const handleMismatchDismiss = () => {
     setShowMismatchScreen(false);
@@ -544,7 +539,6 @@ export function FourLayerGate() {
   };
 
   const handleVaultAnimationComplete = () => {
-    // Redirect to dashboard after vault animation
     router.push('/dashboard');
   };
 
@@ -811,23 +805,32 @@ export function FourLayerGate() {
     setShowSeedVerification(true);
   };
 
-  /** Seed verification passed — store recovery seed then assign primary sentinel and proceed. */
-  const handleSeedVerificationPassed = async (answers: string[]) => {
+  /** Seed verification passed — show Success shield "5 VIDA CAP SUCCESSFULLY MINTED" then on Continue store + assign + goToDashboard. */
+  const handleSeedVerificationPassed = (answers: string[]) => {
     if (!identityAnchor || !generatedSeed || verificationIndices.length !== 3 || !sacredRecordDeviceContext) return;
     if (!verify3Words(generatedSeed, verificationIndices, answers)) {
       setSeedVerificationError('Words do not match. Check your Master Key and try again.');
       return;
     }
     setSeedVerificationError(null);
+    setShowSeedVerification(false);
+    setShowSeedSuccessShield(true);
+  };
+
+  /** After Success shield — store recovery seed, assign primary sentinel, proceed to dashboard. */
+  const handleSeedSuccessContinue = async () => {
+    if (!identityAnchor || !generatedSeed || !sacredRecordDeviceContext) return;
     const storeResult = await storeRecoverySeed(identityAnchor.phone, generatedSeed, identityAnchor.name);
     if (!storeResult.ok) {
       setSeedVerificationError(storeResult.error ?? 'Failed to save recovery seed.');
+      setShowSeedSuccessShield(false);
+      setShowSeedVerification(true);
       return;
     }
     const ctx = sacredRecordDeviceContext;
     setGeneratedSeed(null);
-    setShowSeedVerification(false);
     setSacredRecordDeviceContext(null);
+    setShowSeedSuccessShield(false);
 
     const { deviceInfo, compositeDeviceId } = ctx;
     const ipAddress = 'unknown';
@@ -988,6 +991,55 @@ export function FourLayerGate() {
     );
   }
 
+  // Success shield — minting press: "5 VIDA CAP SUCCESSFULLY MINTED" in gold
+  if (showSeedSuccessShield && identityAnchor) {
+    return (
+      <div className="min-h-screen bg-[#050505] flex items-center justify-center p-4">
+        <div
+          className="absolute inset-0 opacity-30 pointer-events-none"
+          style={{ background: 'radial-gradient(ellipse 80% 50% at 50% 30%, rgba(212, 175, 55, 0.25) 0%, rgba(92, 71, 22, 0.1) 40%, rgba(5, 5, 5, 0) 70%)' }}
+          aria-hidden
+        />
+        <div
+          className="relative z-10 rounded-2xl border-2 p-8 max-w-md w-full text-center overflow-hidden"
+          style={{
+            background: 'linear-gradient(180deg, rgba(30, 28, 22, 0.98) 0%, rgba(15, 14, 10, 0.99) 100%)',
+            borderColor: 'rgba(212, 175, 55, 0.6)',
+            boxShadow: '0 0 60px rgba(212, 175, 55, 0.25), inset 0 1px 0 rgba(212, 175, 55, 0.15)',
+          }}
+        >
+          {/* Minting press / digital forge: stamp drops onto 5 VIDA plate */}
+          <div className="relative flex flex-col items-center mb-6 h-24" aria-hidden>
+            <motion.div
+              className="absolute left-1/2 -translate-x-1/2 w-24 h-4 rounded-b-lg bg-gradient-to-b from-[#4a4035] to-[#2a2520] border-x-2 border-b-2 border-[#D4AF37]/50 z-10"
+              style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.7)' }}
+              initial={{ y: -32 }}
+              animate={{ y: 0 }}
+              transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+            />
+            <div className="absolute bottom-0 w-36 h-14 rounded-lg flex items-center justify-center border-2 border-[#D4AF37]/60 bg-gradient-to-b from-[#2a2520] to-[#1a1815]" style={{ boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.5), 0 4px 16px rgba(212,175,55,0.25)' }}>
+              <span className="text-xl font-bold font-mono text-[#D4AF37] tracking-tight">5 VIDA</span>
+            </div>
+          </div>
+          <h2 className={`text-2xl font-bold uppercase tracking-wider mb-4 ${jetbrains.className}`} style={{ color: '#D4AF37' }}>
+            5 VIDA CAP SUCCESSFULLY MINTED
+          </h2>
+          <p className="text-sm text-[#a0a0a5] mb-8">
+            Your Master Key is verified. Continue to complete device binding and access your dashboard.
+          </p>
+          <button
+            type="button"
+            onClick={handleSeedSuccessContinue}
+            className="w-full py-4 rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#C9A227] hover:from-[#e8c547] hover:to-[#D4AF37] text-black font-bold text-lg uppercase tracking-wider transition-all cursor-pointer"
+            style={{ boxShadow: '0 0 30px rgba(212, 175, 55, 0.5)' }}
+          >
+            Continue
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // Seed Verification — 3 random words before finishing registration
   if (showSeedVerification && identityAnchor && verificationIndices.length === 3) {
     return (
@@ -1129,12 +1181,12 @@ export function FourLayerGate() {
           />
         </div>
         <button
-          type="button"
-          onClick={() => setShowRecoverFlow(true)}
-          className="mt-3 text-sm font-medium text-[#e8c547] hover:text-[#c9a227] transition-colors underline"
-        >
-          Recover My Account (lost device)
-        </button>
+            type="button"
+            onClick={() => setShowRecoverFlow(true)}
+            className="mt-3 text-sm font-medium text-[#e8c547] hover:text-[#c9a227] transition-colors underline"
+          >
+            Lost Device? Recover Account
+          </button>
         <button
           type="button"
           onClick={handleDebugInfo}
@@ -1293,9 +1345,17 @@ export function FourLayerGate() {
               <span>Scanning…</span>
             </>
           ) : (
-            <>🔓 Begin Authentication</>
+            <>⚒ Finalize Minting</>
           )}
         </motion.button>
+
+        <button
+          type="button"
+          onClick={() => setShowRecoverFlow(true)}
+          className="relative z-50 mt-3 w-full text-sm font-medium text-[#e8c547] hover:text-[#c9a227] transition-colors underline"
+        >
+          Lost Device? Recover Account
+        </button>
 
         <button
           type="button"
@@ -1331,7 +1391,7 @@ export function FourLayerGate() {
             <div className="bg-[#0d0d0f] border-2 rounded-xl p-6 max-w-md w-full shadow-xl text-center" style={{ borderColor: '#D4AF37', boxShadow: '0 0 40px rgba(212, 175, 55, 0.3)' }} onClick={(e) => e.stopPropagation()}>
               <p className="text-lg font-bold mb-4" style={{ color: '#D4AF37' }}>Location Blocked by Browser</p>
               <p className="text-sm text-[#a0a0a5] mb-6">
-                Please click the Lock icon in your address bar and select &quot;Allow Location&quot; to claim your $1,000.
+                Please click the Lock icon in your address bar and select &quot;Allow Location&quot; to authorize the minting protocol and finalize your 5 VIDA cap.
               </p>
               <button
                 type="button"

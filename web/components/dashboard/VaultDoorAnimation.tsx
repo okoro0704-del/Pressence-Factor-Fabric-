@@ -145,7 +145,7 @@ export function VaultDoorAnimation({ onComplete }: VaultDoorAnimationProps) {
             <p className="text-sm text-[#6b6b70]">
               {stage === 'locking' && 'Initializing biometric lock...'}
               {stage === 'unlocking' && '4-Layer authentication complete'}
-              {stage === 'opening' && 'Granting total sovereign command...'}
+              {stage === 'opening' && 'Minting protocol complete — sovereign command...'}
               {stage === 'complete' && 'The Simulation Ends Here.'}
             </p>
           </div>

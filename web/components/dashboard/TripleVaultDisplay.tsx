@@ -42,12 +42,18 @@ export function TripleVaultDisplay({
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
         </svg>
         <h3 className="text-sm font-semibold text-[#e8c547] uppercase tracking-wider">
-          Triple Vault — 50/50 National Handshake
+          Triple Vault — 5 VIDA Active Minting Cap
         </h3>
         <svg className="w-5 h-5 text-[#e8c547]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
         </svg>
       </div>
+      {faceVerified && (
+        <div className="mb-4 p-3 bg-[#c9a227]/10 border border-[#c9a227]/40 rounded-lg flex items-center justify-between">
+          <span className="text-xs font-bold text-[#e8c547] uppercase tracking-wider">Active minting cap (5 VIDA)</span>
+          <span className="text-lg font-bold font-mono text-[#e8c547]">{formatUsd(summary.primarySecuredUsd)}</span>
+        </div>
+      )}
 
       {/* Vault A — Gold: National Reserve */}
       <div className="relative bg-gradient-to-br from-amber-600/25 via-[#c9a227]/20 to-amber-800/15 rounded-xl p-5 border-2 border-amber-500/50 overflow-hidden">
@@ -89,7 +95,7 @@ export function TripleVaultDisplay({
         <div className="absolute -top-10 -right-10 w-32 h-32 bg-emerald-400/20 rounded-full blur-3xl" />
         <div className="relative z-10">
           <div className="flex items-center justify-between mb-2">
-            <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wider">Vault C — Available Cash</h4>
+            <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wider">Vault C — Sovereign Liquidity</h4>
             <span className="text-xs font-mono text-emerald-400 bg-emerald-500/20 px-2 py-1 rounded">AVAILABLE NOW</span>
           </div>
           <div className="flex items-baseline gap-2">
@@ -103,7 +109,7 @@ export function TripleVaultDisplay({
             )}
           </div>
           <p className="text-[10px] text-[#6b6b70] mt-2 uppercase tracking-wide">
-            Liquid $1,000 minus Sentinel Activation fee
+            Sentinel Network Fee: 0.1 VIDA to authorize minting protocol. Liquid after fee: $900.
           </p>
         </div>
       </div>
