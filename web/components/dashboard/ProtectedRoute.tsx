@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useGlobalPresenceGateway } from '@/contexts/GlobalPresenceGateway';
 
 interface ProtectedRouteProps {
@@ -17,6 +17,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { isPresenceVerified, loading } = useGlobalPresenceGateway();
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
@@ -31,14 +32,16 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
       return;
     }
 
-    // Redirect to gate if not verified
+    // Redirect to gate if not verified; preserve ?next= so after login we can send user to intended page (e.g. architect)
     if (!isPresenceVerified) {
       console.warn('[ProtectedRoute] Presence not verified, redirecting to gate');
-      router.push('/');
+      const next = searchParams.get('next') || pathname;
+      const gateUrl = next && next !== '/' ? `/?next=${encodeURIComponent(next)}` : '/';
+      router.push(gateUrl);
     } else {
       setIsChecking(false);
     }
-  }, [isPresenceVerified, loading, pathname, router]);
+  }, [isPresenceVerified, loading, pathname, router, searchParams]);
 
   // Show loading state while checking
   if (loading || isChecking) {

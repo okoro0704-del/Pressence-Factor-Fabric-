@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { JetBrains_Mono } from 'next/font/google';
 import {
@@ -46,7 +46,7 @@ import {
 import { maskPhoneForDisplay } from '@/lib/phoneMask';
 import { mintFoundationSeigniorage } from '@/lib/foundationSeigniorage';
 import { hasSignedConstitution } from '@/lib/legalApprovals';
-import { setIdentityAnchorForSession, isSentinelActive } from '@/lib/sentinelActivation';
+import { setIdentityAnchorForSession, getIdentityAnchorPhone, isSentinelActive } from '@/lib/sentinelActivation';
 import { getCurrentUserRole, setRoleCookie, canAccessMaster, canAccessGovernment, getProfileWithPrimarySentinel } from '@/lib/roleAuth';
 import { ensureGenesisIfEmpty } from '@/lib/auth';
 import { SovereignConstitution } from '@/components/auth/SovereignConstitution';
@@ -154,6 +154,7 @@ export function FourLayerGate() {
   /** Success shield after 3-word verification: "5 VIDA CAP SUCCESSFULLY MINTED" in gold (minting press visual) */
   const [showSeedSuccessShield, setShowSeedSuccessShield] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { setPresenceVerified } = useGlobalPresenceGateway();
 
   // Restore pillar state from localStorage so refresh doesn't require re-verifying HW/GPS
@@ -170,7 +171,7 @@ export function FourLayerGate() {
     }
   }, [identityAnchor?.phone]);
 
-  // Hydration sync + restore language/identity from storage so remount doesn't bounce back to language (e.g. during "Verifying presence")
+  // Hydration sync + restore language/identity so redirect from architect (or any protected route) doesn't bounce back to language
   useEffect(() => {
     setMounted(true);
     console.log('Interaction Layer Active', '(FourLayerGate)');
@@ -178,7 +179,7 @@ export function FourLayerGate() {
     const storedLang = getStoredLanguage();
     if (storedLang) setLanguageConfirmed(storedLang);
     try {
-      const raw = sessionStorage.getItem(GATE_IDENTITY_STORAGE_KEY);
+      const raw = sessionStorage.getItem(GATE_IDENTITY_STORAGE_KEY) || localStorage.getItem(GATE_IDENTITY_STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as { phone: string; name: string; vocalExempt?: boolean; isMinor?: boolean; guardianPhone?: string; isDependent?: boolean };
         if (parsed?.phone && parsed?.name) {
@@ -190,7 +191,19 @@ export function FourLayerGate() {
             guardianPhone: parsed.guardianPhone,
             isDependent: parsed.isDependent,
           });
+          return;
         }
+      }
+      const savedPhone = getIdentityAnchorPhone();
+      if (savedPhone) {
+        setIdentityAnchor({
+          phone: savedPhone,
+          name: 'Sovereign',
+          vocalExempt: undefined,
+          isMinor: undefined,
+          guardianPhone: undefined,
+          isDependent: undefined,
+        });
       }
     } catch {
       // ignore invalid stored identity
@@ -334,7 +347,9 @@ export function FourLayerGate() {
     };
     setIdentityAnchor(anchor);
     try {
-      sessionStorage.setItem(GATE_IDENTITY_STORAGE_KEY, JSON.stringify(anchor));
+      const json = JSON.stringify(anchor);
+      sessionStorage.setItem(GATE_IDENTITY_STORAGE_KEY, json);
+      localStorage.setItem(GATE_IDENTITY_STORAGE_KEY, json);
     } catch {
       // ignore
     }
@@ -570,7 +585,12 @@ export function FourLayerGate() {
   };
 
   const handleVaultAnimationComplete = () => {
-    router.push('/dashboard');
+    const next = searchParams.get('next');
+    if (next && typeof next === 'string' && next.startsWith('/') && !next.startsWith('//')) {
+      router.push(next);
+    } else {
+      router.push('/dashboard');
+    }
   };
 
   const handleDebugInfo = async () => {

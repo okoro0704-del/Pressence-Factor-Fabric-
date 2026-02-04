@@ -5,6 +5,12 @@ import { useRouter, usePathname } from 'next/navigation';
 import { getIdentityAnchorPhone } from '@/lib/sentinelActivation';
 import { getCurrentUserRole, setRoleCookie, canAccessMaster, logAdminAction } from '@/lib/roleAuth';
 
+/** Preserve intended destination so after login we can redirect to architect (or other) page. */
+function getDashboardRedirectWithNext(pathname: string): string {
+  const next = pathname?.startsWith('/') ? pathname : '/master/command-center';
+  return `/dashboard?next=${encodeURIComponent(next)}`;
+}
+
 const DEV_BACKDOOR_KEY = 'pff_dev_backdoor_secret';
 
 /**
@@ -45,7 +51,7 @@ export function MasterArchitectGuard({ children }: MasterArchitectGuardProps) {
     const identityAnchor = getIdentityAnchorPhone();
     if (!identityAnchor) {
       setAllowed(false);
-      router.replace('/dashboard?unauthorized=1');
+      router.replace(getDashboardRedirectWithNext(pathname || '/master/command-center') + '&unauthorized=1');
       return;
     }
     getCurrentUserRole(identityAnchor).then((role) => {
@@ -55,7 +61,7 @@ export function MasterArchitectGuard({ children }: MasterArchitectGuardProps) {
         setRoleCookie(role);
         logAdminAction({ actor_identity_anchor: identityAnchor, action_type: 'MASTER_VIEW' });
       }
-      if (!ok) router.replace('/dashboard?unauthorized=1');
+      if (!ok) router.replace(getDashboardRedirectWithNext(pathname || '/master/command-center') + '&unauthorized=1');
     });
   }, [pathname, router]);
 
