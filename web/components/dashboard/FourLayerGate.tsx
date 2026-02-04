@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { motion } from 'framer-motion';
 import { JetBrains_Mono } from 'next/font/google';
 import {
   resolveSovereignByPresence,
@@ -39,6 +40,10 @@ import {
 } from '@/lib/multiDeviceVitalization';
 import { maskPhoneForDisplay } from '@/lib/phoneMask';
 import { mintFoundationSeigniorage } from '@/lib/foundationSeigniorage';
+import { hasSignedConstitution } from '@/lib/legalApprovals';
+import { setIdentityAnchorForSession, isSentinelActive } from '@/lib/sentinelActivation';
+import { getCurrentUserRole, setRoleCookie, canAccessMaster, canAccessGovernment } from '@/lib/roleAuth';
+import { SovereignConstitution } from '@/components/auth/SovereignConstitution';
 
 const jetbrains = JetBrains_Mono({ weight: ['400', '600', '700'], subsets: ['latin'] });
 
@@ -49,11 +54,21 @@ const jetbrains = JetBrains_Mono({ weight: ['400', '600', '700'], subsets: ['lat
  * No access to any page without completing all 4 layers
  */
 export function FourLayerGate() {
+  const [mounted, setMounted] = useState(false);
   const [authStatus, setAuthStatus] = useState<AuthStatus>(AuthStatus.IDLE);
   const [currentLayer, setCurrentLayer] = useState<AuthLayer | null>(null);
   const [result, setResult] = useState<BiometricAuthResult | null>(null);
   const [showVaultAnimation, setShowVaultAnimation] = useState(false);
-  const [identityAnchor, setIdentityAnchor] = useState<{ phone: string; name: string; vocalExempt?: boolean; isMinor?: boolean } | null>(null);
+  const [identityAnchor, setIdentityAnchor] = useState<{
+    phone: string;
+    name: string;
+    vocalExempt?: boolean;
+    isMinor?: boolean;
+    guardianPhone?: string;
+    isDependent?: boolean;
+  } | null>(null);
+  /** Dependent flow: show "Guardian Authorization Detected. Sentinel Secure." and skip full biometric. */
+  const [showGuardianAuthorizationBypass, setShowGuardianAuthorizationBypass] = useState(false);
   /** PRE-VITALIZATION: Confirm Language → Vocal Instruction → Identity Anchor (always show before login) */
   const [languageConfirmed, setLanguageConfirmed] = useState<LanguageCode | null>(null);
   const [showVocalInstruction, setShowVocalInstruction] = useState(false);
@@ -76,12 +91,24 @@ export function FourLayerGate() {
   const [guardianRecoveryRequestId, setGuardianRecoveryRequestId] = useState<string | null>(null);
   /** DEVICE HANDSHAKE: true when login failed on new/unrecognized device — show "Verify from an authorized device" */
   const [showVerifyFromAuthorizedDevice, setShowVerifyFromAuthorizedDevice] = useState(false);
+  /** Admin Portal: 3-of-4 biometric for admin; only MASTER_ARCHITECT or GOVERNMENT_ADMIN can open panel */
+  const [adminPortalScanning, setAdminPortalScanning] = useState(false);
+  const [adminPortalError, setAdminPortalError] = useState<string | null>(null);
+  /** Sovereign Constitution Entry Gate: must sign constitution before 10 VIDA mint; re-sign if version changed */
+  const [showConstitutionGate, setShowConstitutionGate] = useState(false);
   const router = useRouter();
   const { setPresenceVerified } = useGlobalPresenceGateway();
+
+  // Hydration sync: only become interactive after client has fully mounted
+  useEffect(() => {
+    setMounted(true);
+    console.log('Interaction Layer Active', '(FourLayerGate)');
+  }, []);
 
   // ZERO-PERSISTENCE SESSION INITIALIZATION
   // Reset to Layer 1 on every entry (app initialization or foreground)
   useEffect(() => {
+    if (!mounted) return;
     console.log('🔐 Initializing Zero-Persistence Session Management');
 
     // Initialize zero-persistence session management
@@ -94,7 +121,7 @@ export function FourLayerGate() {
     setSessionStatus(getSessionStatus());
 
     console.log('✅ Session reset to Layer 1 - All 4 layers required');
-  }, []);
+  }, [mounted]);
 
   // Update session status periodically
   useEffect(() => {
@@ -153,7 +180,13 @@ export function FourLayerGate() {
   };
 
   /** KILL AUTO-VERIFY: Only transition to biometric scan step. Verification happens only after real-time hardware scan. */
-  const handleAnchorVerified = (payload: { phoneNumber: string; fullName: string; identity?: BiometricIdentityRecord }) => {
+  const handleAnchorVerified = (payload: {
+    phoneNumber: string;
+    fullName: string;
+    identity?: BiometricIdentityRecord;
+    guardianPhone?: string;
+    isDependent?: boolean;
+  }) => {
     const vocalExempt = payload.identity ? isVocalResonanceExempt(payload.identity) : false;
     const isMinor = payload.identity ? isIdentityMinor(payload.identity) : false;
     setIdentityAnchor({
@@ -161,20 +194,40 @@ export function FourLayerGate() {
       name: payload.fullName,
       vocalExempt,
       isMinor,
+      guardianPhone: payload.guardianPhone,
+      isDependent: payload.isDependent === true,
     });
   };
 
-  const handleStartAuthentication = async () => {
+  const biometricPendingRef = useRef(false);
+
+  const handleStartAuthentication = useCallback(async () => {
     if (!identityAnchor) {
       alert('Identity anchor required. Please enter phone number first.');
       return;
     }
+    if (biometricPendingRef.current) return;
+    biometricPendingRef.current = true;
 
     setAuthStatus(AuthStatus.SCANNING);
     setResult(null);
     setShowVerifyFromAuthorizedDevice(false);
 
-    const deviceInfo = getCurrentDeviceInfo();
+    try {
+      // DEPENDENT BYPASS: Guardian Authorization — skip Voice/Face resonance; inherit Sentinel from Guardian.
+      if (identityAnchor.isDependent && identityAnchor.guardianPhone) {
+        const guardianSentinelActive = await isSentinelActive(identityAnchor.guardianPhone);
+        if (guardianSentinelActive) {
+          setShowGuardianAuthorizationBypass(true);
+          setAuthStatus(AuthStatus.IDLE);
+          return;
+        }
+        setAuthStatus(AuthStatus.IDLE);
+        alert('Your guardian must activate their Sentinel to unlock your wallet. Ask them to complete activation at /sentinel.');
+        return;
+      }
+
+      const deviceInfo = getCurrentDeviceInfo();
     const isNewDevice = !(await isDeviceAuthorized(identityAnchor.phone, deviceInfo.deviceId));
     const authResult = await resolveSovereignByPresence(
       identityAnchor.phone,
@@ -225,8 +278,14 @@ export function FourLayerGate() {
             geolocation
           );
 
-          console.log('✅ PRIMARY_SENTINEL assigned - proceeding to dashboard');
+          console.log('✅ PRIMARY_SENTINEL assigned - check constitution then proceed');
+          const signed = await hasSignedConstitution(identityAnchor.phone);
+          if (!signed) {
+            setShowConstitutionGate(true);
+            return;
+          }
           await mintFoundationSeigniorage(identityAnchor.phone);
+          setIdentityAnchorForSession(identityAnchor.phone);
           setPresenceVerified(true);
           setShowVaultAnimation(true);
           return;
@@ -264,10 +323,17 @@ export function FourLayerGate() {
       // Device is authorized - update last used timestamp
       await updateDeviceLastUsed(deviceInfo.deviceId);
 
+      // Constitution must be signed before grant
+      const signed = await hasSignedConstitution(identityAnchor.phone);
+      if (!signed) {
+        setShowConstitutionGate(true);
+        return;
+      }
       // Foundation Seigniorage: dual-mint (10 VIDA user, 1 VIDA foundation) when gate clears
       await mintFoundationSeigniorage(identityAnchor.phone);
 
       // Proceed to dashboard
+      setIdentityAnchorForSession(identityAnchor.phone);
       setPresenceVerified(true);
       setShowVaultAnimation(true);
     } else {
@@ -301,7 +367,10 @@ export function FourLayerGate() {
       });
       setShowMismatchScreen(true);
     }
-  };
+    } finally {
+      biometricPendingRef.current = false;
+    }
+  }, [identityAnchor]);
 
   const handleMismatchDismiss = () => {
     setShowMismatchScreen(false);
@@ -318,9 +387,16 @@ export function FourLayerGate() {
   };
 
   const handleVitalizationApproved = async () => {
-    console.log('✅ Vitalization approved - transitioning to dashboard');
+    console.log('✅ Vitalization approved - check constitution then proceed');
     setShowAwaitingAuth(false);
-    if (identityAnchor) await mintFoundationSeigniorage(identityAnchor.phone);
+    if (!identityAnchor) return;
+    const signed = await hasSignedConstitution(identityAnchor.phone);
+    if (!signed) {
+      setShowConstitutionGate(true);
+      return;
+    }
+    await mintFoundationSeigniorage(identityAnchor.phone);
+    setIdentityAnchorForSession(identityAnchor.phone);
     setPresenceVerified(true);
     setShowVaultAnimation(true);
   };
@@ -359,6 +435,44 @@ export function FourLayerGate() {
     setShowGuardianRecovery(true);
   };
 
+  /** Admin Portal: 3-of-4 biometric scan; only MASTER_ARCHITECT or GOVERNMENT_ADMIN can open panel */
+  const handleAdminPortalClick = async () => {
+    if (!identityAnchor) return;
+    setAdminPortalError(null);
+    setAdminPortalScanning(true);
+    try {
+      const authResult = await resolveSovereignByPresence(
+        identityAnchor.phone,
+        (layer, status) => {
+          setCurrentLayer(layer);
+          setAuthStatus(status);
+        },
+        { skipVoiceLayer: identityAnchor.vocalExempt === true, requireAllLayers: false }
+      );
+      if (authResult.success && authResult.identity) {
+        const role = await getCurrentUserRole(identityAnchor.phone);
+        setRoleCookie(role);
+        if (canAccessMaster(role)) {
+          router.push('/master/dashboard');
+          return;
+        }
+        if (canAccessGovernment(role)) {
+          router.push('/government/treasury');
+          return;
+        }
+        setAdminPortalError('Unauthorized Access. Only MASTER_ARCHITECT or GOVERNMENT_ADMIN can open the Admin Portal.');
+      } else {
+        setAdminPortalError('Biometric verification failed. Access denied.');
+      }
+    } catch {
+      setAdminPortalError('Verification failed. Access denied.');
+    } finally {
+      setAdminPortalScanning(false);
+      setAuthStatus(AuthStatus.IDLE);
+      setCurrentLayer(null);
+    }
+  };
+
   const handleGuardianRecoveryRequestCreated = (requestId: string) => {
     console.log('✅ Guardian recovery request created:', requestId);
     setGuardianRecoveryRequestId(requestId);
@@ -375,10 +489,17 @@ export function FourLayerGate() {
   };
 
   const handleGuardianRecoveryApproved = async () => {
-    console.log('✅ Guardian recovery approved - new primary device assigned');
+    console.log('✅ Guardian recovery approved - check constitution then proceed');
     setShowGuardianRecoveryStatus(false);
     setGuardianRecoveryRequestId(null);
-    if (identityAnchor) await mintFoundationSeigniorage(identityAnchor.phone);
+    if (!identityAnchor) return;
+    const signed = await hasSignedConstitution(identityAnchor.phone);
+    if (!signed) {
+      setShowConstitutionGate(true);
+      return;
+    }
+    await mintFoundationSeigniorage(identityAnchor.phone);
+    setIdentityAnchorForSession(identityAnchor.phone);
     setPresenceVerified(true);
     setShowVaultAnimation(true);
   };
@@ -402,6 +523,88 @@ export function FourLayerGate() {
     setCurrentLayer(null);
     setResult(null);
   };
+
+  /** Dependent flow: user confirmed "Guardian Authorization Detected. Sentinel Secure." — proceed to dashboard. */
+  const handleGuardianAuthorizationConfirm = async () => {
+    if (!identityAnchor) return;
+    setShowGuardianAuthorizationBypass(false);
+    const signed = await hasSignedConstitution(identityAnchor.phone);
+    if (!signed) {
+      setShowConstitutionGate(true);
+      return;
+    }
+    await mintFoundationSeigniorage(identityAnchor.phone);
+    setIdentityAnchorForSession(identityAnchor.phone);
+    setPresenceVerified(true);
+    setShowVaultAnimation(true);
+  };
+
+  /** After Biometric Signature on Sovereign Constitution — record already done in component; mint and proceed. */
+  const handleConstitutionAccepted = async () => {
+    if (!identityAnchor) return;
+    setShowConstitutionGate(false);
+    await mintFoundationSeigniorage(identityAnchor.phone);
+    setIdentityAnchorForSession(identityAnchor.phone);
+    setPresenceVerified(true);
+    setShowVaultAnimation(true);
+  };
+
+  // Avoid rendering interactive content until mounted (prevents hydration mismatch / unresponsive UI)
+  if (!mounted) {
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center bg-[#050505]"
+        style={{ color: '#6b6b70' }}
+        aria-busy="true"
+        aria-live="polite"
+      >
+        <p className="text-sm">Loading...</p>
+      </div>
+    );
+  }
+
+  // DEPENDENT BYPASS: Guardian Authorization Detected — skip Voice/Face; Sentinel inherited from Guardian.
+  if (showGuardianAuthorizationBypass && identityAnchor) {
+    return (
+      <div className="min-h-screen bg-[#050505] flex items-center justify-center p-4">
+        <div
+          className="rounded-2xl border p-8 max-w-md w-full text-center"
+          style={{
+            background: 'linear-gradient(135deg, rgba(212, 175, 55, 0.08) 0%, rgba(0, 0, 0, 0.9) 100%)',
+            borderColor: 'rgba(212, 175, 55, 0.4)',
+            boxShadow: '0 0 60px rgba(212, 175, 55, 0.2)',
+          }}
+        >
+          <div className="text-6xl mb-6">🛡️</div>
+          <h2 className={`text-2xl font-bold text-[#D4AF37] uppercase tracking-wider mb-4 ${jetbrains.className}`}>
+            Guardian Authorization Detected. Sentinel Secure.
+          </h2>
+          <p className="text-sm text-[#a0a0a5] mb-6">
+            Your guardian&apos;s Sentinel is active. Voice/Face resonance check bypassed. Proceeding with secure access.
+          </p>
+          <button
+            type="button"
+            onClick={handleGuardianAuthorizationConfirm}
+            className="relative z-50 w-full py-4 rounded-lg bg-gradient-to-r from-[#D4AF37] to-[#C9A227] hover:from-[#e8c547] hover:to-[#D4AF37] text-black font-bold text-lg uppercase tracking-wider transition-all duration-300 cursor-pointer"
+            style={{ boxShadow: '0 0 30px rgba(212, 175, 55, 0.5)' }}
+          >
+            Continue to Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Sovereign Constitution Entry Gate — must sign (Biometric Signature) before 10 VIDA mint; re-sign if version changed
+  if (showConstitutionGate && identityAnchor) {
+    return (
+      <SovereignConstitution
+        identityAnchorPhone={identityAnchor.phone}
+        skipVoiceLayer={identityAnchor.vocalExempt === true}
+        onAccept={handleConstitutionAccepted}
+      />
+    );
+  }
 
   // Show "Awaiting Master Authorization" screen (secondary device)
   if (showAwaitingAuth && vitalizationRequestId && primaryDeviceInfo) {
@@ -438,10 +641,11 @@ export function FourLayerGate() {
 
   const screenBg = (
     <div
-      className="absolute inset-0 opacity-20"
+      className="absolute inset-0 opacity-20 pointer-events-none"
       style={{
         background: 'radial-gradient(circle at center, rgba(212, 175, 55, 0.2) 0%, rgba(5, 5, 5, 0) 70%)',
       }}
+      aria-hidden="true"
     />
   );
 
@@ -490,20 +694,21 @@ export function FourLayerGate() {
   }
 
   return (
-    <div className="min-h-screen bg-[#050505] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#050505] flex items-center justify-center p-4 relative">
       {/* 4/4 Layers Verified Status Bar */}
       <LayerStatusBar />
 
-      {/* Background Glow */}
+      {/* Background Glow — pointer-events-none so it does not block clicks */}
       <div
-        className="absolute inset-0 opacity-20"
+        className="absolute inset-0 opacity-20 pointer-events-none"
         style={{
           background: 'radial-gradient(circle at center, rgba(212, 175, 55, 0.2) 0%, rgba(5, 5, 5, 0) 70%)',
         }}
+        aria-hidden="true"
       />
 
-      {/* Main Gate Container */}
-      <div className="relative max-w-2xl w-full">
+      {/* Main Gate Container — z-10 so buttons receive clicks above background */}
+      <div className="relative z-10 max-w-2xl w-full">
         {/* Identity Anchor Display */}
         <div
           className="rounded-lg border p-4 mb-6"
@@ -580,23 +785,28 @@ export function FourLayerGate() {
           })}
         </div>
 
-        {/* Authentication Button or Status */}
-        {authStatus === AuthStatus.IDLE && (
-          <button
-            onClick={handleStartAuthentication}
-            className="w-full py-6 rounded-lg bg-gradient-to-r from-[#D4AF37] to-[#C9A227] hover:from-[#e8c547] hover:to-[#D4AF37] text-black font-bold text-xl uppercase tracking-wider transition-all duration-300"
-            style={{ boxShadow: '0 0 40px rgba(212, 175, 55, 0.6)' }}
-          >
-            🔓 Begin Authentication
-          </button>
-        )}
-
-        {authStatus === AuthStatus.SCANNING && (
-          <div className="text-center py-6">
-            <div className="text-4xl mb-4 animate-spin">⚡</div>
-            <p className="text-[#D4AF37] font-bold text-lg">Scanning...</p>
-          </div>
-        )}
+        {/* Authentication Button — spinner inside on first click (debounced); z-50 above mesh */}
+        <motion.button
+          type="button"
+          onClick={handleStartAuthentication}
+          disabled={authStatus === AuthStatus.SCANNING}
+          className="relative z-50 w-full min-h-[48px] py-4 px-6 rounded-lg bg-gradient-to-r from-[#D4AF37] to-[#C9A227] hover:from-[#e8c547] hover:to-[#D4AF37] text-black font-bold text-xl uppercase tracking-wider transition-all duration-300 disabled:opacity-90 disabled:pointer-events-none flex items-center justify-center gap-3 touch-manipulation cursor-pointer"
+          style={{ boxShadow: '0 0 40px rgba(212, 175, 55, 0.6)' }}
+          whileTap={{ scale: 0.98 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+        >
+          {authStatus === AuthStatus.SCANNING ? (
+            <>
+              <svg className="w-6 h-6 animate-spin shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+              <span>Scanning…</span>
+            </>
+          ) : (
+            <>🔓 Begin Authentication</>
+          )}
+        </motion.button>
 
         {authStatus === AuthStatus.FAILED && result && (
           <div className="p-6 rounded-lg bg-red-500/10 border-2 border-red-500">
@@ -604,15 +814,17 @@ export function FourLayerGate() {
             <p className="text-sm text-[#6b6b70] text-center mb-4">{result.errorMessage}</p>
             <div className="flex flex-col gap-3">
               <button
+                type="button"
                 onClick={handleStartAuthentication}
-                className="w-full py-3 rounded-lg bg-red-500 hover:bg-red-600 text-white font-bold uppercase tracking-wider transition-all duration-300"
+                className="relative z-50 w-full py-3 rounded-lg bg-red-500 hover:bg-red-600 text-white font-bold uppercase tracking-wider transition-all duration-300 cursor-pointer"
               >
                 Retry
               </button>
               {showVerifyFromAuthorizedDevice && (
                 <button
+                  type="button"
                   onClick={handleVerifyFromAuthorizedDevice}
-                  className="w-full py-3 rounded-lg border-2 border-[#D4AF37] text-[#D4AF37] font-bold uppercase tracking-wider transition-all duration-300 hover:bg-[#D4AF37]/10"
+                  className="relative z-50 w-full py-3 rounded-lg border-2 border-[#D4AF37] text-[#D4AF37] font-bold uppercase tracking-wider transition-all duration-300 hover:bg-[#D4AF37]/10 cursor-pointer"
                 >
                   Verify from an authorized device
                 </button>
@@ -629,6 +841,19 @@ export function FourLayerGate() {
           <p className="text-xs text-[#4a4a4e] mt-1">
             Architect: Isreal Okoro (mrfundzman)
           </p>
+          <button
+            type="button"
+            onClick={handleAdminPortalClick}
+            disabled={adminPortalScanning}
+            className="relative z-50 mt-4 text-[10px] text-[#4a4a4e] hover:text-[#6b6b70] underline underline-offset-2 transition-colors disabled:opacity-50 cursor-pointer"
+          >
+            {adminPortalScanning ? 'Verifying...' : 'Admin Portal'}
+          </button>
+          {adminPortalError && (
+            <p className="mt-2 text-xs text-red-500 max-w-sm mx-auto" role="alert">
+              {adminPortalError}
+            </p>
+          )}
         </div>
       </div>
 

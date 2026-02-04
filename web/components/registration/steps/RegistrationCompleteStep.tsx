@@ -81,7 +81,7 @@ export function RegistrationCompleteStep({ identity, dependents, onFinish }: Reg
             </span>
           </div>
           <div className="flex items-center justify-between text-sm">
-            <span style={{ color: '#6b6b70' }}>Fundzman by UBA Account:</span>
+            <span style={{ color: '#6b6b70' }}>PFF Sovereign Account:</span>
             <span className="font-bold" style={{ color: '#D4AF37' }}>
               Auto-Created ✓
             </span>
@@ -155,7 +155,7 @@ export function RegistrationCompleteStep({ identity, dependents, onFinish }: Reg
           </div>
           <div className="flex items-start gap-2">
             <span>•</span>
-            <span>Link additional bank accounts via Fundzman by UBA integration</span>
+            <span>Link additional bank accounts via Presence Factor Fabric (PFF) integration</span>
           </div>
           <div className="flex items-start gap-2">
             <span>•</span>

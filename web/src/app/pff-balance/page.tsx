@@ -8,7 +8,7 @@ import { PFFBalanceDashboard } from '@/components/dashboard/PFFBalanceDashboard'
  * 
  * Features:
  * - Total PFF Balance (Grand Total with Heavy Gold Glow)
- * - Fundzman by UBA Default Account (Pre-Activated National Block)
+ * - PFF Sovereign Default Account (Pre-Activated National Block)
  * - Legacy Bank Account Linking (GTB, Zenith, Access, etc.)
  * - National Scale Ticker (220M Active Sovereign Nodes)
  * - UI Hierarchy: Primary → Secondary → Tertiary
@@ -62,11 +62,11 @@ export default function PFFBalancePage() {
               </div>
               <p className="text-sm text-[#a0a0a5] leading-relaxed">
                 The <span className="font-bold text-[#e8c547]">Ultimate Truth</span> of your wealth. 
-                Aggregates Fundzman by UBA + Legacy Accounts + 20% Spendable VIDA Value with heavy gold glow styling.
+                Aggregates PFF Sovereign + Legacy Accounts + 20% Spendable VIDA Value with heavy gold glow styling.
               </p>
               <div className="bg-[#0d0d0f] rounded-lg p-3 border border-[#2a2a2e]">
                 <code className="text-xs text-[#00ff41] font-mono">
-                  PFF = Fundzman + Legacy + VIDA
+                  PFF = PFF Sovereign + Legacy + VIDA
                 </code>
               </div>
             </div>
@@ -75,17 +75,17 @@ export default function PFFBalancePage() {
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <span className="text-2xl">🏦</span>
-                <h3 className="text-lg font-bold text-[#f5f5f5]">Fundzman by UBA Default</h3>
+                <h3 className="text-lg font-bold text-[#f5f5f5]">PFF Sovereign Default</h3>
               </div>
               <p className="text-sm text-[#a0a0a5] leading-relaxed">
-                Every user gets a <span className="font-bold text-[#EE3124]">Pre-Activated National Block Account</span> automatically. 
-                Zero setup, instant access, backed by UBA Liquidity Bridge.
+                Every user gets a <span className="font-bold text-[#D4AF37]">Pre-Activated National Block Account</span> automatically. 
+                Zero setup, instant access, backed by Presence Factor Fabric.
               </p>
               <div className="flex gap-2">
                 <span className="px-2 py-1 bg-[#00ff41]/20 text-[#00ff41] text-xs font-bold rounded border border-[#00ff41]/30">
                   PRE-ACTIVATED
                 </span>
-                <span className="px-2 py-1 bg-[#EE3124]/20 text-[#EE3124] text-xs font-bold rounded border border-[#EE3124]/30">
+                <span className="px-2 py-1 bg-[#D4AF37]/20 text-[#D4AF37] text-xs font-bold rounded border border-[#D4AF37]/30">
                   SOVEREIGN
                 </span>
               </div>
@@ -114,7 +114,7 @@ export default function PFFBalancePage() {
               </div>
               <p className="text-sm text-[#a0a0a5] leading-relaxed">
                 Live display of <span className="font-bold text-[#e8c547]">220,000,000 Active Sovereign Nodes</span> powered 
-                by UBA Liquidity Bridge. Real-time network stats and uptime monitoring.
+                by Presence Factor Fabric. Real-time network stats and uptime monitoring.
               </p>
               <div className="flex gap-2">
                 <span className="px-2 py-1 bg-[#00ff41]/20 text-[#00ff41] text-xs font-bold rounded border border-[#00ff41]/30">
@@ -131,7 +131,7 @@ export default function PFFBalancePage() {
               </div>
               <p className="text-sm text-[#a0a0a5] leading-relaxed">
                 Clear visual hierarchy: <span className="font-bold text-[#e8c547]">Primary</span> (Total PFF), 
-                <span className="font-bold text-[#EE3124]"> Secondary</span> (Fundzman by UBA), 
+                <span className="font-bold text-[#D4AF37]"> Secondary</span> (PFF Sovereign), 
                 <span className="font-bold text-[#6b6b70]"> Tertiary</span> (Legacy Accounts).
               </p>
             </div>

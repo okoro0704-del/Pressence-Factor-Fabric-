@@ -54,9 +54,10 @@ async function mintVidaCap(pffId: string): Promise<VidaCapResult> {
   // Simulate API delay
   await new Promise((resolve) => setTimeout(resolve, 500));
 
-  const totalMinted = 1.0; // 1 VIDA CAP per Vitalization
-  const citizenShare = totalMinted * 0.5; // 50%
-  const nationalReserveShare = totalMinted * 0.5; // 50%
+  const totalMinted = 10; // Sovereign Handshake: 10 VIDA grant per Vitalization
+  const citizenShare = 4.98;   // Sovereign Handshake: user_wallet
+  const nationalReserveShare = 5.0;   // government_treasury_vault
+  const sentinelShare = 0.02; // sentinel_business_ledger
   const transactionHash = `tx_${Date.now()}_${Math.random().toString(36).slice(2, 16)}`;
 
   return {
@@ -66,6 +67,8 @@ async function mintVidaCap(pffId: string): Promise<VidaCapResult> {
       totalMinted,
       citizenShare,
       nationalReserveShare,
+      sentinelShare,
+      batchId: `batch_${Date.now()}`,
       transactionHash,
     },
   };

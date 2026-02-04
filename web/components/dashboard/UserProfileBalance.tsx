@@ -9,6 +9,19 @@ import { PresenceOverrideModal } from './PresenceOverrideModal';
 import { GenesisHandshakeIndicator } from './GenesisHandshakeIndicator';
 import { checkPresenceVerified } from '@/lib/withPresenceCheck';
 import type { GlobalIdentity } from '@/lib/phoneIdentity';
+import { getIdentityAnchorPhone } from '@/lib/sentinelActivation';
+import { hasActiveSentinelLicense } from '@/lib/sentinelLicensing';
+import { getSentinelTokenVerified } from '@/lib/sentinelSecurityToken';
+import { SentinelActivationOverlay } from './SentinelActivationOverlay';
+import {
+  GROSS_SOVEREIGN_GRANT_VIDA,
+  NATIONAL_CONTRIBUTION_VIDA,
+  SECURITY_ACTIVATION_VIDA,
+  NET_SPENDABLE_VIDA,
+  VIDA_PRICE_USD,
+  NAIRA_RATE,
+  NET_SPENDABLE_USD,
+} from '@/lib/sovereignHandshakeConstants';
 
 export function UserProfileBalance() {
   const [vaultData, setVaultData] = useState<CitizenVault | null>(null);
@@ -16,12 +29,10 @@ export function UserProfileBalance() {
   const [showSendVida, setShowSendVida] = useState(false);
   const [showPresenceModal, setShowPresenceModal] = useState(false);
   const [isPresenceVerified, setIsPresenceVerified] = useState(false);
+  const [hasLicense, setHasLicense] = useState(false);
+  const [tokenVerified, setTokenVerified] = useState(false);
+  const sentinelVerified = hasLicense && tokenVerified;
 
-  const TOTAL_MINTED_CAP = 10;
-  const ARCHITECT_SHARE = 5;
-  const STATE_SHARE = 5;
-  const VIDA_PRICE_USD = 1000;
-  const NAIRA_RATE = 1400;
   const SPENDABLE_PERCENT = 0.20;
   const LOCKED_PERCENT = 0.80;
   const MILESTONE_TARGET = 1000000000;
@@ -37,10 +48,10 @@ export function UserProfileBalance() {
         owner: mockData.owner || 'Isreal Okoro',
         alias: mockData.alias || 'mrfundzman',
         status: mockData.status || 'VITALIZED',
-        total_vida_cap_minted: TOTAL_MINTED_CAP,
-        personal_share_50: ARCHITECT_SHARE,
-        state_contribution_50: STATE_SHARE,
-        spendable_balance_vida: ARCHITECT_SHARE * SPENDABLE_PERCENT,
+        total_vida_cap_minted: GROSS_SOVEREIGN_GRANT_VIDA,
+        personal_share_50: NET_SPENDABLE_VIDA,
+        state_contribution_50: NATIONAL_CONTRIBUTION_VIDA,
+        spendable_balance_vida: NET_SPENDABLE_VIDA * SPENDABLE_PERCENT,
         linked_bank_accounts: mockData.linked_bank_accounts || [],
       });
       setLoading(false);
@@ -56,10 +67,20 @@ export function UserProfileBalance() {
       setIsPresenceVerified(result.verified);
     };
     checkPresence();
-    
-    // Recheck every 30 seconds
     const interval = setInterval(checkPresence, 30000);
     return () => clearInterval(interval);
+  }, []);
+
+  // Sentinel Verified = active license + security token verified (re-check on focus)
+  useEffect(() => {
+    const check = () => {
+      setTokenVerified(getSentinelTokenVerified());
+      const phone = getIdentityAnchorPhone();
+      if (phone) hasActiveSentinelLicense(phone).then(setHasLicense);
+    };
+    check();
+    window.addEventListener('focus', check);
+    return () => window.removeEventListener('focus', check);
   }, []);
 
   const handlePresenceVerified = (identity: GlobalIdentity) => {
@@ -68,15 +89,16 @@ export function UserProfileBalance() {
   };
 
   const handleSwapClick = () => {
+    if (!sentinelVerified) return;
     if (!isPresenceVerified) {
       setShowPresenceModal(true);
     } else {
-      // TODO: Implement swap functionality
       console.log('Swap clicked');
     }
   };
 
   const handleSendClick = () => {
+    if (!sentinelVerified) return;
     if (!isPresenceVerified) {
       setShowPresenceModal(true);
     } else {
@@ -95,8 +117,8 @@ export function UserProfileBalance() {
     );
   }
 
-  const liquidVida = ARCHITECT_SHARE * SPENDABLE_PERCENT;
-  const lockedVida = ARCHITECT_SHARE * LOCKED_PERCENT;
+  const liquidVida = NET_SPENDABLE_VIDA * SPENDABLE_PERCENT;
+  const lockedVida = NET_SPENDABLE_VIDA * LOCKED_PERCENT;
   const liquidUSD = liquidVida * VIDA_PRICE_USD;
   const liquidNaira = liquidVida * VIDA_PRICE_USD * NAIRA_RATE;
   const lockedUSD = lockedVida * VIDA_PRICE_USD;
@@ -223,23 +245,30 @@ export function UserProfileBalance() {
           </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 mb-6">
-          <button
-            onClick={handleSwapClick}
-            disabled={!isPresenceVerified}
-            className={`relative bg-gradient-to-br from-[#c9a227]/30 to-[#e8c547]/20 hover:from-[#c9a227]/40 hover:to-[#e8c547]/30 text-[#e8c547] font-bold py-3 px-4 rounded-lg border border-[#c9a227]/50 transition-all duration-300 group ${!isPresenceVerified ? 'opacity-50 cursor-not-allowed' : ''}`}
-          >
-            <span className="relative z-10 text-sm uppercase tracking-wider">Swap</span>
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[#e8c547]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-          </button>
-          <button
-            onClick={handleSendClick}
-            disabled={!isPresenceVerified}
-            className={`relative bg-gradient-to-br from-[#c9a227]/30 to-[#e8c547]/20 hover:from-[#c9a227]/40 hover:to-[#e8c547]/30 text-[#e8c547] font-bold py-3 px-4 rounded-lg border border-[#c9a227]/50 transition-all duration-300 group ${!isPresenceVerified ? 'opacity-50 cursor-not-allowed' : ''}`}
-          >
-            <span className="relative z-10 text-sm uppercase tracking-wider">📤 Send</span>
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[#e8c547]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-          </button>
+        <div className={`relative rounded-xl mb-6 transition-all duration-300 ${!sentinelVerified ? 'select-none' : ''}`}>
+          <SentinelActivationOverlay
+            show={!sentinelVerified}
+            subtitle="Activate your Sentinel at the Sentinel Vault to enable Swap and Send."
+            onVerified={() => setTokenVerified(true)}
+          />
+          <div className={`grid grid-cols-2 gap-3 ${!sentinelVerified ? 'pointer-events-none blur-[2px]' : ''}`}>
+            <button
+              onClick={handleSwapClick}
+              disabled={!isPresenceVerified || !sentinelVerified}
+              className={`relative bg-gradient-to-br from-[#c9a227]/30 to-[#e8c547]/20 hover:from-[#c9a227]/40 hover:to-[#e8c547]/30 text-[#e8c547] font-bold py-3 px-4 rounded-lg border border-[#c9a227]/50 transition-all duration-300 group ${!isPresenceVerified || !sentinelVerified ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              <span className="relative z-10 text-sm uppercase tracking-wider">Swap</span>
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[#e8c547]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            </button>
+            <button
+              onClick={handleSendClick}
+              disabled={!isPresenceVerified || !sentinelVerified}
+              className={`relative bg-gradient-to-br from-[#c9a227]/30 to-[#e8c547]/20 hover:from-[#c9a227]/40 hover:to-[#e8c547]/30 text-[#e8c547] font-bold py-3 px-4 rounded-lg border border-[#c9a227]/50 transition-all duration-300 group ${!isPresenceVerified || !sentinelVerified ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              <span className="relative z-10 text-sm uppercase tracking-wider">📤 Send</span>
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[#e8c547]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            </button>
+          </div>
         </div>
 
         <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
@@ -261,39 +290,55 @@ export function UserProfileBalance() {
       </div>
 
       <div className="bg-[#16161a] rounded-xl p-6 border border-[#2a2a2e]">
-        <h3 className="text-sm font-semibold text-[#6b6b70] uppercase tracking-wider mb-4">Vault Summary</h3>
+        <h3 className="text-sm font-semibold text-[#6b6b70] uppercase tracking-wider mb-4">Sovereign Grant Breakdown</h3>
         <div className="space-y-4">
           <div className="p-4 bg-[#0d0d0f] rounded-lg border border-[#2a2a2e]">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-[#6b6b70]">Total VIDA CAP Minted</span>
+              <span className="text-sm text-[#6b6b70]">Gross Sovereign Grant</span>
+              <span className="text-xl font-bold text-[#c9a227]">
+                {GROSS_SOVEREIGN_GRANT_VIDA.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VIDA
+              </span>
             </div>
-            <p className="text-2xl font-bold text-[#c9a227]">
-              {TOTAL_MINTED_CAP.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </p>
-            <p className="text-xs text-[#6b6b70] mt-1">10 VIDA CAP Total Supply</p>
+            <p className="text-xs text-[#6b6b70] mt-1">10 VIDA grant ($10,000) upon verification</p>
           </div>
 
           <div className="p-4 bg-[#0d0d0f] rounded-lg border border-[#2a2a2e]">
-            <p className="text-xs text-[#6b6b70] mb-3 uppercase tracking-wider">50/50 Split</p>
-            <div className="space-y-3">
+            <p className="text-xs text-[#6b6b70] mb-3 uppercase tracking-wider">Deductions</p>
+            <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-[#6b6b70]">Your Share (50%)</span>
-                <span className="text-base font-bold text-[#e8c547]">
-                  {vaultData.personal_share_50.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VIDA CAP
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-[#6b6b70]">Naira Equivalent</span>
-                <span className="text-sm font-mono text-[#00ff41]">
-                  ₦{yourShareNaira.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
-              </div>
-              <div className="flex items-center justify-between pt-2 border-t border-[#2a2a2e]">
-                <span className="text-sm text-[#6b6b70]">State Contribution (50%)</span>
+                <span className="text-sm text-[#6b6b70]">− National Contribution</span>
                 <span className="text-base font-bold text-[#6b6b70]">
-                  {vaultData.state_contribution_50.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VIDA CAP
+                  {NATIONAL_CONTRIBUTION_VIDA.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VIDA
                 </span>
               </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-[#6b6b70]">− Security Activation</span>
+                <span className="text-base font-bold text-[#6b6b70]">
+                  {SECURITY_ACTIVATION_VIDA.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VIDA
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-4 bg-gradient-to-br from-[#c9a227]/20 to-[#e8c547]/10 rounded-lg border-2 border-[#c9a227]/50">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-bold text-[#e8c547] uppercase tracking-wider">= Net Spendable</span>
+              <span className="text-2xl font-bold text-[#e8c547]">
+                {NET_SPENDABLE_VIDA.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VIDA
+              </span>
+            </div>
+            <p className="text-sm font-mono text-[#e8c547]">
+              ${NET_SPENDABLE_USD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </p>
+            <p className="text-xs text-[#6b6b70] mt-1">Your share after National Contribution and Security Activation</p>
+          </div>
+
+          <div className="p-4 bg-[#0d0d0f] rounded-lg border border-[#2a2a2e]">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-[#6b6b70]">Naira Equivalent (Net Spendable)</span>
+              <span className="text-sm font-mono text-[#00ff41]">
+                ₦{yourShareNaira.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
             </div>
           </div>
         </div>

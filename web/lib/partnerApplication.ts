@@ -31,7 +31,7 @@ export interface SubmitPartnerApplicationInput {
   consent_privacy: boolean;
 }
 
-/** Submit a partner application. Saves with status PENDING_REVIEW. */
+/** Submit a partner application. Saves with status PENDING_REVIEW. Respects Master Switch (partner applications enabled). */
 export async function submitPartnerApplication(
   input: SubmitPartnerApplicationInput
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
@@ -40,6 +40,17 @@ export async function submitPartnerApplication(
     return { ok: false, error: 'Both 5% Corporate Royalty and Sovereign Privacy Agreement must be accepted' };
   }
   try {
+    // Master Switch: reject if new partner applications are disabled (maintenance)
+    const switchRes = await fetch('/api/master/partner-applications-enabled');
+    if (switchRes.ok) {
+      const switchData = await switchRes.json();
+      if (switchData?.enabled === false) {
+        return {
+          ok: false,
+          error: 'Partner applications are temporarily disabled for system maintenance. Please try again later.',
+        };
+      }
+    }
     const { data, error } = await (supabase as any)
       .from('pff_partner_applications')
       .insert({
@@ -88,6 +99,12 @@ export async function listPartnerApplications(): Promise<PartnerApplicationRow[]
   } catch {
     return [];
   }
+}
+
+/** List only APPROVED partners (for Certified PFF Partners grid). */
+export async function getApprovedPartners(): Promise<PartnerApplicationRow[]> {
+  const all = await listPartnerApplications();
+  return all.filter((a) => a.status === 'APPROVED');
 }
 
 /** Generate a secure PFF API key (for approved partners). */

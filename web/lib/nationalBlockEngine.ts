@@ -3,6 +3,7 @@
  * Every National Block automatically deducts 3% of total gross inflow before
  * distributing any VIDA or DLLR to local citizens or government.
  * Applied in Priority Lock simultaneously with Corporate 2% before any other splits.
+ * Deduction mapping: 3% National Block Levy applies to all funds, including Dependent accounts.
  */
 
 import { supabase } from './supabase';

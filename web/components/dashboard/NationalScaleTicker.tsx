@@ -8,7 +8,7 @@ interface NationalScaleTickerProps {
 
 /**
  * NATIONAL SCALE TICKER
- * Bottom ticker showing active sovereign nodes powered by UBA Liquidity Bridge
+ * Bottom ticker showing active sovereign nodes — Presence Factor Fabric
  */
 export function NationalScaleTicker({ activeSovereignNodes = 220_000_000 }: NationalScaleTickerProps) {
   const [isVisible, setIsVisible] = useState(true);
@@ -70,11 +70,11 @@ export function NationalScaleTicker({ activeSovereignNodes = 220_000_000 }: Nati
           {/* Center: UBA Liquidity Bridge */}
           <div className="hidden md:flex items-center gap-3 px-6 py-2 bg-[#EE3124]/10 border border-[#EE3124]/30 rounded-lg backdrop-blur-sm">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#EE3124]/30 to-[#EE3124]/10 backdrop-blur-md border border-[#EE3124]/50 flex items-center justify-center">
-              <span className="text-sm font-black text-[#EE3124]">UBA</span>
+              <span className="text-sm font-black text-[#D4AF37]">PFF</span>
             </div>
             <div>
               <p className="text-xs font-bold text-[#EE3124] uppercase tracking-wider">Powered by</p>
-              <p className="text-sm font-bold text-[#f5f5f5]">UBA Liquidity Bridge</p>
+              <p className="text-sm font-bold text-[#f5f5f5]">Presence Factor Fabric</p>
             </div>
           </div>
 
@@ -115,7 +115,7 @@ export function NationalScaleTicker({ activeSovereignNodes = 220_000_000 }: Nati
       <div className="md:hidden relative z-10 px-4 py-3 border-t border-[#2a2a2e]">
         <div className="flex items-center justify-center gap-2 text-center">
           <span className="text-xs text-[#6b6b70]">Powered by</span>
-          <span className="text-xs font-bold text-[#EE3124]">UBA Liquidity Bridge</span>
+          <span className="text-xs font-bold text-[#D4AF37]">Presence Factor Fabric</span>
           <span className="text-xs text-[#6b6b70]">•</span>
           <span className="text-xs text-[#00ff41]">99.99% Uptime</span>
         </div>

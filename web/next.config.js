@@ -3,6 +3,9 @@ const nextConfig = {
   // Static export
   output: 'export',
 
+  // Mark static export build so API routes can return stubs without reading request (cookies)
+  env: { NEXT_STATIC_EXPORT: '1' },
+
   // Trailing slash for Netlify static hosting
   trailingSlash: true,
 
@@ -17,11 +20,6 @@ const nextConfig = {
   // Disable TypeScript errors during build
   typescript: {
     ignoreBuildErrors: true,
-  },
-
-  // Disable ESLint during build
-  eslint: {
-    ignoreDuringBuilds: true,
   },
 };
 

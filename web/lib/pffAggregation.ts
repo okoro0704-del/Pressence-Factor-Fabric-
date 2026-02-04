@@ -1,6 +1,6 @@
 /**
  * PFF BALANCE AGGREGATION SYSTEM
- * Calculates Total PFF Balance = (Fundzman by UBA) + (External Accounts) + (20% Spendable VIDA Value)
+ * Calculates Total PFF Balance = (PFF Sovereign Account) + (External Accounts) + (20% Spendable VIDA Value)
  * Architect: Isreal Okoro (mrfundzman)
  */
 
@@ -27,7 +27,7 @@ export const NIGERIAN_LEGACY_BANKS = [
 
 // Account Types
 export enum AccountCategory {
-  FUNDZMAN_UBA = 'FUNDZMAN_UBA', // Primary sovereign account
+  PFF_SOVEREIGN = 'PFF_SOVEREIGN', // Primary sovereign account (Presence Factor Fabric)
   LEGACY_BANK = 'LEGACY_BANK', // External linked accounts
   VIDA_VAULT = 'VIDA_VAULT', // Spendable VIDA converted to Naira
 }
@@ -48,8 +48,8 @@ export interface BankAccount {
 
 // PFF Balance Breakdown
 export interface PFFBalanceBreakdown {
-  // Primary Account
-  fundzmanByUBA: {
+  // Primary Account (PFF Sovereign)
+  pffSovereign: {
     balance_naira: number;
     account_number: string;
     status: 'PRE_ACTIVATED' | 'ACTIVE';
@@ -94,7 +94,7 @@ export function calculatePFFBalance(
   const totalPFFBalance = fundzmanBalance + legacyAccountsTotal + vidaNairaEquivalent;
   
   return {
-    fundzmanByUBA: {
+    pffSovereign: {
       balance_naira: fundzmanBalance,
       account_number: '2200000001', // Auto-generated sovereign account
       status: 'PRE_ACTIVATED',
@@ -111,17 +111,17 @@ export function calculatePFFBalance(
 }
 
 /**
- * Create Fundzman by UBA Default Account
+ * Create PFF Sovereign default account (Presence Factor Fabric)
  */
-export function createFundzmanDefaultAccount(phoneNumber: string): BankAccount {
+export function createPFFDefaultAccount(phoneNumber: string): BankAccount {
   return {
     id: crypto.randomUUID(),
-    category: AccountCategory.FUNDZMAN_UBA,
-    bank_code: 'UBA',
-    bank_name: 'United Bank for Africa',
+    category: AccountCategory.PFF_SOVEREIGN,
+    bank_code: 'PFF',
+    bank_name: 'Presence Factor Fabric',
     account_number: '2200000001', // Auto-generated from phone hash
-    account_name: 'Fundzman Sovereign Account',
-    balance_naira: 0, // Starts at 0, funded through VIDA transfers
+    account_name: 'PFF Sovereign Account',
+    balance_naira: 0,
     is_primary: true,
     status: 'ACTIVE',
     created_at: new Date().toISOString(),

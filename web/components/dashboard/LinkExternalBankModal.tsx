@@ -12,7 +12,7 @@ interface LinkExternalBankModalProps {
 
 /**
  * LINK EXTERNAL INSTITUTION MODAL
- * Allows users to bridge legacy bank accounts to their Fundzman profile
+ * Allows users to bridge legacy bank accounts to their PFF profile
  */
 export function LinkExternalBankModal({ isOpen, onClose, phoneNumber, onAccountLinked }: LinkExternalBankModalProps) {
   const [selectedBank, setSelectedBank] = useState('');
@@ -62,7 +62,7 @@ export function LinkExternalBankModal({ isOpen, onClose, phoneNumber, onAccountL
               <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-[#e8c547] to-[#c9a227]">
                 Link External Institution
               </h2>
-              <p className="text-sm text-[#6b6b70] mt-1">Bridge your legacy bank account to Fundzman</p>
+              <p className="text-sm text-[#6b6b70] mt-1">Bridge your legacy bank account to PFF</p>
             </div>
             <button
               onClick={onClose}

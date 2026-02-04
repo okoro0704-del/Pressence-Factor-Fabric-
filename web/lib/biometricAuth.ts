@@ -564,7 +564,7 @@ export async function resolveSovereignByPresence(
       }
       if (scannedPhone === identityAnchorPhone) {
         phoneNumber = scannedPhone;
-        markLayerPassed(1);
+        await markLayerPassed(1, identityAnchorPhone);
         layersPassed.push(AuthLayer.BIOMETRIC_SIGNATURE);
         console.log('✅ Layer 1/4 passed: Biometric Identity Match');
       }
@@ -576,13 +576,13 @@ export async function resolveSovereignByPresence(
     onProgress?.(AuthLayer.VOICE_PRINT, AuthStatus.SCANNING);
     if (skipVoiceLayer) {
       voiceResult = { success: true, voicePrint: 'elder-minor-exempt' };
-      markLayerPassed(2);
+      await markLayerPassed(2, identityAnchorPhone);
       layersPassed.push(AuthLayer.VOICE_PRINT);
       console.log('✅ Layer 2/4 skipped (Elder & Minor Exemption)');
     } else {
       voiceResult = await verifyVoicePrint(identityAnchorPhone);
       if (voiceResult.success) {
-        markLayerPassed(2);
+        await markLayerPassed(2, identityAnchorPhone);
         layersPassed.push(AuthLayer.VOICE_PRINT);
         console.log('✅ Layer 2/4 passed: Vocal Resonance Match');
       } else if (requireAllLayers) {
@@ -594,7 +594,7 @@ export async function resolveSovereignByPresence(
     onProgress?.(AuthLayer.HARDWARE_TPM, AuthStatus.SCANNING);
     tpmResult = await verifyHardwareTPM(phoneNumber);
     if (tpmResult.success) {
-      markLayerPassed(3);
+      await markLayerPassed(3, identityAnchorPhone);
       layersPassed.push(AuthLayer.HARDWARE_TPM);
       console.log('✅ Layer 3/4 passed: Hardware Sentinel Verified');
     } else if (requireAllLayers) {
@@ -606,7 +606,7 @@ export async function resolveSovereignByPresence(
     const { resolvePhoneToIdentity } = await import('./phoneIdentity');
     genesisIdentity = phoneNumber ? await resolvePhoneToIdentity(phoneNumber) : null;
     if (genesisIdentity) {
-      markLayerPassed(4);
+      await markLayerPassed(4, identityAnchorPhone);
       layersPassed.push(AuthLayer.GENESIS_HANDSHAKE);
       console.log('✅ Layer 4/4 passed: Genesis Handshake');
     } else if (requireAllLayers) {

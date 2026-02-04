@@ -3,6 +3,9 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { checkPresenceVerified, markPresenceVerified, clearPresenceVerification } from '@/lib/withPresenceCheck';
+import { getIdentityAnchorPhone } from '@/lib/sentinelActivation';
+import { hasActiveSentinelLicense } from '@/lib/sentinelLicensing';
+import { getCurrentUserRole, setRoleCookie } from '@/lib/roleAuth';
 
 interface GlobalPresenceGatewayContextType {
   isPresenceVerified: boolean;
@@ -19,6 +22,12 @@ const GlobalPresenceGatewayContext = createContext<GlobalPresenceGatewayContextT
 const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
 const PRESENCE_CHECK_INTERVAL_MS = 30 * 1000; // 30 seconds
 const PUBLIC_ROUTES = ['/', '/manifesto']; // Routes that don't require authentication
+/** Wallet access requires an active Sentinel License. */
+const WALLET_ROUTES = ['/dashboard', '/pff-balance', '/presence-dashboard'];
+/** Partner API / business access requires an active Sentinel License. */
+const PARTNER_API_ROUTES = ['/foundation/applications', '/partners/apply'];
+const LICENSE_REQUIRED_ROUTES = [...WALLET_ROUTES, ...PARTNER_API_ROUTES];
+const SENTINEL_ROUTES = ['/sentinel', '/sentinel/purchase', '/sentinel-vault']; // Don't require license to view store / Sentinel Vault
 
 export function GlobalPresenceGatewayProvider({ children }: { children: ReactNode }) {
   const [isPresenceVerified, setIsPresenceVerified] = useState(false);
@@ -42,6 +51,10 @@ export function GlobalPresenceGatewayProvider({ children }: { children: ReactNod
         setPresenceTimestamp(result.timestamp);
         setLastActivityTime(Date.now());
         setConnecting(false);
+        const identityAnchor = getIdentityAnchorPhone();
+        if (identityAnchor) {
+          getCurrentUserRole(identityAnchor).then((role) => setRoleCookie(role));
+        }
         return true;
       }
 
@@ -72,6 +85,10 @@ export function GlobalPresenceGatewayProvider({ children }: { children: ReactNod
       setPresenceTimestamp(now);
       setLastActivityTime(Date.now());
       markPresenceVerified();
+      const identityAnchor = getIdentityAnchorPhone();
+      if (identityAnchor) {
+        getCurrentUserRole(identityAnchor).then((role) => setRoleCookie(role));
+      }
     } else {
       setIsPresenceVerified(false);
       setPresenceTimestamp(null);
@@ -87,28 +104,56 @@ export function GlobalPresenceGatewayProvider({ children }: { children: ReactNod
   }, []);
 
   /**
-   * Initial presence check on mount
+   * Initial presence check on mount. Safety timeout so UI never stays blocked if check hangs.
+   * Mandatory Blockade: if route requires Sentinel License (Wallet or Partner API) and user has none, redirect to Sentinel Store.
    */
   useEffect(() => {
+    let cancelled = false;
+    const SAFETY_TIMEOUT_MS = 8000;
+
     const initializePresence = async () => {
       setLoading(true);
       setConnecting(true);
+      const timeoutId = setTimeout(() => {
+        if (cancelled) return;
+        setConnecting(false);
+        setLoading(false);
+      }, SAFETY_TIMEOUT_MS);
       try {
         const verified = await checkAndRefreshPresence();
+        if (cancelled) return;
         if (!verified && !PUBLIC_ROUTES.includes(pathname)) {
           router.push('/');
+          return;
+        }
+        if (LICENSE_REQUIRED_ROUTES.some((r) => pathname.startsWith(r)) && !SENTINEL_ROUTES.includes(pathname)) {
+          const ownerId = getIdentityAnchorPhone();
+          if (ownerId) {
+            const hasLicense = await hasActiveSentinelLicense(ownerId);
+            if (!cancelled && !hasLicense) {
+              router.push('/sentinel/purchase');
+            }
+          }
         }
       } catch {
-        setIsPresenceVerified(false);
-        setConnecting(false);
+        if (!cancelled) {
+          setIsPresenceVerified(false);
+          setConnecting(false);
+        }
       } finally {
-        setLoading(false);
-        setConnecting(false);
+        clearTimeout(timeoutId);
+        if (!cancelled) {
+          setLoading(false);
+          setConnecting(false);
+        }
       }
     };
 
     initializePresence();
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [pathname, router]);
 
   /**
    * Periodic presence check (every 30 seconds)

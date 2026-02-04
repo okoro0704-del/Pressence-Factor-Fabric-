@@ -45,7 +45,7 @@ export function HowToInstallTooltip() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="fixed top-4 right-4 z-50 flex items-center gap-1.5 rounded-lg border border-[#2a2a2e] bg-[#16161a] px-3 py-2 text-xs font-medium text-[#6b6b70] hover:border-[#c9a227] hover:text-[#e8c547] transition-colors"
+        className="fixed top-4 right-4 z-50 flex items-center gap-1.5 rounded-lg border border-[#2a2a2e] bg-[#16161a] px-3 py-2 text-xs font-medium text-[#6b6b70] hover:border-[#c9a227] hover:text-[#e8c547] transition-colors cursor-pointer"
         aria-label="How to install PFF"
       >
         <span aria-hidden>↓</span>
@@ -54,14 +54,14 @@ export function HowToInstallTooltip() {
 
       {open && (
         <div
-          className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/60 p-4"
+          className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/60 p-4 cursor-pointer"
           role="dialog"
           aria-modal="true"
           aria-labelledby="install-title"
           onClick={() => setOpen(false)}
         >
           <div
-            className="w-full max-w-md rounded-2xl border border-[#2a2a2e] bg-[#16161a] p-6 shadow-xl"
+            className="w-full max-w-md rounded-2xl border border-[#2a2a2e] bg-[#16161a] p-6 shadow-xl cursor-default"
             onClick={(e) => e.stopPropagation()}
           >
             <h2 id="install-title" className="text-lg font-bold text-[#e8c547] mb-2">
@@ -88,7 +88,7 @@ export function HowToInstallTooltip() {
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="rounded-lg border border-[#2a2a2e] px-4 py-2 text-sm font-medium text-[#6b6b70] hover:bg-[#0d0d0f]"
+                className="rounded-lg border border-[#2a2a2e] px-4 py-2 text-sm font-medium text-[#6b6b70] hover:bg-[#0d0d0f] cursor-pointer"
               >
                 Close
               </button>

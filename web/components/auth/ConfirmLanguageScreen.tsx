@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { JetBrains_Mono } from 'next/font/google';
 import { SUPPORTED_LANGUAGES, storeLanguage, type LanguageCode } from '@/lib/i18n/config';
 import { setSessionLanguage } from '@/lib/sessionManagement';
@@ -10,7 +10,7 @@ const jetbrains = JetBrains_Mono({ weight: ['400', '600', '700'], subsets: ['lat
 /**
  * LANGUAGE SELECTION (Pre-Vitalization Handshake)
  * Grid layout, searchable, scrollable. Stores in i18n + sessionManagement before Identity Anchor.
- * Confirm button: 'use client', active onClick → storeLanguage + setSessionLanguage → onConfirm (next step in 3-of-4 biometric flow).
+ * UI only interactive after client mount to prevent hydration mismatches.
  */
 export interface ConfirmLanguageScreenProps {
   onConfirm: (languageCode: LanguageCode) => void;
@@ -23,8 +23,13 @@ export function ConfirmLanguageScreen({
   title = 'Confirm Language',
   subtitle = 'Select your language for vocal verification. You will be asked to speak a phrase in this language.',
 }: ConfirmLanguageScreenProps) {
+  const [mounted, setMounted] = useState(false);
   const [selected, setSelected] = useState<LanguageCode | null>(null);
   const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -43,6 +48,23 @@ export function ConfirmLanguageScreen({
     setSessionLanguage(selected);
     onConfirm(selected);
   };
+
+  if (!mounted) {
+    return (
+      <div
+        className="rounded-2xl border w-full max-w-2xl mx-auto overflow-hidden flex items-center justify-center p-8"
+        style={{
+          background: 'linear-gradient(135deg, rgba(212, 175, 55, 0.05) 0%, rgba(0, 0, 0, 0.9) 100%)',
+          borderColor: 'rgba(212, 175, 55, 0.3)',
+          minHeight: 200,
+        }}
+        aria-busy="true"
+        aria-live="polite"
+      >
+        <p className="text-sm" style={{ color: '#6b6b70' }}>Loading...</p>
+      </div>
+    );
+  }
 
   return (
     <div

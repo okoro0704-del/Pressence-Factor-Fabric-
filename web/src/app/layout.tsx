@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { HowToInstallTooltip } from '@/components/HowToInstallTooltip';
 import { GlobalPresenceGatewayProvider } from '@/contexts/GlobalPresenceGateway';
+import { RegisterServiceWorker } from '@/components/RegisterServiceWorker';
 import Script from 'next/script';
 
 export const metadata: Metadata = {
@@ -25,7 +26,14 @@ export default function RootLayout({
       <head>
         <meta charSet="utf-8" />
         <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#c9a227" />
+        <meta name="theme-color" content="#0A0A0A" />
+        {/* iOS: standalone web app, no Safari UI */}
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="PFF" />
+        <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+        <link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192.png" />
+        <link rel="apple-touch-icon" sizes="512x512" href="/icons/icon-512.png" />
 
         {/* CRITICAL BYPASS: Inline script that runs BEFORE React loads */}
         <Script
@@ -216,8 +224,12 @@ export default function RootLayout({
       </head>
       <body className="bg-[#0d0d0f] text-[#f5f5f5] antialiased">
         <GlobalPresenceGatewayProvider>
-          {children}
+          {/* app-root: base layer; overlays when inactive must unmount or use pointer-events-none to avoid dead screen */}
+          <div id="app-root" className="relative z-0 min-h-screen">
+            {children}
+          </div>
           <HowToInstallTooltip />
+          <RegisterServiceWorker />
         </GlobalPresenceGatewayProvider>
       </body>
     </html>

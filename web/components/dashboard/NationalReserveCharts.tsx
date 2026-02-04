@@ -1,22 +1,39 @@
-﻿'use client';
+'use client';
 
 import { useState, useEffect } from 'react';
 import { fetchNationalReserve, type NationalReserve } from '@/lib/supabaseTelemetry';
 import { getNationalReserveData } from '@/lib/mockDataService';
 
+const BACKEND_URL = process.env.NEXT_PUBLIC_PFF_BACKEND_URL || '';
+
 export function NationalReserveCharts() {
   const [reserve, setReserve] = useState<NationalReserve | null>(null);
+  const [totalNationalReserveAccumulated, setTotalNationalReserveAccumulated] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadReserveData() {
       setLoading(true);
       const liveData = await fetchNationalReserve();
-      
       if (liveData) {
         setReserve(liveData);
       } else {
         setReserve(getNationalReserveData());
+      }
+      if (BACKEND_URL) {
+        try {
+          const res = await fetch(`${BACKEND_URL}/economic/vida-cap/national-reserve-accumulated`);
+          if (res.ok) {
+            const data = await res.json();
+            setTotalNationalReserveAccumulated(data.totalNationalReserveAccumulated ?? 0);
+          } else {
+            setTotalNationalReserveAccumulated(null);
+          }
+        } catch {
+          setTotalNationalReserveAccumulated(null);
+        }
+      } else {
+        setTotalNationalReserveAccumulated(null);
       }
       setLoading(false);
     }
@@ -104,6 +121,20 @@ export function NationalReserveCharts() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Government view: Total National Reserve Accumulated — sum of all 5 VIDA splits from every citizen */}
+      <div className="bg-[#0d0d0f] rounded-xl p-6 border-2 border-[#D4AF37]/40">
+        <h4 className="text-xs font-bold text-[#D4AF37] uppercase tracking-wider mb-2">Government View</h4>
+        <p className="text-xs text-[#6b6b70] mb-2">Total National Reserve Accumulated (all 5 VIDA splits from sovereign_mint_ledger)</p>
+        <p className="text-3xl font-bold font-mono text-[#D4AF37]">
+          {totalNationalReserveAccumulated !== null
+            ? totalNationalReserveAccumulated.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+            : typeof (reserve as { sovereign_share_vida?: number })?.sovereign_share_vida === 'number'
+              ? ((reserve as { sovereign_share_vida: number }).sovereign_share_vida * 2).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+              : '—'}
+        </p>
+        <p className="text-sm text-[#6b6b70] mt-1">VIDA CAP</p>
       </div>
 
       {/* Additional Metrics */}

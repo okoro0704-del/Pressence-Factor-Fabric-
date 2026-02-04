@@ -29,6 +29,8 @@ let currentStatus: SessionStatus = SessionStatus.NO_SESSION;
 let passedLayers: number[] = [];
 let currentSessionLanguage: string | null = null;
 let sessionMetadata: SessionMetadata = {};
+/** When 3-of-4 layers pass but Sentinel is not active — fund access limited. */
+let sessionSecurityWarning: string | null = null;
 
 export const getSessionStatus = () => {
   return currentStatus;
@@ -39,8 +41,19 @@ export const initializeZeroPersistenceSession = () => {
   passedLayers = [];
   sessionMetadata = {};
   currentSessionLanguage = null;
+  sessionSecurityWarning = null;
   console.log("Vault Session Initialized: Memory Wiped.");
 };
+
+/** Get current security warning (e.g. Sentinel not activated — fund access limited). */
+export function getSessionSecurityWarning(): string | null {
+  return sessionSecurityWarning;
+}
+
+/** Clear security warning (e.g. after Sentinel activated). */
+export function clearSessionSecurityWarning(): void {
+  sessionSecurityWarning = null;
+}
 
 /** Store selected language in session (called when user confirms language before Identity Anchor). */
 export function setSessionLanguage(languageCode: string): void {
@@ -58,21 +71,47 @@ export function getSessionMetadata(): SessionMetadata {
   return { ...sessionMetadata };
 }
 
-export const markLayerPassed = async (layerNumber: number) => {
+export interface MarkLayerPassedResult {
+  ok: boolean;
+  securityWarning?: string;
+}
+
+/** Biometric tunneling: when 3-of-4 pass, report Sentinel-Verified status. Without it, return Security Warning. */
+export const markLayerPassed = async (
+  layerNumber: number,
+  identityAnchorPhone?: string
+): Promise<MarkLayerPassedResult> => {
   if (!passedLayers.includes(layerNumber)) {
     passedLayers.push(layerNumber);
   }
-  
-  // SOVEREIGN QUORUM: 3 out of 4 layers = Total Success
+
   if (passedLayers.length >= 3) {
     currentStatus = SessionStatus.ALL_LAYERS_VERIFIED;
+    if (identityAnchorPhone) {
+      try {
+        const { isSentinelActive } = await import('./sentinelActivation');
+        const sentinelActive = await isSentinelActive(identityAnchorPhone);
+        if (!sentinelActive) {
+          sessionSecurityWarning =
+            'FUND ACCESS LIMITED: Activate your Sentinel to enable full DLLR functionality.';
+          console.warn('[Session] Security Warning: Sentinel not activated.');
+          return { ok: true, securityWarning: sessionSecurityWarning };
+        }
+        sessionSecurityWarning = null;
+      } catch {
+        sessionSecurityWarning =
+          'FUND ACCESS LIMITED: Activate your Sentinel to enable full DLLR functionality.';
+        return { ok: true, securityWarning: sessionSecurityWarning };
+      }
+    }
   } else if (passedLayers.length === 1) {
     currentStatus = SessionStatus.LAYER_1_VERIFIED;
   } else if (passedLayers.length === 2) {
     currentStatus = SessionStatus.LAYER_2_VERIFIED;
   }
-  
+
   console.log(`Layer ${layerNumber} Secured. Total Layers: ${passedLayers.length}/4`);
+  return { ok: true };
 };
 
 export const resetSessionToLayer1 = () => {

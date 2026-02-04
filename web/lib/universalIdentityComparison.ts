@@ -36,6 +36,8 @@ export interface BiometricIdentityRecord {
   age?: number;
   is_minor?: boolean;
   is_elder?: boolean;
+  /** For Minor/Elder: linked Guardian phone (E.164). Enables Sentinel proxy-activation. */
+  guardian_phone?: string;
   metadata?: Record<string, unknown>;
   [key: string]: unknown;
 }
@@ -145,6 +147,7 @@ export async function fetchIdentityAnchor(
     const isElder = record.is_elder === true || (age !== undefined && age >= VOCAL_EXEMPT_ELDER_AGE) ||
       (dob ? calculateAge(dob) >= VOCAL_EXEMPT_ELDER_AGE : false);
 
+    const guardianPhone = (meta.guardian_phone as string | undefined) ?? undefined;
     const out: BiometricIdentityRecord = {
       ...record,
       phone_number: record.phone_number as string,
@@ -155,6 +158,7 @@ export async function fetchIdentityAnchor(
       age,
       is_minor: isMinor,
       is_elder: isElder,
+      guardian_phone: guardianPhone && String(guardianPhone).trim() ? String(guardianPhone).trim() : undefined,
     };
 
     return { success: true, identity: out };

@@ -11,7 +11,7 @@ interface TotalPFFBalanceProps {
 /**
  * TOTAL PFF BALANCE - THE GRAND TOTAL
  * Primary display showing ultimate truth of user's wealth
- * Formula: (Fundzman by UBA) + (External Accounts) + (20% Spendable VIDA Value)
+ * Formula: (PFF Sovereign) + (External Accounts) + (20% Spendable VIDA Value)
  */
 export function TotalPFFBalance({ breakdown }: TotalPFFBalanceProps) {
   const { t } = useTranslation();
@@ -64,14 +64,14 @@ export function TotalPFFBalance({ breakdown }: TotalPFFBalanceProps) {
 
         {/* Breakdown */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-6 border-t-2 border-[#e8c547]/30">
-          {/* Fundzman by UBA */}
-          <div className="bg-[#16161a]/80 backdrop-blur-sm rounded-xl p-5 border border-[#EE3124]/50">
+          {/* PFF Sovereign */}
+          <div className="bg-[#16161a]/80 backdrop-blur-sm rounded-xl p-5 border border-[#D4AF37]/50">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-2xl">🏦</span>
-              <h3 className="text-xs font-bold text-[#EE3124] uppercase tracking-wider">Fundzman by UBA</h3>
+              <h3 className="text-xs font-bold text-[#D4AF37] uppercase tracking-wider">PFF Sovereign</h3>
             </div>
             <p className="text-2xl font-bold font-mono text-[#f5f5f5]">
-              ₦{breakdown.fundzmanByUBA.balance_naira.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              ₦{breakdown.pffSovereign.balance_naira.toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </p>
             <p className="text-[10px] text-[#6b6b70] mt-1 uppercase">Sovereign Default</p>
           </div>
@@ -108,7 +108,7 @@ export function TotalPFFBalance({ breakdown }: TotalPFFBalanceProps) {
         {/* Formula Display */}
         <div className="bg-[#0d0d0f]/60 backdrop-blur-sm rounded-lg p-4 border border-[#2a2a2e]">
           <p className="text-xs text-center text-[#6b6b70] font-mono">
-            <span className="text-[#EE3124]">Fundzman</span> + <span className="text-[#a0a0a5]">Legacy</span> + <span className="text-[#e8c547]">VIDA</span> = <span className="text-[#ffd700] font-bold">TOTAL PFF</span>
+            <span className="text-[#D4AF37]">PFF</span> + <span className="text-[#a0a0a5]">Legacy</span> + <span className="text-[#e8c547]">VIDA</span> = <span className="text-[#ffd700] font-bold">TOTAL PFF</span>
           </p>
         </div>
       </div>

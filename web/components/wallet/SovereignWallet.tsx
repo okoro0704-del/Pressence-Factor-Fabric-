@@ -19,6 +19,9 @@ import {
   USER_VIDA_ON_VERIFY,
   FOUNDATION_VIDA_ON_VERIFY,
 } from '@/lib/foundationSeigniorage';
+import { hasActiveSentinelLicense } from '@/lib/sentinelLicensing';
+import { getSentinelTokenVerified } from '@/lib/sentinelSecurityToken';
+import { SentinelActivationOverlay } from '@/components/dashboard/SentinelActivationOverlay';
 
 const jetbrains = JetBrains_Mono({ weight: ['400', '600', '700'], subsets: ['latin'] });
 
@@ -44,6 +47,9 @@ export function SovereignWallet({ phoneNumber, layerResults }: SovereignWalletPr
   const [showUSDTBridge, setShowUSDTBridge] = useState(false);
   const [biometricError, setBiometricError] = useState<string | null>(null);
   const [foundationReserve, setFoundationReserve] = useState<number>(0);
+  const [hasLicense, setHasLicense] = useState<boolean>(false);
+  const [tokenVerified, setTokenVerified] = useState<boolean>(false);
+  const sentinelVerified = hasLicense && tokenVerified;
 
   useEffect(() => {
     let cancelled = false;
@@ -71,6 +77,12 @@ export function SovereignWallet({ phoneNumber, layerResults }: SovereignWalletPr
   useEffect(() => {
     getTotalFoundationReserve().then(setFoundationReserve);
   }, [wallet?.updated_at]);
+
+  useEffect(() => {
+    setTokenVerified(getSentinelTokenVerified());
+    if (!phoneNumber) return;
+    hasActiveSentinelLicense(phoneNumber).then(setHasLicense);
+  }, [phoneNumber, wallet?.updated_at]);
 
   const quorumSatisfied =
     layerResults &&
@@ -208,11 +220,16 @@ export function SovereignWallet({ phoneNumber, layerResults }: SovereignWalletPr
         </p>
       </div>
 
-      {/* Convert VIDA to DLLR — MUST verify identity first */}
+      {/* Convert VIDA to DLLR — MUST verify identity + Sentinel active */}
       <section
-        className="rounded-xl border p-6 mb-6"
+        className={`rounded-xl border p-6 mb-6 relative ${!sentinelVerified ? 'opacity-60 blur-[2px] pointer-events-none select-none' : ''}`}
         style={{ background: GOLD_BG, borderColor: BORDER }}
       >
+        <SentinelActivationOverlay
+          show={!sentinelVerified}
+          subtitle="Activate your Sentinel at the Sentinel Vault to enable Withdraw and Transfer."
+          onVerified={() => setTokenVerified(true)}
+        />
         <h3 className="text-lg font-semibold mb-4" style={{ color: GOLD }}>
           Convert VIDA to DLLR
         </h3>
@@ -275,8 +292,15 @@ export function SovereignWallet({ phoneNumber, layerResults }: SovereignWalletPr
         )}
       </section>
 
-      {/* USDT Bridge — static deposit address */}
-      <section>
+      {/* USDT Bridge — static deposit address (Withdraw requires Sentinel) */}
+      <section className={`relative ${!sentinelVerified ? 'opacity-60 blur-[2px] pointer-events-none select-none' : ''}`}>
+        {!sentinelVerified && (
+          <SentinelActivationOverlay
+            show
+            subtitle="Activate at Sentinel Vault to enable Deposit/Withdraw."
+            onVerified={() => setTokenVerified(true)}
+          />
+        )}
         <button
           type="button"
           onClick={() => setShowUSDTBridge((v) => !v)}

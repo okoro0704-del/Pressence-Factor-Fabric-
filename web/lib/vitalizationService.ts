@@ -23,7 +23,9 @@ export interface VidaCapResult {
     totalMinted: number;
     citizenShare: number;
     nationalReserveShare: number;
+    sentinelShare?: number;
     transactionHash: string;
+    batchId?: string;
   };
 }
 

@@ -149,7 +149,7 @@ export function PersonalDetailsStep({ identity, onComplete, onBack }: PersonalDe
             }}
           >
             <option value="">Select bank</option>
-            <option value="UBA">United Bank for Africa (UBA)</option>
+            <option value="PFF_PARTNER">PFF Partner Bank (United Bank for Africa)</option>
             <option value="GTBank">Guaranty Trust Bank</option>
             <option value="Access Bank">Access Bank</option>
             <option value="First Bank">First Bank of Nigeria</option>

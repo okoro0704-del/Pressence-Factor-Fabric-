@@ -29,7 +29,7 @@ export function LegacyAccountsList({ accounts, phoneNumber, onAccountsUpdated }:
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-xl font-black text-[#a0a0a5] uppercase tracking-wider">Legacy Bank Accounts</h3>
-          <p className="text-xs text-[#6b6b70] mt-1">External institutions bridged to your Fundzman profile</p>
+          <p className="text-xs text-[#6b6b70] mt-1">External institutions bridged to your PFF profile</p>
         </div>
         <button
           onClick={() => setShowLinkModal(true)}

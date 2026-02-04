@@ -9,11 +9,15 @@ let _supabase: any = null;
 let _initialized = false;
 let _isMock = false;
 
-/** No-op mock so supabase.from().select().gte().order().limit() never throws when URL is missing */
-function createMockClient(): any {
+/** Cached mock client — single instance so we never re-run or create new refs during render/SSR. */
+let _cachedMock: any = null;
+
+/** No-op mock so supabase.from().select().gte().order().limit() never throws when URL is missing. Initialized once. */
+function getMockClient(): any {
+  if (_cachedMock) return _cachedMock;
   const resolved = Promise.resolve({ data: null, error: { message: 'Supabase URL not configured' } });
   const chain = () => ({ gte: chain, order: chain, limit: () => resolved, eq: chain, single: () => resolved });
-  return {
+  _cachedMock = {
     from: () => ({
       select: () => ({ gte: chain, order: chain, limit: () => resolved }),
       insert: () => resolved,
@@ -28,6 +32,7 @@ function createMockClient(): any {
     channel: () => ({ on: () => ({ subscribe: () => ({ unsubscribe: () => {} }) }) }),
     removeChannel: () => {},
   };
+  return _cachedMock;
 }
 
 function initSupabase() {
@@ -41,7 +46,7 @@ function initSupabase() {
     console.warn(
       '[SUPABASE] Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY. Using mock client so the app does not crash. Add env vars to .env.local for real data.'
     );
-    _supabase = createMockClient();
+    _supabase = getMockClient();
     _isMock = true;
     return;
   }
@@ -61,19 +66,19 @@ function initSupabase() {
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     console.warn('[SUPABASE] Failed to create client (using mock):', msg);
-    _supabase = createMockClient();
+    _supabase = getMockClient();
     _isMock = true;
   }
 }
 
-// Initialize only in browser
+// Initialize only in browser — outside component render cycle so it does not re-run on every click
 if (typeof window !== 'undefined') {
   initSupabase();
 }
 
-// Export the client (never null after init in browser; mock when URL missing)
+// Export the client (stable ref: real client or single cached mock)
 // @ts-ignore - Supabase client type inference
-export const supabase = _supabase ?? createMockClient();
+export const supabase = _supabase ?? getMockClient();
 
 export function hasSupabase(): boolean {
   if (typeof window === 'undefined') return false;
@@ -81,8 +86,8 @@ export function hasSupabase(): boolean {
   return !!_supabase && !_isMock;
 }
 
-/** Safe getter: returns real client or mock. Use when module may load before init. */
+/** Safe getter: returns real client or cached mock. Use when module may load before init. */
 export function getSupabase(): any {
   if (typeof window !== 'undefined' && !_initialized) initSupabase();
-  return _supabase ?? createMockClient();
+  return _supabase ?? getMockClient();
 }

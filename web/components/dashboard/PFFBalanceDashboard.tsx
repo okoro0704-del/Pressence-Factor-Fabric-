@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { TotalPFFBalance } from './TotalPFFBalance';
-import { FundzmanUBAAccount } from './FundzmanUBAAccount';
+import { PFFSovereignAccount } from './PFFSovereignAccount';
 import { LegacyAccountsList } from './LegacyAccountsList';
 import { NationalScaleTicker } from './NationalScaleTicker';
 import { GlobalTradeCard } from './GlobalTradeCard';
-import { calculatePFFBalance, createFundzmanDefaultAccount, type BankAccount, AccountCategory } from '@/lib/pffAggregation';
+import { calculatePFFBalance, createPFFDefaultAccount, type BankAccount, AccountCategory } from '@/lib/pffAggregation';
 
 interface PFFBalanceDashboardProps {
   phoneNumber: string;
@@ -19,19 +19,19 @@ interface PFFBalanceDashboardProps {
  * 
  * UI Hierarchy:
  * - Primary: Total PFF Balance (The Grand Total)
- * - Secondary: Fundzman by UBA (Sovereign Default)
+ * - Secondary: PFF Sovereign Account (Sovereign Default)
  * - Tertiary: Linked Legacy Accounts
  * - Footer: National Scale Ticker (220M Nodes)
  */
 export function PFFBalanceDashboard({ phoneNumber, spendableVida }: PFFBalanceDashboardProps) {
-  const [fundzmanAccount, setFundzmanAccount] = useState<BankAccount | null>(null);
+  const [pffSovereignAccount, setPFFSovereignAccount] = useState<BankAccount | null>(null);
   const [legacyAccounts, setLegacyAccounts] = useState<BankAccount[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Initialize Fundzman by UBA default account
-    const defaultAccount = createFundzmanDefaultAccount(phoneNumber);
-    setFundzmanAccount(defaultAccount);
+    // Initialize PFF Sovereign default account
+    const defaultAccount = createPFFDefaultAccount(phoneNumber);
+    setPFFSovereignAccount(defaultAccount);
 
     // Load legacy accounts from Supabase
     // TODO: Query Supabase pff_bank_accounts table
@@ -67,7 +67,7 @@ export function PFFBalanceDashboard({ phoneNumber, spendableVida }: PFFBalanceDa
     setIsLoading(false);
   }, [phoneNumber]);
 
-  if (isLoading || !fundzmanAccount) {
+  if (isLoading || !pffSovereignAccount) {
     return (
       <div className="min-h-screen bg-[#050505] flex items-center justify-center">
         <div className="text-center space-y-4">
@@ -80,7 +80,7 @@ export function PFFBalanceDashboard({ phoneNumber, spendableVida }: PFFBalanceDa
 
   // Calculate PFF Balance Breakdown
   const pffBreakdown = calculatePFFBalance(
-    fundzmanAccount.balance_naira,
+    pffSovereignAccount.balance_naira,
     legacyAccounts,
     spendableVida,
     220_000_000
@@ -112,7 +112,7 @@ export function PFFBalanceDashboard({ phoneNumber, spendableVida }: PFFBalanceDa
           <GlobalTradeCard />
         </section>
 
-        {/* SECONDARY: Fundzman by UBA (Sovereign Default) */}
+        {/* SECONDARY: PFF Sovereign Account (Sovereign Default) */}
         <section>
           <div className="mb-4">
             <div className="flex items-center gap-2">
@@ -120,7 +120,7 @@ export function PFFBalanceDashboard({ phoneNumber, spendableVida }: PFFBalanceDa
               <h2 className="text-sm font-bold text-[#EE3124] uppercase tracking-wider">Secondary Account</h2>
             </div>
           </div>
-          <FundzmanUBAAccount account={fundzmanAccount} />
+          <PFFSovereignAccount account={pffSovereignAccount} />
         </section>
 
         {/* TERTIARY: Linked Legacy Accounts */}
@@ -145,7 +145,7 @@ export function PFFBalanceDashboard({ phoneNumber, spendableVida }: PFFBalanceDa
               <span className="text-4xl">🏛️</span>
               <h3 className="text-sm font-bold text-[#e8c547] uppercase tracking-wider">National Reserve</h3>
               <p className="text-xs text-[#6b6b70] leading-relaxed">
-                Backed by UBA's sovereign liquidity infrastructure
+                Backed by PFF sovereign liquidity infrastructure
               </p>
             </div>
             <div className="text-center space-y-2">
@@ -159,7 +159,7 @@ export function PFFBalanceDashboard({ phoneNumber, spendableVida }: PFFBalanceDa
               <span className="text-4xl">⚡</span>
               <h3 className="text-sm font-bold text-[#e8c547] uppercase tracking-wider">Instant Transfers</h3>
               <p className="text-xs text-[#6b6b70] leading-relaxed">
-                Zero fees between Fundzman and legacy accounts
+                Zero fees between PFF and legacy accounts
               </p>
             </div>
           </div>

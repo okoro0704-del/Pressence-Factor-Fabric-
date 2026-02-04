@@ -65,7 +65,7 @@ export function PersonalRegistration() {
             <div className="flex items-center gap-3">
               <div className="w-2 h-2 rounded-full" style={{ background: '#D4AF37' }} />
               <p className="text-sm" style={{ color: '#a0a0a5' }}>
-                Auto-Created Fundzman by UBA Account
+                Auto-Created PFF Sovereign Account
               </p>
             </div>
             <div className="flex items-center gap-3">

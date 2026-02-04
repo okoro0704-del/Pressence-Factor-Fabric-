@@ -30,7 +30,7 @@
     "lockedUntil1B": "Locked Until 1B Users"
   },
   "banking": {
-    "fundzmanByUBA": "Fundzman by UBA",
+    "fundzmanByUBA": "Presence Factor Fabric (PFF)",
     "sovereignDefault": "Sovereign Default",
     "preActivated": "Pre-Activated",
     "nationalBlockAccount": "National Block Account",
@@ -54,7 +54,7 @@
   },
   "ticker": {
     "activeSovereignNodes": "Active Sovereign Nodes",
-    "poweredByUBA": "Powered by UBA Liquidity Bridge",
+    "poweredByUBA": "Powered by Presence Factor Fabric",
     "networkUptime": "Network Uptime",
     "transactionsPerSec": "Transactions/Sec",
     "totalVolume24h": "Total Volume (24h)",
@@ -66,9 +66,9 @@
     "secondaryAccount": "Secondary Account",
     "tertiaryAccounts": "Tertiary Accounts",
     "nationalReserve": "National Reserve",
-    "backedByUBA": "Backed by UBA's sovereign liquidity infrastructure",
+    "backedByUBA": "Backed by PFF sovereign liquidity infrastructure",
     "biometricProtection": "Biometric authentication protects every transaction",
-    "instantTransfersDesc": "Zero fees between Fundzman and legacy accounts"
+    "instantTransfersDesc": "Zero fees between PFF and legacy accounts"
   },
   "companion": {
     "greeting": "Hello, Sovereign Citizen",
@@ -78,7 +78,7 @@
     "requestComplete": "Request complete"
   },
   "formula": {
-    "pffCalculation": "PFF Balance = Fundzman + Legacy + VIDA"
+    "pffCalculation": "PFF Balance = PFF Sovereign + Legacy + VIDA"
   }
 }
 

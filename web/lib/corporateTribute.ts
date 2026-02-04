@@ -17,6 +17,10 @@ export interface CorporateTributeInput {
   /** Currency unit (e.g. 'VIDA', 'USD'). */
   currency?: string;
   reference?: string;
+  /** True when this revenue is from a Dependent account. */
+  isFromDependentAccount?: boolean;
+  /** True when Guardian uses Dependent's account for a corporate transaction. 2% only applies in this case for dependents. */
+  isCorporateTransaction?: boolean;
 }
 
 export interface CorporateTributeResult {
@@ -47,11 +51,16 @@ export function calculateCorporateTribute(input: CorporateTributeInput): Corpora
 /**
  * Record 2% Corporate Tribute to foundation_vault_ledger (corporate_royalty_inflow).
  * Use when recording corporate royalty only. For Priority Lock (2% + 3% together), use applyPriorityLockDeductions.
+ * Deduction mapping: For Dependent accounts, 2% Corporate Royalty only triggers when Guardian uses
+ * the Dependent's account for a corporate transaction (isFromDependentAccount && isCorporateTransaction).
  */
 export async function recordCorporateTribute(
   input: CorporateTributeInput
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!supabase) return { ok: false, error: 'Supabase not available' };
+  if (input.isFromDependentAccount === true && input.isCorporateTransaction !== true) {
+    return { ok: true };
+  }
   const computed = calculateCorporateTribute(input);
   try {
     const { error } = await (supabase as any)
