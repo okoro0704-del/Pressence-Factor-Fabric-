@@ -28,6 +28,11 @@
   NEXT_PUBLIC_SUPABASE_URL = "https://xbpomcmkzwunozrsbqxf.supabase.co"
   NEXT_PUBLIC_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhicG9tY21rend1bm96cnNicXhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk2MzUwNzUsImV4cCI6MjA4NTIxMTA3NX0.RIKURwGoev3epQczHR8vKfNcE_bqarX5OyJjodmPk9o"
 
+  # Global SMS Gateway (Section CDLXXII — set in Netlify UI; do not commit secrets)
+  # SUPABASE_AUTH_EXTERNAL_SMS_PROVIDER = "twilio"
+  # TWILIO_ACCOUNT_SID = (from Twilio Dashboard)
+  # TWILIO_AUTH_TOKEN = (from Twilio Dashboard)
+
   # ROOT SOVEREIGN DEVICE BINDING
   NEXT_PUBLIC_SENTINEL_ROOT_DEVICE = "HP-LAPTOP-ROOT-SOVEREIGN-001"
   NEXT_PUBLIC_ROOT_DEVICE_TYPE = "LAPTOP"

@@ -10,6 +10,7 @@ import {
   markLayerPassed,
   validateSession,
   getSessionStatus,
+  getSessionLanguage,
   SessionStatus,
 } from './sessionManagement';
 
@@ -537,8 +538,9 @@ export async function resolveSovereignByPresence(
       return fail(null, 'Identity anchor required. Please enter phone number before authentication.');
     }
 
-    createSession(identityAnchorPhone);
-    console.log('🔐 Zero-persistence session created for:', identityAnchorPhone);
+    const language = getSessionLanguage();
+    createSession(identityAnchorPhone, language ? { language } : undefined);
+    console.log('🔐 Zero-persistence session created for:', identityAnchorPhone, language ? `(lang: ${language})` : '');
 
     const lockedUntil = localStorage.getItem('pff_portal_locked_until');
     if (lockedUntil && new Date(lockedUntil) > new Date()) {

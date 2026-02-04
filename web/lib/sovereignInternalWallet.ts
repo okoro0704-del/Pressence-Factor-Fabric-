@@ -101,7 +101,10 @@ export function getStaticUSDTAddresses(phoneNumber: string): { erc20: string; tr
 /** Conversion rate: 1 VIDA = 1,000 DLLR. */
 export const VIDA_TO_DLLR_RATE = 1000;
 
-/** Update balances after Convert VIDA to DLLR (internal table only). 1 VIDA = 1,000 DLLR. */
+/** 2% conversion levy routed to PFF_FOUNDATION_VAULT (user receives DLLR on 98% of VIDA). */
+const CONVERSION_LEVY_PERCENT = 0.02;
+
+/** Update balances after Convert VIDA to DLLR. 2% levy goes to Foundation Vault; user gets DLLR on 98%. */
 export async function updateSovereignWalletConvertVidaToDllr(
   phoneNumber: string,
   vidaAmount: number
@@ -109,7 +112,15 @@ export async function updateSovereignWalletConvertVidaToDllr(
   if (!supabase || vidaAmount <= 0) return false;
   const row = await getSovereignInternalWallet(phoneNumber);
   if (!row) return false;
-  const dllrCredited = vidaAmount * VIDA_TO_DLLR_RATE;
+  const levyVida = vidaAmount * CONVERSION_LEVY_PERCENT;
+  const netVidaForUser = vidaAmount - levyVida;
+  const dllrCredited = netVidaForUser * VIDA_TO_DLLR_RATE;
+
+  const { routeConversionLevyToFoundation } = await import('@/lib/foundationSeigniorage');
+  if (levyVida > 0) {
+    await routeConversionLevyToFoundation(phoneNumber, levyVida, `convert_${Date.now()}`);
+  }
+
   const { error } = await (supabase as any)
     .from('sovereign_internal_wallets')
     .update({

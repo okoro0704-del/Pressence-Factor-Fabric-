@@ -17,62 +17,84 @@ export interface PresenceCheckResult {
 
 /**
  * Check if presence is currently verified
- * First checks localStorage cache, then queries Supabase if needed
+ * First checks localStorage cache, then queries Supabase if needed.
+ * Wrapped in try-catch; defaults to verified: false on any failure.
  */
 export async function checkPresenceVerified(): Promise<PresenceCheckResult> {
   try {
-    // Check localStorage cache first
-    const stored = localStorage.getItem(STORAGE_KEY);
-    const timestamp = localStorage.getItem(TIMESTAMP_KEY);
-    
-    if (stored === 'true' && timestamp) {
-      const verifiedAt = new Date(timestamp);
-      const now = new Date();
-      const elapsed = now.getTime() - verifiedAt.getTime();
-      
-      if (elapsed < PRESENCE_EXPIRY_MS) {
-        return { verified: true, timestamp: verifiedAt };
-      } else {
-        // Expired - clear storage
+    // Skip Supabase call if URL is not configured (SSR/build or missing env)
+    if (typeof process !== 'undefined' && !process.env.NEXT_PUBLIC_SUPABASE_URL) {
+      return { verified: false, error: 'Supabase URL not configured' };
+    }
+
+    // Check localStorage cache first (browser only)
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      const timestamp = localStorage.getItem(TIMESTAMP_KEY);
+
+      if (stored === 'true' && timestamp) {
+        const verifiedAt = new Date(timestamp);
+        const now = new Date();
+        const elapsed = now.getTime() - verifiedAt.getTime();
+
+        if (elapsed < PRESENCE_EXPIRY_MS) {
+          return { verified: true, timestamp: verifiedAt };
+        }
         localStorage.removeItem(STORAGE_KEY);
         localStorage.removeItem(TIMESTAMP_KEY);
       }
     }
 
-    // Query Supabase for recent presence handshake
+    // Query Supabase only when URL is defined and client is available
     if (!hasSupabase() || !supabase) {
       return { verified: false, error: 'Supabase not available' };
     }
 
-    const { data, error } = await supabase
-      .from('presence_handshakes')
-      .select('verified_at, liveness_score')
-      .gte('liveness_score', 0.99)
-      .order('verified_at', { ascending: false })
-      .limit(1);
+    let data: { verified_at: string; liveness_score?: number }[] | null = null;
+    let error: { message?: string } | null = null;
 
-    if (error) {
-      console.error('[withPresenceCheck] Error querying presence:', error);
-      return { verified: false, error: error.message };
+    try {
+      const result = await supabase
+        .from('presence_handshakes')
+        .select('verified_at, liveness_score')
+        .gte('liveness_score', 0.99)
+        .order('verified_at', { ascending: false })
+        .limit(1);
+      data = result.data ?? null;
+      error = result.error ?? null;
+    } catch (queryErr) {
+      const msg = queryErr instanceof Error ? queryErr.message : String(queryErr);
+      console.warn('[withPresenceCheck] Database query threw (non-blocking):', msg);
+      return { verified: false, error: msg };
     }
 
-    if (data && data.length > 0) {
+    if (error) {
+      const msg =
+        (error && typeof error === 'object' && 'message' in error && String((error as { message?: unknown }).message).trim()) ||
+        'Database call failed';
+      console.warn('[withPresenceCheck] Error querying presence (non-blocking):', msg);
+      return { verified: false, error: msg };
+    }
+
+    if (data && Array.isArray(data) && data.length > 0) {
       const verifiedAt = new Date(data[0].verified_at);
       const now = new Date();
       const elapsed = now.getTime() - verifiedAt.getTime();
 
       if (elapsed < PRESENCE_EXPIRY_MS) {
-        // Cache the result
-        localStorage.setItem(STORAGE_KEY, 'true');
-        localStorage.setItem(TIMESTAMP_KEY, verifiedAt.toISOString());
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(STORAGE_KEY, 'true');
+          localStorage.setItem(TIMESTAMP_KEY, verifiedAt.toISOString());
+        }
         return { verified: true, timestamp: verifiedAt };
       }
     }
 
     return { verified: false, error: 'No recent presence verification found' };
-  } catch (error) {
-    console.error('[withPresenceCheck] Error checking presence:', error);
-    return { verified: false, error: String(error) };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[withPresenceCheck] Error checking presence:', msg);
+    return { verified: false, error: msg };
   }
 }
 

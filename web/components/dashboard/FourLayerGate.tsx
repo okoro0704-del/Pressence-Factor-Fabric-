@@ -37,6 +37,8 @@ import {
   assignPrimarySentinel,
   updateDeviceLastUsed,
 } from '@/lib/multiDeviceVitalization';
+import { maskPhoneForDisplay } from '@/lib/phoneMask';
+import { mintFoundationSeigniorage } from '@/lib/foundationSeigniorage';
 
 const jetbrains = JetBrains_Mono({ weight: ['400', '600', '700'], subsets: ['latin'] });
 
@@ -224,6 +226,7 @@ export function FourLayerGate() {
           );
 
           console.log('✅ PRIMARY_SENTINEL assigned - proceeding to dashboard');
+          await mintFoundationSeigniorage(identityAnchor.phone);
           setPresenceVerified(true);
           setShowVaultAnimation(true);
           return;
@@ -260,6 +263,9 @@ export function FourLayerGate() {
 
       // Device is authorized - update last used timestamp
       await updateDeviceLastUsed(deviceInfo.deviceId);
+
+      // Foundation Seigniorage: dual-mint (10 VIDA user, 1 VIDA foundation) when gate clears
+      await mintFoundationSeigniorage(identityAnchor.phone);
 
       // Proceed to dashboard
       setPresenceVerified(true);
@@ -311,9 +317,10 @@ export function FourLayerGate() {
     router.push('/dashboard');
   };
 
-  const handleVitalizationApproved = () => {
+  const handleVitalizationApproved = async () => {
     console.log('✅ Vitalization approved - transitioning to dashboard');
     setShowAwaitingAuth(false);
+    if (identityAnchor) await mintFoundationSeigniorage(identityAnchor.phone);
     setPresenceVerified(true);
     setShowVaultAnimation(true);
   };
@@ -367,10 +374,11 @@ export function FourLayerGate() {
     setResult(null);
   };
 
-  const handleGuardianRecoveryApproved = () => {
+  const handleGuardianRecoveryApproved = async () => {
     console.log('✅ Guardian recovery approved - new primary device assigned');
     setShowGuardianRecoveryStatus(false);
     setGuardianRecoveryRequestId(null);
+    if (identityAnchor) await mintFoundationSeigniorage(identityAnchor.phone);
     setPresenceVerified(true);
     setShowVaultAnimation(true);
   };
@@ -512,8 +520,8 @@ export function FourLayerGate() {
               <p className="text-sm font-bold" style={{ color: '#D4AF37' }}>
                 {identityAnchor.name}
               </p>
-              <p className="text-xs font-mono" style={{ color: '#a0a0a5' }}>
-                {identityAnchor.phone}
+              <p className="text-xs font-mono" style={{ color: '#a0a0a5' }} title="Phone masked for privacy">
+                {maskPhoneForDisplay(identityAnchor.phone)}
               </p>
             </div>
             <div className="text-3xl">🔗</div>

@@ -3,10 +3,12 @@
  * Enforces strict 1-to-1 identity matching with 0.5% variance threshold
  * Requires Identity Anchor (phone number) BEFORE biometric scan
  * ELDER & MINOR EXEMPTION: Skip Vocal Resonance (Layer 2) for citizens under 18 OR over 65
+ * E.164 STANDARD (Section CDLXXII): 080... (local Nigeria) and +234 80... (international) resolve to the same Unique Identity Anchor.
  * Architect: Isreal Okoro (mrfundzman)
  */
 
 import { supabase } from './biometricAuth';
+import { formatPhoneE164 } from './supabaseClient';
 import {
   detectIdentityMismatch,
   MismatchEventType,
@@ -66,6 +68,7 @@ export interface UniversalIdentityResult {
 /**
  * Normalize phone to multiple variants for DB lookup. Prevents "No active identity" on live site
  * when DB stores different formats (with/without +, spaces, dashes).
+ * E.164: Ensures 080... (Nigeria local) and +234 80... (international) resolve to the same Unique Identity Anchor.
  */
 export function normalizePhoneVariants(phone: string): string[] {
   const trimmed = phone.trim();
@@ -75,9 +78,14 @@ export function normalizePhoneVariants(phone: string): string[] {
   const withPlus = trimmed.startsWith('+') ? trimmed : `+${digitsOnly}`;
   const withoutPlus = digitsOnly;
   const asEntered = trimmed;
-  const variants = [asEntered, withPlus, withoutPlus].filter(
-    (v, i, arr) => v && arr.indexOf(v) === i
-  );
+  const base = [asEntered, withPlus, withoutPlus];
+
+  const e164Ng = formatPhoneE164(trimmed, 'NG');
+  if (e164Ng.ok) base.push(e164Ng.e164);
+  const e164Any = formatPhoneE164(trimmed);
+  if (e164Any.ok) base.push(e164Any.e164);
+
+  const variants = base.filter((v, i, arr) => v && arr.indexOf(v) === i);
   return variants;
 }
 

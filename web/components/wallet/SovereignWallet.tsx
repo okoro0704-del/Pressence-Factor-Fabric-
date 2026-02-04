@@ -14,6 +14,11 @@ import {
   type BiometricLayerResults,
 } from '@/lib/universalIdentityComparison';
 import { VIDA_TO_DLLR_RATE } from '@/lib/sovereignInternalWallet';
+import {
+  getTotalFoundationReserve,
+  USER_VIDA_ON_VERIFY,
+  FOUNDATION_VIDA_ON_VERIFY,
+} from '@/lib/foundationSeigniorage';
 
 const jetbrains = JetBrains_Mono({ weight: ['400', '600', '700'], subsets: ['latin'] });
 
@@ -38,6 +43,7 @@ export function SovereignWallet({ phoneNumber, layerResults }: SovereignWalletPr
   const [convertError, setConvertError] = useState<string | null>(null);
   const [showUSDTBridge, setShowUSDTBridge] = useState(false);
   const [biometricError, setBiometricError] = useState<string | null>(null);
+  const [foundationReserve, setFoundationReserve] = useState<number>(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -61,6 +67,10 @@ export function SovereignWallet({ phoneNumber, layerResults }: SovereignWalletPr
     })();
     return () => { cancelled = true; };
   }, [phoneNumber]);
+
+  useEffect(() => {
+    getTotalFoundationReserve().then(setFoundationReserve);
+  }, [wallet?.updated_at]);
 
   const quorumSatisfied =
     layerResults &&
@@ -157,8 +167,16 @@ export function SovereignWallet({ phoneNumber, layerResults }: SovereignWalletPr
         Sovereign Wallet
       </h2>
 
-      {/* Balance cards */}
-      <div className="grid gap-4 mb-8 sm:grid-cols-3">
+      {/* Vault Status badge */}
+      <div
+        className="rounded-lg border px-4 py-2 mb-6 text-center text-xs font-semibold uppercase tracking-wider"
+        style={{ borderColor: BORDER, color: GOLD_DIM, background: GOLD_BG }}
+      >
+        Funds locked for Infrastructure &amp; Future Mesh Projects.
+      </div>
+
+      {/* Balance cards — user sees their 10 VIDA clearly */}
+      <div className="grid gap-4 mb-4 sm:grid-cols-3">
         <BalanceCard
           label="Sovereign DLLR"
           value={wallet?.dllr_balance ?? 0}
@@ -166,10 +184,28 @@ export function SovereignWallet({ phoneNumber, layerResults }: SovereignWalletPr
         />
         <BalanceCard label="USDT" value={wallet?.usdt_balance ?? 0} suffix="USDT" />
         <BalanceCard
-          label="Available VIDA CAP"
+          label={`Your VIDA (${USER_VIDA_ON_VERIFY} on verify)`}
           value={wallet?.vida_cap_balance ?? 0}
           suffix="VIDA"
         />
+      </div>
+
+      {/* Foundation contribution notice */}
+      <p className="text-xs mb-6" style={{ color: '#6b6b70' }}>
+        {FOUNDATION_VIDA_ON_VERIFY} VIDA has been contributed to the Foundation Vault to secure the Mesh&apos;s future.
+      </p>
+
+      {/* Foundation Impact stat */}
+      <div
+        className="rounded-xl border p-4 mb-8"
+        style={{ background: GOLD_BG, borderColor: BORDER }}
+      >
+        <p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: GOLD_DIM }}>
+          Foundation Impact
+        </p>
+        <p className="text-xl font-bold" style={{ color: GOLD, textShadow: `0 0 16px ${GOLD_DIM}` }}>
+          Total Foundation Reserve: {foundationReserve.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VIDA
+        </p>
       </div>
 
       {/* Convert VIDA to DLLR — MUST verify identity first */}

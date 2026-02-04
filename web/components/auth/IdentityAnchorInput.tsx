@@ -1,7 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { JetBrains_Mono } from 'next/font/google';
 import { fetchIdentityAnchor, type BiometricIdentityRecord } from '@/lib/universalIdentityComparison';
+import { formatPhoneE164 } from '@/lib/supabaseClient';
+import { PHONE_COUNTRIES, DEFAULT_PHONE_COUNTRY, type PhoneCountry } from '@/lib/phoneCountries';
+
+const jetbrains = JetBrains_Mono({ weight: ['400', '600', '700'], subsets: ['latin'] });
 
 /** KILL AUTO-VERIFY: Anchor verification only transitions to biometric scan step. Actual verification happens after real-time hardware scan. */
 export interface AnchorVerifiedPayload {
@@ -19,31 +24,42 @@ interface IdentityAnchorInputProps {
   subtitle?: string;
 }
 
-export function IdentityAnchorInput({ 
-  onAnchorVerified, 
+export function IdentityAnchorInput({
+  onAnchorVerified,
   onCancel,
-  title = "Identity Anchor Required",
-  subtitle = "Enter your phone number to proceed to hardware biometric scan. Verification occurs only after the scan."
+  title = 'Identity Anchor Required',
+  subtitle = 'Enter your phone number to proceed to hardware biometric scan. Verification occurs after the scan.',
 }: IdentityAnchorInputProps) {
-  const [phoneNumber, setPhoneNumber] = useState('');
+  const [country, setCountry] = useState<PhoneCountry>(DEFAULT_PHONE_COUNTRY);
+  const [nationalNumber, setNationalNumber] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [error, setError] = useState('');
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const pickerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const close = (e: MouseEvent) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) setPickerOpen(false);
+    };
+    document.addEventListener('click', close);
+    return () => document.removeEventListener('click', close);
+  }, []);
+
+  const fullPhone = nationalNumber.trim() ? `${country.dialCode}${nationalNumber.trim().replace(/\D/g, '')}` : '';
 
   const handleVerifyAnchor = async () => {
     setError('');
 
-    // Validate phone number format (E.164)
-    const phoneRegex = /^\+[1-9]\d{1,14}$/;
-    if (!phoneRegex.test(phoneNumber)) {
-      setError('Invalid phone number format. Use E.164 format (e.g., +2348012345678)');
+    const formatted = formatPhoneE164(fullPhone || `${country.dialCode}${nationalNumber}`, country.code);
+    if (!formatted.ok) {
+      setError(formatted.error || 'Invalid phone number. Use E.164 (e.g. +234 801 234 5678).');
       return;
     }
 
     setIsVerifying(true);
 
     try {
-      // fetchIdentityAnchor uses normalizePhoneVariants internally to prevent "No active identity" on live site
-      const result = await fetchIdentityAnchor(phoneNumber.trim());
+      const result = await fetchIdentityAnchor(formatted.e164);
 
       if (!result.success || !result.identity) {
         setError(result.error || 'Identity not found. Please register first.');
@@ -51,9 +67,8 @@ export function IdentityAnchorInput({
         return;
       }
 
-      // KILL AUTO-VERIFY: Only transition to biometric scan step; do NOT mark as verified
       onAnchorVerified({
-        phoneNumber,
+        phoneNumber: formatted.e164,
         fullName: result.identity.full_name,
         identity: result.identity,
       });
@@ -65,21 +80,18 @@ export function IdentityAnchorInput({
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && phoneNumber && !isVerifying) {
-      handleVerifyAnchor();
-    }
+    if (e.key === 'Enter' && fullPhone && !isVerifying) handleVerifyAnchor();
   };
 
   return (
-    <div 
+    <div
       className="rounded-2xl border p-8"
       style={{
         background: 'linear-gradient(135deg, rgba(212, 175, 55, 0.05) 0%, rgba(0, 0, 0, 0.8) 100%)',
         borderColor: 'rgba(212, 175, 55, 0.3)',
-        boxShadow: '0 0 60px rgba(212, 175, 55, 0.2)'
+        boxShadow: '0 0 60px rgba(212, 175, 55, 0.2)',
       }}
     >
-      {/* Header */}
       <div className="text-center mb-8">
         <div className="text-6xl mb-4">🔗</div>
         <h2 className="text-3xl font-black mb-2" style={{ color: '#D4AF37' }}>
@@ -90,12 +102,11 @@ export function IdentityAnchorInput({
         </p>
       </div>
 
-      {/* Info Box */}
-      <div 
+      <div
         className="rounded-lg border p-4 mb-6"
         style={{
           background: 'rgba(212, 175, 55, 0.05)',
-          borderColor: 'rgba(212, 175, 55, 0.2)'
+          borderColor: 'rgba(212, 175, 55, 0.2)',
         }}
       >
         <div className="flex items-start gap-3">
@@ -114,37 +125,72 @@ export function IdentityAnchorInput({
         </div>
       </div>
 
-      {/* Phone Number Input */}
+      {/* Country Code Picker + Phone Input */}
       <div className="mb-6">
         <label className="block text-sm font-bold mb-2" style={{ color: '#D4AF37' }}>
-          Phone Number (E.164 Format)
+          Phone Number
         </label>
-        <input
-          type="tel"
-          value={phoneNumber}
-          onChange={(e) => setPhoneNumber(e.target.value)}
-          onKeyPress={handleKeyPress}
-          placeholder="+2348012345678"
-          disabled={isVerifying}
-          className="w-full px-4 py-3 rounded-lg border font-mono text-lg"
-          style={{
-            background: '#0d0d0f',
-            borderColor: error ? '#ef4444' : 'rgba(212, 175, 55, 0.3)',
-            color: '#D4AF37'
-          }}
-        />
+        <div className="flex rounded-lg border overflow-hidden" style={{ borderColor: 'rgba(212, 175, 55, 0.3)' }}>
+          <div className="relative" ref={pickerRef}>
+            <button
+              type="button"
+              onClick={() => setPickerOpen((o) => !o)}
+              className="flex items-center gap-2 px-3 py-3 border-r min-w-[120px] hover:bg-neutral-800/50 transition-colors"
+              style={{ borderColor: 'rgba(212, 175, 55, 0.3)', background: '#0d0d0f', color: '#D4AF37' }}
+            >
+              <span className="text-xl leading-none">{country.flag}</span>
+              <span className={`text-sm font-mono ${jetbrains.className}`}>{country.dialCode}</span>
+              <span className="ml-auto text-neutral-500">▾</span>
+            </button>
+            {pickerOpen && (
+              <div
+                className="absolute left-0 top-full z-50 mt-1 max-h-64 overflow-y-auto rounded-lg border shadow-xl"
+                style={{
+                  background: '#0d0d0f',
+                  borderColor: 'rgba(212, 175, 55, 0.3)',
+                  minWidth: 200,
+                }}
+              >
+                {PHONE_COUNTRIES.map((c) => (
+                  <button
+                    key={c.code}
+                    type="button"
+                    onClick={() => {
+                      setCountry(c);
+                      setPickerOpen(false);
+                    }}
+                    className="flex items-center gap-2 w-full px-3 py-2 text-left hover:bg-[#D4AF37]/10"
+                    style={{ color: c.code === country.code ? '#D4AF37' : '#a0a0a5' }}
+                  >
+                    <span className="text-lg">{c.flag}</span>
+                    <span className="font-mono text-sm">{c.dialCode}</span>
+                    <span className="text-sm truncate">{c.name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <input
+            type="tel"
+            value={nationalNumber}
+            onChange={(e) => setNationalNumber(e.target.value)}
+            onKeyPress={handleKeyPress}
+            placeholder="801 234 5678"
+            disabled={isVerifying}
+            className={`flex-1 px-4 py-3 font-mono text-lg bg-[#0d0d0f] text-[#D4AF37] placeholder-neutral-500 outline-none ${jetbrains.className}`}
+          />
+        </div>
         <p className="text-xs mt-2" style={{ color: '#6b6b70' }}>
-          Example: +234 (Nigeria), +1 (USA), +44 (UK)
+          Select country (flag) then enter number without country code. E.164 applied automatically.
         </p>
       </div>
 
-      {/* Error Message */}
       {error && (
-        <div 
+        <div
           className="rounded-lg border p-3 mb-6"
           style={{
             background: 'rgba(239, 68, 68, 0.1)',
-            borderColor: 'rgba(239, 68, 68, 0.3)'
+            borderColor: 'rgba(239, 68, 68, 0.3)',
           }}
         >
           <p className="text-sm font-bold" style={{ color: '#ef4444' }}>
@@ -153,7 +199,6 @@ export function IdentityAnchorInput({
         </div>
       )}
 
-      {/* Action Buttons */}
       <div className="flex gap-3">
         {onCancel && (
           <button
@@ -162,7 +207,7 @@ export function IdentityAnchorInput({
             className="flex-1 px-6 py-3 rounded-lg font-bold text-sm uppercase tracking-wider transition-all duration-300 hover:scale-105 disabled:opacity-50"
             style={{
               background: 'linear-gradient(135deg, #6b6b70 0%, #4a4a4e 100%)',
-              color: '#ffffff'
+              color: '#ffffff',
             }}
           >
             Cancel
@@ -170,16 +215,14 @@ export function IdentityAnchorInput({
         )}
         <button
           onClick={handleVerifyAnchor}
-          disabled={!phoneNumber || isVerifying}
+          disabled={!nationalNumber.trim() || isVerifying}
           className="flex-1 px-6 py-3 rounded-lg font-bold text-sm uppercase tracking-wider transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
           style={{
-            background: phoneNumber && !isVerifying
+            background: nationalNumber.trim() && !isVerifying
               ? 'linear-gradient(135deg, #D4AF37 0%, #c9a227 100%)'
               : 'linear-gradient(135deg, #6b6b70 0%, #4a4a4e 100%)',
-            color: phoneNumber && !isVerifying ? '#0d0d0f' : '#ffffff',
-            boxShadow: phoneNumber && !isVerifying
-              ? '0 0 30px rgba(212, 175, 55, 0.4)'
-              : 'none'
+            color: nationalNumber.trim() && !isVerifying ? '#0d0d0f' : '#ffffff',
+            boxShadow: nationalNumber.trim() && !isVerifying ? '0 0 30px rgba(212, 175, 55, 0.4)' : 'none',
           }}
         >
           {isVerifying ? 'Verifying Identity Anchor...' : 'Continue to Biometric Scan'}
@@ -188,4 +231,3 @@ export function IdentityAnchorInput({
     </div>
   );
 }
-

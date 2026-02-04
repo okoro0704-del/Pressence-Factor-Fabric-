@@ -10,6 +10,8 @@ interface GlobalPresenceGatewayContextType {
   setPresenceVerified: (verified: boolean) => void;
   checkAndRefreshPresence: () => Promise<boolean>;
   loading: boolean;
+  /** true while initial check or when DB returned empty/failed; show "Establishing Secure Connection to Mesh..." */
+  connecting: boolean;
 }
 
 const GlobalPresenceGatewayContext = createContext<GlobalPresenceGatewayContextType | undefined>(undefined);
@@ -22,29 +24,40 @@ export function GlobalPresenceGatewayProvider({ children }: { children: ReactNod
   const [isPresenceVerified, setIsPresenceVerified] = useState(false);
   const [presenceTimestamp, setPresenceTimestamp] = useState<Date | null>(null);
   const [loading, setLoading] = useState(true);
+  const [connecting, setConnecting] = useState(true);
   const [lastActivityTime, setLastActivityTime] = useState(Date.now());
   const router = useRouter();
   const pathname = usePathname();
 
   /**
-   * Check and refresh presence status from Supabase
+   * Check and refresh presence status from Supabase.
+   * Wrapped in try/catch; empty or failed response logs a warning and sets verified: false without freezing UI.
    */
   const checkAndRefreshPresence = useCallback(async (): Promise<boolean> => {
     try {
       const result = await checkPresenceVerified();
-      
+
       if (result.verified && result.timestamp) {
         setIsPresenceVerified(true);
         setPresenceTimestamp(result.timestamp);
         setLastActivityTime(Date.now());
+        setConnecting(false);
         return true;
-      } else {
-        setIsPresenceVerified(false);
-        setPresenceTimestamp(null);
-        return false;
       }
+
+      if (result.error) {
+        console.warn('[GlobalPresenceGateway] Presence check failed (non-blocking):', result.error);
+      }
+      setIsPresenceVerified(false);
+      setPresenceTimestamp(null);
+      setConnecting(false);
+      return false;
     } catch (error) {
-      console.error('[GlobalPresenceGateway] Error checking presence:', error);
+      const msg = error instanceof Error ? error.message : String(error);
+      console.warn('[GlobalPresenceGateway] Presence check threw (non-blocking):', msg);
+      setIsPresenceVerified(false);
+      setPresenceTimestamp(null);
+      setConnecting(false);
       return false;
     }
   }, []);
@@ -79,12 +92,18 @@ export function GlobalPresenceGatewayProvider({ children }: { children: ReactNod
   useEffect(() => {
     const initializePresence = async () => {
       setLoading(true);
-      const verified = await checkAndRefreshPresence();
-      setLoading(false);
-
-      // Redirect to gate if not verified and not on public route
-      if (!verified && !PUBLIC_ROUTES.includes(pathname)) {
-        router.push('/');
+      setConnecting(true);
+      try {
+        const verified = await checkAndRefreshPresence();
+        if (!verified && !PUBLIC_ROUTES.includes(pathname)) {
+          router.push('/');
+        }
+      } catch {
+        setIsPresenceVerified(false);
+        setConnecting(false);
+      } finally {
+        setLoading(false);
+        setConnecting(false);
       }
     };
 
@@ -153,6 +172,8 @@ export function GlobalPresenceGatewayProvider({ children }: { children: ReactNod
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, []);
 
+  const showConnectingMessage = loading || connecting;
+
   return (
     <GlobalPresenceGatewayContext.Provider
       value={{
@@ -161,9 +182,22 @@ export function GlobalPresenceGatewayProvider({ children }: { children: ReactNod
         setPresenceVerified: setPresenceVerifiedHandler,
         checkAndRefreshPresence,
         loading,
+        connecting,
       }}
     >
-      {children}
+      {showConnectingMessage ? (
+        <div
+          className="flex min-h-screen items-center justify-center bg-neutral-950 text-neutral-200"
+          role="status"
+          aria-live="polite"
+        >
+          <p className="font-mono text-sm tracking-wide text-neutral-400">
+            Establishing Secure Connection to Mesh...
+          </p>
+        </div>
+      ) : (
+        children
+      )}
     </GlobalPresenceGatewayContext.Provider>
   );
 }
