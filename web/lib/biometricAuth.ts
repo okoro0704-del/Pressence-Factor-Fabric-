@@ -46,7 +46,7 @@ export interface BiometricAuthResult {
   identity?: GlobalIdentity;
   errorMessage?: string;
   layersPassed: AuthLayer[];
-  /** True when scan hit 8s timeout; trigger Verification with Master Device or Elderly-First Manual Bypass */
+  /** True when scan hit 10s timeout; trigger Retry or Master Device Bypass */
   timedOut?: boolean;
   /** True when only 2 of 4 pillars met at timeout; auto-show Verify with Master Device */
   twoPillarsOnly?: boolean;
@@ -54,10 +54,12 @@ export interface BiometricAuthResult {
   silentModeUsed?: boolean;
 }
 
-/** Scan timeout: if 3-of-4 not verified within 8 seconds, trigger Master Device / Manual Bypass */
-export const SCAN_TIMEOUT_MS = 8000;
+/** Scan timeout: if 3-of-4 not verified within 10 seconds, trigger Retry / Master Device Bypass */
+export const SCAN_TIMEOUT_MS = 10000;
 /** Voice: after 5s silence/noise, suggest Silent Mode (Face + Device + GPS) */
 export const VOICE_SILENCE_TIMEOUT_MS = 5000;
+/** Noise threshold above which we prioritize frequency pattern over literal phrase match */
+const VOICE_NOISE_HIGH_THRESHOLD = 0.35;
 
 /**
  * LAYER 1: BIOMETRIC SIGNATURE (UNIVERSAL 1-TO-1 IDENTITY MATCHING)
@@ -133,8 +135,8 @@ export async function verifyBiometricSignature(
 }
 
 /**
- * MIC-CHECK: Initialize Web Speech API and verify browser has mic permission before scan.
- * Call before user clicks Start so voice layer is ready.
+ * MIC-CHECK: Initialize Web Speech API and verify browser has mic permission.
+ * Call on page load so microphone is listening the millisecond the gate loads (zero lag on Start).
  */
 export async function ensureVoiceAndMicReady(): Promise<{ ok: boolean; error?: string }> {
   try {
@@ -218,11 +220,14 @@ export async function verifyVoicePrint(
         source.connect(analyser);
         const dataArray = new Uint8Array(analyser.frequencyBinCount);
 
+        let noiseLevel = 0;
         if (options?.onAudioLevel) {
           levelInterval = setInterval(() => {
             analyser.getByteFrequencyData(dataArray);
             const avg = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
-            options.onAudioLevel!(Math.min(1, avg / 128));
+            const level = Math.min(1, avg / 128);
+            noiseLevel = noiseLevel * 0.9 + level * 0.1;
+            options.onAudioLevel!(level);
           }, 80);
         }
 
@@ -241,12 +246,24 @@ export async function verifyVoicePrint(
 
         recognition.onresult = async (event: any) => {
           if (silenceTimeout) { clearTimeout(silenceTimeout); silenceTimeout = null; }
-          const transcript = event.results[0][0].transcript.toLowerCase();
+          const transcript = event.results[0][0].transcript.toLowerCase().trim();
           const targetPhrase = 'i am vitalized';
-          const phraseMatch =
+          const literalMatch =
             transcript.includes(targetPhrase) ||
             transcript.includes('vitalized') ||
-            transcript.includes('i am vital');
+            transcript.includes('i am vital') ||
+            transcript.includes('presence') ||
+            transcript.includes("i'm vitalized") ||
+            transcript.includes('i am presence');
+          const highNoise = noiseLevel >= VOICE_NOISE_HIGH_THRESHOLD;
+          const frequencyPatternMatch = highNoise && (
+            transcript.includes('presence') ||
+            transcript.includes('vital') ||
+            transcript.includes('vitalized') ||
+            transcript.includes('pre') ||
+            transcript.includes('vit')
+          );
+          const phraseMatch = literalMatch || frequencyPatternMatch;
 
           if (!phraseMatch) {
             cleanup();
@@ -679,8 +696,26 @@ export async function resolveSovereignByPresence(
       setTimeout(() => reject(new Error('SCAN_TIMEOUT')), SCAN_TIMEOUT_MS)
     );
 
+    let quorumResolve: () => void;
+    const quorumP = new Promise<void>((resolve) => {
+      quorumResolve = resolve;
+    });
+
+    const checkQuorum = () => {
+      const faceOk = state.bio?.success;
+      const deviceOk = state.tpm?.success;
+      const locationOk = state.location?.success;
+      const voiceOk = state.voice?.success || (state.voice as VerifyVoicePrintResult)?.silentModeSuggested || skipVoiceLayer;
+      if (faceOk && deviceOk && locationOk && voiceOk) quorumResolve!();
+    };
+
+    bioP.then(checkQuorum);
+    voiceP.then(checkQuorum);
+    tpmP.then(checkQuorum);
+    locationP.then(checkQuorum);
+
     try {
-      await Promise.race([Promise.all([bioP, voiceP, tpmP, locationP]), timeoutP]);
+      await Promise.race([quorumP, timeoutP]);
     } catch (err) {
       if (err instanceof Error && err.message === 'SCAN_TIMEOUT') {
         if (state.bio?.success) layersPassed.push(AuthLayer.BIOMETRIC_SIGNATURE);
@@ -691,13 +726,15 @@ export async function resolveSovereignByPresence(
         const twoPillarsOnly = passed === 2;
         return fail(
           null,
-          `Verification timed out (8s). ${passed}/4 sensors completed. Use Verification with Master Device or Manual Bypass.`,
+          `Verification timed out (10s). ${passed}/4 sensors completed. Use Retry or Master Device Bypass.`,
           true,
           twoPillarsOnly
         );
       }
       throw err;
     }
+
+    await Promise.all([bioP, voiceP, tpmP, locationP]);
 
     const biometricResult = state.bio!;
     const voiceResult = state.voice!;

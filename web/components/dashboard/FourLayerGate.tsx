@@ -101,7 +101,7 @@ export function FourLayerGate() {
   const [adminPortalError, setAdminPortalError] = useState<string | null>(null);
   /** Sovereign Constitution Entry Gate: must sign constitution before 10 VIDA mint; re-sign if version changed */
   const [showConstitutionGate, setShowConstitutionGate] = useState(false);
-  /** 8s scan timeout: show Verification with Master Device / Manual Bypass */
+  /** 10s scan timeout: show Retry or Master Device Bypass */
   const [showTimeoutBypass, setShowTimeoutBypass] = useState(false);
   /** Voice pulse: 0–1 from onAudioLevel during voice scan */
   const [voiceLevel, setVoiceLevel] = useState(0);
@@ -118,13 +118,12 @@ export function FourLayerGate() {
   const router = useRouter();
   const { setPresenceVerified } = useGlobalPresenceGateway();
 
-  // Mic-check: initialize Web Speech and verify mic permission before user clicks Start
+  // Instant audio: start microphone listening the millisecond the gate page loads (zero lag on Start)
   useEffect(() => {
-    if (!identityAnchor || identityAnchor.vocalExempt) return;
     ensureVoiceAndMicReady().then((r) => {
       if (!r.ok) console.warn('[FourLayerGate] Mic-check:', r.error);
     });
-  }, [identityAnchor?.phone, identityAnchor?.vocalExempt]);
+  }, []);
 
   // Hydration sync: only become interactive after client has fully mounted
   useEffect(() => {
@@ -844,7 +843,7 @@ export function FourLayerGate() {
           </h1>
           <p className="text-lg text-[#6b6b70]">
             {authStatus === AuthStatus.SCANNING
-              ? 'Device → Location → Face (8s max)'
+              ? 'Device → Location → Face (10s max)'
               : 'Complete 3-of-4 pillars (Face + Device + Location or Voice)'}
           </p>
         </div>
@@ -982,7 +981,7 @@ export function FourLayerGate() {
         {authStatus === AuthStatus.FAILED && result && (
           <div className="p-6 rounded-lg bg-red-500/10 border-2 border-red-500 transition-all duration-200">
             <p className="text-red-500 font-bold text-center mb-4">
-              {result.timedOut ? '⏱️ Verification Timed Out (8s)' : '❌ Authentication Failed'}
+              {result.timedOut ? '⏱️ Verification Timed Out (10s)' : '❌ Authentication Failed'}
               {result.twoPillarsOnly && ' — Only 2/4 pillars met'}
             </p>
             <p className="text-sm text-[#6b6b70] text-center mb-4">{result.errorMessage}</p>
