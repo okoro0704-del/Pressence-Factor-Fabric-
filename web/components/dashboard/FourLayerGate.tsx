@@ -10,7 +10,6 @@ import {
   AuthStatus,
   type BiometricAuthResult,
   type PresencePillar,
-  ensureVoiceAndMicReady,
   startLocationRequestFromUserGesture,
   getCompositeDeviceFingerprint,
   SCAN_TIMEOUT_MS,
@@ -20,7 +19,6 @@ import type { GlobalIdentity } from '@/lib/phoneIdentity';
 import { isVocalResonanceExempt, isIdentityMinor, type BiometricIdentityRecord } from '@/lib/universalIdentityComparison';
 import type { LanguageCode } from '@/lib/i18n/config';
 import { ConfirmLanguageScreen } from '@/components/auth/ConfirmLanguageScreen';
-import { VocalInstructionScreen } from '@/components/auth/VocalInstructionScreen';
 import { VaultDoorAnimation } from './VaultDoorAnimation';
 import { useGlobalPresenceGateway } from '@/contexts/GlobalPresenceGateway';
 import { IdentityAnchorInput } from '@/components/auth/IdentityAnchorInput';
@@ -91,9 +89,10 @@ export function FourLayerGate() {
   } | null>(null);
   /** Dependent flow: show "Guardian Authorization Detected. Sentinel Secure." and skip full biometric. */
   const [showGuardianAuthorizationBypass, setShowGuardianAuthorizationBypass] = useState(false);
-  /** PRE-VITALIZATION: Confirm Language → Vocal Instruction → Identity Anchor (always show before login) */
+  /** PRE-VITALIZATION: Confirm Language → Identity Anchor (Voice step removed — Triple-Pillar only) */
   const [languageConfirmed, setLanguageConfirmed] = useState<LanguageCode | null>(null);
-  const [showVocalInstruction, setShowVocalInstruction] = useState(false);
+  /** Recover My Account: enter phone + 12 words to unbind from lost device */
+  const [showRecoverFlow, setShowRecoverFlow] = useState(false);
   const [showMismatchScreen, setShowMismatchScreen] = useState(false);
   const [mismatchData, setMismatchData] = useState<{
     type: MismatchEventType;
@@ -120,18 +119,13 @@ export function FourLayerGate() {
   const [showConstitutionGate, setShowConstitutionGate] = useState(false);
   /** 5s scan timeout: show Retry or Master Device Bypass */
   const [showTimeoutBypass, setShowTimeoutBypass] = useState(false);
-  /** Hardware Fingerprint pulse: 0–1 from onAudioLevel during verification */
-  const [voiceLevel, setVoiceLevel] = useState(0);
   /** Debug Info: show current user UUID for manual SQL promotion */
   const [showDebugModal, setShowDebugModal] = useState(false);
   const [debugUuid, setDebugUuid] = useState<string>('');
-  /** Progress Ring: Device Signature → GPS Presence → Sovereign Face (→ Hardware Fingerprint). */
+  /** Progress Ring: Device Signature → GPS Presence → Sovereign Face (Triple-Pillar; no Voice). */
   const [pillarDevice, setPillarDevice] = useState(false);
   const [pillarLocation, setPillarLocation] = useState(false);
   const [pillarFace, setPillarFace] = useState(false);
-  const [pillarVoice, setPillarVoice] = useState(false);
-  /** "Noisy environment detected. Switching to Silent Presence Mode..." */
-  const [silentModeMessage, setSilentModeMessage] = useState<string | null>(null);
   /** Location permission required — show gold popup to allow access */
   const [showLocationPermissionPopup, setShowLocationPermissionPopup] = useState(false);
   /** GPS taking >3s — show "Syncing with Local Mesh..." (indoor mode) */
@@ -169,13 +163,6 @@ export function FourLayerGate() {
       // ignore
     }
   }, [identityAnchor?.phone]);
-
-  // Instant audio: start microphone listening the millisecond the gate page loads (zero lag on Start)
-  useEffect(() => {
-    ensureVoiceAndMicReady().then((r) => {
-      if (!r.ok) console.warn('[FourLayerGate] Mic-check:', r.error);
-    });
-  }, []);
 
   // Hydration sync: only become interactive after client has fully mounted
   useEffect(() => {
@@ -285,12 +272,10 @@ export function FourLayerGate() {
     }
   };
 
-  /** MINOR: UI focuses exclusively on Face and Fingerprint (2 layers). ELDER: skip Voice (3 layers). Default: 4 layers. */
+  /** Triple-Pillar only: Device → GPS → Face. Voice layer removed (obsolete). MINOR: 2 layers (Face + Device). */
   const requiredLayers = identityAnchor?.isMinor
     ? [AuthLayer.BIOMETRIC_SIGNATURE, AuthLayer.HARDWARE_TPM]
-    : identityAnchor?.vocalExempt
-      ? [AuthLayer.BIOMETRIC_SIGNATURE, AuthLayer.HARDWARE_TPM, AuthLayer.GENESIS_HANDSHAKE]
-      : [AuthLayer.BIOMETRIC_SIGNATURE, AuthLayer.VOICE_PRINT, AuthLayer.HARDWARE_TPM, AuthLayer.GENESIS_HANDSHAKE];
+    : [AuthLayer.BIOMETRIC_SIGNATURE, AuthLayer.HARDWARE_TPM, AuthLayer.GENESIS_HANDSHAKE];
 
   const getLayerStatus = (layer: AuthLayer) => {
     if (!currentLayer) return 'pending';
@@ -342,13 +327,10 @@ export function FourLayerGate() {
     setResult(null);
     setShowVerifyFromAuthorizedDevice(false);
     setShowTimeoutBypass(false);
-    setVoiceLevel(0);
-    setSilentModeMessage(null);
     setGpsTakingLong(false);
     setPillarDevice(false);
     setPillarLocation(false);
     setPillarFace(false);
-    setPillarVoice(false);
 
     try {
       // DEPENDENT BYPASS: Guardian Authorization — skip Voice/Face resonance; inherit Sentinel from Guardian.
@@ -385,22 +367,18 @@ export function FourLayerGate() {
         setAuthStatus(status);
       },
       {
-        skipVoiceLayer: identityAnchor.vocalExempt === true,
+        skipVoiceLayer: true,
         requireAllLayers: isNewDevice,
         registeredCountryCode: 'NG',
-        voiceOptions: identityAnchor.vocalExempt ? undefined : { onAudioLevel: (l) => setVoiceLevel(l) },
-        onSilentMode: () => setSilentModeMessage('Noisy environment detected. Switching to Silent Presence Mode...'),
         onPillarComplete: (pillar: PresencePillar) => {
           if (pillar === 'device') setPillarDevice(true);
           if (pillar === 'location') setPillarLocation(true);
           if (pillar === 'face') setPillarFace(true);
-          if (pillar === 'voice') setPillarVoice(true);
         },
       }
     );
 
     setResult(authResult);
-    setVoiceLevel(0);
     if (authResult.locationPermissionRequired) setShowLocationPermissionPopup(true);
 
     if (authResult.timedOut) {
@@ -645,7 +623,7 @@ export function FourLayerGate() {
           setCurrentLayer(layer);
           setAuthStatus(status);
         },
-        { skipVoiceLayer: identityAnchor.vocalExempt === true, requireAllLayers: false }
+        { skipVoiceLayer: true, requireAllLayers: false }
       );
       if (authResult.success && authResult.identity) {
         const role = await getCurrentUserRole(identityAnchor.phone);
@@ -777,16 +755,14 @@ export function FourLayerGate() {
           setAuthStatus(status);
         },
         {
-          skipVoiceLayer: identityAnchor.vocalExempt === true,
+          skipVoiceLayer: true,
           requireAllLayers: true,
           migrationMode: true,
           registeredCountryCode: 'NG',
-          voiceOptions: identityAnchor.vocalExempt ? undefined : { onAudioLevel: (l) => setVoiceLevel(l) },
           onPillarComplete: (pillar: PresencePillar) => {
             if (pillar === 'device') setPillarDevice(true);
             if (pillar === 'location') setPillarLocation(true);
             if (pillar === 'face') setPillarFace(true);
-            if (pillar === 'voice') setPillarVoice(true);
           },
         }
       );
@@ -1111,35 +1087,19 @@ export function FourLayerGate() {
     />
   );
 
-  // PRE-VITALIZATION: Confirm Language (before vitalization or login)
-  if (!languageConfirmed && !showVocalInstruction) {
+  // PRE-VITALIZATION: Confirm Language → then Identity Anchor (Voice step removed)
+  if (!languageConfirmed) {
     return (
       <div className="min-h-screen bg-[#050505] flex items-center justify-center p-4">
         {screenBg}
         <ConfirmLanguageScreen
-          onConfirm={(code) => {
-            setLanguageConfirmed(code);
-            setShowVocalInstruction(true);
-          }}
+          onConfirm={(code) => setLanguageConfirmed(code)}
         />
       </div>
     );
   }
 
-  // PRE-VITALIZATION: Vocal Instruction (what to say + Read text or Repeat after audio)
-  if (showVocalInstruction && !identityAnchor) {
-    return (
-      <div className="min-h-screen bg-[#050505] flex items-center justify-center p-4">
-        {screenBg}
-        <VocalInstructionScreen
-          languageCode={languageConfirmed || 'en'}
-          onContinue={() => setShowVocalInstruction(false)}
-        />
-      </div>
-    );
-  }
-
-  // Recover My Account — enter phone + 12 words to unbind from lost device
+  // Recover My Account — enter phone + 12 words to unbind from lost device (navigate to RecoverMyAccountScreen)
   if (showRecoverFlow) {
     return (
       <div className="min-h-screen bg-[#050505] flex items-center justify-center p-4">
@@ -1262,21 +1222,15 @@ export function FourLayerGate() {
           </p>
         </div>
 
-        {/* Progress Ring: Triple-Pillar Shield — Device Sig. → GPS Presence → Sovereign Face → HW Fingerprint */}
+        {/* Progress Ring: Triple-Pillar Shield — Device Sig. → GPS Presence → Sovereign Face (no Voice) */}
         {authStatus === AuthStatus.SCANNING && (
           <div className="mb-8 transition-all duration-200">
             <PresenceProgressRing
               deviceVerified={pillarDevice}
               locationVerified={pillarLocation}
               faceVerified={pillarFace}
-              voiceVerified={pillarVoice}
-              showVoice={!identityAnchor?.vocalExempt}
+              showVoice={false}
             />
-            {silentModeMessage && (
-              <p className="mt-3 text-xs text-[#e8c547] text-center animate-pulse transition-opacity duration-200">
-                {silentModeMessage}
-              </p>
-            )}
           </div>
         )}
 
@@ -1342,26 +1296,6 @@ export function FourLayerGate() {
             <>🔓 Begin Authentication</>
           )}
         </motion.button>
-
-        {/* Hardware Fingerprint pulse: gold ring when scanning and 4th pillar required */}
-        {authStatus === AuthStatus.SCANNING && identityAnchor && !identityAnchor.vocalExempt && !silentModeMessage && (
-          <div className="mb-6 flex flex-col items-center gap-2 transition-all duration-200">
-            <div
-              className="rounded-full border-4 transition-transform duration-75 ease-out"
-              style={{
-                borderColor: 'rgba(212, 175, 55, 0.8)',
-                width: 72,
-                height: 72,
-                transform: `scale(${1 + voiceLevel * 0.4})`,
-                boxShadow: voiceLevel > 0.05 ? '0 0 24px rgba(212, 175, 55, 0.6)' : 'none',
-              }}
-              aria-hidden
-            />
-            {voiceLevel < 0.05 && (
-              <p className="text-xs text-[#e8c547] animate-pulse">Hardware Fingerprint: confirm presence.</p>
-            )}
-          </div>
-        )}
 
         <button
           type="button"
