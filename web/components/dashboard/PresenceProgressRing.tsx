@@ -1,9 +1,8 @@
 'use client';
 
 /**
- * Progress Ring: Device (instant) → Location (1s) → Face (2–3s).
- * Each segment turns gold when that pillar is verified. TOTAL SUCCESS at segment 3.
- * 200ms transition for instant feedback when 3rd pillar is verified.
+ * Triple-Pillar Shield Progress Ring: Device Signature → GPS Presence → Sovereign Face → Hardware Fingerprint.
+ * Each segment turns gold when that pillar is verified. 200ms transition for instant feedback.
  */
 
 const GOLD = '#D4AF37';
@@ -30,7 +29,7 @@ export interface PresenceProgressRingProps {
   locationVerified: boolean;
   faceVerified: boolean;
   voiceVerified?: boolean;
-  /** Show 4th segment (Voice) or only 3 (Device, Location, Face) */
+  /** Show 4th segment (Hardware Fingerprint) or only 3 pillars */
   showVoice?: boolean;
 }
 
@@ -77,21 +76,21 @@ export function PresenceProgressRing({
       </svg>
       <div className="flex flex-wrap justify-center gap-2 text-xs">
         <span className={deviceVerified ? 'text-[#D4AF37] font-semibold' : 'text-[#6b6b70]'}>
-          Device {deviceVerified ? '✓' : '…'}
+          Device Sig. {deviceVerified ? '✓' : '…'}
         </span>
         <span className="text-[#4a4a4e]">·</span>
         <span className={locationVerified ? 'text-[#D4AF37] font-semibold' : 'text-[#6b6b70]'}>
-          Location {locationVerified ? '✓' : '…'}
+          GPS Presence {locationVerified ? '✓' : '…'}
         </span>
         <span className="text-[#4a4a4e]">·</span>
         <span className={faceVerified ? 'text-[#D4AF37] font-semibold' : 'text-[#6b6b70]'}>
-          Face {faceVerified ? '✓' : '…'}
+          Sovereign Face {faceVerified ? '✓' : '…'}
         </span>
         {showVoice && (
           <>
             <span className="text-[#4a4a4e]">·</span>
             <span className={voiceVerified ? 'text-[#D4AF37] font-semibold' : 'text-[#6b6b70]'}>
-              Voice {voiceVerified ? '✓' : '…'}
+              HW Fingerprint {voiceVerified ? '✓' : '…'}
             </span>
           </>
         )}

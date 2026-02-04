@@ -101,14 +101,14 @@ export function FourLayerGate() {
   const [adminPortalError, setAdminPortalError] = useState<string | null>(null);
   /** Sovereign Constitution Entry Gate: must sign constitution before 10 VIDA mint; re-sign if version changed */
   const [showConstitutionGate, setShowConstitutionGate] = useState(false);
-  /** 10s scan timeout: show Retry or Master Device Bypass */
+  /** 5s scan timeout: show Retry or Master Device Bypass */
   const [showTimeoutBypass, setShowTimeoutBypass] = useState(false);
-  /** Voice pulse: 0–1 from onAudioLevel during voice scan */
+  /** Hardware Fingerprint pulse: 0–1 from onAudioLevel during verification */
   const [voiceLevel, setVoiceLevel] = useState(0);
   /** Debug Info: show current user UUID for manual SQL promotion */
   const [showDebugModal, setShowDebugModal] = useState(false);
   const [debugUuid, setDebugUuid] = useState<string>('');
-  /** Progress Ring: Device → Location → Face (→ Voice). Updated by onPillarComplete. */
+  /** Progress Ring: Device Signature → GPS Presence → Sovereign Face (→ Hardware Fingerprint). */
   const [pillarDevice, setPillarDevice] = useState(false);
   const [pillarLocation, setPillarLocation] = useState(false);
   const [pillarFace, setPillarFace] = useState(false);
@@ -163,7 +163,7 @@ export function FourLayerGate() {
       case AuthLayer.BIOMETRIC_SIGNATURE:
         return '👤';
       case AuthLayer.VOICE_PRINT:
-        return '🎤';
+        return '🔐';
       case AuthLayer.HARDWARE_TPM:
         return '🔐';
       case AuthLayer.GENESIS_HANDSHAKE:
@@ -175,20 +175,39 @@ export function FourLayerGate() {
     }
   };
 
+  /** Triple-Pillar Shield labels: no Voice/Touch ID — use Hardware Fingerprint Verified */
   const getLayerName = (layer: AuthLayer) => {
     switch (layer) {
       case AuthLayer.BIOMETRIC_SIGNATURE:
-        return 'Face Recognition';
+        return 'Sovereign Face';
       case AuthLayer.VOICE_PRINT:
-        return 'Voice Print';
+        return 'Hardware Fingerprint Verified';
       case AuthLayer.HARDWARE_TPM:
-        return 'Hardware ID';
+        return 'Device Signature';
       case AuthLayer.GENESIS_HANDSHAKE:
         return 'Genesis Handshake';
       case AuthLayer.GPS_LOCATION:
-        return 'GPS Location';
+        return 'GPS Presence';
       default:
         return 'Unknown';
+    }
+  };
+
+  /** Scanning-state copy for Triple-Pillar sequence */
+  const getLayerScanningLabel = (layer: AuthLayer) => {
+    switch (layer) {
+      case AuthLayer.HARDWARE_TPM:
+        return 'Scanning Device Signature...';
+      case AuthLayer.GPS_LOCATION:
+        return 'Acquiring GPS Presence...';
+      case AuthLayer.BIOMETRIC_SIGNATURE:
+        return 'Resolving Sovereign Face...';
+      case AuthLayer.VOICE_PRINT:
+        return 'Verifying Hardware Fingerprint...';
+      case AuthLayer.GENESIS_HANDSHAKE:
+        return 'Genesis Handshake...';
+      default:
+        return 'Verifying...';
     }
   };
 
@@ -238,6 +257,10 @@ export function FourLayerGate() {
     }
     if (biometricPendingRef.current) return;
     biometricPendingRef.current = true;
+
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate([100, 50, 100, 50, 200]);
+    }
 
     setAuthStatus(AuthStatus.SCANNING);
     setResult(null);
@@ -652,7 +675,7 @@ export function FourLayerGate() {
             Guardian Authorization Detected. Sentinel Secure.
           </h2>
           <p className="text-sm text-[#a0a0a5] mb-6">
-            Your guardian&apos;s Sentinel is active. Voice/Face resonance check bypassed. Proceeding with secure access.
+            Your guardian&apos;s Sentinel is active. Hardware Fingerprint check bypassed. Proceeding with secure access.
           </p>
           <button
             type="button"
@@ -839,16 +862,16 @@ export function FourLayerGate() {
             className={`text-4xl font-bold text-[#D4AF37] uppercase tracking-wider mb-4 ${jetbrains.className}`}
             style={{ textShadow: '0 0 30px rgba(212, 175, 55, 0.6)' }}
           >
-            1-to-1 Identity Verification
+            Triple-Pillar Shield
           </h1>
           <p className="text-lg text-[#6b6b70]">
             {authStatus === AuthStatus.SCANNING
-              ? 'Device → Location → Face (10s max)'
-              : 'Complete 3-of-4 pillars (Face + Device + Location or Voice)'}
+              ? 'Device Signature → GPS Presence → Sovereign Face (5s)'
+              : 'Device Signature · GPS Presence · Sovereign Face · Hardware Fingerprint Verified'}
           </p>
         </div>
 
-        {/* Progress Ring: Device (instant) → Location (1s) → Face (2–3s). 200ms transition. */}
+        {/* Progress Ring: Triple-Pillar Shield — Device Sig. → GPS Presence → Sovereign Face → HW Fingerprint */}
         {authStatus === AuthStatus.SCANNING && (
           <div className="mb-8 transition-all duration-200">
             <PresenceProgressRing
@@ -891,11 +914,11 @@ export function FourLayerGate() {
                       <h3 className={`font-bold ${jetbrains.className} ${
                         status === 'complete' ? 'text-green-500' : status === 'active' ? 'text-[#D4AF37]' : 'text-[#6b6b70]'
                       }`}>
-                        Layer {index + 1}: {getLayerName(layer)}
+                        Pillar {index + 1}: {getLayerName(layer)}
                       </h3>
                       <p className="text-xs text-[#6b6b70]">
                         {status === 'complete' && '✅ Verified'}
-                        {status === 'active' && '🔄 Scanning...'}
+                        {status === 'active' && getLayerScanningLabel(layer)}
                         {status === 'pending' && '⏳ Waiting'}
                       </p>
                     </div>
@@ -929,7 +952,7 @@ export function FourLayerGate() {
           )}
         </motion.button>
 
-        {/* Voice pulse: gold ring when scanning and voice required */}
+        {/* Hardware Fingerprint pulse: gold ring when scanning and 4th pillar required */}
         {authStatus === AuthStatus.SCANNING && identityAnchor && !identityAnchor.vocalExempt && !silentModeMessage && (
           <div className="mb-6 flex flex-col items-center gap-2 transition-all duration-200">
             <div
@@ -944,7 +967,7 @@ export function FourLayerGate() {
               aria-hidden
             />
             {voiceLevel < 0.05 && (
-              <p className="text-xs text-[#e8c547] animate-pulse">Speak clearly into the microphone.</p>
+              <p className="text-xs text-[#e8c547] animate-pulse">Hardware Fingerprint: confirm presence.</p>
             )}
           </div>
         )}
@@ -981,7 +1004,7 @@ export function FourLayerGate() {
         {authStatus === AuthStatus.FAILED && result && (
           <div className="p-6 rounded-lg bg-red-500/10 border-2 border-red-500 transition-all duration-200">
             <p className="text-red-500 font-bold text-center mb-4">
-              {result.timedOut ? '⏱️ Verification Timed Out (10s)' : '❌ Authentication Failed'}
+              {result.timedOut ? '⏱️ Verification Timed Out (5s)' : '❌ Authentication Failed'}
               {result.twoPillarsOnly && ' — Only 2/4 pillars met'}
             </p>
             <p className="text-sm text-[#6b6b70] text-center mb-4">{result.errorMessage}</p>

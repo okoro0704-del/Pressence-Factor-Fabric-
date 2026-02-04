@@ -46,7 +46,7 @@ export interface BiometricAuthResult {
   identity?: GlobalIdentity;
   errorMessage?: string;
   layersPassed: AuthLayer[];
-  /** True when scan hit 10s timeout; trigger Retry or Master Device Bypass */
+  /** True when scan hit 5s timeout; trigger Retry or Master Device Bypass */
   timedOut?: boolean;
   /** True when only 2 of 4 pillars met at timeout; auto-show Verify with Master Device */
   twoPillarsOnly?: boolean;
@@ -54,8 +54,8 @@ export interface BiometricAuthResult {
   silentModeUsed?: boolean;
 }
 
-/** Scan timeout: if 3-of-4 not verified within 10 seconds, trigger Retry / Master Device Bypass */
-export const SCAN_TIMEOUT_MS = 10000;
+/** Scan timeout: all three pillars must resolve in under 5 seconds total */
+export const SCAN_TIMEOUT_MS = 5000;
 /** Voice: after 5s silence/noise, suggest Silent Mode (Face + Device + GPS) */
 export const VOICE_SILENCE_TIMEOUT_MS = 5000;
 /** Noise threshold above which we prioritize frequency pattern over literal phrase match */
@@ -726,7 +726,7 @@ export async function resolveSovereignByPresence(
         const twoPillarsOnly = passed === 2;
         return fail(
           null,
-          `Verification timed out (10s). ${passed}/4 sensors completed. Use Retry or Master Device Bypass.`,
+          `Verification timed out (5s). ${passed}/4 sensors completed. Use Retry or Master Device Bypass.`,
           true,
           twoPillarsOnly
         );
