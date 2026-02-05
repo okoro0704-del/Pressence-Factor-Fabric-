@@ -183,6 +183,12 @@ export async function verifyBiometricSignature(
       phone: identityAnchorPhone,
     };
     console.log('FACE CAPTURED:', faceData);
+    try {
+      const { setBiometricSessionVerified } = await import('./biometricSession');
+      setBiometricSessionVerified();
+    } catch {
+      // ignore
+    }
     return {
       success: true,
       credential: credentialForHash,

@@ -5,6 +5,7 @@ import { GlobalPresenceGatewayProvider } from '@/contexts/GlobalPresenceGateway'
 import { SovereignSeedProvider } from '@/contexts/SovereignSeedContext';
 import { GhostSessionGuard } from '@/components/GhostSessionGuard';
 import { RegisterServiceWorker } from '@/components/RegisterServiceWorker';
+import { BiometricSessionProvider } from '@/contexts/BiometricSessionContext';
 import Script from 'next/script';
 
 export const metadata: Metadata = {
@@ -27,6 +28,7 @@ export default function RootLayout({
     <html lang="en" className="dark">
       <head>
         <meta charSet="utf-8" />
+        {/* No link rel="preload" for scripts: avoid console noise; add only if pointing to an existing file with as="script". */}
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#0A0A0A" />
         {/* iOS: standalone web app, no Safari UI */}
@@ -251,6 +253,7 @@ export default function RootLayout({
       </head>
       <body className="bg-[#0d0d0f] text-[#f5f5f5] antialiased">
         <GlobalPresenceGatewayProvider>
+          <BiometricSessionProvider>
           <SovereignSeedProvider>
             <GhostSessionGuard>
               {/* app-root: base layer; overlays when inactive must unmount or use pointer-events-none to avoid dead screen */}
@@ -259,6 +262,7 @@ export default function RootLayout({
               </div>
             </GhostSessionGuard>
           </SovereignSeedProvider>
+          </BiometricSessionProvider>
           <HowToInstallTooltip />
           <RegisterServiceWorker />
         </GlobalPresenceGatewayProvider>

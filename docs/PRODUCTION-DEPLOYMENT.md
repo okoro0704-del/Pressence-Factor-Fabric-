@@ -106,7 +106,7 @@
    extra: {
      vitalieMode: 'PURE_SOVRYN',
      networkId: 'SOVRYN_MAINNET_GENESIS',
-     backendUrl: 'https://api.your-production-domain.com',
+     backendUrl: 'https://your-backend.fly.dev', // or your API URL; use Supabase for national reserve / citizen impact when backend not set
      vltApiUrl: 'https://vlt-node.sovryn.app/api/v1',
    }
    ```
@@ -247,7 +247,7 @@ curl https://api.your-production-domain.com/health
 
 ### Web Application
 
-1. **Visit production URL**: `https://your-production-domain.com`
+1. **Visit production URL**: e.g. `https://your-app.netlify.app` (set in Netlify)
 2. **Check data source**: Open browser console
    ```javascript
    // Should show VLT_LIVE or BACKEND_API, not MOCK

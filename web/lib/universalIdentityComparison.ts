@@ -15,7 +15,8 @@ import {
 } from './identityMismatchDetection';
 import { calculateAge } from './phoneIdentity';
 
-export const UNIVERSAL_VARIANCE_THRESHOLD = 0.5;
+/** Variance threshold — 30% more lenient for standard indoor lighting (0.5% → 0.65%). */
+export const UNIVERSAL_VARIANCE_THRESHOLD = 0.65;
 
 export interface IdentityAnchor {
   phone_number: string;

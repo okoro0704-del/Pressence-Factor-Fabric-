@@ -42,6 +42,7 @@ export interface Database {
           recovery_seed_salt: string | null;
           external_scanner_serial_number: string | null;
           external_fingerprint_hash: string | null;
+          biometric_hash: string | null;
           primary_sentinel_device_id: string | null;
           primary_sentinel_assigned_at: string | null;
           humanity_score: number | null;

@@ -73,6 +73,7 @@ import { BiometricPillar, type BiometricPillarHandle } from '@/components/auth/B
 import { AwaitingLoginApproval } from '@/components/auth/AwaitingLoginApproval';
 import { ArchitectVisionCapture } from '@/components/auth/ArchitectVisionCapture';
 import { speakSovereignAlignmentFailed } from '@/lib/sovereignVoice';
+import { useBiometricSession } from '@/contexts/BiometricSessionContext';
 import { createLoginRequest, completeLoginBridge } from '@/lib/loginRequest';
 
 const jetbrains = JetBrains_Mono({ weight: ['400', '600', '700'], subsets: ['latin'] });
@@ -89,6 +90,7 @@ export interface FourLayerGateProps {
  * No access to any page without completing all 4 layers
  */
 export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = {}) {
+  const { setVerified: setBiometricSessionVerified } = useBiometricSession();
   const [mounted, setMounted] = useState(false);
   const [authStatus, setAuthStatus] = useState<AuthStatus>(AuthStatus.IDLE);
   const [currentLayer, setCurrentLayer] = useState<AuthLayer | null>(null);
@@ -614,6 +616,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
 
   /** After Architect Vision gold freeze (0.5s), run the success flow (dashboard / Sacred Record / Awaiting Auth). */
   const handleArchitectVisionComplete = useCallback(async () => {
+    setBiometricSessionVerified(); // 15-min Auth-Active so Treasury/Swap don't re-prompt
     setShowArchitectVision(false);
     setArchitectVerificationSuccess(null);
     const p = architectSuccessRef.current;
@@ -656,7 +659,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     await updateDeviceLastUsed(compId);
     if (authResult.externalScannerSerialNumber != null) await setHumanityScoreVerified(anchor.phone);
     await goToDashboard();
-  }, [goToDashboard]);
+  }, [goToDashboard, setBiometricSessionVerified]);
 
   const handleMismatchDismiss = () => {
     setShowMismatchScreen(false);

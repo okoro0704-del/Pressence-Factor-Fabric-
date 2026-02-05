@@ -2,14 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { fetchNationalReserve, type NationalReserve } from '@/lib/supabaseTelemetry';
-import { getNationalReserveData } from '@/lib/mockDataService';
+import { fetchReserveCounter } from '@/lib/governmentTreasury';
+import { getSovereigntyFallbackReserve } from '@/lib/sovereigntyFallbacks';
 import { VIDA_USD_DISPLAY } from '@/lib/economic';
-
-const BACKEND_URL = process.env.NEXT_PUBLIC_PFF_BACKEND_URL || '';
 
 export function NationalReserveCharts() {
   const [reserve, setReserve] = useState<NationalReserve | null>(null);
-  const [totalNationalReserveAccumulated, setTotalNationalReserveAccumulated] = useState<number | null>(null);
+  const [totalNationalReserveAccumulated, setTotalNationalReserveAccumulated] = useState<number>(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -19,22 +18,14 @@ export function NationalReserveCharts() {
       if (liveData) {
         setReserve(liveData);
       } else {
-        setReserve(getNationalReserveData());
+        setReserve(getSovereigntyFallbackReserve() as NationalReserve);
       }
-      if (BACKEND_URL) {
-        try {
-          const res = await fetch(`${BACKEND_URL}/economic/vida-cap/national-reserve-accumulated`);
-          if (res.ok) {
-            const data = await res.json();
-            setTotalNationalReserveAccumulated(data.totalNationalReserveAccumulated ?? 0);
-          } else {
-            setTotalNationalReserveAccumulated(null);
-          }
-        } catch {
-          setTotalNationalReserveAccumulated(null);
-        }
-      } else {
-        setTotalNationalReserveAccumulated(null);
+      try {
+        const total = await fetchReserveCounter();
+        setTotalNationalReserveAccumulated(total);
+      } catch {
+        const { FALLBACK_TOTAL_NATIONAL_RESERVE_ACCUMULATED } = await import('@/lib/sovereigntyFallbacks');
+        setTotalNationalReserveAccumulated(FALLBACK_TOTAL_NATIONAL_RESERVE_ACCUMULATED);
       }
       setLoading(false);
     }
@@ -42,7 +33,8 @@ export function NationalReserveCharts() {
     loadReserveData();
   }, []);
 
-  if (loading || !reserve) {
+  const displayReserve = reserve ?? getSovereigntyFallbackReserve() as NationalReserve;
+  if (loading) {
     return (
       <div className="space-y-6">
         <div className="bg-[#16161a] rounded-xl p-6 border border-[#2a2a2e] animate-pulse">
@@ -60,12 +52,12 @@ export function NationalReserveCharts() {
         <div className="text-center">
           <h2 className="text-2xl font-bold text-[#D4AF37] mb-2 tracking-wider">THE ARCHITECT'S SOVEREIGN PORTFOLIO</h2>
           <div className="flex items-center justify-center gap-4 text-sm text-[#6b6b70]">
-            <span>Total Minted: <span className="font-mono text-[#D4AF37]">{reserve.sovereign_share_vida * 2} VIDA CAP</span></span>
+            <span>Total Minted: <span className="font-mono text-[#D4AF37]">{displayReserve.sovereign_share_vida * 2} VIDA CAP</span></span>
             <span className="text-[#D4AF37]">•</span>
-            <span>Sovereign Share (50%): <span className="font-mono text-[#D4AF37]">{reserve.sovereign_share_vida} VIDA CAP</span></span>
+            <span>Sovereign Share (50%): <span className="font-mono text-[#D4AF37]">{displayReserve.sovereign_share_vida} VIDA CAP</span></span>
           </div>
           <div className="mt-3 text-xs text-[#6b6b70]">
-            Total Value: <span className="font-mono text-[#00ff41]">₦{reserve.total_value_naira.toLocaleString()}</span> | <span className="font-mono text-[#3B82F6]">${reserve.total_value_usd.toLocaleString()}</span>
+            Total Value: <span className="font-mono text-[#00ff41]">₦{displayReserve.total_value_naira.toLocaleString()}</span> | <span className="font-mono text-[#3B82F6]">${displayReserve.total_value_usd.toLocaleString()}</span>
           </div>
         </div>
       </div>
@@ -84,12 +76,12 @@ export function NationalReserveCharts() {
             </div>
             <div className="space-y-2">
               <p className="text-5xl font-bold font-mono text-[#D4AF37] tracking-tight">
-                {reserve.national_vault_vida.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {displayReserve.national_vault_vida.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
               <p className="text-sm font-semibold text-[#D4AF37]">VIDA CAP</p>
               <p className="text-xs text-[#6b6b70] mt-2 uppercase tracking-wide">🔒 Locked Reserves</p>
               <div className="mt-3 pt-3 border-t border-[#D4AF37]/20">
-                <p className="text-xs text-[#6b6b70]">Value: <span className="font-mono text-[#D4AF37]">₦{(reserve.national_vault_vida * 1000 * 1400).toLocaleString()}</span></p>
+                <p className="text-xs text-[#6b6b70]">Value: <span className="font-mono text-[#D4AF37]">₦{(displayReserve.national_vault_vida * 1000 * 1400).toLocaleString()}</span></p>
               </div>
             </div>
           </div>
@@ -107,7 +99,7 @@ export function NationalReserveCharts() {
             </div>
             <div className="space-y-2">
               <p className="text-5xl font-bold font-mono text-[#3b82f6] tracking-tight">
-                {reserve.national_liquidity_vida.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {displayReserve.national_liquidity_vida.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
               <p className="text-sm font-semibold text-[#3b82f6]">VIDA CAP</p>
               <p className="text-xs text-[#6b6b70] mt-2 uppercase tracking-wide">💎 Dual System Reserve</p>
@@ -129,11 +121,7 @@ export function NationalReserveCharts() {
         <h4 className="text-xs font-bold text-[#D4AF37] uppercase tracking-wider mb-2">Government View</h4>
         <p className="text-xs text-[#6b6b70] mb-2">Total National Reserve Accumulated (all 5 VIDA splits from sovereign_mint_ledger)</p>
         <p className="text-3xl font-bold font-mono text-[#D4AF37]">
-          {totalNationalReserveAccumulated !== null
-            ? totalNationalReserveAccumulated.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-            : typeof (reserve as { sovereign_share_vida?: number })?.sovereign_share_vida === 'number'
-              ? ((reserve as { sovereign_share_vida: number }).sovereign_share_vida * 2).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-              : '—'}
+          {totalNationalReserveAccumulated.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </p>
         <p className="text-sm text-[#6b6b70] mt-1">VIDA CAP</p>
       </div>
@@ -142,7 +130,7 @@ export function NationalReserveCharts() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-[#0d0d0f] rounded-lg p-4 border border-[#2a2a2e]">
           <p className="text-xs text-[#6b6b70] mb-1">Backing Ratio</p>
-          <p className="text-xl font-bold text-[#c9a227]">{reserve.backing_ratio}</p>
+          <p className="text-xl font-bold text-[#c9a227]">{displayReserve.backing_ratio}</p>
           <p className="text-xs text-green-400 mt-1">Debt-Free</p>
         </div>
 
@@ -154,7 +142,7 @@ export function NationalReserveCharts() {
 
         <div className="bg-[#0d0d0f] rounded-lg p-4 border border-[#2a2a2e]">
           <p className="text-xs text-[#6b6b70] mb-1">Monthly Growth</p>
-          <p className="text-xl font-bold text-green-400">{reserve.monthly_growth}</p>
+          <p className="text-xl font-bold text-green-400">{displayReserve.monthly_growth}</p>
           <p className="text-xs text-[#6b6b70] mt-1">VIDA CAP Reserve</p>
         </div>
       </div>
@@ -171,7 +159,7 @@ export function NationalReserveCharts() {
           </div>
         </div>
         <p className="text-xs text-[#6b6b70] mt-2">
-          All values locked and verified by Sovereign Block Exchange Rate. Total Portfolio: {reserve.sovereign_share_vida} VIDA CAP = ₦{reserve.total_value_naira.toLocaleString()}
+          All values locked and verified by Sovereign Block Exchange Rate. Total Portfolio: {displayReserve.sovereign_share_vida} VIDA CAP = ₦{displayReserve.total_value_naira.toLocaleString()}
         </p>
       </div>
     </div>

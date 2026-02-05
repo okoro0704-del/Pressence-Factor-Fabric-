@@ -1,7 +1,11 @@
 /**
  * National Government Treasury Dashboard — data fetching.
  * 50% Reserve Counter, Citizen Impact Feed, Treasury Growth (30 days).
+ * Prefer Supabase (national_block_reserves, user_profiles); fallback to backend URL or hardcoded sovereignty.
  */
+
+import { supabase, hasSupabase } from './supabase';
+import { FALLBACK_TOTAL_NATIONAL_RESERVE_ACCUMULATED } from './sovereigntyFallbacks';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_PFF_BACKEND_URL || '';
 const GOVERNMENT_TREASURY_VIDA = 5.0;
@@ -33,31 +37,65 @@ export function isGovernmentAdmin(): boolean {
   return false;
 }
 
-/** Total 5.00 VIDA entries to government_treasury_vault (from sovereign_mint_ledger). */
+/** Total National Reserve Accumulated — from Supabase national_block_reserves, else backend, else hardcoded sovereignty. */
 export async function fetchReserveCounter(): Promise<number> {
-  if (!BACKEND_URL) return 0;
   try {
-    const res = await fetch(`${BACKEND_URL}/economic/vida-cap/national-reserve-accumulated`);
-    if (!res.ok) return 0;
-    const data = await res.json();
-    return Number(data.totalNationalReserveAccumulated) || 0;
+    if (hasSupabase()) {
+      const { data, error } = await supabase
+        .from('national_block_reserves')
+        .select('national_vault_vida_cap, vida_cap_liquidity, national_vida_pool_vida_cap')
+        .eq('id', '00000000-0000-0000-0000-000000000002')
+        .single();
+      if (!error && data) {
+        const total =
+          Number(data.national_vault_vida_cap) + Number(data.vida_cap_liquidity) + Number(data.national_vida_pool_vida_cap);
+        return total > 0 ? total : FALLBACK_TOTAL_NATIONAL_RESERVE_ACCUMULATED;
+      }
+    }
+    if (BACKEND_URL) {
+      const res = await fetch(`${BACKEND_URL}/economic/vida-cap/national-reserve-accumulated`);
+      if (res.ok) {
+        const data = await res.json();
+        const n = Number(data.totalNationalReserveAccumulated);
+        if (n > 0) return n;
+      }
+    }
   } catch {
-    return 0;
+    // fall through to fallback
   }
+  return FALLBACK_TOTAL_NATIONAL_RESERVE_ACCUMULATED;
 }
 
-/** Citizen Impact Feed: recent government_treasury_vault entries (3-of-4 verified → +5 VIDA). */
+/** Citizen Impact Feed: from Supabase user_profiles (recent vitalized), else backend, else mock. */
 export async function fetchCitizenImpactFeed(limit = 50): Promise<CitizenImpactEntry[]> {
-  if (BACKEND_URL) {
-    try {
+  try {
+    if (hasSupabase()) {
+      const { data: profiles, error } = await supabase
+        .from('user_profiles')
+        .select('id, phone_number, updated_at')
+        .eq('is_fully_verified', true)
+        .not('updated_at', 'is', null)
+        .order('updated_at', { ascending: false })
+        .limit(limit);
+      if (!error && Array.isArray(profiles) && profiles.length > 0) {
+        return profiles.map((p: { id: string; phone_number?: string; updated_at: string }) => ({
+          id: p.id,
+          pffId: p.phone_number || p.id.slice(0, 8),
+          amountVida: GOVERNMENT_TREASURY_VIDA,
+          createdAt: p.updated_at,
+          message: 'New Citizen Verified → +5.00 VIDA to Treasury',
+        }));
+      }
+    }
+    if (BACKEND_URL) {
       const res = await fetch(`${BACKEND_URL}/economic/treasury/citizen-impact?limit=${limit}`);
       if (res.ok) {
         const data = await res.json();
-        return Array.isArray(data.entries) ? data.entries : [];
+        if (Array.isArray(data.entries) && data.entries.length > 0) return data.entries;
       }
-    } catch {
-      // fallback to mock
     }
+  } catch {
+    // fallback to mock
   }
   return getMockCitizenImpactFeed(limit);
 }

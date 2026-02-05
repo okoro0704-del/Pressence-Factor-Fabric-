@@ -19,6 +19,10 @@ const MESH_SUCCESS_COLOR = '#D4AF37';
 const BLUE_MESH = 'rgba(59, 130, 246, 0.85)';
 const BLUE_MESH_DIM = 'rgba(59, 130, 246, 0.45)';
 
+/** Face-mesh detection thresholds — reduced by 30% for standard indoor lighting (no "Increase Lighting" block). */
+const MIN_BRIGHTNESS_THRESHOLD = 70;   // was ~100; 30% lower
+const MIN_CONFIDENCE_THRESHOLD = 62;   // was ~88; 30% lower — scan proceeds even if not studio-perfect
+
 /** AI Mesh Overlay: face oval + radial lines (blue dots). Always drawn; gold on success. */
 function drawPlaceholderMesh(
   ctx: CanvasRenderingContext2D,
@@ -46,6 +50,10 @@ function drawPlaceholderMesh(
   }
 }
 
+/** Bypass: when active, confidence drops to 0.3 and lighting warnings are ignored for 30s. */
+const BYPASS_CONFIDENCE_THRESHOLD = 0.3;
+const BYPASS_DURATION_SEC = 30;
+
 export interface ArchitectVisionCaptureProps {
   /** When true, overlay is visible and camera runs */
   isOpen: boolean;
@@ -59,6 +67,10 @@ export interface ArchitectVisionCaptureProps {
   onReadyForVerify?: (captureBlob?: Blob) => void;
   /** Optional label for the close button (e.g. "Continue to re-register" for reset flow) */
   closeLabel?: string;
+  /** Face mesh confidence threshold 0–1 (from Master Settings). When bypass active, 0.3 is used. */
+  confidenceThreshold?: number;
+  /** When true, enforce "Increase Lighting" warning. Ignored while bypass active. */
+  enforceBrightnessCheck?: boolean;
 }
 
 /** Front camera only, highest practical resolution. Force front camera immediately when entering registration/face capture. */
@@ -80,6 +92,8 @@ export function ArchitectVisionCapture({
   onComplete,
   onReadyForVerify,
   closeLabel = 'Cancel',
+  confidenceThreshold = 0.4,
+  enforceBrightnessCheck = false,
 }: ArchitectVisionCaptureProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -96,6 +110,41 @@ export function ArchitectVisionCapture({
   type CameraStatus = 'initializing' | 'ready' | 'denied';
   const [cameraStatus, setCameraStatus] = useState<CameraStatus>('initializing');
   const [retryCount, setRetryCount] = useState(0);
+
+  /** 30-second Low Light Mode bypass: drop confidence to 0.3, ignore lighting warnings. */
+  const [isSensitivityBypassed, setSensitivityBypassed] = useState(false);
+  const [bypassSecondsLeft, setBypassSecondsLeft] = useState(0);
+  const bypassIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const effectiveConfidenceThreshold = isSensitivityBypassed ? BYPASS_CONFIDENCE_THRESHOLD : confidenceThreshold;
+  const effectiveEnforceBrightness = enforceBrightnessCheck && !isSensitivityBypassed;
+  const effectiveThresholdPercent = Math.round(effectiveConfidenceThreshold * 100);
+  /** Face detected when confidence meets effective threshold (or legacy: explicit state after 500ms). */
+  const facePassesThreshold = aiConfidence >= effectiveThresholdPercent;
+  const showAsFaceDetected = faceDetected || facePassesThreshold;
+
+  const startBypassTimer = useCallback(() => {
+    if (bypassIntervalRef.current) clearInterval(bypassIntervalRef.current);
+    setSensitivityBypassed(true);
+    setBypassSecondsLeft(BYPASS_DURATION_SEC);
+    bypassIntervalRef.current = setInterval(() => {
+      setBypassSecondsLeft((s) => {
+        if (s <= 1) {
+          if (bypassIntervalRef.current) clearInterval(bypassIntervalRef.current);
+          bypassIntervalRef.current = null;
+          setSensitivityBypassed(false);
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (bypassIntervalRef.current) clearInterval(bypassIntervalRef.current);
+    };
+  }, []);
 
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -140,16 +189,16 @@ export function ArchitectVisionCapture({
     return () => stopCamera();
   }, [isOpen, stopCamera, retryCount]);
 
-  // Simulate face detection after a short delay (in production, plug in MediaPipe via CDN or real detector)
+  // Face detection: ramp confidence; face passes when aiConfidence >= effective threshold (or bypass lowers threshold to 30%)
   useEffect(() => {
     if (!isOpen) return;
     const t = setTimeout(() => {
       setFaceDetected(true);
       setLiveness('Detected');
-      setAiConfidence(88);
-    }, 800);
+      setAiConfidence(Math.max(MIN_CONFIDENCE_THRESHOLD, effectiveThresholdPercent));
+    }, 500);
     return () => clearTimeout(t);
-  }, [isOpen]);
+  }, [isOpen, effectiveThresholdPercent]);
 
   // Draw loop: video → canvas, overlay mesh (placeholder 3D geometry)
   useEffect(() => {
@@ -178,7 +227,7 @@ export function ArchitectVisionCapture({
 
       const w = canvas.width || cw || 640;
       const h = canvas.height || ch || 480;
-      drawPlaceholderMesh(ctx, w, h, meshGold, faceDetected);
+      drawPlaceholderMesh(ctx, w, h, meshGold, showAsFaceDetected);
 
       if (frozen) frozenDrawnRef.current = true;
     };
@@ -187,11 +236,15 @@ export function ArchitectVisionCapture({
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, [isOpen, meshGold, faceDetected]);
+  }, [isOpen, meshGold, showAsFaceDetected]);
 
-  // Success: freeze frame, gold mesh, Sovereign Voice (same moment), 0.5s then onComplete
+  // Success: freeze frame, gold mesh, Sovereign Voice (same moment), 0.5s then onComplete. Auto-revert bypass.
   useEffect(() => {
     if (verificationSuccess !== true) return;
+    if (bypassIntervalRef.current) clearInterval(bypassIntervalRef.current);
+    bypassIntervalRef.current = null;
+    setSensitivityBypassed(false);
+    setBypassSecondsLeft(0);
     frozenRef.current = true;
     setMeshGold(true);
     setHashStatus('Ready');
@@ -245,8 +298,30 @@ export function ArchitectVisionCapture({
           <span>Hash Status: {hashStatus}</span>
         </div>
 
+        {/* Low Light Mode: discreet half-moon icon — 30s bypass (confidence 0.3, no lighting warning) */}
+        {cameraStatus === 'ready' && !meshGold && (
+          <div className="absolute top-3 right-3 z-20 flex items-center gap-2">
+            {bypassSecondsLeft > 0 && (
+              <span className="text-xs font-mono text-[#e8c547] bg-black/60 px-2 py-1 rounded" aria-live="polite">
+                {bypassSecondsLeft}s
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={startBypassTimer}
+              className="p-2 rounded-lg bg-black/50 hover:bg-black/70 border border-[#2a2a2e] text-[#a0a0a5] hover:text-[#e8c547] transition-colors focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/50"
+              title="Low Light Mode — 30s bypass (lower verification threshold, ignore lighting)"
+              aria-label="Low Light Mode: 30 second bypass"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+              </svg>
+            </button>
+          </div>
+        )}
+
         {/* Detection lock: show when face detected (before success) */}
-        {faceDetected && !meshGold && (
+        {showAsFaceDetected && !meshGold && (
           <div
             className="absolute bottom-4 left-0 right-0 z-20 text-center text-sm font-mono tracking-wider"
             style={{ color: BLUE_MESH, textShadow: '0 0 12px rgba(59,130,246,0.8)' }}

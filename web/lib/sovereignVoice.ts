@@ -11,7 +11,7 @@ const SUCCESS_SCRIPT =
   'Sovereign Identity Confirmed. One VIDA anchored. Welcome to the Protocol, Architect.';
 
 const ALIGNMENT_FAILED_SCRIPT =
-  'Alignment failed. Please adjust lighting and try again.';
+  'Position face clearly in frame. Scan can proceed.';
 
 function isSpeechSupported(): boolean {
   return typeof window !== 'undefined' && 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
@@ -66,8 +66,8 @@ export function speakSovereignSuccess(): void {
 }
 
 /**
- * Call when the scan fails (alignment / lighting).
- * Speaks: "Alignment failed. Please adjust lighting and try again."
+ * Call when the scan needs repositioning (alignment). Scan is allowed to proceed even if lighting isn’t studio-perfect.
+ * Speaks: "Position face clearly in frame. Scan can proceed."
  */
 export function speakSovereignAlignmentFailed(): void {
   speak(ALIGNMENT_FAILED_SCRIPT);

@@ -7,13 +7,14 @@ import { usePathname } from 'next/navigation';
 import { LayoutDashboard, Landmark, Vote, Shield, Settings2, ChevronLeft, Menu } from 'lucide-react';
 import { useTripleTapReset } from '@/lib/useTripleTapReset';
 
-/** Bottom tab bar and sidebar: exactly Dashboard, Treasury, Elections, Master, Command. All financial assets live under Treasury. */
+/** Bottom tab bar and sidebar: Dashboard, Treasury, Elections, Master, Command, Settings. */
 const NAV = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/treasury', label: 'Treasury', icon: Landmark },
   { href: '/government/elections', label: 'Elections', icon: Vote },
   { href: '/master/dashboard', label: 'Master', icon: Shield },
   { href: '/master/command-center', label: 'Command', icon: Settings2 },
+  { href: '/settings', label: 'Settings', icon: SlidersHorizontal },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {

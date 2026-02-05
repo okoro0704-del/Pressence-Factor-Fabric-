@@ -6,6 +6,7 @@ import { getVidaBalanceOnChain } from '@/lib/sovryn/vidaBalance';
 import { getIdentityAnchorPhone } from '@/lib/sentinelActivation';
 import { NGN_PER_USD } from '@/lib/sovryn/vngn';
 import { fetchNationalBlockReserves, type NationalBlockReserves } from '@/lib/supabaseTelemetry';
+import { getSovereigntyFallbackBlockReserves } from '@/lib/sovereigntyFallbacks';
 import { getCitizenVaultData } from '@/lib/mockDataService';
 import { VIDA_USD_DISPLAY } from '@/lib/economic';
 import { getOrCreateSovereignWallet } from '@/lib/sovereignInternalWallet';
@@ -17,6 +18,7 @@ import { SendModal } from './SendModal';
 import { RecentActivityList } from './RecentActivityList';
 import { UBABrandingCard } from '@/components/dashboard/UBABrandingCard';
 import { useSovereignSeed } from '@/contexts/SovereignSeedContext';
+import { useBiometricSession } from '@/contexts/BiometricSessionContext';
 
 const TOKENS = ['VIDA', 'DLLR', 'USDT', 'vNGN'] as const;
 type Token = (typeof TOKENS)[number];
@@ -59,6 +61,7 @@ function BalanceRow({
 export function UnifiedSovereignTreasury() {
   const phoneNumber = getIdentityAnchorPhone();
   const sovereignSeed = useSovereignSeed();
+  const { isAuthActive, requestQuickAuth } = useBiometricSession();
   const native = useNativeBalances(phoneNumber);
   const [spendableVidaFromProfile, setSpendableVidaFromProfile] = useState<number | null>(null);
   const [vidaBalance, setVidaBalance] = useState<string>('—');
@@ -70,6 +73,7 @@ export function UnifiedSovereignTreasury() {
   const [showReceive, setShowReceive] = useState(false);
   const [nationalReserves, setNationalReserves] = useState<NationalBlockReserves | null>(null);
   const [linkedAccounts, setLinkedAccounts] = useState<string[]>([]);
+  const [quickAuthMessage, setQuickAuthMessage] = useState<string | null>(null);
 
   const refreshInternalWallet = useCallback(async () => {
     if (!phoneNumber?.trim()) return;
@@ -109,8 +113,8 @@ export function UnifiedSovereignTreasury() {
 
   useEffect(() => {
     fetchNationalBlockReserves()
-      .then((r) => setNationalReserves(r ?? null))
-      .catch(() => setNationalReserves(null));
+      .then((r) => setNationalReserves(r ?? getSovereigntyFallbackBlockReserves() as NationalBlockReserves))
+      .catch(() => setNationalReserves(getSovereigntyFallbackBlockReserves() as NationalBlockReserves));
   }, []);
 
   useEffect(() => {
@@ -183,7 +187,16 @@ export function UnifiedSovereignTreasury() {
         <div className="px-5 pb-5 flex flex-wrap gap-3">
           <button
             type="button"
-            onClick={() => setShowSend(true)}
+            onClick={async () => {
+              setQuickAuthMessage(null);
+              if (isAuthActive) {
+                setShowSend(true);
+                return;
+              }
+              const ok = await requestQuickAuth();
+              if (ok) setShowSend(true);
+              else setQuickAuthMessage('Verification cancelled. Try again or use Face Pulse for high-value moves.');
+            }}
             className="px-6 py-3 rounded-xl font-bold uppercase tracking-wider border transition-all hover:opacity-90"
             style={{ background: 'rgba(42,42,46,0.6)', color: GOLD, borderColor: GOLD_BORDER }}
           >
@@ -199,13 +212,27 @@ export function UnifiedSovereignTreasury() {
           </button>
           <button
             type="button"
-            onClick={() => setShowSwap(true)}
+            onClick={async () => {
+              setQuickAuthMessage(null);
+              if (isAuthActive) {
+                setShowSwap(true);
+                return;
+              }
+              const ok = await requestQuickAuth();
+              if (ok) setShowSwap(true);
+              else setQuickAuthMessage('Verification cancelled. Try again or use Face Pulse for high-value moves.');
+            }}
             className="px-6 py-3 rounded-xl font-bold uppercase tracking-wider border transition-all hover:opacity-90"
             style={{ background: GOLD, color: '#0d0d0f', borderColor: GOLD_BORDER }}
           >
             Swap
           </button>
         </div>
+        {quickAuthMessage && (
+          <p className="px-5 pb-2 text-xs text-[#a0a0a5] text-center" role="alert">
+            {quickAuthMessage}
+          </p>
+        )}
 
         {/* Linked Account — Nigerian Bank exit ramp */}
         <div className="px-5 pb-5">

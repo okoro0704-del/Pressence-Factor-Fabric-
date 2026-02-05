@@ -32,6 +32,7 @@ export async function hashExternalFingerprintRaw(rawOutput: string): Promise<str
  * Persist fingerprint hash to recovery_seed_hash (and external_fingerprint_hash) in Supabase.
  * Call after external scanner returns raw buffer → hash with sha256FromUint8Array → then this.
  */
+/** When fingerprint is registered, hash is stored in external_fingerprint_hash and optionally biometric_hash (profiles table). */
 export async function persistFingerprintHashToRecoverySeed(
   phoneNumber: string,
   fingerprintHashHex: string,
@@ -44,17 +45,26 @@ export async function persistFingerprintHashToRecoverySeed(
     return { ok: false, error: 'Phone number and fingerprint hash required.' };
   }
   try {
+    const hash = fingerprintHashHex.trim();
     const payload: Record<string, unknown> = {
-      recovery_seed_hash: fingerprintHashHex.trim(),
+      recovery_seed_hash: hash,
       updated_at: new Date().toISOString(),
     };
-    if (options?.alsoSetExternalFingerprintHash) {
-      payload.external_fingerprint_hash = fingerprintHashHex.trim();
-    }
-    const { error } = await (supabase as any)
+    // Always sync fingerprint hash to Supabase (external_fingerprint_hash + biometric_hash when column exists)
+    payload.external_fingerprint_hash = hash;
+    payload.biometric_hash = hash;
+    let { error } = await (supabase as any)
       .from('user_profiles')
       .update(payload)
       .eq('phone_number', trimmed);
+    if (error && /column.*biometric_hash|does not exist/i.test(error.message ?? '')) {
+      delete payload.biometric_hash;
+      const retry = await (supabase as any)
+        .from('user_profiles')
+        .update(payload)
+        .eq('phone_number', trimmed);
+      error = retry.error;
+    }
     if (error) return { ok: false, error: error.message ?? 'Failed to persist recovery_seed_hash' };
     return { ok: true };
   } catch (e) {
