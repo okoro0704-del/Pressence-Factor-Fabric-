@@ -955,6 +955,8 @@ export interface ResolveSovereignOptions {
   registeredCountryCode?: string;
   /** Industrial-only enrollment: disable phone fingerprint; Biometric Pillar waits for External USB/Bluetooth Scanner. 5 VIDA MINTED only when Face Pulse AND External Fingerprint are captured. */
   useExternalScanner?: boolean;
+  /** Mobile short-circuit: hide Device/Fingerprint pillar; quorum = Face + Voice + Location only. Fingerprint deferred to Sentinel Hub. */
+  skipDevicePillarForMobile?: boolean;
 }
 
 /** SOVEREIGN THRESHOLD: minimum layers that must pass to grant access (3-out-of-4 quorum) */
@@ -975,6 +977,7 @@ export async function resolveSovereignByPresence(
   const onPillarComplete = options?.onPillarComplete;
   const registeredCountryCode = options?.registeredCountryCode;
   const useExternalScanner = options?.useExternalScanner === true;
+  const skipDevicePillarForMobile = options?.skipDevicePillarForMobile === true;
 
   const fail = (layer: AuthLayer | null, message: string, timedOut?: boolean, twoPillarsOnly?: boolean): BiometricAuthResult => ({
     success: false,
@@ -1023,7 +1026,12 @@ export async function resolveSovereignByPresence(
       return r;
     });
     const EXTERNAL_SCANNER_TIMEOUT_MS = 60_000;
-    const tpmP = useExternalScanner
+    const tpmP = skipDevicePillarForMobile
+      ? Promise.resolve({ success: true, deviceHash: 'mobile-deferred' } as const).then((r) => {
+          state.tpm = r;
+          return r;
+        })
+      : useExternalScanner
       ? waitForExternalFingerprint(EXTERNAL_SCANNER_TIMEOUT_MS).then(async (sig) => {
           const fingerprintHashSha256 = await hashExternalFingerprintRaw(sig.fingerprintHash);
           state.externalScanner = { fingerprintHash: fingerprintHashSha256, scannerSerialNumber: sig.scannerSerialNumber };
@@ -1065,14 +1073,16 @@ export async function resolveSovereignByPresence(
 
     const checkQuorum = () => {
       const faceOk = state.bio?.success === true && state.bio?.credential != null;
-      const deviceOk = useExternalScanner
+      const deviceOk = skipDevicePillarForMobile
+        ? true
+        : useExternalScanner
         ? state.externalScanner != null && state.externalScanner.fingerprintHash != null && state.externalScanner.scannerSerialNumber != null
         : (state.tpm?.success === true && state.tpm?.deviceHash != null && state.tpm.deviceHash !== '');
       const voiceOk =
         state.voice?.success === true ||
         (state.voice as VerifyVoicePrintResult)?.silentModeSuggested === true ||
         skipVoiceLayer;
-      // Dual-biometric (industrial): Face Pulse AND External Fingerprint required for 5 VIDA MINTED
+      // Dual-biometric (industrial): Face Pulse AND External Fingerprint required for 5 VIDA MINTED; mobile: Face + Voice + Location only
       if (faceOk && deviceOk && voiceOk) quorumResolve!();
     };
 
@@ -1087,10 +1097,12 @@ export async function resolveSovereignByPresence(
       if (err instanceof Error && err.message === 'SCAN_TIMEOUT') {
         if (state.bio?.success === true && state.bio?.credential != null) layersPassed.push(AuthLayer.BIOMETRIC_SIGNATURE);
         if (state.voice?.success === true && !(state.voice as VerifyVoicePrintResult).silentModeSuggested) layersPassed.push(AuthLayer.VOICE_PRINT);
-        if (useExternalScanner) {
-          if (state.externalScanner != null) layersPassed.push(AuthLayer.HARDWARE_TPM);
-        } else if (state.tpm?.success === true && state.tpm?.deviceHash != null) {
-          layersPassed.push(AuthLayer.HARDWARE_TPM);
+        if (!skipDevicePillarForMobile) {
+          if (useExternalScanner) {
+            if (state.externalScanner != null) layersPassed.push(AuthLayer.HARDWARE_TPM);
+          } else if (state.tpm?.success === true && state.tpm?.deviceHash != null && state.tpm.deviceHash !== 'mobile-deferred') {
+            layersPassed.push(AuthLayer.HARDWARE_TPM);
+          }
         }
         if (state.location?.success === true && state.location?.coords != null) layersPassed.push(AuthLayer.GPS_LOCATION);
         const passed = layersPassed.length;
@@ -1159,13 +1171,15 @@ export async function resolveSovereignByPresence(
     } else if (requireAllLayers) {
       return fail(AuthLayer.VOICE_PRINT, (voiceResult as VerifyVoicePrintResult).error || 'Voice verification failed.');
     }
-    const devicePillarOk = useExternalScanner
+    const devicePillarOk = skipDevicePillarForMobile
+      ? true
+      : useExternalScanner
       ? state.externalScanner != null
       : (tpmResult.success && tpmResult.deviceHash != null && tpmResult.deviceHash !== '');
-    if (devicePillarOk) {
+    if (devicePillarOk && !skipDevicePillarForMobile) {
       layersPassed.push(AuthLayer.HARDWARE_TPM);
       await markLayerPassed(3, identityAnchorPhone);
-    } else if (requireAllLayers) {
+    } else if (requireAllLayers && !skipDevicePillarForMobile) {
       return fail(
         AuthLayer.HARDWARE_TPM,
         useExternalScanner ? 'External fingerprint scanner required. Connect USB/Bluetooth scanner and scan finger.' : (tpmResult.error || 'Device not authorized.')
@@ -1195,12 +1209,13 @@ export async function resolveSovereignByPresence(
       return fail(AuthLayer.GENESIS_HANDSHAKE, 'Sovereign identity not found in Genesis Vault.');
     }
 
-    const quorumMet = layersPassed.length >= SOVEREIGN_QUORUM_MIN;
+    const minRequired = skipDevicePillarForMobile ? 3 : 4;
+    const quorumMet = layersPassed.length >= (skipDevicePillarForMobile ? 3 : SOVEREIGN_QUORUM_MIN);
     if (!quorumMet && !requireAllLayers) {
-      return fail(null, `Sovereign Threshold not met. ${layersPassed.length}/4 layers passed. Need ${SOVEREIGN_QUORUM_MIN}.`);
+      return fail(null, `Sovereign Threshold not met. ${layersPassed.length}/${minRequired} layers passed.`);
     }
-    if (requireAllLayers && layersPassed.length < 4) {
-      return fail(null, 'New device: all 4 layers required. Please complete full verification.');
+    if (requireAllLayers && layersPassed.length < (skipDevicePillarForMobile ? 3 : 4)) {
+      return fail(null, skipDevicePillarForMobile ? 'Complete Face and GPS to finish initial registration.' : 'New device: all 4 layers required. Please complete full verification.');
     }
 
     const identity = genesisIdentity ?? (phoneNumber ? await resolvePhoneToIdentity(phoneNumber) : null);

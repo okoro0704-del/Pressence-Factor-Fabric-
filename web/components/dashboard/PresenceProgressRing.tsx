@@ -31,6 +31,8 @@ export interface PresenceProgressRingProps {
   voiceVerified?: boolean;
   /** Show 4th segment (Hardware Fingerprint) or only 3 pillars */
   showVoice?: boolean;
+  /** When false (mobile short-circuit), show only 2 segments: GPS Presence + Sovereign Face. Fingerprint deferred to hub. */
+  showDevicePillar?: boolean;
 }
 
 export function PresenceProgressRing({
@@ -39,18 +41,25 @@ export function PresenceProgressRing({
   faceVerified,
   voiceVerified = false,
   showVoice = true,
+  showDevicePillar = true,
 }: PresenceProgressRingProps) {
-  const segments = showVoice ? 4 : 3;
+  const twoPillarMobile = !showDevicePillar;
+  const segments = twoPillarMobile ? 2 : showVoice ? 4 : 3;
   const step = 360 / segments;
-  const segmentAngles = Array.from({ length: segments }, (_, i) => ({
-    start: i * step,
-    end: (i + 1) * step,
-    verified:
-      (i === 0 && deviceVerified) ||
-      (i === 1 && locationVerified) ||
-      (i === 2 && faceVerified) ||
-      (i === 3 && voiceVerified),
-  }));
+  const segmentAngles = twoPillarMobile
+    ? [
+        { start: 0, end: 180, verified: locationVerified },
+        { start: 180, end: 360, verified: faceVerified },
+      ]
+    : Array.from({ length: segments }, (_, i) => ({
+        start: i * step,
+        end: (i + 1) * step,
+        verified:
+          (i === 0 && deviceVerified) ||
+          (i === 1 && locationVerified) ||
+          (i === 2 && faceVerified) ||
+          (i === 3 && voiceVerified),
+      }));
 
   return (
     <div className="flex flex-col items-center gap-3">
@@ -75,10 +84,14 @@ export function PresenceProgressRing({
         ))}
       </svg>
       <div className="flex flex-wrap justify-center gap-2 text-xs">
-        <span className={deviceVerified ? 'text-[#D4AF37] font-semibold' : 'text-[#6b6b70]'}>
-          Device Sig. {deviceVerified ? '✓' : '…'}
-        </span>
-        <span className="text-[#4a4a4e]">·</span>
+        {!twoPillarMobile && (
+          <>
+            <span className={deviceVerified ? 'text-[#D4AF37] font-semibold' : 'text-[#6b6b70]'}>
+              Device Sig. {deviceVerified ? '✓' : '…'}
+            </span>
+            <span className="text-[#4a4a4e]">·</span>
+          </>
+        )}
         <span className={locationVerified ? 'text-[#D4AF37] font-semibold' : 'text-[#6b6b70]'}>
           GPS Presence {locationVerified ? '✓' : '…'}
         </span>
@@ -86,7 +99,7 @@ export function PresenceProgressRing({
         <span className={faceVerified ? 'text-[#D4AF37] font-semibold' : 'text-[#6b6b70]'}>
           Sovereign Face {faceVerified ? '✓' : '…'}
         </span>
-        {showVoice && (
+        {showVoice && showDevicePillar && (
           <>
             <span className="text-[#4a4a4e]">·</span>
             <span className={voiceVerified ? 'text-[#D4AF37] font-semibold' : 'text-[#6b6b70]'}>

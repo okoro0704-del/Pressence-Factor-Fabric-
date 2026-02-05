@@ -44,7 +44,9 @@ import {
   updateDeviceLastUsed,
 } from '@/lib/multiDeviceVitalization';
 import { maskPhoneForDisplay } from '@/lib/phoneMask';
+import { setHumanityScoreVerified } from '@/lib/humanityScore';
 import { mintFoundationSeigniorage } from '@/lib/foundationSeigniorage';
+import { setMintStatus, getMintStatus, MINT_STATUS_PENDING_HARDWARE, MINT_STATUS_MINTED } from '@/lib/mintStatus';
 import { hasSignedConstitution } from '@/lib/legalApprovals';
 import { setIdentityAnchorForSession, getIdentityAnchorPhone, isSentinelActive } from '@/lib/sentinelActivation';
 import { getCurrentUserRole, setRoleCookie, canAccessMaster, canAccessGovernment, getProfileWithPrimarySentinel } from '@/lib/roleAuth';
@@ -69,13 +71,18 @@ import { BiometricPillar } from '@/components/auth/BiometricPillar';
 
 const jetbrains = JetBrains_Mono({ weight: ['400', '600', '700'], subsets: ['latin'] });
 
+export interface FourLayerGateProps {
+  /** Hub verification (PC): force external fingerprint, then set MINTED and mint; redirect to /dashboard?minted=1 */
+  hubVerification?: boolean;
+}
+
 /**
  * 4-LAYER HANDSHAKE GATE (UNIVERSAL 1-TO-1 IDENTITY MATCHING)
  * Mandatory authentication gate for entire PFF system
  * Requires Identity Anchor (phone number) BEFORE biometric scan
  * No access to any page without completing all 4 layers
  */
-export function FourLayerGate() {
+export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = {}) {
   const [mounted, setMounted] = useState(false);
   const [authStatus, setAuthStatus] = useState<AuthStatus>(AuthStatus.IDLE);
   const [currentLayer, setCurrentLayer] = useState<AuthLayer | null>(null);
@@ -157,9 +164,17 @@ export function FourLayerGate() {
   /** Industrial-only: scanner serial + fingerprint hash from last successful verification (for Sentinel ID tagging). */
   const [lastExternalScannerSerial, setLastExternalScannerSerial] = useState<string | null>(null);
   const [lastExternalFingerprintHash, setLastExternalFingerprintHash] = useState<string | null>(null);
+  /** Mobile short-circuit: hide Fingerprint pillar; Complete Initial Registration and set mint_status PENDING_HARDWARE. */
+  const [isMobile, setIsMobile] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const { setPresenceVerified } = useGlobalPresenceGateway();
+
+  useEffect(() => {
+    if (typeof navigator !== 'undefined') {
+      setIsMobile(/Android|iPhone|iPad|iPod|webOS|Mobile/i.test(navigator.userAgent));
+    }
+  }, []);
 
   // Restore pillar state from localStorage so refresh doesn't require re-verifying HW/GPS
   useEffect(() => {
@@ -348,9 +363,12 @@ export function FourLayerGate() {
     }
   };
 
-  /** Triple-Pillar only: Device → GPS → Face. Voice layer removed (obsolete). MINOR: 2 layers (Face + Device). */
+  /** Triple-Pillar only: Device → GPS → Face. Voice layer removed (obsolete). MINOR: 2 layers (Face + Device). Mobile (non-hub): hide Fingerprint (Face + GPS + Genesis). */
+  const effectiveMobile = isMobile && !hubVerification;
   const requiredLayers = identityAnchor?.isMinor
     ? [AuthLayer.BIOMETRIC_SIGNATURE, AuthLayer.HARDWARE_TPM]
+    : effectiveMobile
+    ? [AuthLayer.BIOMETRIC_SIGNATURE, AuthLayer.GPS_LOCATION, AuthLayer.GENESIS_HANDSHAKE]
     : [AuthLayer.BIOMETRIC_SIGNATURE, AuthLayer.HARDWARE_TPM, AuthLayer.GENESIS_HANDSHAKE];
 
   const getLayerStatus = (layer: AuthLayer) => {
@@ -393,7 +411,7 @@ export function FourLayerGate() {
 
   const biometricPendingRef = useRef(false);
 
-  /** Triple-Pillar success: Device + GPS + Face verified (no Voice). Transition to Success/Dashboard. */
+  /** Triple-Pillar success: Device + GPS + Face verified (no Voice). Transition to Success/Dashboard. Mobile: skip mint when PENDING_HARDWARE. Hub: always set MINTED and mint, then redirect. */
   const goToDashboard = useCallback(async () => {
     if (!identityAnchor) return;
     const signed = await hasSignedConstitution(identityAnchor.phone);
@@ -401,14 +419,26 @@ export function FourLayerGate() {
       setShowConstitutionGate(true);
       return;
     }
-    await mintFoundationSeigniorage(identityAnchor.phone);
+    if (hubVerification) {
+      await setMintStatus(identityAnchor.phone, MINT_STATUS_MINTED);
+      await mintFoundationSeigniorage(identityAnchor.phone);
+    } else {
+      const mintRes = await getMintStatus(identityAnchor.phone);
+      if (!(mintRes.ok && mintRes.mint_status === MINT_STATUS_PENDING_HARDWARE)) {
+        await mintFoundationSeigniorage(identityAnchor.phone);
+      }
+    }
     setIdentityAnchorForSession(identityAnchor.phone);
     ensureGenesisIfEmpty(identityAnchor.phone, identityAnchor.name).catch(() => {});
     setPresenceVerified(true);
     setSessionIdentity(identityAnchor.phone);
     await logGuestAccessIfNeeded();
+    if (hubVerification) {
+      router.push('/dashboard?minted=1');
+      return;
+    }
     setShowVaultAnimation(true);
-  }, [identityAnchor]);
+  }, [identityAnchor, hubVerification, router]);
 
   const handleStartAuthentication = useCallback(async () => {
     if (!identityAnchor) {
@@ -471,7 +501,8 @@ export function FourLayerGate() {
         skipVoiceLayer: true,
         requireAllLayers: isNewDevice,
         registeredCountryCode: 'NG',
-        useExternalScanner: true,
+        useExternalScanner: hubVerification ? true : !isMobile,
+        skipDevicePillarForMobile: hubVerification ? false : isMobile,
         onPillarComplete: (pillar: PresencePillar) => {
           if (pillar === 'device') setPillarDevice(true);
           if (pillar === 'location') setPillarLocation(true);
@@ -542,6 +573,9 @@ export function FourLayerGate() {
             authResult.externalFingerprintHash ?? null
           );
 
+          if (effectiveMobile) {
+            await setMintStatus(identityAnchor.phone, MINT_STATUS_PENDING_HARDWARE);
+          }
           console.log('✅ PRIMARY_SENTINEL assigned (scanner:', authResult.externalScannerSerialNumber ?? '—', ') - check constitution then proceed');
           await goToDashboard();
           return;
@@ -622,7 +656,7 @@ export function FourLayerGate() {
     } finally {
       biometricPendingRef.current = false;
     }
-  }, [identityAnchor, goToDashboard]);
+  }, [identityAnchor, goToDashboard, isMobile, hubVerification]);
 
   const handleMismatchDismiss = () => {
     setShowMismatchScreen(false);
@@ -1384,7 +1418,11 @@ export function FourLayerGate() {
           </h1>
           <p className="text-lg text-[#6b6b70]">
             {authStatus === AuthStatus.SCANNING
-              ? 'Device Signature → GPS Presence → Sovereign Face (5s)'
+              ? effectiveMobile
+                ? 'GPS Presence → Sovereign Face (5s)'
+                : 'Device Signature → GPS Presence → Sovereign Face (5s)'
+              : effectiveMobile
+              ? 'GPS Presence · Sovereign Face · Complete Initial Registration'
               : 'Device Signature · GPS Presence · Sovereign Face · Hardware Fingerprint Verified'}
           </p>
         </div>
@@ -1397,9 +1435,10 @@ export function FourLayerGate() {
               locationVerified={pillarLocation}
               faceVerified={pillarFace}
               showVoice={false}
+              showDevicePillar={!effectiveMobile}
             />
-            {/* Hardware Handshake: Connect Scanner → USB session → finger data → hash & store → Biometric Anchor Secured */}
-            {identityAnchor && (
+            {/* Hardware Handshake: Connect Scanner → USB session → finger data → hash & store. Mobile: Fingerprint deferred to Sentinel Hub. */}
+            {identityAnchor && !effectiveMobile && (
               <div className="mt-6">
                 <BiometricPillar phoneNumber={identityAnchor.phone} />
               </div>
@@ -1466,7 +1505,7 @@ export function FourLayerGate() {
               <span>Scanning…</span>
             </>
           ) : (
-            <>⚒ Finalize Minting</>
+            <>{effectiveMobile ? 'Complete Initial Registration' : '⚒ Finalize Minting'}</>
           )}
         </motion.button>
 

@@ -66,9 +66,15 @@ export async function recordConstitutionSignature(
   }
 }
 
+function isMobileUserAgent(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return /Android|iPhone|iPad|iPod|webOS|Mobile/i.test(navigator.userAgent);
+}
+
 /**
- * Sign constitution with biometrics only. Industrial-only: requires Face Pulse AND a fresh scan
- * from the external USB/Bluetooth scanner as the Legal Digital Thumbprint. Saves signature to legal_approvals.
+ * Sign constitution with biometrics.
+ * Mobile: uses built-in sensor (FaceID/TouchID) only for the legal agreement signature; device_id = composite device fingerprint.
+ * PC/Hub: requires Face Pulse AND external USB/Bluetooth scanner as Legal Digital Thumbprint.
  */
 export async function signConstitutionWithBiometrics(
   identityAnchorPhone: string,
@@ -85,6 +91,20 @@ export async function signConstitutionWithBiometrics(
     return { ok: false, error: 'Biometric credential required. Complete face or fingerprint scan.' };
   }
 
+  const timestamp = new Date().toISOString();
+
+  if (isMobileUserAgent()) {
+    const compositeDeviceId = await getCompositeDeviceFingerprint();
+    const recorded = await recordConstitutionSignature(
+      trimmed,
+      version,
+      compositeDeviceId,
+      null
+    );
+    if (!recorded.ok) return { ok: false, error: recorded.error };
+    return { ok: true, device_id: compositeDeviceId, timestamp };
+  }
+
   const externalSignal = await waitForExternalFingerprint(60_000).catch((e) => {
     return null;
   });
@@ -95,7 +115,6 @@ export async function signConstitutionWithBiometrics(
     };
   }
 
-  const timestamp = new Date().toISOString();
   const recorded = await recordConstitutionSignature(
     trimmed,
     version,

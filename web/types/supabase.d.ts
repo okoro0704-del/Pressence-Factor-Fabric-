@@ -45,6 +45,7 @@ export interface Database {
           primary_sentinel_device_id: string | null;
           primary_sentinel_assigned_at: string | null;
           humanity_score: number | null;
+          mint_status: string | null;
           updated_at: string | null;
           [key: string]: unknown;
         };
