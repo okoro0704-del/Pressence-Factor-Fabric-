@@ -13,7 +13,7 @@ const BORDER = 'rgba(212, 175, 55, 0.25)';
 /**
  * PFF Sentinel — 3-out-of-4 biometric guardian scanning indicator.
  * Sits at top of Partners page. Connected to GlobalPresenceGateway:
- * when user has valid session: "Sentinel Status: Active | Mesh Secured".
+ * when user has valid session: "Sentinel Status: Active | Protocol Secured".
  */
 export function PFFSentinel() {
   const { isPresenceVerified, loading, connecting } = useGlobalPresenceGateway();
@@ -56,7 +56,7 @@ export function PFFSentinel() {
             {scanning
               ? 'Scanning...'
               : active
-                ? 'Sentinel Status: Active | Mesh Secured'
+                ? 'Sentinel Status: Active | Protocol Secured'
                 : 'Sentinel Status: Standby'}
           </p>
         </div>

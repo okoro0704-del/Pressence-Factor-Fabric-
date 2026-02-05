@@ -11,4 +11,4 @@ CREATE TABLE IF NOT EXISTS foundation_vault_ledger (
 CREATE INDEX IF NOT EXISTS idx_foundation_vault_ledger_citizen ON foundation_vault_ledger(citizen_id);
 CREATE INDEX IF NOT EXISTS idx_foundation_vault_ledger_created ON foundation_vault_ledger(created_at);
 
-COMMENT ON TABLE foundation_vault_ledger IS 'PFF Foundation Vault: 1 VIDA per verified identity (audit). Funds locked for Infrastructure & Future Mesh Projects.';
+COMMENT ON TABLE foundation_vault_ledger IS 'PFF Foundation Vault: 1 VIDA per verified identity (audit). Funds locked for Infrastructure & Future Protocol Projects.';

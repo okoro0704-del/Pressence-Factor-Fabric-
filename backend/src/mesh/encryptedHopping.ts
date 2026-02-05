@@ -1,5 +1,5 @@
 /**
- * PFF Backend — VLT Darknet Mesh Sync: Encrypted Hopping
+ * PFF Backend — VLT Darknet Protocol Sync: Encrypted Hopping
  * Store encrypted offline vitalization data on neighboring devices
  * Architect: Isreal Okoro (mrfundzman)
  * 

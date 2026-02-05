@@ -1,5 +1,5 @@
 /**
- * Humanity Ledger — Public (anonymous) count of verified humans in the Mesh.
+ * Humanity Ledger — Public (anonymous) count of verified humans in the Protocol.
  * Returns total number of profiles with humanity_score = 1.0 (Proof of Personhood).
  * No auth required; proves network growth to the world.
  */

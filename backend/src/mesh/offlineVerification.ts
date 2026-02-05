@@ -1,5 +1,5 @@
 /**
- * PFF Backend — VLT Darknet Mesh Sync: Offline Verification
+ * PFF Backend — VLT Darknet Protocol Sync: Offline Verification
  * 4-Layer Handshake verification using TEE without internet
  * Architect: Isreal Okoro (mrfundzman)
  * 

@@ -10,7 +10,7 @@ const jetbrains = JetBrains_Mono({ weight: ['400', '600'], subsets: ['latin'] })
 
 /**
  * Sovereign ID Card — Proof of Personhood (Verified Human).
- * WorldID-style high-tech aesthetics, branded as Sovereign Mesh.
+ * WorldID-style high-tech aesthetics, branded as Sovereign Protocol.
  * Shows Verified Human badge when humanity_score is 1.0.
  */
 export function SovereignIdCard() {
@@ -67,10 +67,10 @@ export function SovereignIdCard() {
       />
 
       <div className="p-5">
-        {/* Header: Sovereign Mesh branding */}
+        {/* Header: Sovereign Protocol branding */}
         <div className="flex items-center justify-between mb-4">
           <span className={`text-xs font-semibold uppercase tracking-[0.2em] text-[#D4AF37]/90 ${jetbrains.className}`}>
-            Sovereign Mesh
+            Sovereign Protocol
           </span>
           {verifiedHuman && (
             <span

@@ -1,11 +1,17 @@
 /**
  * PFF × Sovryn — VIDA CAP to DLLR Sovereign Swap
- * Deducts VIDA CAP from 20% Spendable Balance and credits DLLR on Rootstock
+ * Uses getSovereignSigner (internal) when phoneNumber set — no window.ethereum.
+ * Gas check: if insufficient RBTC, triggers Relayer for first swap.
+ * Contract: Sovryn swap convertByPath when configured; else DLLR credit path.
  */
 
-import { Contract, parseUnits, formatUnits } from 'ethers';
-import { DLLR_ADDRESS } from './config';
-import { getBrowserProvider } from './wallet';
+import { Contract, parseUnits } from 'ethers';
+import { DLLR_ADDRESS, SOVRYN_SWAP_CONTRACT_ADDRESS } from './config';
+import { getBrowserProvider, getRbtcBalance } from './wallet';
+import { getInternalSigner, MIN_RBTC_FOR_GAS } from './internalSigner';
+import { requestRelayerGasForSwap } from './relayerGas';
+import { swapByPath, getVidaToDllrPath } from './sovrynSwapContract';
+import { VIDA_TOKEN_ADDRESS } from './config';
 import { hasSupabase, supabase } from '../supabase';
 
 // Pricing Constants
@@ -23,6 +29,8 @@ const DLLR_ABI = [
 export interface SovereignSwapParams {
   vidaCapAmount: number; // Amount of VIDA CAP to swap
   citizenId?: string; // Optional citizen ID for Supabase lookup
+  /** When set, use internal signer (no Connect Wallet popup). */
+  phoneNumber?: string;
 }
 
 export interface SovereignSwapResult {
@@ -163,57 +171,78 @@ async function logToSovereignLedger(entry: Omit<SovereignLedgerEntry, 'id'>): Pr
 
 /**
  * Execute Sovereign Swap: VIDA CAP → DLLR
- *
- * Flow:
- * 1. Validate presence verification
- * 2. Get connected wallet address
- * 3. Deduct VIDA CAP from Supabase (20% spendable balance)
- * 4. Calculate DLLR output (1 VIDA CAP = 1,000 DLLR)
- * 5. Execute smart contract call to credit DLLR on Rootstock
- * 6. Log transaction to Sovereign Ledger
- * 7. Return result with tx hash
+ * Uses getSovereignSigner (internal) when phoneNumber set — no external provider.
+ * Gas: if RBTC below MIN_RBTC_FOR_GAS, triggers Relayer for first swap.
+ * Contract: Sovryn convertByPath when SOVRYN_SWAP_CONTRACT configured; else DLLR credit path.
  */
 export async function executeSovereignSwap(
   params: SovereignSwapParams
 ): Promise<SovereignSwapResult> {
-  const { vidaCapAmount, citizenId } = params;
+  const { vidaCapAmount, citizenId, phoneNumber } = params;
 
   try {
-    // Step 1: Validate amount
     if (vidaCapAmount <= 0) {
       return { success: false, error: 'Invalid VIDA CAP amount' };
     }
 
-    // Step 2: Get wallet provider and address
-    const provider = await getBrowserProvider();
-    const signer = await provider.getSigner();
+    // Get signer: when phoneNumber set use internal only (no window.ethereum)
+    let signer;
+    if (phoneNumber?.trim()) {
+      signer = await getInternalSigner(phoneNumber.trim());
+      if (!signer) return { success: false, error: 'Recovery seed not available. Complete setup first.' };
+    } else {
+      const provider = await getBrowserProvider();
+      if (!provider) return { success: false, error: 'No wallet provider found' };
+      signer = await provider.getSigner();
+    }
     const walletAddress = await signer.getAddress();
 
-    // Step 3: Calculate DLLR output
-    const dllrAmount = calculateDLLROutput(vidaCapAmount);
-
-    // Step 4: Deduct VIDA CAP from Supabase vault (if citizenId provided)
-    if (citizenId) {
-      const deductResult = await deductVIDAFromVault(citizenId, vidaCapAmount);
-      if (!deductResult.success) {
-        return { success: false, error: deductResult.error };
+    // Gas check: if insufficient RBTC and internal signer, trigger Relayer for first VIDA→DLLR swap
+    const { rbtc } = await getRbtcBalance(walletAddress);
+    const rbtcNum = parseFloat(rbtc);
+    if (phoneNumber?.trim() && rbtcNum < MIN_RBTC_FOR_GAS) {
+      const relayerResult = await requestRelayerGasForSwap(phoneNumber.trim());
+      if (relayerResult.ok) {
+        await new Promise((r) => setTimeout(r, 2500));
+      }
+      const { rbtc: rbtcAfter } = await getRbtcBalance(walletAddress);
+      if (parseFloat(rbtcAfter) < MIN_RBTC_FOR_GAS) {
+        return {
+          success: false,
+          error: 'Insufficient RBTC for gas. Relayer was notified — try again in a moment or add a small amount of RBTC.',
+        };
       }
     }
 
-    // Step 5: Execute smart contract call to credit DLLR
-    // NOTE: In production, this would call a swap contract that mints/transfers DLLR
-    // For now, we'll simulate the transaction (replace with actual contract call)
-    const contract = new Contract(DLLR_ADDRESS, DLLR_ABI, signer);
-    const decimals = await contract.decimals() as number;
-    const dllrAmountWei = parseUnits(dllrAmount.toString(), decimals);
+    const dllrAmount = calculateDLLROutput(vidaCapAmount);
 
-    // In production, this would be a swap contract call like:
-    // const tx = await swapContract.swapVIDAForDLLR(vidaCapAmount, walletAddress);
-    // For now, we'll use a transfer as a placeholder (requires DLLR in contract)
-    const tx = await contract.transfer(walletAddress, dllrAmountWei);
-    const receipt = await tx.wait();
+    if (citizenId) {
+      const deductResult = await deductVIDAFromVault(citizenId, vidaCapAmount);
+      if (!deductResult.success) return { success: false, error: deductResult.error };
+    }
 
-    // Step 6: Log to Sovereign Ledger
+    let txHash: string;
+
+    // Prefer Sovryn swap contract convertByPath when configured (VIDA → DLLR)
+    if (SOVRYN_SWAP_CONTRACT_ADDRESS && VIDA_TOKEN_ADDRESS && VIDA_TOKEN_ADDRESS !== '0x0000000000000000000000000000000000000000') {
+      const path = getVidaToDllrPath();
+      const vidaWei = parseUnits(vidaCapAmount.toString(), 18);
+      const swapResult = await swapByPath(signer, vidaWei, path);
+      if ('txHash' in swapResult) {
+        txHash = swapResult.txHash;
+      } else {
+        return { success: false, error: swapResult.error ?? 'Swap contract call failed' };
+      }
+    } else {
+      // Fallback: DLLR credit path (transfer to self as placeholder when no swap contract)
+      const contract = new Contract(DLLR_ADDRESS, DLLR_ABI, signer);
+      const decimals = (await contract.decimals()) as number;
+      const dllrAmountWei = parseUnits(dllrAmount.toString(), decimals);
+      const tx = await contract.transfer(walletAddress, dllrAmountWei);
+      const receipt = await tx.wait();
+      txHash = receipt.hash;
+    }
+
     const ledgerEntry: Omit<SovereignLedgerEntry, 'id'> = {
       timestamp: new Date(),
       fromVault: 'NATIONAL_BLOCK',
@@ -222,24 +251,27 @@ export async function executeSovereignSwap(
       dllrCredited: dllrAmount,
       exchangeRate: VIDA_TO_DLLR_RATE,
       walletAddress,
-      txHash: receipt.hash,
+      txHash,
       status: 'CONFIRMED',
     };
 
     const ledgerId = await logToSovereignLedger(ledgerEntry);
 
-    // Step 7: Return success result
     return {
       success: true,
       dllrAmount,
-      txHash: receipt.hash,
+      txHash,
       ledgerEntry: ledgerId ? { ...ledgerEntry, id: ledgerId } : undefined,
     };
   } catch (error) {
     console.error('[executeSovereignSwap] Error:', error);
+    const msg = error instanceof Error ? error.message : 'Swap failed';
+    const gasRelated = /insufficient funds|out of gas|not enough gas|gas required/i.test(msg);
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Swap failed',
+      error: phoneNumber && gasRelated
+        ? 'Insufficient RBTC for gas. Relayer was notified — try again or add a small amount of RBTC.'
+        : msg,
     };
   }
 }

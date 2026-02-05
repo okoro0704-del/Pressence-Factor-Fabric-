@@ -11,7 +11,7 @@ interface MerchantStoreSignProps {
 
 const W = 800;
 const H = 1000;
-const LOGO_TEXT = 'Sovereign Mesh';
+const LOGO_TEXT = 'Sovereign Protocol';
 const TAGLINE = 'VIDA ACCEPTED HERE – Secured by Presence';
 
 export function MerchantStoreSign({ walletAddress, onDownload }: MerchantStoreSignProps) {
@@ -53,7 +53,7 @@ export function MerchantStoreSign({ walletAddress, onDownload }: MerchantStoreSi
       ctx.lineWidth = 4;
       ctx.strokeRect(2, 2, W - 4, H - 4);
 
-      // Sovereign Mesh logo (text)
+      // Sovereign Protocol logo (text)
       ctx.fillStyle = '#e8c547';
       ctx.font = 'bold 48px system-ui, sans-serif';
       ctx.textAlign = 'center';
@@ -90,7 +90,7 @@ export function MerchantStoreSign({ walletAddress, onDownload }: MerchantStoreSi
       // Footer
       ctx.fillStyle = '#3d3d45';
       ctx.font = '14px system-ui, sans-serif';
-      ctx.fillText('PFF × Sovereign Mesh · Secured by Presence', W / 2, H - 40);
+      ctx.fillText('PFF × Sovereign Protocol · Secured by Presence', W / 2, H - 40);
 
       const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png', 1));
       if (!blob) throw new Error('Export failed');

@@ -8,7 +8,7 @@
  * - Verify Root-Pair binding
  * - Activate SOVRYN AI Deep Truth Feed
  * - Activate Anti-Kill Daemon
- * - Activate Darknet Mesh VLT syncing
+ * - Activate Darknet Protocol VLT syncing
  * - Log final deployment validation
  */
 
@@ -260,7 +260,7 @@ function activateAntiKillDaemon(): boolean {
  * Activate Darknet Mesh
  */
 function activateDarknetMesh(): boolean {
-  // Darknet Mesh is already implemented and active
+  // Darknet Protocol is already implemented and active
   return true;
 }
 

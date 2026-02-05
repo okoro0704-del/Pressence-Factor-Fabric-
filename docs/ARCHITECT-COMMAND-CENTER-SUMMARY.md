@@ -15,7 +15,7 @@ I've successfully built the complete **Architect's Sentinel Command Center** - a
 1. **✅ God-Mode Aesthetic** — Dark theme with Unicorn of Trust nebula background and animated stars
 2. **✅ Live Telemetry Dashboard** — Real-time counts for Active Sentinels, Total Tributes, and National Liquidity
 3. **✅ Security Status Display** — Massive 'HARDWARE BINDED' badge for HP/Mobile ROOT_SOVEREIGN_PAIR
-4. **✅ Action Center** — Broadcast to Mesh and Emergency Stasis Lock buttons with confirmation modals
+4. **✅ Action Center** — Broadcast to Protocol and Emergency Stasis Lock buttons with confirmation modals
 5. **✅ Backend API** — Complete API endpoints for telemetry, security status, and sovereign actions
 
 ---
@@ -153,11 +153,11 @@ I've successfully built the complete **Architect's Sentinel Command Center** - a
 
 ## 🎮 ACTION CENTER
 
-### Broadcast to Mesh Button
+### Broadcast to Protocol Button
 
 **Functionality:**
 - Opens modal with message textarea
-- Sends sovereign message to all connected Sentinels via Darknet Mesh
+- Sends sovereign message to all connected Sentinels via Darknet Protocol
 - Logs broadcast to VLT for transparency
 - Success/error feedback with auto-close
 
@@ -226,7 +226,7 @@ I've successfully built the complete **Architect's Sentinel Command Center** - a
 1. **`GET /api/command-center/telemetry`** — Get real-time telemetry data
 2. **`GET /api/command-center/security-status`** — Get ROOT_SOVEREIGN_PAIR security status
 3. **`GET /api/command-center/top-nations`** — Get top 10 nations by liquidity reserves
-4. **`POST /api/command-center/broadcast-mesh`** — Broadcast message to all Sentinels
+4. **`POST /api/command-center/broadcast-mesh`** — Broadcast message to all Sentinels (API path unchanged for compatibility)
 5. **`POST /api/command-center/emergency-stasis`** — Trigger global emergency stasis lock
 
 ---

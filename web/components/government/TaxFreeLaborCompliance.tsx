@@ -41,7 +41,7 @@ export function TaxFreeLaborCompliance() {
         </h3>
       </div>
       <p className="text-xs text-[#a0a0a5] mb-4">
-        Article VI — The 50% Government Reserve is the primary alternative to traditional income tax. Labor verified on the Mesh is tax-free at point of earnings; the National Reserve is funded by sovereign handshake allocation.
+        Article VI — The 50% Government Reserve is the primary alternative to traditional income tax. Labor verified on the Protocol is tax-free at point of earnings; the National Reserve is funded by sovereign handshake allocation.
       </p>
       {loading && totalReserve === null ? (
         <div className="h-14 bg-[#2a2a2e] rounded w-2/3 animate-pulse" />
@@ -54,7 +54,7 @@ export function TaxFreeLaborCompliance() {
         </div>
       )}
       <p className="text-xs text-[#6b6b70] mt-2">
-        Status: Compliant — Reserve accrual replaces income tax for Mesh participants.
+        Status: Compliant — Reserve accrual replaces income tax for Protocol participants.
       </p>
     </section>
   );

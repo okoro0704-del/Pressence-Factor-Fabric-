@@ -1,5 +1,5 @@
 /**
- * PFF Backend — VLT Darknet Mesh Sync: Gossip Protocol
+ * PFF Backend — VLT Darknet Protocol Sync: Gossip Protocol
  * Automatic Truth Packet swapping between connected Sentinels
  * Architect: Isreal Okoro (mrfundzman)
  * 

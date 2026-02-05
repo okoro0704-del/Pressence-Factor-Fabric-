@@ -69,7 +69,7 @@ INSERT INTO system_config (config_key, config_value, description)
 VALUES 
   ('EMERGENCY_STASIS_ACTIVE', 'false', 'Global emergency stasis lock status'),
   ('STASIS_TIMER_LOCK_ACTIVE', 'true', 'Stasis timer lock status (Feb 7, 2026)'),
-  ('MESH_BROADCAST_ENABLED', 'true', 'Darknet mesh broadcast enabled status')
+  ('MESH_BROADCAST_ENABLED', 'true', 'Darknet protocol broadcast enabled status')
 ON CONFLICT (config_key) DO NOTHING;
 
 -- ============================================================================

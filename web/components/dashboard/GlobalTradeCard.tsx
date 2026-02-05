@@ -7,8 +7,10 @@ import {
   ensureRSK,
   getDLLRBalance,
   isMasterHandshakeComplete,
+  deriveRSKWalletFromSeed,
 } from '@/lib/sovryn';
 import { sendDLLR, isValidAddress } from '@/lib/sovryn/sendDLLR';
+import { getIdentityAnchorPhone } from '@/lib/sentinelActivation';
 
 const jetbrains = JetBrains_Mono({ weight: ['400', '600', '700'], subsets: ['latin'] });
 
@@ -56,6 +58,16 @@ export function GlobalTradeCard() {
     setLoading(true);
     setError(null);
     try {
+      const phone = getIdentityAnchorPhone();
+      if (phone?.trim()) {
+        const derived = await deriveRSKWalletFromSeed(phone.trim());
+        if (derived.ok) {
+          setAddress(derived.address);
+          await fetchBalance(derived.address);
+          setLoading(false);
+          return;
+        }
+      }
       const addr = await getConnectedAddress();
       if (!addr) {
         setError('No wallet connected.');
@@ -110,10 +122,11 @@ export function GlobalTradeCard() {
     setSendError(null);
     setSendSuccess(null);
 
-    const result = await sendDLLR({
-      toAddress: recipientAddress,
-      amount: sendAmount,
-    });
+    const phone = getIdentityAnchorPhone();
+    const result = await sendDLLR(
+      { toAddress: recipientAddress, amount: sendAmount },
+      phone?.trim() ? { phoneNumber: phone.trim() } : undefined
+    );
 
     setSending(false);
 
@@ -264,7 +277,7 @@ export function GlobalTradeCard() {
               boxShadow: loading ? 'none' : '0 0 20px rgba(212, 175, 55, 0.3)',
             }}
           >
-            {loading ? 'Connecting...' : balance !== null ? '🔄 Refresh' : '🔗 Connect Wallet'}
+            {loading ? 'Loading…' : balance !== null ? '🔄 Refresh' : 'View balance'}
           </button>
 
           <button

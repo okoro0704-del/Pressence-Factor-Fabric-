@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { JetBrains_Mono } from 'next/font/google';
 import Link from 'next/link';
 import { PFFSentinel } from '@/components/partners/PFFSentinel';
+import { PlanSelector } from '@/components/sentinel/PlanSelector';
 import { getIdentityAnchorPhone, activateSentinelHandshake, isSentinelActive } from '@/lib/sentinelActivation';
 
 const jetbrains = JetBrains_Mono({ weight: ['400', '600', '700'], subsets: ['latin'] });
@@ -131,6 +132,11 @@ export default function SentinelPage() {
 
         {error && (
           <p className="text-sm text-red-400 mb-6">{error}</p>
+        )}
+
+        {/* Plan Selector — Standard ($100), Family ($200), Small Business ($500), Enterprise ($1000). Auto-debit from Spendable Vault. */}
+        {phone && (
+          <PlanSelector ownerId={phone} />
         )}
 
         {!phone && (

@@ -6,9 +6,12 @@ import {
   revokeDeviceAuthorization,
   updateDeviceNickname,
 } from '@/lib/multiDeviceVitalization';
+import { linkDeviceToLicense } from '@/lib/sentinelLicensing';
 
 interface SentinelDevicesManagerProps {
   phoneNumber: string;
+  /** From user_profiles.device_limit (Sentinel Hub plan). Add Device only allowed when linked count < device_limit. */
+  deviceLimit?: number | null;
 }
 
 interface AuthorizedDevice {
@@ -30,11 +33,13 @@ interface AuthorizedDevice {
  * Device Management UI for Sovereign Dashboard
  * Shows all authorized devices with revoke functionality
  */
-export function SentinelDevicesManager({ phoneNumber }: SentinelDevicesManagerProps) {
+export function SentinelDevicesManager({ phoneNumber, deviceLimit }: SentinelDevicesManagerProps) {
   const [devices, setDevices] = useState<AuthorizedDevice[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingNickname, setEditingNickname] = useState<string | null>(null);
   const [nicknameValue, setNicknameValue] = useState('');
+  const [addingDevice, setAddingDevice] = useState(false);
+  const [addDeviceError, setAddDeviceError] = useState<string | null>(null);
 
   useEffect(() => {
     loadDevices();
@@ -75,6 +80,21 @@ export function SentinelDevicesManager({ phoneNumber }: SentinelDevicesManagerPr
 
   const activeDevices = devices.filter((d) => d.status === 'ACTIVE');
   const revokedDevices = devices.filter((d) => d.status === 'REVOKED');
+  const linkedCount = activeDevices.length;
+  const canAddDevice = deviceLimit == null || linkedCount < deviceLimit;
+
+  const handleAddDevice = async () => {
+    if (!canAddDevice) return;
+    setAddDeviceError(null);
+    setAddingDevice(true);
+    const result = await linkDeviceToLicense(phoneNumber);
+    setAddingDevice(false);
+    if (result.ok) {
+      await loadDevices();
+    } else {
+      setAddDeviceError(result.error ?? 'Failed to link device');
+    }
+  };
 
   const getDeviceIcon = (deviceType: string) => {
     switch (deviceType) {
@@ -112,17 +132,42 @@ export function SentinelDevicesManager({ phoneNumber }: SentinelDevicesManagerPr
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <h2 className="text-2xl font-bold text-[#D4AF37] font-mono">SENTINEL DEVICES</h2>
-        <div className="flex gap-4 text-sm font-mono">
-          <div className="text-[#22c55e]">
-            Active: <span className="font-bold">{activeDevices.length}</span>
+        <div className="flex flex-wrap items-center gap-4">
+          {deviceLimit != null && (
+            <span className="text-sm font-mono text-[#6b6b70]">
+              Limit: <span className="text-[#D4AF37]">{linkedCount} / {deviceLimit}</span>
+            </span>
+          )}
+          <div className="flex gap-4 text-sm font-mono">
+            <div className="text-[#22c55e]">
+              Active: <span className="font-bold">{activeDevices.length}</span>
+            </div>
+            <div className="text-[#ef4444]">
+              Revoked: <span className="font-bold">{revokedDevices.length}</span>
+            </div>
           </div>
-          <div className="text-[#ef4444]">
-            Revoked: <span className="font-bold">{revokedDevices.length}</span>
-          </div>
+          <button
+            type="button"
+            onClick={handleAddDevice}
+            disabled={!canAddDevice || addingDevice}
+            className="px-4 py-2 rounded-lg font-bold text-sm uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed transition-colors bg-[#D4AF37] text-[#050505] hover:opacity-90"
+          >
+            {addingDevice ? 'Linking…' : canAddDevice ? 'Add Device' : 'Device limit reached'}
+          </button>
         </div>
       </div>
+      {addDeviceError && (
+        <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm font-mono">
+          {addDeviceError}
+        </div>
+      )}
+      {deviceLimit != null && !canAddDevice && (
+        <p className="text-xs text-[#6b6b70] font-mono">
+          Upgrade your plan on the Sentinel Hub to add more devices.
+        </p>
+      )}
 
       {/* Active Devices */}
       <div className="space-y-4">

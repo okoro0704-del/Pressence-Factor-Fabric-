@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { CURRENT_CONSTITUTION_VERSION, signConstitutionWithBiometrics } from '@/lib/legalApprovals';
 import { getCurrentUserRole } from '@/lib/roleAuth';
-import { ARTICLES_OF_THE_MESH, CONSTITUTION_PREAMBLE } from '@/data/articlesOfTheMesh';
+import { ARTICLES_OF_THE_PROTOCOL, CONSTITUTION_PREAMBLE } from '@/data/articlesOfTheProtocol';
 import { FileSignature, Loader2, CheckCircle } from 'lucide-react';
 
 const GOLD = '#D4AF37';
@@ -22,7 +22,7 @@ export interface SovereignConstitutionProps {
 
 /**
  * Sovereign Constitution Entry Gate.
- * Displays the Articles of the Mesh in a Legal Scroll format.
+ * Displays the Articles of the Protocol in a Legal Scroll format.
  * Replaces standard "I Agree" with Biometric Signature; 10 VIDA minting only after signature is recorded.
  */
 export function SovereignConstitution({
@@ -101,7 +101,7 @@ export function SovereignConstitution({
             className="text-lg font-bold uppercase tracking-widest"
             style={{ color: INK }}
           >
-            Articles of the Mesh
+            Articles of the Protocol
           </h1>
           <p className="text-xs mt-1" style={{ color: '#5c4d3a' }}>
             Sovereign Constitution · Version {CURRENT_CONSTITUTION_VERSION}
@@ -113,7 +113,7 @@ export function SovereignConstitution({
           <p className="text-sm italic leading-relaxed border-l-4 pl-4" style={{ borderColor: GOLD }}>
             {CONSTITUTION_PREAMBLE}
           </p>
-          {ARTICLES_OF_THE_MESH.map((article) => (
+          {ARTICLES_OF_THE_PROTOCOL.map((article) => (
             <section key={article.number} className="space-y-1">
               <h2 className="font-bold text-sm uppercase tracking-wide" style={{ color: GOLD }}>
                 Article {article.number}: {article.title}

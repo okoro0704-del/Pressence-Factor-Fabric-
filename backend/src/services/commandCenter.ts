@@ -291,7 +291,7 @@ export async function getTopNationsByLiquidity(limit: number = 10): Promise<Nati
 // ============================================================================
 
 /**
- * Broadcast Message to Mesh
+ * Broadcast Message to Protocol
  * Send sovereign message to all connected Sentinels
  */
 export async function broadcastToMesh(message: string): Promise<ActionResult> {
@@ -332,7 +332,7 @@ export async function broadcastToMesh(message: string): Promise<ActionResult> {
       ]
     );
 
-    console.log(`[COMMAND CENTER] Mesh broadcast sent: ${message}`);
+    console.log(`[COMMAND CENTER] Protocol broadcast sent: ${message}`);
 
     return {
       success: true,
@@ -341,11 +341,11 @@ export async function broadcastToMesh(message: string): Promise<ActionResult> {
     };
   } catch (e) {
     const err = e as Error;
-    console.error('[COMMAND CENTER] Failed to broadcast to mesh:', err);
+    console.error('[COMMAND CENTER] Failed to broadcast to protocol:', err);
 
     return {
       success: false,
-      error: 'Failed to broadcast to mesh',
+      error: 'Failed to broadcast to protocol',
       timestamp: timestamp.toISOString(),
     };
   }

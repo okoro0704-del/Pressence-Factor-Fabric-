@@ -93,7 +93,7 @@ export function isGuestMode(): boolean {
 
 /**
  * Log "Guest Access on Master Device" to access_logs.
- * Allows the Architect to see how many people used his phone as a gateway to the Mesh.
+ * Allows the Architect to see how many people used his phone as a gateway to the Protocol.
  * Table expected: access_logs (access_type, device_id?, auth_uid?, created_at).
  */
 export async function logGuestAccessOnMasterDevice(

@@ -4,7 +4,7 @@
 
 ## The Sovereign Bridge
 
-> An identity that only works in one country is a cage. By integrating a global SMS gateway, you turn the Sovereign Mesh into a borderless network.
+> An identity that only works in one country is a cage. By integrating a global SMS gateway, you turn the Sovereign Protocol into a borderless network.
 
 This document describes environment setup for the Global SMS Gateway (Netlify + local) and the E.164 standard for the Unique Identity Anchor.
 

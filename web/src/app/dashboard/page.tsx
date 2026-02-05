@@ -5,6 +5,8 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { DashboardContent } from '@/components/sovryn/DashboardContent';
 import { ProtectedRoute } from '@/components/dashboard/ProtectedRoute';
 import { InstallSmartBanner } from '@/components/InstallSmartBanner';
+import { VitalizationRequestListener } from '@/components/dashboard/VitalizationRequestListener';
+import { LoginRequestListener } from '@/components/dashboard/LoginRequestListener';
 import { getMintStatus, MINT_STATUS_PENDING_HARDWARE } from '@/lib/mintStatus';
 import { getIdentityAnchorPhone } from '@/lib/sentinelActivation';
 import { getProfileFaceAndSeed } from '@/lib/recoverySeedStorage';
@@ -17,6 +19,7 @@ import { startVerifiedMintListener } from '@/lib/sovryn/verifiedMintListener';
  */
 export default function DashboardPage() {
   const [mounted, setMounted] = useState(false);
+  const [identityPhone, setIdentityPhone] = useState<string | null>(null);
   const [pendingHardware, setPendingHardware] = useState(false);
   const [vaultStable, setVaultStable] = useState(false);
   /** When gasless mint completes, tx hash is set; UI shows "5 VIDA MINTED ON BITCOIN LAYER 2" with golden checkmark. */
@@ -30,6 +33,10 @@ export default function DashboardPage() {
     setMounted(true);
     console.log('Interaction Layer Active', '(dashboard)');
   }, []);
+
+  useEffect(() => {
+    if (mounted) setIdentityPhone(getIdentityAnchorPhone());
+  }, [mounted]);
 
   useEffect(() => {
     if (!mounted) return;
@@ -122,6 +129,8 @@ export default function DashboardPage() {
         )}
         <DashboardContent vaultStable={vaultStable} mintTxHash={mintTxHash} />
         <InstallSmartBanner />
+        {identityPhone && <VitalizationRequestListener phoneNumber={identityPhone} />}
+        {identityPhone && <LoginRequestListener phoneNumber={identityPhone} />}
       </main>
     </ProtectedRoute>
   );

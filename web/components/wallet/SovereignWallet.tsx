@@ -21,9 +21,12 @@ import {
 } from '@/lib/foundationSeigniorage';
 import { hasActiveSentinelLicense } from '@/lib/sentinelLicensing';
 import { getSentinelTokenVerified } from '@/lib/sentinelSecurityToken';
-import { SentinelActivationOverlay } from '@/components/dashboard/SentinelActivationOverlay';
-import { getMintStatus, getSpendingUnlocked, MINT_STATUS_MINTED } from '@/lib/mintStatus';
+import { getMintStatus, getSpendingUnlocked, getBiometricSpendingActive, MINT_STATUS_MINTED } from '@/lib/mintStatus';
 import { SpendingLockModal } from '@/components/dashboard/SpendingLockModal';
+import { SpendQRModal } from '@/components/dashboard/SpendQRModal';
+import { BETA_LIQUIDITY_TEST, SOVRYN_AMM_SWAP_URL } from '@/lib/betaLiquidityTest';
+import { useNativeBalances } from '@/lib/sovryn/useNativeBalances';
+import { MIN_RBTC_FOR_GAS } from '@/lib/sovryn/internalSigner';
 
 const jetbrains = JetBrains_Mono({ weight: ['400', '600', '700'], subsets: ['latin'] });
 
@@ -53,9 +56,17 @@ export function SovereignWallet({ phoneNumber, layerResults }: SovereignWalletPr
   const [tokenVerified, setTokenVerified] = useState<boolean>(false);
   const [fingerprintVerified, setFingerprintVerified] = useState<boolean>(false);
   const [spendingUnlocked, setSpendingUnlocked] = useState<boolean>(false);
+  const [biometricSpendingActive, setBiometricSpendingActive] = useState<boolean>(false);
   const [showLockModal, setShowLockModal] = useState<boolean>(false);
-  const sentinelVerified = hasLicense && tokenVerified;
-  const canSpend = fingerprintVerified || spendingUnlocked;
+  const [showSpendQR, setShowSpendQR] = useState(false);
+  const sentinelVerified = BETA_LIQUIDITY_TEST || (hasLicense && tokenVerified);
+  /** Protocol Release: unlock when is_fully_verified or face_hash present. */
+  const canSpend = biometricSpendingActive || fingerprintVerified || spendingUnlocked;
+  /** Native DLLR/USDT/RBTC from RSK every 10s (no Connect Wallet). */
+  const nativeBalances = useNativeBalances(phoneNumber);
+  const dllrDisplay = nativeBalances.address ? nativeBalances.dllr : (wallet?.dllr_balance ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 });
+  const usdtDisplay = nativeBalances.address ? nativeBalances.usdt : (wallet?.usdt_balance ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 });
+  const hasEnoughGas = nativeBalances.address && parseFloat(nativeBalances.rbtc) >= MIN_RBTC_FOR_GAS;
 
   useEffect(() => {
     let cancelled = false;
@@ -93,6 +104,9 @@ export function SovereignWallet({ phoneNumber, layerResults }: SovereignWalletPr
     });
     getSpendingUnlocked(phoneNumber).then((res) => {
       if (res.ok) setSpendingUnlocked(res.spending_unlocked);
+    });
+    getBiometricSpendingActive(phoneNumber).then((res) => {
+      if (res.ok) setBiometricSpendingActive(res.active);
     });
   }, [phoneNumber, wallet?.updated_at]);
 
@@ -188,6 +202,17 @@ export function SovereignWallet({ phoneNumber, layerResults }: SovereignWalletPr
         boxShadow: `0 0 60px ${GOLD_BG}`,
       }}
     >
+      {BETA_LIQUIDITY_TEST && (
+        <div
+          className="rounded-lg border-2 border-amber-500/60 bg-amber-500/15 px-4 py-3 text-center mb-6"
+          style={{ borderColor: 'rgba(245,158,11,0.6)' }}
+        >
+          <p className="text-sm font-bold uppercase tracking-wider" style={{ color: '#f59e0b' }}>
+            BETA TEST MODE: 100% Liquidity Unlocked (No Fees)
+          </p>
+          <p className="text-xs mt-1" style={{ color: 'rgba(245,158,11,0.9)' }}>Swap to DLLR / USDT active. Direct route to Sovryn AMM below.</p>
+        </div>
+      )}
       <h2
         className="text-2xl font-bold uppercase tracking-wider mb-6"
         style={{ color: GOLD, textShadow: `0 0 24px ${GOLD_DIM}` }}
@@ -200,27 +225,51 @@ export function SovereignWallet({ phoneNumber, layerResults }: SovereignWalletPr
         className="rounded-lg border px-4 py-2 mb-6 text-center text-xs font-semibold uppercase tracking-wider"
         style={{ borderColor: BORDER, color: GOLD_DIM, background: GOLD_BG }}
       >
-        Funds locked for Infrastructure &amp; Future Mesh Projects.
+        Funds locked for Infrastructure &amp; Future Protocol Projects.
       </div>
 
-      {/* Balance cards — user sees their 10 VIDA clearly */}
+      {/* Balance cards — DLLR/USDT from RSK every 10s; VIDA from internal */}
       <div className="grid gap-4 mb-4 sm:grid-cols-3">
         <BalanceCard
           label="Sovereign DLLR"
-          value={wallet?.dllr_balance ?? 0}
+          value={typeof dllrDisplay === 'string' ? parseFloat(dllrDisplay) || 0 : dllrDisplay}
           suffix="DLLR"
+          subLabel={nativeBalances.address ? 'From chain (10s)' : undefined}
         />
-        <BalanceCard label="USDT" value={wallet?.usdt_balance ?? 0} suffix="USDT" />
+        <BalanceCard
+          label="USDT"
+          value={typeof usdtDisplay === 'string' ? parseFloat(usdtDisplay) || 0 : usdtDisplay}
+          suffix="USDT"
+          subLabel={nativeBalances.address ? 'From chain (10s)' : undefined}
+        />
         <BalanceCard
           label={`Your VIDA (${USER_VIDA_ON_VERIFY} on verify)`}
           value={wallet?.vida_cap_balance ?? 0}
           suffix="VIDA"
         />
       </div>
+      {nativeBalances.address && (
+        <p className="text-[10px] text-[#6b6b70] mb-4">
+          Gas (RBTC): {nativeBalances.rbtc} {!hasEnoughGas && '— Relayer can cover fees if needed.'}
+        </p>
+      )}
+
+      {/* Spend — QR for receive/pay address (no leaving app) */}
+      <div className="mb-6">
+        <button
+          type="button"
+          onClick={() => setShowSpendQR(true)}
+          className="w-full py-3 rounded-xl border font-bold uppercase tracking-wider transition-all hover:opacity-90"
+          style={{ background: GOLD_BG, borderColor: BORDER, color: GOLD }}
+        >
+          Spend — Show QR to receive USDT/DLLR
+        </button>
+        <SpendQRModal isOpen={showSpendQR} onClose={() => setShowSpendQR(false)} phoneNumber={phoneNumber} />
+      </div>
 
       {/* Foundation contribution notice */}
       <p className="text-xs mb-6" style={{ color: '#6b6b70' }}>
-        {FOUNDATION_VIDA_ON_VERIFY} VIDA has been contributed to the Foundation Vault to secure the Mesh&apos;s future.
+        {FOUNDATION_VIDA_ON_VERIFY} VIDA has been contributed to the Foundation Vault to secure the Protocol&apos;s future.
       </p>
 
       {/* Foundation Impact stat */}
@@ -236,19 +285,25 @@ export function SovereignWallet({ phoneNumber, layerResults }: SovereignWalletPr
         </p>
       </div>
 
-      {/* Convert VIDA to DLLR — MUST verify identity + Sentinel active */}
+      {/* Convert VIDA to DLLR */}
       <section
-        className={`rounded-xl border p-6 mb-6 relative ${!sentinelVerified ? 'opacity-60 blur-[2px] pointer-events-none select-none' : ''}`}
+        className="rounded-xl border p-6 mb-6 relative"
         style={{ background: GOLD_BG, borderColor: BORDER }}
       >
-        <SentinelActivationOverlay
-          show={!sentinelVerified}
-          subtitle="Activate your Sentinel at the Sentinel Vault to enable Withdraw and Transfer."
-          onVerified={() => setTokenVerified(true)}
-        />
         <h3 className="text-lg font-semibold mb-4" style={{ color: GOLD }}>
           Convert VIDA to DLLR
         </h3>
+        {BETA_LIQUIDITY_TEST && (
+          <a
+            href={SOVRYN_AMM_SWAP_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block w-full mb-4 py-2.5 rounded-lg font-bold text-sm uppercase tracking-wider text-center transition-all hover:opacity-90"
+            style={{ background: '#059669', color: '#fff' }}
+          >
+            Swap to DLLR on Sovryn AMM (Direct) →
+          </a>
+        )}
         <p className="text-xs mb-4" style={{ color: '#6b6b70' }}>
           {quorumSatisfied
             ? '3-of-4 biometric quorum satisfied. 1 VIDA = 1,000 DLLR.'
@@ -308,15 +363,8 @@ export function SovereignWallet({ phoneNumber, layerResults }: SovereignWalletPr
         )}
       </section>
 
-      {/* USDT Bridge — static deposit address (Withdraw requires Sentinel) */}
-      <section className={`relative ${!sentinelVerified ? 'opacity-60 blur-[2px] pointer-events-none select-none' : ''}`}>
-        {!sentinelVerified && (
-          <SentinelActivationOverlay
-            show
-            subtitle="Activate at Sentinel Vault to enable Deposit/Withdraw."
-            onVerified={() => setTokenVerified(true)}
-          />
-        )}
+      {/* USDT Bridge — static deposit address */}
+      <section className="relative">
         <button
           type="button"
           onClick={() => {
@@ -379,10 +427,12 @@ function BalanceCard({
   label,
   value,
   suffix,
+  subLabel,
 }: {
   label: string;
   value: number;
   suffix: string;
+  subLabel?: string;
 }) {
   return (
     <div
@@ -401,6 +451,7 @@ function BalanceCard({
       >
         {value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 })} {suffix}
       </p>
+      {subLabel && <p className="text-[10px] text-[#6b6b70] mt-1">{subLabel}</p>}
     </div>
   );
 }

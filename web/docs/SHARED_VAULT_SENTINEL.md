@@ -40,4 +40,4 @@ CSS/Styles on pffsentinel.com (and the in-repo Sentinel pages `/activate`, `/sen
 - **Gold**: `#D4AF37` (primary), `rgba(212, 175, 55, 0.3)` (borders).
 - Font: JetBrains Mono for headings and tokens.
 
-These match the main Mesh (e.g. `SentinelGuard`, dashboard, sentinel purchase pages).
+These match the main Protocol (e.g. `SentinelGuard`, dashboard, sentinel purchase pages).

@@ -1,5 +1,5 @@
 /**
- * PFF Backend — VLT Darknet Mesh Sync API Routes
+ * PFF Backend — VLT Darknet Protocol Sync API Routes
  * Architect: Isreal Okoro (mrfundzman)
  * 
  * API endpoints for:

@@ -2,14 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { DLLRBalanceTracker } from './DLLRBalanceTracker';
-import { LaunchSovereignVaultButton } from './LaunchSovereignVaultButton';
+import { MultiCurrencyBalanceCards } from './MultiCurrencyBalanceCards';
 import { NationalReserveCharts } from '../dashboard/NationalReserveCharts';
 import { NationalBlockCommand } from '../dashboard/NationalBlockCommand';
 import { UserProfileBalance } from '../dashboard/UserProfileBalance';
 import { SovereignIdCard } from '../dashboard/SovereignIdCard';
 import { PresenceOverrideModal } from '../dashboard/PresenceOverrideModal';
-import { SentinelAccessBanner } from '../dashboard/SentinelAccessBanner';
 import { FamilyVault } from '../dashboard/FamilyVault';
 import { MerchantModeSection } from '../dashboard/MerchantModeSection';
 import { MerchantSalesTab } from '../dashboard/MerchantSalesTab';
@@ -59,7 +57,6 @@ export function DashboardContent({
 
   return (
     <div className="flex flex-col min-h-screen">
-      <SentinelAccessBanner />
       <header className="shrink-0 border-b border-[#2a2a2e] bg-[#16161a]/90 backdrop-blur px-4 py-3">
         <div className="flex items-center justify-between">
           <div>
@@ -86,6 +83,12 @@ export function DashboardContent({
               Staff Portal
             </Link>
             )}
+            <Link
+              href="/treasury"
+              className="relative z-50 text-sm font-medium text-[#c9a227] hover:text-[#e8c547] transition-colors cursor-pointer"
+            >
+              Treasury
+            </Link>
             <Link
               href="/manifesto"
               className="relative z-50 text-sm font-medium text-[#c9a227] hover:text-[#e8c547] transition-colors cursor-pointer"
@@ -168,23 +171,12 @@ export function DashboardContent({
         <div className="max-w-2xl">
           <section className="mb-6">
             <h2 className="text-sm font-semibold text-[#6b6b70] uppercase tracking-wider mb-3">
-              Launch Sovereign Vault
+              Protocol Vault — DLLR & USDT
             </h2>
-            <p className="text-sm text-[#a0a0a5] mb-4">
-              Prove presence (3D scan) → Presence_Verified signal on Rootstock → redirect to Sovryn
-              Wealth Dashboard. Connect your wallet first; tap to start.
+            <p className="text-xs text-[#6b6b70] mb-3">
+              Multi-currency balances on Rootstock (RSK). Active Spending Power appears after you convert VIDA to DLLR.
             </p>
-            <LaunchSovereignVaultButton />
-          </section>
-
-          <section className="mb-6">
-            <h2 className="text-sm font-semibold text-[#6b6b70] uppercase tracking-wider mb-3">
-              Sovereign Unit (DLLR)
-            </h2>
-            <p className="text-xs text-[#6b6b70] mb-2">
-              Balance visible only after Master Handshake is complete.
-            </p>
-            <DLLRBalanceTracker />
+            <MultiCurrencyBalanceCards />
           </section>
 
           <section className="rounded-xl border border-[#2a2a2e] bg-[#16161a] p-4">
@@ -194,9 +186,6 @@ export function DashboardContent({
               gated by <strong className="text-[#e8c547]">withPresence(transaction)</strong>. Your
               wallet signs RSK transactions only after the PFF Fabric verifies your physical presence
               via biometric handshake. No trade or loan can be initiated without it.
-            </p>
-            <p className="mt-3 text-xs text-[#6b6b70]">
-              Use MetaMask, Defiant, or a hardware wallet on Rootstock.
             </p>
           </section>
 

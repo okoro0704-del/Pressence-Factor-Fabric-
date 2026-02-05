@@ -1,4 +1,4 @@
--- PFF Backend — VLT Darknet Mesh Sync Schema
+-- PFF Backend — VLT Darknet Protocol Sync Schema
 -- Architect: Isreal Okoro (mrfundzman)
 -- 
 -- Tables for peer-to-peer discovery, gossip protocol, encrypted hopping, and offline verification

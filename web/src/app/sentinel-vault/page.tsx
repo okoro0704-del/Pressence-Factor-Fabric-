@@ -9,6 +9,7 @@ import {
 } from '@/lib/sentinelLicensing';
 import { createSecurityToken } from '@/lib/sentinelSecurityToken';
 import { getIdentityAnchorPhone } from '@/lib/sentinelActivation';
+import { PlanSelector } from '@/components/sentinel/PlanSelector';
 
 const jetbrains = JetBrains_Mono({ weight: ['400', '600', '700'], subsets: ['latin'] });
 
@@ -41,10 +42,26 @@ export default function SentinelVaultPage() {
   const [purchasing, setPurchasing] = useState<SentinelTierType | null>(null);
   const [activated, setActivated] = useState<{ token: string; tier: SentinelTierType; pffApiKey?: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [deviceLimit, setDeviceLimit] = useState<number | undefined>(undefined);
+  const [planType, setPlanType] = useState<string | null>(null);
 
   useEffect(() => {
     setOwnerId(getIdentityAnchorPhone());
   }, []);
+
+  const effectiveOwner = ownerId ?? (ownerInput.trim() || null);
+  useEffect(() => {
+    if (!effectiveOwner) return;
+    fetch(`/api/sentinel/profile?phone=${encodeURIComponent(effectiveOwner)}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.ok) {
+          setDeviceLimit(d.device_limit);
+          setPlanType(d.sentinel_plan_type ?? null);
+        }
+      })
+      .catch(() => {});
+  }, [effectiveOwner]);
 
   const handlePurchase = async (tierType: SentinelTierType) => {
     const owner = ownerId ?? (ownerInput.trim() || getIdentityAnchorPhone());
@@ -137,6 +154,26 @@ export default function SentinelVaultPage() {
             {error}
           </div>
         )}
+
+        {/* Plan Selector — Standard $100, Family $200, Small Business $500, Enterprise $1000. Auto-debit from Spendable Vault. */}
+        <PlanSelector
+          ownerId={effectiveOwner}
+          currentDeviceLimit={deviceLimit}
+          currentPlanType={planType}
+          onUpgraded={() => {
+            if (effectiveOwner) {
+              fetch(`/api/sentinel/profile?phone=${encodeURIComponent(effectiveOwner)}`)
+                .then((r) => r.json())
+                .then((d) => {
+                  if (d?.ok) {
+                    setDeviceLimit(d.device_limit);
+                    setPlanType(d.sentinel_plan_type ?? null);
+                  }
+                })
+                .catch(() => {});
+            }
+          }}
+        />
 
         {/* Activated: Security Token + QR */}
         {activated && (

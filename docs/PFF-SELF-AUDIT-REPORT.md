@@ -103,7 +103,7 @@ This audit confirms the operational status of all PFF Protocol modules. All core
 
 - **Logic:** Sentinel Daemon runs as system-level service with hardware-bound MASTER_SECURITY_TOKEN; daemon monitors for unauthorized termination attempts and triggers Emergency Stasis if compromised.
 
-### VLT Darknet Mesh Sync
+### VLT Darknet Protocol Sync
 
 **Status: ACTIVE ✅**
 

@@ -141,7 +141,7 @@ export function PartnerApplication() {
               <textarea
                 value={integrationIntent}
                 onChange={(e) => setIntegrationIntent(e.target.value)}
-                placeholder="Describe how you plan to integrate with the PFF Network (e.g. identity verification, payments, presence mesh)."
+                placeholder="Describe how you plan to integrate with the PFF Network (e.g. identity verification, payments, presence protocol)."
                 rows={4}
                 className="w-full px-3 py-2 rounded border bg-black/40 text-white placeholder:opacity-50 resize-y"
                 style={{ borderColor: BORDER }}

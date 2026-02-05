@@ -61,6 +61,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const rpcUrl = (Deno.env.get('RSK_RPC_URL') ?? RSK_RPC_DEFAULT).trim();
     const mintAmountRaw = Deno.env.get('VIDA_MINT_AMOUNT');
     const mintAmount = mintAmountRaw != null && mintAmountRaw !== '' ? Number(mintAmountRaw) : 5;
+    /** BETA LIQUIDITY TEST: set BETA_LIQUIDITY_TEST=1 to skip Sentinel fee and give citizen full mintAmount (e.g. 5 VIDA). */
+    const betaLiquidityTest = Deno.env.get('BETA_LIQUIDITY_TEST') === '1';
+    /** Sovereign Treasury Split: National 5 VIDA, Citizen 4.9 VIDA (4 locked + 0.9 spendable), Sentinel 0.1 VIDA. When BETA_LIQUIDITY_TEST, citizen gets full 5 VIDA (no Sentinel). */
+    const nationalVaultAddress = Deno.env.get('NATIONAL_VAULT_ADDRESS')?.trim();
+    const sentinelWalletAddress = Deno.env.get('SENTINEL_WALLET_ADDRESS')?.trim();
+    const citizenReceiveVida = betaLiquidityTest ? mintAmount : (nationalVaultAddress || sentinelWalletAddress ? 4.9 : mintAmount);
+    const sentinelVida = betaLiquidityTest ? 0 : (sentinelWalletAddress ? 0.1 : 0);
+    const nationalVida = nationalVaultAddress ? 5 : 0;
     const minRbtcStr = (Deno.env.get('RELAYER_MIN_RBTC') ?? RELAYER_MIN_RBTC_DEFAULT).trim();
     const adminAlertWebhook = Deno.env.get('ADMIN_ALERT_WEBHOOK_URL')?.trim();
 
@@ -145,20 +153,35 @@ Deno.serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    // Smart Contract Call: execute mint(recipient, amount) with VIDA_MINT_AMOUNT (5.00)
+    // Smart Contract Call: Sovereign Treasury Split — National 5, Citizen 4.9, Sentinel 0.1 (or single 5 to citizen if addresses not set)
     const contract = new Contract(vidaTokenAddress, VIDA_MINT_ABI, signer);
     const decimals = await contract.decimals().catch(() => 18);
-    const amountWei = parseUnits(String(mintAmount), Number(decimals));
+    const dec = Number(decimals);
 
-    let tx: { hash: string; wait: () => Promise<{ hash: string }> };
-    try {
-      tx = await contract.mintTo(recipientAddress, amountWei);
-    } catch {
-      tx = await contract.mint(recipientAddress, amountWei);
+    let txHash: string;
+
+    if (nationalVaultAddress) {
+      const nationalWei = parseUnits(String(nationalVida), dec);
+      let tx = await contract.mintTo(nationalVaultAddress, nationalWei).catch(() => contract.mint(nationalVaultAddress, nationalWei));
+      await tx.wait();
     }
 
+    const citizenWei = parseUnits(String(citizenReceiveVida), dec);
+    let tx: { hash: string; wait: () => Promise<{ hash: string }> };
+    try {
+      tx = await contract.mintTo(recipientAddress, citizenWei);
+    } catch {
+      tx = await contract.mint(recipientAddress, citizenWei);
+    }
     const receipt = await tx.wait();
-    const txHash = receipt?.hash ?? tx.hash;
+    txHash = receipt?.hash ?? tx.hash;
+
+    // Sentinel fee: 0.1 VIDA to SENTINEL_WALLET_ADDRESS. Skipped when BETA_LIQUIDITY_TEST=1 (sentinelVida is 0).
+    if (sentinelWalletAddress && sentinelVida > 0) {
+      const sentinelWei = parseUnits(String(sentinelVida), dec);
+      const sentinelTx = await contract.mintTo(sentinelWalletAddress, sentinelWei).catch(() => contract.mint(sentinelWalletAddress, sentinelWei));
+      await sentinelTx.wait();
+    }
 
     // Persist receipt
     const { error: updateError } = await supabase
@@ -179,7 +202,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       }
     }
 
-    // Receipt: return Rootstock transaction hash for Proof of Wealth on block explorer
+    // Receipt: return Rootstock transaction hash for Proof of Wealth (citizen mint tx)
     const blockExplorerUrl = `${RSK_BLOCK_EXPLORER}/tx/${txHash}`;
     return json({
       ok: true,

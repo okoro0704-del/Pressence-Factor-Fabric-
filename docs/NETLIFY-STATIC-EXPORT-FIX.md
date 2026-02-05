@@ -138,7 +138,7 @@ return (
 ```typescript
 {/* Action Center - ALWAYS RENDER regardless of telemetry status */}
 <ActionCenter
-  onBroadcastToMesh={handleBroadcastToMesh}
+  onBroadcastToProtocol={handleBroadcastToProtocol}
   onEmergencyStasis={handleEmergencyStasis}
 />
 ```

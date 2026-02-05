@@ -1,6 +1,6 @@
 /**
  * PFF Web — Action Center
- * Broadcast to Mesh and Emergency Stasis Lock buttons
+ * Broadcast to Protocol and Emergency Stasis Lock buttons
  * Architect: Isreal Okoro (mrfundzman)
  */
 
@@ -10,11 +10,11 @@ import { Radio, Lock, AlertTriangle, Send, X } from 'lucide-react';
 import { ActionResult } from '../../types/commandCenter';
 
 interface ActionCenterProps {
-  onBroadcastToMesh: (message: string) => Promise<ActionResult>;
+  onBroadcastToProtocol: (message: string) => Promise<ActionResult>;
   onEmergencyStasis: (reason: string) => Promise<ActionResult>;
 }
 
-export default function ActionCenter({ onBroadcastToMesh, onEmergencyStasis }: ActionCenterProps) {
+export default function ActionCenter({ onBroadcastToProtocol, onEmergencyStasis }: ActionCenterProps) {
   const [showBroadcastModal, setShowBroadcastModal] = useState(false);
   const [showStasisModal, setShowStasisModal] = useState(false);
   const [broadcastMessage, setBroadcastMessage] = useState('');
@@ -29,7 +29,7 @@ export default function ActionCenter({ onBroadcastToMesh, onEmergencyStasis }: A
     }
 
     setLoading(true);
-    const actionResult = await onBroadcastToMesh(broadcastMessage);
+    const actionResult = await onBroadcastToProtocol(broadcastMessage);
     setResult(actionResult);
     setLoading(false);
 
@@ -78,7 +78,7 @@ export default function ActionCenter({ onBroadcastToMesh, onEmergencyStasis }: A
       </motion.div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Broadcast to Mesh Button */}
+        {/* Broadcast to Protocol Button */}
         <motion.button
           initial={{ opacity: 0, x: -50 }}
           animate={{ opacity: 1, x: 0 }}
@@ -120,9 +120,9 @@ export default function ActionCenter({ onBroadcastToMesh, onEmergencyStasis }: A
               />
               <Radio className="w-12 h-12 text-blue-400 relative z-10" />
             </div>
-            <h3 className="text-2xl font-bold text-white">BROADCAST TO MESH</h3>
+            <h3 className="text-2xl font-bold text-white">BROADCAST TO PROTOCOL</h3>
             <p className="text-gray-400 text-center">
-              Send sovereign message to all connected Sentinels via Darknet Mesh
+              Send sovereign message to all connected Sentinels via Darknet Protocol
             </p>
           </div>
         </motion.button>
@@ -176,7 +176,7 @@ export default function ActionCenter({ onBroadcastToMesh, onEmergencyStasis }: A
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-2xl font-bold text-white flex items-center gap-3">
                   <Radio className="w-8 h-8 text-blue-400" />
-                  BROADCAST TO MESH
+                  BROADCAST TO PROTOCOL
                 </h3>
                 <button
                   onClick={() => setShowBroadcastModal(false)}

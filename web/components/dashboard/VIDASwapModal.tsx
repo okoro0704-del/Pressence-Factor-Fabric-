@@ -8,6 +8,8 @@ interface VIDASwapModalProps {
   onClose: () => void;
   maxAmount: number; // 20% spendable balance
   citizenId?: string;
+  /** When set, swap uses getSovereignSigner (internal) — no external wallet. */
+  phoneNumber?: string;
   onSwapSuccess?: () => void;
 }
 
@@ -16,6 +18,7 @@ export function VIDASwapModal({
   onClose,
   maxAmount,
   citizenId,
+  phoneNumber,
   onSwapSuccess
 }: VIDASwapModalProps) {
   const [vidaAmount, setVidaAmount] = useState('');
@@ -52,10 +55,11 @@ export function VIDASwapModal({
         return;
       }
 
-      // Execute swap
+      // Execute swap (internal signer when phoneNumber set — no window.ethereum)
       const result = await executeSovereignSwap({
         vidaCapAmount: vidaNum,
         citizenId,
+        phoneNumber,
       });
 
       if (!result.success) {

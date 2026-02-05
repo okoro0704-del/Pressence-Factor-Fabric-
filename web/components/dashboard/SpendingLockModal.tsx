@@ -1,8 +1,8 @@
 'use client';
 
 /**
- * Spending Lock Modal — shown when user tries Send/Swap without Industrial Fingerprint at Hub.
- * Message: Industrial Fingerprint Required at Hub to Unlock Spending Power.
+ * Spending Lock Modal — shown when user tries Send/Swap before Face Pulse (or is_fully_verified / face_hash).
+ * Protocol Release: normally bypassed when Biometric Spending Active (is_fully_verified or face_hash present).
  */
 
 interface SpendingLockModalProps {
@@ -36,7 +36,7 @@ export function SpendingLockModal({ isOpen, onClose }: SpendingLockModalProps) {
           5 VIDA SECURED
         </h2>
         <p className="text-center text-[#a0a0a5] text-sm leading-relaxed mb-6">
-          Industrial Fingerprint Required at Hub to Unlock Spending Power.
+          Complete Face Pulse to enable Send and Transfer. When active, you&apos;ll see &quot;Biometric Spending Active&quot; on the vault.
         </p>
         <div className="flex justify-center">
           <button

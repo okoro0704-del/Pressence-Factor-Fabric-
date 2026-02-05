@@ -165,7 +165,7 @@ export default function EvgAuthorizePage() {
           </button>
         </div>
         <p className="text-[10px] text-[#6b6b70] mt-6">
-          Sovereign Mesh · Enterprise Verification Gateway (EVG)
+          Sovereign Protocol · Enterprise Verification Gateway (EVG)
         </p>
       </div>
     </main>

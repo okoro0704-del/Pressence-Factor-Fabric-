@@ -84,7 +84,7 @@ export function RegisterDependentModal({ isOpen, onClose, guardianPhone }: Regis
           <div className="text-6xl mb-4">👨‍👩‍👧‍👦</div>
           <h2 className="text-2xl font-bold text-[#3b82f6] mb-2">Register Dependent</h2>
           <p className="text-sm text-[#6b6b70]">
-            Add a family member or elderly relative to your mesh
+            Add a family member or elderly relative to your protocol
           </p>
         </div>
 

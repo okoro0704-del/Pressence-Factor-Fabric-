@@ -126,7 +126,7 @@ Open the Architect Command Center in your browser and check the console (F12):
 
 ### Step 2: Test Action Center
 
-1. Click **"Broadcast to Mesh"** button
+1. Click **"Broadcast to Protocol"** button
 2. Check console for successful insert to `sovereign_audit_log`
 3. Click **"Emergency Stasis Lock"** button
 4. Verify both actions log correctly

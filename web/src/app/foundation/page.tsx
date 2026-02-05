@@ -50,7 +50,7 @@ export default function FoundationDashboardPage() {
           Foundation Dashboard
         </h1>
         <p className="text-sm mb-6 opacity-80">
-          Transparency: 5% Corporate Royalty and 2% conversion levy fund the PFF Foundation Vault for future Mesh projects.
+          Transparency: 5% Corporate Royalty and 2% conversion levy fund the PFF Foundation Vault for future Protocol projects.
         </p>
         <a
           href="/foundation/applications"

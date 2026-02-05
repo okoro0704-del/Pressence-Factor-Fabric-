@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useBeforeInstallPrompt } from '@/lib/useBeforeInstallPrompt';
 
 type Platform = 'ios' | 'android' | 'desktop' | null;
 
@@ -28,6 +29,7 @@ export function HowToInstallTooltip() {
   const [open, setOpen] = useState(false);
   const [platform, setPlatform] = useState<Platform>(null);
   const [standalone, setStandalone] = useState(false);
+  const { canPrompt, promptInstall, isInstalling } = useBeforeInstallPrompt();
 
   useEffect(() => {
     setPlatform(detectPlatform());
@@ -39,6 +41,11 @@ export function HowToInstallTooltip() {
   }, []);
 
   if (standalone) return null;
+
+  const handleInstall = async () => {
+    const ok = await promptInstall();
+    if (ok) setOpen(false);
+  };
 
   return (
     <>
@@ -70,6 +77,19 @@ export function HowToInstallTooltip() {
             <p className="text-sm text-[#6b6b70] mb-4">
               Get the full PFF experience without an App Store download. Install on your home screen for standalone mode and offline use.
             </p>
+
+            {canPrompt && (
+              <div className="mb-4">
+                <button
+                  type="button"
+                  onClick={handleInstall}
+                  disabled={isInstalling}
+                  className="w-full rounded-lg bg-[#D4AF37] px-4 py-3 text-sm font-semibold text-[#0A0A0A] hover:bg-[#c9a227] disabled:opacity-60"
+                >
+                  {isInstalling ? 'Installing…' : 'Install PFF to this device'}
+                </button>
+              </div>
+            )}
 
             <div className="space-y-3 text-sm text-[#f5f5f5]">
               <p

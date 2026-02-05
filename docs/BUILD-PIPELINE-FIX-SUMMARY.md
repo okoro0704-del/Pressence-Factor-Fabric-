@@ -189,7 +189,7 @@ After deployment, verify:
    - No "10%" references anywhere
 
 4. **Action Center:**
-   - "Broadcast to Mesh" button should work
+   - "Broadcast to Protocol" button should work
    - "Emergency Stasis Lock" button should work
    - Both should log to `sovereign_audit_log` table
 

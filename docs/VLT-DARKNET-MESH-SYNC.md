@@ -8,7 +8,7 @@
 
 ## 🎉 What Has Been Built
 
-I've successfully implemented the complete **VLT Darknet Mesh Sync** with all four requirements:
+I've successfully implemented the complete **VLT Darknet Protocol Sync** with all four requirements:
 
 ### ✅ The Four Pillars (All Complete)
 
@@ -26,7 +26,7 @@ I've successfully implemented the complete **VLT Darknet Mesh Sync** with all fo
 
 3. **✅ Encrypted Hopping** — Store encrypted offline vitalization data on neighboring devices
    - AES-256-GCM encryption for offline vitalization data
-   - Multi-hop storage across mesh network
+   - Multi-hop storage across protocol network
    - Automatic forwarding when internet-active node is reached
    - Acknowledgment protocol for delivery confirmation
 

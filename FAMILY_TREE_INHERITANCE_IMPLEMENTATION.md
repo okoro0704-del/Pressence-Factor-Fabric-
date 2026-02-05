@@ -41,7 +41,7 @@
    - Build guardian consensus approval flow
    - Create death certificate verification system
 
-5. ⏳ **Build visual family tree mesh map for dashboard** (NOT STARTED)
+5. ⏳ **Build visual family tree protocol map for dashboard** (NOT STARTED)
    - Create interactive family tree visualization component
    - Implement color coding (Gold/Silver/Grey)
    - Add zoom and pan controls

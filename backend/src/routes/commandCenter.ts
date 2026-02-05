@@ -86,7 +86,7 @@ commandCenterRouter.get('/top-nations', async (req: Request, res: Response) => {
 
 /**
  * POST /api/command-center/broadcast-mesh
- * Broadcast message to all Sentinels via Darknet Mesh
+ * Broadcast message to all Sentinels via Darknet Protocol
  */
 commandCenterRouter.post('/broadcast-mesh', async (req: Request, res: Response) => {
   try {
@@ -117,10 +117,10 @@ commandCenterRouter.post('/broadcast-mesh', async (req: Request, res: Response) 
     }
   } catch (e) {
     const err = e as Error;
-    console.error('[COMMAND CENTER API] Failed to broadcast to mesh:', err);
+    console.error('[COMMAND CENTER API] Failed to broadcast to protocol:', err);
     res.status(500).json({
       success: false,
-      error: 'Failed to broadcast to mesh',
+      error: 'Failed to broadcast to protocol',
       details: err.message,
     });
   }

@@ -1,5 +1,5 @@
 /**
- * PFF Backend — VLT Darknet Mesh Sync: Peer-to-Peer Discovery
+ * PFF Backend — VLT Darknet Protocol Sync: Peer-to-Peer Discovery
  * Enable Sentinel-to-Sentinel discovery via BLE and Local WiFi
  * Architect: Isreal Okoro (mrfundzman)
  * 

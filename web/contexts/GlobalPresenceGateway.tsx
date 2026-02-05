@@ -17,10 +17,10 @@ interface GlobalPresenceGatewayContextType {
   setPresenceVerified: (verified: boolean) => void;
   checkAndRefreshPresence: () => Promise<boolean>;
   loading: boolean;
-  /** true while initial check or when DB returned empty/failed; show "Establishing Secure Connection to Mesh..." */
+  /** true while initial check or when DB returned empty/failed; show "Initializing Protocol..." */
   connecting: boolean;
-  /** true when testConnection() failed; show "Reconnecting to Mesh" instead of crashing */
-  meshReconnecting: boolean;
+  /** true when testConnection() failed; show "Reconnecting to Protocol" instead of crashing */
+  protocolReconnecting: boolean;
 }
 
 const GlobalPresenceGatewayContext = createContext<GlobalPresenceGatewayContextType | undefined>(undefined);
@@ -40,7 +40,7 @@ export function GlobalPresenceGatewayProvider({ children }: { children: ReactNod
   const [presenceTimestamp, setPresenceTimestamp] = useState<Date | null>(null);
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(true);
-  const [meshReconnecting, setMeshReconnecting] = useState(false);
+  const [protocolReconnecting, setProtocolReconnecting] = useState(false);
   const [lastActivityTime, setLastActivityTime] = useState(Date.now());
   const router = useRouter();
   const pathname = usePathname();
@@ -125,7 +125,7 @@ export function GlobalPresenceGatewayProvider({ children }: { children: ReactNod
     const initializePresence = async () => {
       setLoading(true);
       setConnecting(true);
-      setMeshReconnecting(false);
+      setProtocolReconnecting(false);
       const timeoutId = setTimeout(() => {
         if (cancelled) return;
         setConnecting(false);
@@ -134,10 +134,10 @@ export function GlobalPresenceGatewayProvider({ children }: { children: ReactNod
       try {
         const conn = await testConnection();
         if (!cancelled && !conn.ok) {
-          setMeshReconnecting(true);
+          setProtocolReconnecting(true);
           console.warn('[GlobalPresenceGateway] Supabase handshake failed:', conn.error);
         } else if (!cancelled) {
-          setMeshReconnecting(false);
+          setProtocolReconnecting(false);
         }
         const phone = getIdentityAnchorPhone();
         let uid: string | null = null;
@@ -270,16 +270,16 @@ export function GlobalPresenceGatewayProvider({ children }: { children: ReactNod
 
   /** When connection is weak, retry testConnection periodically until ok */
   useEffect(() => {
-    if (!meshReconnecting) return;
+    if (!protocolReconnecting) return;
     const interval = setInterval(async () => {
       const conn = await testConnection();
-      if (conn.ok) setMeshReconnecting(false);
+      if (conn.ok) setProtocolReconnecting(false);
     }, 5000);
     return () => clearInterval(interval);
-  }, [meshReconnecting]);
+  }, [protocolReconnecting]);
 
   const showConnectingMessage = loading || connecting;
-  const showReconnectingMessage = meshReconnecting && !showConnectingMessage;
+  const showReconnectingMessage = protocolReconnecting && !showConnectingMessage;
 
   return (
     <GlobalPresenceGatewayContext.Provider
@@ -290,7 +290,7 @@ export function GlobalPresenceGatewayProvider({ children }: { children: ReactNod
         checkAndRefreshPresence,
         loading,
         connecting,
-        meshReconnecting,
+        protocolReconnecting,
       }}
     >
       {showConnectingMessage ? (
@@ -300,7 +300,7 @@ export function GlobalPresenceGatewayProvider({ children }: { children: ReactNod
           aria-live="polite"
         >
           <p className="font-mono text-sm tracking-wide text-neutral-400">
-            Establishing Secure Connection to Mesh...
+            Initializing Protocol...
           </p>
         </div>
       ) : showReconnectingMessage ? (
@@ -310,7 +310,7 @@ export function GlobalPresenceGatewayProvider({ children }: { children: ReactNod
           aria-live="polite"
         >
           <p className="font-mono text-sm tracking-wide text-amber-400">
-            Reconnecting to Mesh...
+            Reconnecting to Protocol...
           </p>
         </div>
       ) : (

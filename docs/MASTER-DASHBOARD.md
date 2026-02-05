@@ -118,10 +118,10 @@ Response: { sentinelTreasury, sovereignMovement, architectMasterBlock }
 ---
 
 ### 5. ✅ AI Governance Feed
-**Purpose:** Show Decision Logs of SOVRYN AI managing VLT and Darknet Mesh
+**Purpose:** Show Decision Logs of SOVRYN AI managing VLT and Darknet Protocol
 
 **Log Types:**
-- `MESH_SYNC` - Darknet mesh synchronization decisions
+- `MESH_SYNC` - Darknet protocol synchronization decisions
 - `VLT_VALIDATION` - Truth ledger validation decisions
 - `STASIS_TRIGGER` - Emergency stasis triggers
 - `DIVIDEND_CALCULATION` - Monthly dividend calculations

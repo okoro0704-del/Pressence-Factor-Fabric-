@@ -12,7 +12,7 @@ import { getSentinelWebhookUrl, getMainPffAppUrl } from '@/lib/sentinelConstants
 
 const jetbrains = JetBrains_Mono({ weight: ['400', '600', '700'], subsets: ['latin'] });
 
-/** Deep slate / gold Sovereign aesthetic — matches Main PFF Mesh and pffsentinel.com */
+/** Deep slate / gold Sovereign aesthetic — matches Main PFF Protocol and pffsentinel.com */
 const SOVEREIGN = {
   slateBg: '#0d0d0f',
   slateCard: '#16161a',

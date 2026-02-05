@@ -1,7 +1,7 @@
 /**
  * I18N CONFIGURATION
  * Multi-language support for PFF platform (ISO 639-1)
- * Major global languages + Nigerian languages for sovereign mesh
+ * Major global languages + Nigerian languages for sovereign protocol
  */
 
 export type LanguageCode =

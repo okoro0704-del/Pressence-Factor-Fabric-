@@ -8,7 +8,7 @@ const jetbrains = JetBrains_Mono({ weight: ['400', '600', '700'], subsets: ['lat
 
 /**
  * Humanity Ledger — Public (anonymous) verified human count.
- * Proves the Mesh network's growth to the world. No PII; only the total.
+ * Proves the Protocol network's growth to the world. No PII; only the total.
  */
 export default function HumanityLedgerPage() {
   const [count, setCount] = useState<number | null>(null);
@@ -41,7 +41,7 @@ export default function HumanityLedgerPage() {
             Humanity Ledger
           </h1>
           <p className="text-[#a0a0a5] text-sm mt-2">
-            Anonymous count of verified humans in the Sovereign Mesh. Proof of Personhood only — no identities stored.
+            Anonymous count of verified humans in the Sovereign Protocol. Proof of Personhood only — no identities stored.
           </p>
         </header>
 
@@ -68,7 +68,7 @@ export default function HumanityLedgerPage() {
         </div>
 
         <p className="text-center text-xs text-[#6b6b70] mt-8">
-          Sovereign Mesh · Born in Lagos. Built for the World.
+          Sovereign Protocol · Born in Lagos. Built for the World.
         </p>
       </div>
     </main>

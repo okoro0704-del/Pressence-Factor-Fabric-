@@ -42,7 +42,7 @@ Replace all mock data in the Architect's Sentinel Command Center with live Supab
 
 #### `sovereign_audit_log`
 - Audit trail for all Architect action executions
-- Tracks broadcast to mesh, emergency stasis, protocol changes
+- Tracks broadcast to protocol, emergency stasis, protocol changes
 - Immutable log with metadata support
 
 **Columns:**
@@ -95,7 +95,7 @@ import { supabase, hasSupabase } from '../../lib/supabase';
 - Maps to `SecurityStatus` TypeScript type
 
 #### Action Execution with Audit Logging
-- `handleBroadcastToMesh` — INSERTs into `sovereign_audit_log` with action_type='BROADCAST_TO_MESH'
+- `handleBroadcastToProtocol` — INSERTs into `sovereign_audit_log` with action_type='BROADCAST_TO_MESH'
 - `handleEmergencyStasis` — INSERTs into `sovereign_audit_log` with action_type='EMERGENCY_STASIS'
 - Both functions return success/failure with timestamp
 
@@ -166,7 +166,7 @@ npm run dev
 - ✅ Dashboard loads with live data from Supabase
 - ✅ Telemetry shows real Sentinel counts and tributes
 - ✅ Security status shows ROOT_SOVEREIGN_PAIR binding
-- ✅ Broadcast to Mesh logs to `sovereign_audit_log`
+- ✅ Broadcast to Protocol logs to `sovereign_audit_log`
 - ✅ Emergency Stasis logs to `sovereign_audit_log`
 
 **If CONNECTION_ERROR:**
@@ -212,7 +212,7 @@ npm run dev
 - [x] Mock data removed from initialization
 - [x] Live telemetry query implemented
 - [x] Live security status query implemented
-- [x] Broadcast to Mesh logs to audit table
+- [x] Broadcast to Protocol logs to audit table
 - [x] Emergency Stasis logs to audit table
 - [x] CONNECTION_ERROR display on Supabase failure
 - [x] Loading state until first successful response

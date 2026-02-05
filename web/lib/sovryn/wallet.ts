@@ -69,3 +69,11 @@ export async function getConnectedAddress(): Promise<string | null> {
     return null;
   }
 }
+
+/** Get RBTC (native) balance for an address on RSK. Used for gas checks. */
+export async function getRbtcBalance(address: string): Promise<{ wei: bigint; rbtc: string }> {
+  const provider = await getRSKProvider();
+  const wei = await provider.getBalance(address);
+  const rbtc = (Number(wei) / 1e18).toFixed(6);
+  return { wei, rbtc };
+}

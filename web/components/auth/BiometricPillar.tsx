@@ -1,21 +1,38 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { JetBrains_Mono } from 'next/font/google';
 import { sha256FromUint8Array, persistFingerprintHashToRecoverySeed } from '@/lib/biometricAnchorSync';
 import { dispatchExternalFingerprint } from '@/lib/externalScannerBridge';
+import { getSupabase } from '@/lib/supabase';
+import {
+  connectSentinelBleBridge,
+  sendCaptureCommand,
+  startHashListener,
+  getBridgeHandle,
+  disconnectSentinelBleBridge,
+} from '@/lib/sentinelBleBridge';
 
 const jetbrains = JetBrains_Mono({ weight: ['400', '600'], subsets: ['latin'] });
+
+const AUTO_POLL_INTERVAL_MS = 500;
+const TRANSFER_POLL_MS = 200;
 
 type ScannerState =
   | 'waiting'
   | 'connecting'
   | 'ready_to_capture'
+  | 'auto_on'
   | 'capturing'
   | 'finger_detected'
   | 'hashing'
   | 'secured'
   | 'error';
+
+export interface BiometricPillarHandle {
+  /** Call when Face Pulse is successfully saved to send command to USB/Serial or Bluetooth bridge and start Auto-On polling. */
+  triggerExternalCapture: () => void;
+}
 
 interface BiometricPillarProps {
   phoneNumber: string;
@@ -79,32 +96,215 @@ async function sendCaptureRequest(device: USBDevice): Promise<void> {
   }
 }
 
-/** Poll for transfer result (finger data). Max length 64 bytes typical for interrupt IN. */
-async function waitForTransferIn(device: USBDevice, endpointNumber: number, maxWaitMs: number): Promise<Uint8Array> {
+/** Quick poll for transfer (one short wait). Returns data if available, else null. */
+async function tryTransferIn(device: USBDevice, endpointNumber: number, maxWaitMs: number): Promise<Uint8Array | null> {
   const length = 64;
   const deadline = Date.now() + maxWaitMs;
   while (Date.now() < deadline) {
     try {
       const result = await device.transferIn(endpointNumber, length);
       if (result.status === 'ok' && result.data && result.data.byteLength > 0) {
-        const arr = new Uint8Array(result.data.buffer, result.data.byteOffset, result.data.byteLength);
-        return arr;
+        return new Uint8Array(result.data.buffer, result.data.byteOffset, result.data.byteLength);
       }
     } catch {
-      // Retry
+      // retry
     }
-    await new Promise((r) => setTimeout(r, 100));
+    await new Promise((r) => setTimeout(r, 20));
   }
+  return null;
+}
+
+/** Poll for transfer result (finger data). Max length 64 bytes typical for interrupt IN. */
+async function waitForTransferIn(device: USBDevice, endpointNumber: number, maxWaitMs: number): Promise<Uint8Array> {
+  const arr = await tryTransferIn(device, endpointNumber, maxWaitMs);
+  if (arr) return arr;
   throw new Error('No fingerprint data received. Place your finger on the scanner and tap Capture Fingerprint again.');
 }
 
-export function BiometricPillar({ phoneNumber, onComplete }: BiometricPillarProps) {
+export const BiometricPillar = forwardRef<BiometricPillarHandle, BiometricPillarProps>(function BiometricPillar(
+  { phoneNumber, onComplete },
+  ref
+) {
   const [state, setState] = useState<ScannerState>('waiting');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [captureProgress, setCaptureProgress] = useState(0);
+  const [bridgeMode, setBridgeMode] = useState<'usb' | 'ble' | null>(null);
   const deviceRef = useRef<USBDevice | null>(null);
   const inEndpointRef = useRef<number | null>(null);
+  const autoPollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isProcessingRef = useRef(false);
+  const bleConnectedRef = useRef(false);
+  const hashListenerCancelRef = useRef<(() => void) | null>(null);
+
+  /** Process raw fingerprint buffer: hash, persist, dispatch, onComplete. */
+  const processRawBuffer = useCallback(
+    async (device: USBDevice, rawBuffer: Uint8Array) => {
+      const serial = device.serialNumber ?? 'USB';
+      setState('hashing');
+      setCaptureProgress(70);
+      const hashHex = await sha256FromUint8Array(rawBuffer);
+      setCaptureProgress(90);
+      const persistResult = await persistFingerprintHashToRecoverySeed(phoneNumber.trim(), hashHex, {
+        alsoSetExternalFingerprintHash: true,
+      });
+      if (!persistResult.ok) {
+        setState('error');
+        setErrorMessage(persistResult.error ?? 'Failed to save to database.');
+        return;
+      }
+      setCaptureProgress(100);
+      setState('secured');
+      dispatchExternalFingerprint({ fingerprintHash: hashHex, scannerSerialNumber: serial });
+      onComplete?.({ fingerprintHash: hashHex, scannerSerialNumber: serial });
+    },
+    [phoneNumber, onComplete]
+  );
+
+  /** Persist BLE hash to recovery_seed_hash and complete (auto-submit 5 VIDA MINT path). */
+  const processBleHash = useCallback(
+    async (hashHex: string) => {
+      hashListenerCancelRef.current?.();
+      hashListenerCancelRef.current = null;
+      if (!hashHex?.trim()) {
+        setState(bleConnectedRef.current ? 'ready_to_capture' : 'waiting');
+        setErrorMessage('Timed out. Place finger on Bridge and try again.');
+        return;
+      }
+      setState('finger_detected');
+      setCaptureProgress(50);
+      setState('hashing');
+      setCaptureProgress(70);
+      const persistResult = await persistFingerprintHashToRecoverySeed(phoneNumber.trim(), hashHex.trim(), {
+        alsoSetExternalFingerprintHash: true,
+      });
+      if (!persistResult.ok) {
+        setState('error');
+        setErrorMessage(persistResult.error ?? 'Failed to save to database.');
+        return;
+      }
+      setCaptureProgress(100);
+      setState('secured');
+      dispatchExternalFingerprint({ fingerprintHash: hashHex.trim(), scannerSerialNumber: 'SENTINEL_BRIDGE' });
+      onComplete?.({ fingerprintHash: hashHex.trim(), scannerSerialNumber: 'SENTINEL_BRIDGE' });
+    },
+    [phoneNumber, onComplete]
+  );
+
+  /** Send command to USB/Serial or BLE Bridge; start Auto-On (USB polling or BLE hash listener). */
+  const triggerExternalCapture = useCallback(() => {
+    const bleHandle = getBridgeHandle();
+    if (bleHandle && bleConnectedRef.current) {
+      hashListenerCancelRef.current?.();
+      sendCaptureCommand()
+        .then((r) => {
+          if (!r.ok) {
+            setErrorMessage(r.error ?? 'Failed to send capture command.');
+            return;
+          }
+          setState('auto_on');
+          setErrorMessage(null);
+          setCaptureProgress(20);
+          hashListenerCancelRef.current = startHashListener(
+            (hashHex) => processBleHash(hashHex),
+            120_000
+          );
+        })
+        .catch((e) => setErrorMessage(e instanceof Error ? e.message : String(e)));
+      return;
+    }
+
+    const device = deviceRef.current;
+    const inEp = inEndpointRef.current;
+
+    if (device && inEp != null) {
+      sendCaptureRequest(device).catch(() => {});
+      setState('auto_on');
+      setErrorMessage(null);
+      if (autoPollIntervalRef.current) {
+        clearInterval(autoPollIntervalRef.current);
+        autoPollIntervalRef.current = null;
+      }
+      autoPollIntervalRef.current = setInterval(async () => {
+        if (isProcessingRef.current) return;
+        const d = deviceRef.current;
+        const ep = inEndpointRef.current;
+        if (!d || ep == null) return;
+        try {
+          await sendCaptureRequest(d);
+          const raw = await tryTransferIn(d, ep, TRANSFER_POLL_MS);
+          if (raw && raw.byteLength > 0) {
+            if (autoPollIntervalRef.current) {
+              clearInterval(autoPollIntervalRef.current);
+              autoPollIntervalRef.current = null;
+            }
+            isProcessingRef.current = true;
+            setState('capturing');
+            setCaptureProgress(20);
+            setState('finger_detected');
+            setCaptureProgress(50);
+            await processRawBuffer(d, raw);
+            isProcessingRef.current = false;
+          }
+        } catch {
+          // no finger this tick
+        }
+      }, AUTO_POLL_INTERVAL_MS);
+      return;
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('pff_sentinel_wake_scanner', { detail: { phoneNumber } }));
+    }
+  }, [phoneNumber, processRawBuffer, processBleHash]);
+
+  useImperativeHandle(ref, () => ({ triggerExternalCapture }), [triggerExternalCapture]);
+
+  useEffect(() => {
+    return () => {
+      if (autoPollIntervalRef.current) {
+        clearInterval(autoPollIntervalRef.current);
+        autoPollIntervalRef.current = null;
+      }
+      hashListenerCancelRef.current?.();
+      hashListenerCancelRef.current = null;
+      if (bleConnectedRef.current) {
+        disconnectSentinelBleBridge();
+        bleConnectedRef.current = false;
+      }
+      setBridgeMode(null);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!phoneNumber?.trim()) return;
+    const supabase = getSupabase();
+    if (!supabase?.channel) return;
+
+    const channel = (supabase as any)
+      .channel(`sentinel_remote_commands_${phoneNumber.trim()}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'sentinel_remote_commands',
+          filter: `phone_number=eq.${phoneNumber.trim()}`,
+        },
+        (payload: { new: { command?: string } }) => {
+          const cmd = payload?.new?.command;
+          if (cmd === 'wake_scanner') triggerExternalCapture();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      (supabase as any).removeChannel(channel);
+    };
+  }, [phoneNumber, triggerExternalCapture]);
 
   const connectScanner = useCallback(async () => {
+    setBridgeMode(null);
+    bleConnectedRef.current = false;
     const nav = typeof navigator !== 'undefined' ? navigator : null;
     const usb = nav?.usb;
     if (!usb) {
@@ -134,6 +334,30 @@ export function BiometricPillar({ phoneNumber, onComplete }: BiometricPillarProp
       }
 
       inEndpointRef.current = endpointNumber;
+      setBridgeMode('usb');
+      setState('ready_to_capture');
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setState('error');
+      setErrorMessage(msg);
+    }
+  }, []);
+
+  /** Connect to BLE device named SENTINEL_BRIDGE (Bridge Box). Enables cable-free fingerprint via ZKTeco. */
+  const connectBleBridge = useCallback(async () => {
+    deviceRef.current = null;
+    inEndpointRef.current = null;
+    setState('connecting');
+    setErrorMessage(null);
+    try {
+      const result = await connectSentinelBleBridge();
+      if (!result.ok) {
+        setState('error');
+        setErrorMessage(result.error ?? 'Could not connect to Sentinel Bridge.');
+        return;
+      }
+      bleConnectedRef.current = true;
+      setBridgeMode('ble');
       setState('ready_to_capture');
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -152,38 +376,23 @@ export function BiometricPillar({ phoneNumber, onComplete }: BiometricPillarProp
     }
 
     setState('capturing');
+    setCaptureProgress(0);
     setErrorMessage(null);
 
     try {
       await sendCaptureRequest(device);
-
+      setCaptureProgress(20);
       const rawBuffer = await waitForTransferIn(device, inEp, 30_000);
       setState('finger_detected');
-
-      setState('hashing');
-      const hashHex = await sha256FromUint8Array(rawBuffer);
-
-      const persistResult = await persistFingerprintHashToRecoverySeed(phoneNumber.trim(), hashHex, {
-        alsoSetExternalFingerprintHash: true,
-      });
-
-      if (!persistResult.ok) {
-        setState('error');
-        setErrorMessage(persistResult.error ?? 'Failed to save to database.');
-        return;
-      }
-
-      setState('secured');
-
-      const serial = device.serialNumber ?? 'USB';
-      dispatchExternalFingerprint({ fingerprintHash: hashHex, scannerSerialNumber: serial });
-      onComplete?.({ fingerprintHash: hashHex, scannerSerialNumber: serial });
+      setCaptureProgress(50);
+      await processRawBuffer(device, rawBuffer);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       setState('ready_to_capture');
+      setCaptureProgress(0);
       setErrorMessage(msg);
     }
-  }, [phoneNumber, onComplete]);
+  }, [processRawBuffer]);
 
   const getStatusText = () => {
     switch (state) {
@@ -193,12 +402,14 @@ export function BiometricPillar({ phoneNumber, onComplete }: BiometricPillarProp
         return 'Connecting…';
       case 'ready_to_capture':
         return 'Scanner ready';
+      case 'auto_on':
+        return 'Sensor Ready (Auto-On)';
       case 'capturing':
-        return 'Capturing…';
+        return 'Capturing Digital DNA…';
       case 'finger_detected':
-        return 'Finger Detected';
+        return 'Capturing Digital DNA…';
       case 'hashing':
-        return 'Securing…';
+        return 'Capturing Digital DNA…';
       case 'secured':
         return 'Biometric Anchor Secured';
       case 'error':
@@ -207,6 +418,9 @@ export function BiometricPillar({ phoneNumber, onComplete }: BiometricPillarProp
         return 'Waiting for Scanner';
     }
   };
+
+  const sensorActive = state === 'ready_to_capture' || state === 'auto_on';
+  const capturingDna = state === 'capturing' || state === 'finger_detected' || state === 'hashing';
 
   return (
     <div
@@ -220,31 +434,89 @@ export function BiometricPillar({ phoneNumber, onComplete }: BiometricPillarProp
         Hardware Handshake
       </h3>
 
+      {sensorActive && (
+        <div className="mb-4">
+          <div
+            className="inline-flex items-center justify-center w-16 h-16 rounded-full border-2 border-[#D4AF37] animate-pulse"
+            style={{ boxShadow: '0 0 24px rgba(212, 175, 55, 0.3)' }}
+          >
+            <span className="text-2xl text-[#D4AF37]">◇</span>
+          </div>
+          <p className="text-sm font-medium text-[#e8c547] mt-2">{getStatusText()}</p>
+          {bridgeMode === 'ble' && state === 'auto_on' ? (
+            <p className="text-[10px] text-[#6b6b70] mt-1">Place finger on Bridge scanner. Hash will auto-submit.</p>
+          ) : bridgeMode !== 'ble' ? (
+            <p className="text-[10px] text-[#6b6b70] mt-1">Scanner polling every {AUTO_POLL_INTERVAL_MS}ms</p>
+          ) : null}
+        </div>
+      )}
+
+      {capturingDna && (
+        <div className="mb-4">
+          <p className="text-sm font-medium text-[#e8c547] mb-2">Capturing Digital DNA…</p>
+          <div className="w-full h-2 bg-[#2a2a2e] rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-[#c9a227] to-[#e8c547] rounded-full transition-all duration-300"
+              style={{ width: `${Math.max(5, captureProgress)}%` }}
+            />
+          </div>
+        </div>
+      )}
+
       {state === 'waiting' && (
-        <button
-          type="button"
-          onClick={connectScanner}
-          className="w-full py-4 rounded-lg bg-[#D4AF37] text-[#0d0d0f] font-bold text-sm uppercase tracking-wider hover:opacity-90 transition-opacity"
-        >
-          Connect Scanner
-        </button>
+        <div className="space-y-3">
+          <button
+            type="button"
+            onClick={connectScanner}
+            className="w-full py-4 rounded-lg bg-[#D4AF37] text-[#0d0d0f] font-bold text-sm uppercase tracking-wider hover:opacity-90 transition-opacity"
+          >
+            Connect USB Scanner
+          </button>
+          <button
+            type="button"
+            onClick={connectBleBridge}
+            className="w-full py-4 rounded-lg border-2 border-[#D4AF37] text-[#D4AF37] font-bold text-sm uppercase tracking-wider hover:bg-[#D4AF37]/10 transition-colors"
+          >
+            Connect Sentinel Bridge (BLE)
+          </button>
+        </div>
       )}
 
       {state === 'ready_to_capture' && (
         <>
-          <p className="text-sm font-medium text-[#e8c547] mb-4">{getStatusText()}</p>
-          <p className="text-xs text-[#6b6b70] mb-4">Place your finger on the scanner, then tap the button below.</p>
-          <button
-            type="button"
-            onClick={captureFingerprint}
-            className="w-full py-4 rounded-lg bg-[#D4AF37] text-[#0d0d0f] font-bold text-sm uppercase tracking-wider hover:opacity-90 transition-opacity"
-          >
-            Capture Fingerprint
-          </button>
+          {bridgeMode === 'ble' ? (
+            <>
+              <p className="text-xs text-[#6b6b70] mb-4">Place your finger on the Bridge scanner. Request capture to power ZKTeco and receive hash (no cable).</p>
+              <button
+                type="button"
+                onClick={() => triggerExternalCapture()}
+                className="w-full py-4 rounded-lg bg-[#D4AF37] text-[#0d0d0f] font-bold text-sm uppercase tracking-wider hover:opacity-90 transition-opacity"
+              >
+                Request fingerprint
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="text-xs text-[#6b6b70] mb-4">Place your finger on the scanner, or wait for Auto-On after Face Pulse.</p>
+              <button
+                type="button"
+                onClick={captureFingerprint}
+                className="w-full py-4 rounded-lg bg-[#D4AF37] text-[#0d0d0f] font-bold text-sm uppercase tracking-wider hover:opacity-90 transition-opacity"
+              >
+                Capture Fingerprint
+              </button>
+            </>
+          )}
         </>
       )}
 
-      {state !== 'waiting' && state !== 'ready_to_capture' && (
+      {state === 'auto_on' && (
+        <p className="text-xs text-[#6b6b70]">
+          {bridgeMode === 'ble' ? 'Place your finger on the Bridge scanner. Hash will be sent via BLE and saved to recovery_seed_hash.' : 'Place your finger on the scanner. Capturing automatically.'}
+        </p>
+      )}
+
+      {state !== 'waiting' && !sensorActive && !capturingDna && (
         <p
           className={`text-sm font-medium ${
             state === 'secured' ? 'text-green-400' : state === 'error' ? 'text-red-400' : 'text-[#e8c547]'
@@ -252,10 +524,6 @@ export function BiometricPillar({ phoneNumber, onComplete }: BiometricPillarProp
         >
           {getStatusText()}
         </p>
-      )}
-
-      {state === 'capturing' && (
-        <p className="text-xs text-[#6b6b70] mt-2">Place your finger on the scanner now…</p>
       )}
 
       {state === 'secured' && (
@@ -268,11 +536,11 @@ export function BiometricPillar({ phoneNumber, onComplete }: BiometricPillarProp
         </p>
       )}
 
-      {state === 'ready_to_capture' && errorMessage && (
+      {(state === 'ready_to_capture' || state === 'auto_on') && errorMessage && (
         <p className="text-xs text-red-400 mt-2" role="alert">
           {errorMessage}
         </p>
       )}
     </div>
   );
-}
+});

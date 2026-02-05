@@ -5,7 +5,7 @@ import { AccountType, type GlobalIdentity, getGuardianDependents } from '@/lib/p
 import { RegisterDependentModal } from './RegisterDependentModal';
 import { SendVidaModal } from './SendVidaModal';
 
-export function MyMesh() {
+export function MyProtocol() {
   const [dependents, setDependents] = useState<GlobalIdentity[]>([]);
   const [showRegisterDependent, setShowRegisterDependent] = useState(false);
   const [showOnboardPartner, setShowOnboardPartner] = useState(false);
@@ -42,7 +42,7 @@ export function MyMesh() {
 
       {/* Header */}
       <div className="bg-[#16161a] rounded-xl p-6 border border-[#2a2a2e]">
-        <h2 className="text-2xl font-bold text-[#e8c547] mb-2">🌐 My Mesh</h2>
+        <h2 className="text-2xl font-bold text-[#e8c547] mb-2">🌐 My Protocol</h2>
         <p className="text-sm text-[#6b6b70]">
           Manage your network of dependents and business partners
         </p>
@@ -60,7 +60,7 @@ export function MyMesh() {
             <div className="text-4xl mb-3">👨‍👩‍👧‍👦</div>
             <h3 className="text-xl font-bold text-[#3b82f6] mb-2">Register Dependent</h3>
             <p className="text-sm text-[#6b6b70]">
-              Add family members or elderly relatives to your mesh. Simplified interface for easy management.
+              Add family members or elderly relatives to your protocol. Simplified interface for easy management.
             </p>
           </div>
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[#3b82f6]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
@@ -120,7 +120,7 @@ export function MyMesh() {
       {dependents.length === 0 && !loading && (
         <div className="bg-[#16161a] rounded-xl p-12 border border-[#2a2a2e] text-center">
           <div className="text-6xl mb-4">🌐</div>
-          <h3 className="text-xl font-bold text-[#6b6b70] mb-2">No Mesh Members Yet</h3>
+          <h3 className="text-xl font-bold text-[#6b6b70] mb-2">No Protocol Members Yet</h3>
           <p className="text-sm text-[#6b6b70]">
             Start building your network by registering dependents or onboarding partners
           </p>
@@ -136,8 +136,8 @@ export function MyMesh() {
               Phone Number = Global Identity
             </h4>
             <p className="text-xs text-[#6b6b70] leading-relaxed mb-2">
-              Your phone number is your <span className="font-mono text-[#e8c547]">Primary Key</span> in the PFF system. 
-              It maps to a unique <span className="font-mono text-[#e8c547]">Global Identity Hash</span> and acts as a 
+              Your phone number is your <span className="font-mono text-[#e8c547]">Primary Key</span> in the PFF system.
+              It maps to a unique <span className="font-mono text-[#e8c547]">Global Identity Hash</span> and acts as a
               <span className="font-mono text-[#e8c547]"> Virtual Bridge</span> to traditional banking.
             </p>
             <p className="text-xs text-[#6b6b70] leading-relaxed">
@@ -149,4 +149,3 @@ export function MyMesh() {
     </div>
   );
 }
-

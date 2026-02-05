@@ -478,7 +478,7 @@ export async function getRevenueTelemetry(): Promise<RevenueTelemetry> {
 // ============================================================================
 
 /**
- * Get SOVRYN AI decision logs for VLT and Darknet Mesh management
+ * Get SOVRYN AI decision logs for VLT and Darknet Protocol management
  * Shows AI governance actions and outcomes
  */
 export async function getAIGovernanceLogs(limit: number = 50): Promise<AIGovernanceLog[]> {

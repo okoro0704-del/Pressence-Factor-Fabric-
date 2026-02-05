@@ -16,7 +16,7 @@ The **Master Dashboard (Architect's Eye)** has been successfully implemented wit
 2. **✅ Global Heatmap Layer** — Real-time world map showing Vitalization_Density with SOVRYN AI growth predictions
 3. **✅ Ultimatum Monitor** — Sidebar displaying every nation's DEATH_CLOCK (180-day SNAT countdown) with RED highlighting for <30 days
 4. **✅ Revenue Flow Analytics** — Live telemetry for Sentinel Treasury, 1% Sovereign Movement, and Architect's Master Block
-5. **✅ AI Governance Feed** — Decision Logs of SOVRYN AI managing VLT and Darknet Mesh sync
+5. **✅ AI Governance Feed** — Decision Logs of SOVRYN AI managing VLT and Darknet Protocol sync
 6. **✅ Emergency Command Console** — MASTER_OVERRIDE button secured by continuous heartbeat-sync requirement
 
 ---

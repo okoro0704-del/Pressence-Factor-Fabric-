@@ -69,7 +69,9 @@ import { storeRecoverySeedWithFaceAndMint, hasRecoverySeed, confirmRecoverySeedS
 import { getStoredBiometricAnchors } from '@/lib/biometricAnchorSync';
 import type { DeviceInfo } from '@/lib/multiDeviceVitalization';
 import { RecoverMyAccountScreen } from '@/components/auth/RecoverMyAccountScreen';
-import { BiometricPillar } from '@/components/auth/BiometricPillar';
+import { BiometricPillar, type BiometricPillarHandle } from '@/components/auth/BiometricPillar';
+import { AwaitingLoginApproval } from '@/components/auth/AwaitingLoginApproval';
+import { createLoginRequest, completeLoginBridge } from '@/lib/loginRequest';
 
 const jetbrains = JetBrains_Mono({ weight: ['400', '600', '700'], subsets: ['latin'] });
 
@@ -138,7 +140,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
   const [pillarFace, setPillarFace] = useState(false);
   /** Location permission required — show gold popup to allow access */
   const [showLocationPermissionPopup, setShowLocationPermissionPopup] = useState(false);
-  /** GPS taking >3s — show "Syncing with Local Mesh..." (indoor mode) */
+  /** GPS taking >3s — show "Initializing Protocol..." (indoor mode) */
   const [gpsTakingLong, setGpsTakingLong] = useState(false);
   /** New Device Authorization: device_fingerprint does not match primary_sentinel_device_id — require 5s Face Pulse then update binding */
   const [showNewDeviceAuthorization, setShowNewDeviceAuthorization] = useState(false);
@@ -162,6 +164,9 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
   const [lastExternalFingerprintHash, setLastExternalFingerprintHash] = useState<string | null>(null);
   /** Mobile short-circuit: hide Fingerprint pillar; Complete Initial Registration and set mint_status PENDING_HARDWARE. */
   const [isMobile, setIsMobile] = useState(false);
+  /** Login via phone: computer creates login_request → phone approves → computer (Realtime) logs into Vault. */
+  const [loginRequestId, setLoginRequestId] = useState<string | null>(null);
+  const [showAwaitingLoginApproval, setShowAwaitingLoginApproval] = useState(false);
   /** Hard Navigation Lock: 1s transition spinner before replace to dashboard so DB can catch up; prevents back-stack re-entry. */
   const [transitioningToDashboard, setTransitioningToDashboard] = useState(false);
   const router = useRouter();
@@ -286,7 +291,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     };
   }, [resetVerification]);
 
-  // When GPS pillar is active and scanning, after 3s show "Syncing with Local Mesh..." (indoor mode)
+  // When GPS pillar is active and scanning, after 3s show "Initializing Protocol..." (indoor mode)
   useEffect(() => {
     if (currentLayer !== AuthLayer.GPS_LOCATION || authStatus !== AuthStatus.SCANNING) return;
     const t = setTimeout(() => setGpsTakingLong(true), 3000);
@@ -331,7 +336,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
   /** Scanning-state copy for Triple-Pillar sequence; GPS >3s shows indoor mode. */
   const getLayerScanningLabel = (layer: AuthLayer) => {
     if (layer === AuthLayer.GPS_LOCATION && gpsTakingLong) {
-      return 'Syncing with Local Mesh...';
+      return 'Initializing Protocol...';
     }
     switch (layer) {
       case AuthLayer.HARDWARE_TPM:
@@ -396,6 +401,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
   };
 
   const biometricPendingRef = useRef(false);
+  const biometricPillarRef = useRef<BiometricPillarHandle>(null);
 
   /** Triple-Pillar success: Device + GPS + Face verified (no Voice). Transition to Success/Dashboard. Mobile: skip mint when PENDING_HARDWARE. Hub: always set MINTED and mint, then redirect. */
   const goToDashboard = useCallback(async () => {
@@ -474,14 +480,17 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
       const deviceInfo = getCurrentDeviceInfo();
     const compositeDeviceId = await getCompositeDeviceFingerprint();
 
-    // New Hardware Detection: if verified user's device_fingerprint does not match stored primary_sentinel_device_id → New Device Authorization
+    // New Hardware Detection: if device is not primary, check if it is an authorized secondary device before showing New Device screen
     const profile = await getProfileWithPrimarySentinel(identityAnchor.phone);
     const storedPrimaryId = profile?.primary_sentinel_device_id?.trim() ?? '';
     if (storedPrimaryId && compositeDeviceId !== storedPrimaryId) {
-      setShowNewDeviceAuthorization(true);
-      setAuthStatus(AuthStatus.IDLE);
-      biometricPendingRef.current = false;
-      return;
+      const isAuthorizedSecondary = await isDeviceAuthorized(identityAnchor.phone, compositeDeviceId);
+      if (!isAuthorizedSecondary) {
+        setShowNewDeviceAuthorization(true);
+        setAuthStatus(AuthStatus.IDLE);
+        biometricPendingRef.current = false;
+        return;
+      }
     }
 
     const isNewDevice = !(await isDeviceAuthorized(identityAnchor.phone, compositeDeviceId));
@@ -512,7 +521,10 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
         onPillarComplete: (pillar: PresencePillar) => {
           if (pillar === 'device') setPillarDevice(true);
           if (pillar === 'location') setPillarLocation(true);
-          if (pillar === 'face') setPillarFace(true);
+          if (pillar === 'face') {
+            setPillarFace(true);
+            biometricPillarRef.current?.triggerExternalCapture();
+          }
         },
       }
     );
@@ -828,7 +840,10 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
           onPillarComplete: (pillar: PresencePillar) => {
             if (pillar === 'device') setPillarDevice(true);
             if (pillar === 'location') setPillarLocation(true);
-            if (pillar === 'face') setPillarFace(true);
+            if (pillar === 'face') {
+              setPillarFace(true);
+              biometricPillarRef.current?.triggerExternalCapture();
+            }
           },
         }
       );
@@ -867,6 +882,87 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     setShowNewDeviceAuthorization(false);
     setNewDeviceMigrationError(null);
     setAuthStatus(AuthStatus.IDLE);
+  };
+
+  /** Login via phone: on APPROVED, fetch user from request row → set session → redirect; cleanup login_requests row. */
+  const handleLoginRequestApproved = useCallback(async () => {
+    const requestId = loginRequestId;
+    const anchor = identityAnchor;
+    setShowAwaitingLoginApproval(false);
+    setLoginRequestId(null);
+    if (!requestId) return;
+
+    setTransitioningToDashboard(true);
+
+    const result = await completeLoginBridge(requestId);
+    if (!result.ok) {
+      console.warn('[Login via phone] Bridge failed:', result.error);
+      setTransitioningToDashboard(false);
+      setLoginRequestId(requestId);
+      setShowAwaitingLoginApproval(true);
+      return;
+    }
+
+    setPresenceVerified(true);
+    if (typeof window !== 'undefined') {
+      window.location.href = '/dashboard';
+    } else {
+      router.replace('/dashboard');
+    }
+  }, [loginRequestId, router]);
+
+  const handleLoginRequestDenied = useCallback(() => {
+    setShowAwaitingLoginApproval(false);
+    setLoginRequestId(null);
+    alert('Login was denied on your phone. Try again or use biometrics on this device.');
+  }, []);
+
+  /** Computer: create login_request and show "Waiting for approval on your phone". */
+  const handleLoginViaPhone = useCallback(async () => {
+    if (!identityAnchor) return;
+    const deviceInfo = typeof navigator !== 'undefined' ? { userAgent: navigator.userAgent, platform: navigator.platform } : undefined;
+    const res = await createLoginRequest(identityAnchor.phone, identityAnchor.name, deviceInfo);
+    if (res.ok) {
+      setLoginRequestId(res.requestId);
+      setShowAwaitingLoginApproval(true);
+    } else {
+      alert(res.error || 'Failed to create login request.');
+    }
+  }, [identityAnchor]);
+
+  /** Add this device by requesting approval from primary (phone). Creates vitalization request; mobile approves and laptop is added to authorized_devices. */
+  const handleRequestAddFromPhone = async () => {
+    if (!identityAnchor) return;
+    setNewDeviceMigrationError(null);
+    const primary = await getPrimaryDevice(identityAnchor.phone);
+    if (!primary) {
+      setNewDeviceMigrationError('No primary device on file. Use "Authorize only this device" to make this device primary.');
+      return;
+    }
+    setPrimaryDeviceInfo({
+      device_name: primary.device_name,
+      last_4_digits: primary.last_4_digits,
+      device_id: primary.device_id,
+    });
+    try {
+      const deviceInfo = getCurrentDeviceInfo();
+      const compositeDeviceId = await getCompositeDeviceFingerprint();
+      const ipAddress = 'unknown';
+      const geolocation = { city: 'Unknown', country: '', latitude: 0, longitude: 0 };
+      const requestId = await createVitalizationRequest(
+        identityAnchor.phone,
+        deviceInfo,
+        ipAddress,
+        geolocation,
+        compositeDeviceId
+      );
+      setVitalizationRequestId(requestId);
+      setShowNewDeviceAuthorization(false);
+      setShowAwaitingAuth(true);
+      setNewDeviceMigrationError(null);
+    } catch (e) {
+      setNewDeviceMigrationError(e instanceof Error ? e.message : 'Failed to create request. Try again.');
+    }
   };
 
   /** Sacred Record: user acknowledged — show 3-word verification. */
@@ -1184,11 +1280,23 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
         />
         <NewDeviceAuthorizationScreen
           onAuthorize={handleNewDeviceAuthorize}
+          onAddFromPhone={handleRequestAddFromPhone}
           onCancel={handleNewDeviceCancel}
           loading={newDeviceMigrationScanning}
           error={newDeviceMigrationError}
         />
       </div>
+    );
+  }
+
+  // Login via phone: computer created login_request; waiting for phone to approve. Realtime subscribes to row; on APPROVED → Vault.
+  if (showAwaitingLoginApproval && loginRequestId && identityAnchor) {
+    return (
+      <AwaitingLoginApproval
+        requestId={loginRequestId}
+        onApproved={handleLoginRequestApproved}
+        onDenied={handleLoginRequestDenied}
+      />
     );
   }
 
@@ -1354,7 +1462,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
             {/* Hardware Handshake: Connect Scanner → USB session → finger data → hash & store. Mobile: Fingerprint deferred to Sentinel Hub. */}
             {identityAnchor && !effectiveMobile && (
               <div className="mt-6">
-                <BiometricPillar phoneNumber={identityAnchor.phone} />
+                <BiometricPillar ref={biometricPillarRef} phoneNumber={identityAnchor.phone} />
               </div>
             )}
           </div>
@@ -1400,7 +1508,19 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
           </div>
         )}
 
-        {/* Authentication Button — z-50 above mesh; 200ms transition */}
+        {/* Desktop: Log in via my phone — create login_request; phone approves → Realtime → Vault */}
+        {identityAnchor && !effectiveMobile && (
+          <button
+            type="button"
+            onClick={handleLoginViaPhone}
+            disabled={authStatus === AuthStatus.SCANNING}
+            className="relative z-50 w-full min-h-[48px] py-3 px-6 rounded-lg border-2 border-[#D4AF37] bg-[#D4AF37]/10 text-[#e8c547] font-bold text-sm uppercase tracking-wider transition-all duration-200 hover:bg-[#D4AF37]/20 disabled:opacity-50 flex items-center justify-center gap-2 mb-3 touch-manipulation cursor-pointer"
+          >
+            📱 Log in via my phone
+          </button>
+        )}
+
+        {/* Authentication Button — z-50 above overlay; 200ms transition */}
         <motion.button
           type="button"
           onClick={handleStartAuthentication}

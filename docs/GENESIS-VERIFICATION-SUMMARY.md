@@ -55,7 +55,7 @@ STEP 1: Hardware Sync
 
 STEP 2: The 4-Layer Genesis Signature
 ├─ Trigger camera and sensors for Final Handshake
-├─ Capture Face (127-point mesh, liveness ≥ 0.99)
+├─ Capture Face (127-point geometry, liveness ≥ 0.99)
 ├─ Capture Finger (match confidence ≥ 1.0)
 ├─ Capture Heart (40-200 BPM, spectral hash)
 ├─ Capture Voice (spectral resonance)

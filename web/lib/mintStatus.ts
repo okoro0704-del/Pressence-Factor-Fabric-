@@ -146,6 +146,31 @@ export async function ensureMintedAndBalance(phoneNumber: string): Promise<{ ok:
   }
 }
 
+/** Protocol Release: spending is unlocked when is_fully_verified === true OR face_hash is present (no external fingerprint required). */
+export async function getBiometricSpendingActive(
+  phoneNumber: string
+): Promise<{ ok: true; active: boolean } | { ok: false; error: string }> {
+  const supabase = getSupabase();
+  if (!supabase) return { ok: false, error: 'Supabase not available' };
+  const trimmed = phoneNumber?.trim();
+  if (!trimmed) return { ok: false, error: 'Phone number required.' };
+  try {
+    const { data, error } = await (supabase as any)
+      .from('user_profiles')
+      .select('is_fully_verified, face_hash')
+      .eq('phone_number', trimmed)
+      .maybeSingle();
+    if (error) return { ok: false, error: error.message ?? 'Failed to get biometric status' };
+    const isFullyVerified = data?.is_fully_verified === true;
+    const faceHash = data?.face_hash != null ? String(data.face_hash).trim() : '';
+    const active = isFullyVerified || faceHash !== '';
+    return { ok: true, active };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false, error: msg };
+  }
+}
+
 /** Vault Sync: spending_unlocked is true when second biometric (external fingerprint) is saved in DB. */
 export async function getSpendingUnlocked(
   phoneNumber: string

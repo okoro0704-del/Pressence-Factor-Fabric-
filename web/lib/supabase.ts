@@ -119,7 +119,7 @@ export function getSupabase(): any {
   return _supabase ?? getMockClient();
 }
 
-/** Handshake verification: ping Supabase on app startup. Returns ok + latency ms or error. Use to show "Reconnecting to Mesh" instead of crashing. */
+/** Handshake verification: ping Supabase on app startup. Returns ok + latency ms or error. Use to show "Reconnecting to Protocol" instead of crashing. */
 export async function testConnection(): Promise<
   { ok: true; latencyMs: number } | { ok: false; error: string }
 > {

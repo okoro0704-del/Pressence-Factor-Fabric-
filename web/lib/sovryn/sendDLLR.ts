@@ -1,11 +1,12 @@
 /**
  * PFF × Sovryn — DLLR Send/Transfer Functions
- * Presence-gated DLLR transfers to external wallets/exchanges
+ * Uses internal signer (derived from seed) when phoneNumber is provided — no Connect Wallet popup.
  */
 
-import { Contract, parseUnits } from 'ethers';
+import { Contract, parseUnits, type Signer } from 'ethers';
 import { DLLR_ADDRESS } from './config';
 import { getBrowserProvider } from './wallet';
+import { getInternalSigner } from './internalSigner';
 
 const ERC20_ABI = [
   'function transfer(address to, uint256 amount) returns (bool)',
@@ -19,6 +20,11 @@ export interface SendDLLRParams {
   amount: string; // Human-readable amount (e.g., "100.50")
 }
 
+export interface SendDLLROptions {
+  /** When set, use internal signer from recovery seed (no MetaMask popup). */
+  phoneNumber?: string;
+}
+
 export interface SendDLLRResult {
   success: boolean;
   txHash?: string;
@@ -26,10 +32,14 @@ export interface SendDLLRResult {
 }
 
 /**
- * Send DLLR to an external address (exchange, wallet, etc.)
- * Requires wallet connection and presence verification (handled by caller)
+ * Send DLLR to an external address.
+ * When options.phoneNumber is set: uses internal signer (derived from seed) — no Connect Wallet.
+ * Otherwise: uses browser provider (MetaMask); may trigger connection popup.
  */
-export async function sendDLLR(params: SendDLLRParams): Promise<SendDLLRResult> {
+export async function sendDLLR(
+  params: SendDLLRParams,
+  options?: SendDLLROptions
+): Promise<SendDLLRResult> {
   try {
     const { toAddress, amount } = params;
 
@@ -44,13 +54,17 @@ export async function sendDLLR(params: SendDLLRParams): Promise<SendDLLRResult> 
       return { success: false, error: 'Invalid amount' };
     }
 
-    // Get browser provider and signer
-    const provider = await getBrowserProvider();
-    if (!provider) {
-      return { success: false, error: 'No wallet provider found' };
+    // Prefer internal signer (no popup) when phoneNumber is provided
+    let signer: Signer | null = null;
+    if (options?.phoneNumber?.trim()) {
+      signer = await getInternalSigner(options.phoneNumber.trim());
+      if (!signer) return { success: false, error: 'Recovery seed not available. Complete setup first.' };
+    } else {
+      const provider = await getBrowserProvider();
+      if (!provider) return { success: false, error: 'No wallet provider found' };
+      signer = await provider.getSigner();
     }
 
-    const signer = await provider.getSigner();
     const contract = new Contract(DLLR_ADDRESS, ERC20_ABI, signer);
 
     // Get decimals
@@ -83,9 +97,13 @@ export async function sendDLLR(params: SendDLLRParams): Promise<SendDLLRResult> 
     };
   } catch (error) {
     console.error('[sendDLLR] Error:', error);
+    const msg = error instanceof Error ? error.message : 'Failed to send DLLR';
+    const gasRelated = /insufficient funds|out of gas|not enough gas|gas required/i.test(msg);
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to send DLLR',
+      error: options?.phoneNumber && gasRelated
+        ? 'Gas insufficient. The Protocol Relayer can cover fees — try again or ensure your wallet has a small amount of RBTC.'
+        : msg,
     };
   }
 }

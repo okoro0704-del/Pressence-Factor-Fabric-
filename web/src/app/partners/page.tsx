@@ -75,7 +75,7 @@ export default function PartnersPage() {
           Certified PFF Partners
         </h1>
         <p className={`text-sm mb-8 ${jetbrains.className}`} style={{ color: GOLD_DIM, opacity: 0.9 }}>
-          Presence Factor Fabric certified partners — Sovereign Verified integration with the Mesh.
+          Presence Factor Fabric certified partners — Sovereign Verified integration with the Protocol.
         </p>
 
         {loading ? (
