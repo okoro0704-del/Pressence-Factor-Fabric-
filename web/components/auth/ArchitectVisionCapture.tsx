@@ -15,19 +15,22 @@ import { speakSovereignSuccess } from '@/lib/sovereignVoice';
 const BLUE_LASER = 'rgba(59, 130, 246, 0.95)';
 const MESH_COLOR = 'rgba(212, 175, 55, 0.6)';
 const MESH_SUCCESS_COLOR = '#D4AF37';
+const BLUE_MESH = 'rgba(59, 130, 246, 0.85)';
 
-/** Simple mesh: face oval + radial lines (3D geometry placeholder). Replace with MediaPipe landmarks when loaded. */
+/** Simple mesh: face oval + radial lines. Blue when face detected (diagnostic), gold on success. */
 function drawPlaceholderMesh(
   ctx: CanvasRenderingContext2D,
   w: number,
   h: number,
-  gold: boolean
+  gold: boolean,
+  faceDetected: boolean
 ) {
   const cx = w / 2;
   const cy = h / 2;
   const rx = w * 0.35;
   const ry = h * 0.45;
-  ctx.strokeStyle = gold ? MESH_SUCCESS_COLOR : MESH_COLOR;
+  const strokeColor = gold ? MESH_SUCCESS_COLOR : faceDetected ? BLUE_MESH : MESH_COLOR;
+  ctx.strokeStyle = strokeColor;
   ctx.lineWidth = gold ? 2.5 : 1.5;
   ctx.beginPath();
   ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
@@ -52,6 +55,8 @@ export interface ArchitectVisionCaptureProps {
   onComplete?: () => void;
   /** Called when we have a stable frame (optional, for parent to trigger verify) */
   onReadyForVerify?: (captureBlob?: Blob) => void;
+  /** Optional label for the close button (e.g. "Continue to re-register" for reset flow) */
+  closeLabel?: string;
 }
 
 /** Highest practical resolution for unique/permanent Face Hash (hardware verification) */
@@ -72,6 +77,7 @@ export function ArchitectVisionCapture({
   verificationSuccess,
   onComplete,
   onReadyForVerify,
+  closeLabel = 'Cancel',
 }: ArchitectVisionCaptureProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -164,7 +170,7 @@ export function ArchitectVisionCapture({
 
       const w = canvas.width || cw || 640;
       const h = canvas.height || ch || 480;
-      drawPlaceholderMesh(ctx, w, h, meshGold);
+      drawPlaceholderMesh(ctx, w, h, meshGold, faceDetected);
 
       if (frozen) frozenDrawnRef.current = true;
     };
@@ -173,7 +179,7 @@ export function ArchitectVisionCapture({
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, [isOpen, meshGold]);
+  }, [isOpen, meshGold, faceDetected]);
 
   // Success: freeze frame, gold mesh, Sovereign Voice (same moment), 0.5s then onComplete
   useEffect(() => {
@@ -231,6 +237,16 @@ export function ArchitectVisionCapture({
           <span>Hash Status: {hashStatus}</span>
         </div>
 
+        {/* Diagnostic: "The Machine is Watching" when face detected (before success) */}
+        {faceDetected && !meshGold && (
+          <div
+            className="absolute bottom-4 left-0 right-0 z-20 text-center text-sm font-mono tracking-wider"
+            style={{ color: BLUE_MESH, textShadow: '0 0 12px rgba(59,130,246,0.8)' }}
+          >
+            The Machine is Watching.
+          </div>
+        )}
+
         {/* Success overlay (gold tint) */}
         {meshGold && (
           <div
@@ -249,7 +265,7 @@ export function ArchitectVisionCapture({
         onClick={onClose}
         className="mt-6 px-6 py-2 rounded-lg border-2 border-[#D4AF37]/60 text-[#e8c547] hover:bg-[#D4AF37]/10 transition-colors"
       >
-        Cancel
+        {closeLabel}
       </button>
 
       <style dangerouslySetInnerHTML={{

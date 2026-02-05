@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { vitalizationService, type MockPresenceProof, type MockVidaCapResult, type MockVidaBalance } from '@/lib/mockService';
 import { BiometricScanningHUD } from './BiometricScanningHUD';
+import { ArchitectVisionCapture } from './auth/ArchitectVisionCapture';
 // To switch to real API, change the import above to:
 // import { vitalizationService } from '@/lib/realVitalizationService';
 
@@ -14,9 +16,13 @@ import { BiometricScanningHUD } from './BiometricScanningHUD';
  * - PFF Triple-Lock Scan (Phone UUID + Face + Fingerprint)
  * - 50/50 VIDA CAP Minting Split Display
  * - $VIDA Balance Updates
- * - Mobile-first responsive design
+ * - Hard reset flow (?reset=1): camera diagnostic (mirror + blue mesh), then re-register
  */
 export function VitalizationScreen() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const isResetFlow = searchParams.get('reset') === '1';
+
   const [step, setStep] = useState<'idle' | 'scanning' | 'minting' | 'success' | 'error'>('idle');
   const [presenceProof, setPresenceProof] = useState<MockPresenceProof | null>(null);
   const [vidaCapResult, setVidaCapResult] = useState<MockVidaCapResult | null>(null);
@@ -103,6 +109,18 @@ export function VitalizationScreen() {
     setVidaCapResult(null);
     setError(null);
   };
+
+  // Hard Identity Reset: show camera with mirror + AI mesh; "The Machine is Watching"; then re-register
+  if (isResetFlow) {
+    return (
+      <ArchitectVisionCapture
+        isOpen={true}
+        verificationSuccess={null}
+        onClose={() => router.push('/')}
+        closeLabel="Continue to re-register"
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0d0d0f] text-[#f5f5f5]">

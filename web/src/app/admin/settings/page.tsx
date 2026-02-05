@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { getIdentityAnchorPhone } from '@/lib/sentinelActivation';
+import { executeHardIdentityReset } from '@/lib/identityReset';
 
 const ADMIN_PHONE = process.env.NEXT_PUBLIC_ADMIN_PHONE?.trim() ?? '';
 
@@ -23,6 +24,15 @@ export default function AdminSettingsPage() {
   }, []);
 
   const isAdmin = !!ADMIN_PHONE && !!phone && phone.replace(/\s/g, '') === ADMIN_PHONE.replace(/\s/g, '');
+
+  const handleHardIdentityReset = async () => {
+    setResetStatus('loading');
+    setResetMessage('');
+    const result = await executeHardIdentityReset();
+    if (result.ok) return;
+    setResetStatus('error');
+    setResetMessage(result.error ?? 'Reset failed');
+  };
 
   const handleForceSchemaRefresh = async () => {
     if (!phone) return;
@@ -95,6 +105,24 @@ export default function AdminSettingsPage() {
           <p className={`mt-3 text-sm ${refreshStatus === 'ok' ? 'text-emerald-400' : 'text-amber-400'}`}>
             {refreshMessage}
           </p>
+        )}
+      </section>
+
+      <section className="rounded-xl border border-[#2a2a2e] bg-[#0d0d0f] p-6 mb-6">
+        <h2 className="text-sm font-semibold text-[#a0a0a5] uppercase tracking-wider mb-2">Device identity</h2>
+        <p className="text-xs text-[#6b6b70] mb-4">
+          Hard Identity Reset: clear local state and Supabase profile binding for this device, then open camera and re-registration flow.
+        </p>
+        <button
+          type="button"
+          onClick={handleHardIdentityReset}
+          disabled={resetStatus === 'loading'}
+          className="w-full py-3 rounded-lg bg-[#2a2a2e] text-[#e8c547] font-bold uppercase tracking-wider disabled:opacity-50 hover:bg-[#3d3d45] transition-colors border border-[#D4AF37]/30"
+        >
+          {resetStatus === 'loading' ? 'Resetting…' : 'Reset Device Identity'}
+        </button>
+        {resetMessage && (
+          <p className="mt-3 text-sm text-amber-400">{resetMessage}</p>
         )}
       </section>
 
