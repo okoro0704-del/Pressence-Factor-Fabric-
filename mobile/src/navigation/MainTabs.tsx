@@ -1,11 +1,12 @@
 /**
  * PFF — Bottom tab navigator: Home (Manifesto / Vote / Vitalization) and Wallet.
- * Dedicated icons for each tab (Wallet icon at bottom tab).
+ * Dedicated icons for each tab (Wallet icon at bottom tab). Tab bar is always visible.
  */
 
 import React from 'react';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { ManifestoFlow } from '../manifesto/ManifestoFlow';
 import { VoteForVitalizationScreen } from '../vote/VoteForVitalizationScreen';
@@ -52,11 +53,18 @@ export type MainTabParamList = {
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 export function MainTabs(): React.JSX.Element {
+  const insets = useSafeAreaInsets();
+  const tabBarHeight = 56 + (Platform.OS === 'ios' ? insets.bottom : 0);
+
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarStyle: styles.tabBar,
+        tabBarStyle: [
+          styles.tabBar,
+          { height: tabBarHeight, paddingBottom: Platform.OS === 'ios' ? insets.bottom : 8, paddingTop: 8 },
+        ],
+        tabBarShowLabel: true,
         tabBarActiveTintColor: '#D4AF37',
         tabBarInactiveTintColor: MUTED,
         tabBarLabelStyle: styles.tabBarLabel,
@@ -88,7 +96,11 @@ const styles = StyleSheet.create({
     backgroundColor: SURFACE,
     borderTopColor: BORDER,
     borderTopWidth: 1,
-    height: 60,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
   },
   tabBarLabel: {
     fontSize: 11,
