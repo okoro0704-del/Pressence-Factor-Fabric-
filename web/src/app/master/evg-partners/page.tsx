@@ -94,10 +94,10 @@ function EvgPartnersContent() {
   const handleRevoke = async (id: string) => {
     if (!confirm('Revoke this partner? They will no longer be able to verify humans.')) return;
     try {
-      const res = await fetch(`/api/evg/admin/partners/${id}`, {
+      const res = await fetch('/api/evg/admin/partners/update', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'revoked' }),
+        body: JSON.stringify({ id, status: 'revoked' }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? 'Update failed');
       setMessage({ type: 'success', text: 'Partner revoked.' });
@@ -109,10 +109,10 @@ function EvgPartnersContent() {
 
   const handleReactivate = async (id: string) => {
     try {
-      const res = await fetch(`/api/evg/admin/partners/${id}`, {
+      const res = await fetch('/api/evg/admin/partners/update', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'active' }),
+        body: JSON.stringify({ id, status: 'active' }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? 'Update failed');
       setMessage({ type: 'success', text: 'Partner reactivated.' });

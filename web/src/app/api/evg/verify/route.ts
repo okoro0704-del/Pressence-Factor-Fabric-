@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAccessTokenAndHumanity, getEvgPartner, recordEvgRevenueShare } from '@/lib/evg';
 
-export const dynamic = 'force-dynamic';
+export const dynamic = 'force-static';
 
 export async function GET(request: NextRequest) {
   try {

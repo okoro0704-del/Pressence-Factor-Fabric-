@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseServer } from '@/lib/supabaseServer';
 import { hashClientSecret } from '@/lib/evg';
 
-export const dynamic = 'force-dynamic';
+export const dynamic = 'force-static';
 
 const ROLE_COOKIE = 'pff_role';
 const MASTER = 'MASTER_ARCHITECT';

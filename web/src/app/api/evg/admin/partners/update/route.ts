@@ -1,12 +1,12 @@
 /**
- * EVG Admin — Update or revoke authorized partner.
+ * EVG Admin — Update or revoke authorized partner (id in body; no dynamic segment for static export).
  * MASTER_ARCHITECT only.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseServer } from '@/lib/supabaseServer';
 
-export const dynamic = 'force-dynamic';
+export const dynamic = 'force-static';
 
 const ROLE_COOKIE = 'pff_role';
 const MASTER = 'MASTER_ARCHITECT';
@@ -19,17 +19,15 @@ function requireMaster(request: NextRequest): NextResponse | null {
   return null;
 }
 
-/** PATCH: Update partner (name, redirect_uris, fee, revenue_share_user_pct, status). */
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+/** PATCH: Update partner (id, name, redirect_uris, fee, revenue_share_user_pct, status in body). */
+export async function PATCH(request: NextRequest) {
   const forbidden = requireMaster(request);
   if (forbidden) return forbidden;
 
-  const { id } = await params;
+  const body = await request.json();
+  const id = typeof body.id === 'string' ? body.id.trim() : '';
   if (!id) {
-    return NextResponse.json({ error: 'Partner id required' }, { status: 400 });
+    return NextResponse.json({ error: 'Partner id required in body' }, { status: 400 });
   }
 
   const supabase = getSupabaseServer();
@@ -38,7 +36,6 @@ export async function PATCH(
   }
 
   try {
-    const body = await request.json();
     const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
     if (typeof body.name === 'string' && body.name.trim()) updates.name = body.name.trim();
     if (Array.isArray(body.redirect_uris)) {
