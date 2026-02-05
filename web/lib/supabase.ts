@@ -80,6 +80,10 @@ function initSupabase() {
 
   try {
     _supabase = createClient(url, anon, {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+      },
       global: {
         fetch: noCacheFetch,
       },
@@ -113,4 +117,26 @@ export function hasSupabase(): boolean {
 export function getSupabase(): any {
   if (typeof window !== 'undefined' && !_initialized) initSupabase();
   return _supabase ?? getMockClient();
+}
+
+/** Handshake verification: ping Supabase on app startup. Returns ok + latency ms or error. Use to show "Reconnecting to Mesh" instead of crashing. */
+export async function testConnection(): Promise<
+  { ok: true; latencyMs: number } | { ok: false; error: string }
+> {
+  const client = getSupabase();
+  if (!client || _isMock) {
+    return { ok: false, error: 'Supabase not configured or mock client' };
+  }
+  const start = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  try {
+    const { error } = await client.from('user_profiles').select('id').limit(1);
+    const latencyMs = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - start);
+    if (error) {
+      return { ok: false, error: error.message ?? 'Query failed' };
+    }
+    return { ok: true, latencyMs };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false, error: msg };
+  }
 }

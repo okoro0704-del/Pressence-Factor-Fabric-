@@ -145,6 +145,93 @@ export async function storeRecoverySeed(
 }
 
 /**
+ * Final Minting save: wait for face_hash to be ready, then update profiles with face_hash + recovery_seed_* + is_minted,
+ * and credit sovereign_internal_wallets with 5.0 VIDA. Call only after Face Pulse has persisted face_hash.
+ */
+export async function storeRecoverySeedWithFaceAndMint(
+  phoneNumber: string,
+  phrase: string,
+  fullName: string | undefined,
+  faceHash: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const trimmed = phoneNumber?.trim();
+  if (!trimmed || !faceHash?.trim()) {
+    return { ok: false, error: 'Face hash required. Complete Face Pulse first so face_hash is stored.' };
+  }
+  const normalized = normalizeMnemonic(phrase);
+  if (!normalized || normalized.split(' ').length !== 12) {
+    return { ok: false, error: 'Invalid 12-word phrase' };
+  }
+
+  const supabase = getSupabase();
+  if (!supabase) return { ok: false, error: 'Supabase not available' };
+
+  try {
+    const [recoverySeedHash, encrypted] = await Promise.all([
+      hashSeedForStorage(normalized),
+      encryptSeed(normalized, trimmed),
+    ]);
+
+    const { data: existing } = await (supabase as any)
+      .from('user_profiles')
+      .select('id')
+      .eq('phone_number', trimmed)
+      .maybeSingle();
+
+    const profilePayload = {
+      face_hash: faceHash.trim(),
+      recovery_seed_hash: recoverySeedHash,
+      recovery_seed_encrypted: encrypted.encryptedHex,
+      recovery_seed_iv: encrypted.ivHex,
+      recovery_seed_salt: encrypted.saltHex,
+      is_minted: true,
+      is_fully_verified: true,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (existing?.id) {
+      const { error: profileError } = await (supabase as any)
+        .from('user_profiles')
+        .update(profilePayload)
+        .eq('id', existing.id);
+      if (profileError) return { ok: false, error: profileError.message ?? 'Failed to save profile with face_hash and recovery_seed' };
+    } else {
+      const { error: insertError } = await (supabase as any)
+        .from('user_profiles')
+        .insert({
+          phone_number: trimmed,
+          full_name: fullName?.trim() || '—',
+          ...profilePayload,
+        });
+      if (insertError) return { ok: false, error: insertError.message ?? 'Failed to insert profile' };
+    }
+
+    const { getOrCreateSovereignWallet } = await import('./sovereignInternalWallet');
+    await getOrCreateSovereignWallet(trimmed);
+    const { data: wallet } = await (supabase as any)
+      .from('sovereign_internal_wallets')
+      .select('vida_cap_balance')
+      .eq('phone_number', trimmed)
+      .maybeSingle();
+    const current = Number(wallet?.vida_cap_balance ?? 0);
+    const { error: walletError } = await (supabase as any)
+      .from('sovereign_internal_wallets')
+      .update({
+        vida_cap_balance: current + 5,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('phone_number', trimmed);
+    if (walletError) {
+      return { ok: false, error: walletError.message ?? 'Failed to credit 5 VIDA' };
+    }
+    return { ok: true };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false, error: msg };
+  }
+}
+
+/**
  * Confirm that recovery_seed_hash was persisted (database has the column set).
  * Call after storeRecoverySeed to ensure Success screen only shows once DB is updated.
  */
@@ -172,6 +259,57 @@ export async function hasRecoverySeed(phoneNumber: string): Promise<boolean> {
     .maybeSingle();
   if (error || !data) return false;
   return !!(data.recovery_seed_hash && String(data.recovery_seed_hash).length > 0);
+}
+
+/** Confirm both face_hash and recovery_seed_hash are updated in Supabase (Success trigger: only then show Success shield and allow navigation.reset to Vault). */
+export async function confirmFaceAndSeedStored(phoneNumber: string): Promise<boolean> {
+  const supabase = getSupabase();
+  if (!supabase) return false;
+  const trimmed = phoneNumber?.trim();
+  if (!trimmed) return false;
+  const { data, error } = await (supabase as any)
+    .from('user_profiles')
+    .select('face_hash, recovery_seed_hash')
+    .eq('phone_number', trimmed)
+    .maybeSingle();
+  if (error || !data) return false;
+  const fh = data.face_hash && String(data.face_hash).trim();
+  const rh = data.recovery_seed_hash && String(data.recovery_seed_hash).trim();
+  return !!(fh && rh);
+}
+
+/** Verification gate: allow Vault entry only when BOTH face_hash and recovery_seed_hash are present. */
+export async function hasFaceAndSeed(phoneNumber: string): Promise<boolean> {
+  const r = await getProfileFaceAndSeed(phoneNumber);
+  return r.ok && !!r.face_hash && !!r.recovery_seed_hash;
+}
+
+/** Vault entry: read these values from Supabase. If both anchors present, show 5 VIDA and stop back/bounce. */
+export async function getProfileFaceAndSeed(
+  phoneNumber: string
+): Promise<
+  | { ok: true; face_hash: string | null; recovery_seed_hash: string | null; vida_mint_tx_hash: string | null }
+  | { ok: false; error: string }
+> {
+  const supabase = getSupabase();
+  if (!supabase) return { ok: false, error: 'Supabase not available' };
+  const trimmed = phoneNumber?.trim();
+  if (!trimmed) return { ok: false, error: 'Phone number required.' };
+  try {
+    const { data, error } = await (supabase as any)
+      .from('user_profiles')
+      .select('face_hash, recovery_seed_hash, vida_mint_tx_hash')
+      .eq('phone_number', trimmed)
+      .maybeSingle();
+    if (error) return { ok: false, error: error.message ?? 'Failed to read profile' };
+    const face_hash = data?.face_hash && String(data.face_hash).trim() ? String(data.face_hash).trim() : null;
+    const recovery_seed_hash = data?.recovery_seed_hash && String(data.recovery_seed_hash).trim() ? String(data.recovery_seed_hash).trim() : null;
+    const vida_mint_tx_hash = data?.vida_mint_tx_hash && String(data.vida_mint_tx_hash).trim() ? String(data.vida_mint_tx_hash).trim() : null;
+    return { ok: true, face_hash, recovery_seed_hash, vida_mint_tx_hash };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false, error: msg };
+  }
 }
 
 /**

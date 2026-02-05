@@ -1,25 +1,28 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { DashboardContent } from '@/components/sovryn/DashboardContent';
 import { ProtectedRoute } from '@/components/dashboard/ProtectedRoute';
 import { InstallSmartBanner } from '@/components/InstallSmartBanner';
 import { getMintStatus, MINT_STATUS_PENDING_HARDWARE } from '@/lib/mintStatus';
 import { getIdentityAnchorPhone } from '@/lib/sentinelActivation';
+import { getProfileFaceAndSeed } from '@/lib/recoverySeedStorage';
+import { startVerifiedMintListener } from '@/lib/sovryn/verifiedMintListener';
 
 /**
- * DASHBOARD PAGE - PROTECTED
- * Requires 4-layer authentication to access
- * Users without verified presence are redirected to gate
- * Shows "Unauthorized Access" when redirected from /government or /sentinel without correct role
- * When mint_status is PENDING_HARDWARE (mobile initial reg): Silver Dashboard with hub instructions.
- * Hydration: render only after mount to prevent dead screen (HTML visible but JS not attached).
+ * DASHBOARD PAGE - PROTECTED (VAULT)
+ * Reads face_hash and recovery_seed_hash on entry. If both present: show 5 VIDA, stop back/bounce.
+ * Success trigger: navigation.reset to Vault only when both confirmed in Supabase.
  */
 export default function DashboardPage() {
   const [mounted, setMounted] = useState(false);
   const [pendingHardware, setPendingHardware] = useState(false);
+  const [vaultStable, setVaultStable] = useState(false);
+  /** When gasless mint completes, tx hash is set; UI shows "5 VIDA MINTED ON BITCOIN LAYER 2" with golden checkmark. */
+  const [mintTxHash, setMintTxHash] = useState<string | null>(null);
   const searchParams = useSearchParams();
+  const router = useRouter();
   const unauthorized = searchParams.get('unauthorized') === '1';
   const showMintedBanner = searchParams.get('minted') === '1';
 
@@ -39,13 +42,60 @@ export default function DashboardPage() {
     });
   }, [mounted]);
 
+  /** Vault stability: on entry read face_hash, recovery_seed_hash, vida_mint_tx_hash. If both anchors present, set vaultStable; if tx hash present, show confirmation UI. */
+  useEffect(() => {
+    if (!mounted) return;
+    let cancelled = false;
+    (async () => {
+      const phone = getIdentityAnchorPhone();
+      if (!phone) return;
+      const profile = await getProfileFaceAndSeed(phone);
+      if (cancelled || !profile.ok) return;
+      const bothPresent = !!(profile.face_hash && profile.recovery_seed_hash);
+      if (bothPresent) setVaultStable(true);
+      if (profile.ok && profile.vida_mint_tx_hash) setMintTxHash(profile.vida_mint_tx_hash);
+    })();
+    return () => { cancelled = true; };
+  }, [mounted]);
+
+  /** When is_fully_verified becomes TRUE, trigger mintVidaToken (5 VIDA to derived RSK wallet); receipt saved to Supabase. */
+  useEffect(() => {
+    if (!mounted || !vaultStable) return;
+    const phone = getIdentityAnchorPhone();
+    if (!phone) return;
+    const cleanup = startVerifiedMintListener(phone, (result) => {
+      if (result.txHash) {
+        console.log('[VidaMint] Receipt:', result.txHash);
+        setMintTxHash(result.txHash);
+      }
+      if (result.error) {
+        console.warn('[VidaMint]', result.error);
+      }
+    }, { pollIntervalMs: 20000 });
+    return cleanup;
+  }, [mounted, vaultStable]);
+
+  /** When both anchors present: disable back navigation (no going back / bouncing). */
+  useEffect(() => {
+    if (!mounted || typeof window === 'undefined' || !vaultStable) return;
+    let removePopState: (() => void) | null = null;
+    window.history.replaceState({ vaultLocked: true }, '', window.location.pathname + window.location.search);
+    const onPopState = () => router.replace('/dashboard');
+    window.addEventListener('popstate', onPopState);
+    removePopState = () => window.removeEventListener('popstate', onPopState);
+    return () => removePopState?.();
+  }, [mounted, vaultStable, router]);
+
   if (!mounted) {
     return null;
   }
 
   return (
     <ProtectedRoute>
-      <main className="min-h-screen bg-[#0d0d0f] pb-36 md:pb-0">
+      <main
+        className="min-h-screen bg-[#0d0d0f] pb-36 md:pb-0"
+        data-vault-stable={vaultStable ? 'true' : undefined}
+      >
         {pendingHardware && (
           <div
             className="bg-[#C0C0C0]/25 border-b border-[#C0C0C0]/60 px-4 py-4 text-center text-[#a0a0a8] text-sm font-semibold uppercase tracking-wider"
@@ -70,7 +120,7 @@ export default function DashboardPage() {
             Unauthorized Access. You do not have the required role for that page.
           </div>
         )}
-        <DashboardContent />
+        <DashboardContent vaultStable={vaultStable} mintTxHash={mintTxHash} />
         <InstallSmartBanner />
       </main>
     </ProtectedRoute>

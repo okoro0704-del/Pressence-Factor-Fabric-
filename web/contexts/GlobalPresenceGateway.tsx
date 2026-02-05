@@ -4,10 +4,12 @@ import { createContext, useContext, useState, useEffect, ReactNode, useCallback 
 import { useRouter, usePathname } from 'next/navigation';
 import { checkPresenceVerified, markPresenceVerified, clearPresenceVerification } from '@/lib/withPresenceCheck';
 import { getIdentityAnchorPhone } from '@/lib/sentinelActivation';
+import { hasFaceAndSeed } from '@/lib/recoverySeedStorage';
+import { getMintStatusForPresence, MINT_STATUS_PENDING_HARDWARE, MINT_STATUS_MINTED } from '@/lib/mintStatus';
 import { hasActiveSentinelLicense } from '@/lib/sentinelLicensing';
 import { getCurrentUserRole, setRoleCookie } from '@/lib/roleAuth';
 import { checkSessionIsolation, setSessionIdentity } from '@/lib/sessionIsolation';
-import { getSupabase } from '@/lib/supabase';
+import { getSupabase, testConnection } from '@/lib/supabase';
 
 interface GlobalPresenceGatewayContextType {
   isPresenceVerified: boolean;
@@ -17,6 +19,8 @@ interface GlobalPresenceGatewayContextType {
   loading: boolean;
   /** true while initial check or when DB returned empty/failed; show "Establishing Secure Connection to Mesh..." */
   connecting: boolean;
+  /** true when testConnection() failed; show "Reconnecting to Mesh" instead of crashing */
+  meshReconnecting: boolean;
 }
 
 const GlobalPresenceGatewayContext = createContext<GlobalPresenceGatewayContextType | undefined>(undefined);
@@ -36,6 +40,7 @@ export function GlobalPresenceGatewayProvider({ children }: { children: ReactNod
   const [presenceTimestamp, setPresenceTimestamp] = useState<Date | null>(null);
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(true);
+  const [meshReconnecting, setMeshReconnecting] = useState(false);
   const [lastActivityTime, setLastActivityTime] = useState(Date.now());
   const router = useRouter();
   const pathname = usePathname();
@@ -120,12 +125,20 @@ export function GlobalPresenceGatewayProvider({ children }: { children: ReactNod
     const initializePresence = async () => {
       setLoading(true);
       setConnecting(true);
+      setMeshReconnecting(false);
       const timeoutId = setTimeout(() => {
         if (cancelled) return;
         setConnecting(false);
         setLoading(false);
       }, SAFETY_TIMEOUT_MS);
       try {
+        const conn = await testConnection();
+        if (!cancelled && !conn.ok) {
+          setMeshReconnecting(true);
+          console.warn('[GlobalPresenceGateway] Supabase handshake failed:', conn.error);
+        } else if (!cancelled) {
+          setMeshReconnecting(false);
+        }
         const phone = getIdentityAnchorPhone();
         let uid: string | null = null;
         try {
@@ -141,6 +154,22 @@ export function GlobalPresenceGatewayProvider({ children }: { children: ReactNod
           setPresenceVerifiedHandler(false);
           router.push('/');
           return;
+        }
+        if (phone) {
+          // Bypass first (RPC bypasses RLS): user passed the gate and has mint_status or is_minted — allow through so they stay on dashboard even before face_hash+recovery_seed are in DB. Single RPC avoids RLS-blocked direct reads that cause redirect back to language.
+          const mintRes = await getMintStatusForPresence(phone);
+          const allowedByMint =
+            mintRes.ok &&
+            (mintRes.mint_status === MINT_STATUS_PENDING_HARDWARE || mintRes.mint_status === MINT_STATUS_MINTED || mintRes.is_minted);
+          if (!cancelled && allowedByMint) {
+            setPresenceVerifiedHandler(true);
+            return;
+          }
+          const bothAnchors = await hasFaceAndSeed(phone);
+          if (!cancelled && bothAnchors) {
+            setPresenceVerifiedHandler(true);
+            return;
+          }
         }
         const verified = await checkAndRefreshPresence();
         if (cancelled) return;
@@ -239,7 +268,18 @@ export function GlobalPresenceGatewayProvider({ children }: { children: ReactNod
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, []);
 
+  /** When connection is weak, retry testConnection periodically until ok */
+  useEffect(() => {
+    if (!meshReconnecting) return;
+    const interval = setInterval(async () => {
+      const conn = await testConnection();
+      if (conn.ok) setMeshReconnecting(false);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [meshReconnecting]);
+
   const showConnectingMessage = loading || connecting;
+  const showReconnectingMessage = meshReconnecting && !showConnectingMessage;
 
   return (
     <GlobalPresenceGatewayContext.Provider
@@ -250,6 +290,7 @@ export function GlobalPresenceGatewayProvider({ children }: { children: ReactNod
         checkAndRefreshPresence,
         loading,
         connecting,
+        meshReconnecting,
       }}
     >
       {showConnectingMessage ? (
@@ -260,6 +301,16 @@ export function GlobalPresenceGatewayProvider({ children }: { children: ReactNod
         >
           <p className="font-mono text-sm tracking-wide text-neutral-400">
             Establishing Secure Connection to Mesh...
+          </p>
+        </div>
+      ) : showReconnectingMessage ? (
+        <div
+          className="flex min-h-screen items-center justify-center bg-neutral-950 text-neutral-200"
+          role="status"
+          aria-live="polite"
+        >
+          <p className="font-mono text-sm tracking-wide text-amber-400">
+            Reconnecting to Mesh...
           </p>
         </div>
       ) : (

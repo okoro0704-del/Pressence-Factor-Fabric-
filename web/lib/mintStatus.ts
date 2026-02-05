@@ -54,3 +54,117 @@ export async function getMintStatus(
     return { ok: false, error: msg };
   }
 }
+
+/** Bypass gate: true when user has completed Face Pulse and received 5 VIDA auto-credit (is_minted on profile). */
+export async function getIsMinted(
+  phoneNumber: string
+): Promise<{ ok: true; is_minted: boolean } | { ok: false; error: string }> {
+  const supabase = getSupabase();
+  if (!supabase) return { ok: false, error: 'Supabase not available' };
+  const trimmed = phoneNumber?.trim();
+  if (!trimmed) return { ok: false, error: 'Phone number required.' };
+  try {
+    const { data, error } = await (supabase as any)
+      .from('user_profiles')
+      .select('is_minted')
+      .eq('phone_number', trimmed)
+      .maybeSingle();
+    if (error) return { ok: false, error: error.message ?? 'Failed to get is_minted' };
+    const is_minted = data?.is_minted === true;
+    return { ok: true, is_minted };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false, error: msg };
+  }
+}
+
+/**
+ * Read mint_status and is_minted by phone via RPC (bypasses RLS when app.current_user_phone is not set).
+ * Use in GlobalPresenceGateway for vault bypass so users who passed the gate can stay on dashboard.
+ */
+export async function getMintStatusForPresence(
+  phoneNumber: string
+): Promise<{ ok: true; mint_status: MintStatus; is_minted: boolean } | { ok: false; error: string }> {
+  const supabase = getSupabase();
+  if (!supabase) return { ok: false, error: 'Supabase not available' };
+  const trimmed = phoneNumber?.trim();
+  if (!trimmed) return { ok: false, error: 'Phone number required.' };
+  try {
+    const { data, error } = await (supabase as any).rpc('get_mint_status_for_presence', {
+      p_phone: trimmed,
+    });
+    if (error) return { ok: false, error: error.message ?? 'RPC failed' };
+    if (data?.ok === false) return { ok: false, error: data?.error ?? 'RPC returned error' };
+    const mint_status = (data?.mint_status ?? null) as MintStatus;
+    const is_minted = data?.is_minted === true;
+    return { ok: true, mint_status, is_minted };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false, error: msg };
+  }
+}
+
+/** 5 VIDA auto-credit on successful Face Pulse: set user_profiles.is_minted = true and credit sovereign_internal_wallets.vida_cap_balance += 5. Uses RPC when available to bypass RLS. */
+export async function ensureMintedAndBalance(phoneNumber: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = getSupabase();
+  if (!supabase) return { ok: false, error: 'Supabase not available' };
+  const trimmed = phoneNumber?.trim();
+  if (!trimmed) return { ok: false, error: 'Phone number required.' };
+  try {
+    const { data: rpcData, error: rpcError } = await (supabase as any).rpc('ensure_minted_and_balance_rpc', {
+      p_phone: trimmed,
+    });
+    if (!rpcError && rpcData?.ok === true) return { ok: true };
+    if (rpcError) {
+      console.warn('[mintStatus] ensure_minted_and_balance_rpc failed, trying direct update:', rpcError.message);
+    }
+
+    const { error: profileError } = await (supabase as any)
+      .from('user_profiles')
+      .update({ is_minted: true, updated_at: new Date().toISOString() })
+      .eq('phone_number', trimmed);
+    if (profileError) return { ok: false, error: profileError.message ?? 'Failed to set is_minted' };
+
+    const { data: wallet } = await (supabase as any)
+      .from('sovereign_internal_wallets')
+      .select('vida_cap_balance')
+      .eq('phone_number', trimmed)
+      .maybeSingle();
+    const current = Number(wallet?.vida_cap_balance ?? 0);
+    const { error: walletError } = await (supabase as any)
+      .from('sovereign_internal_wallets')
+      .update({
+        vida_cap_balance: current + 5,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('phone_number', trimmed);
+    if (walletError) return { ok: false, error: walletError.message ?? 'Failed to credit 5 VIDA' };
+    return { ok: true };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false, error: msg };
+  }
+}
+
+/** Vault Sync: spending_unlocked is true when second biometric (external fingerprint) is saved in DB. */
+export async function getSpendingUnlocked(
+  phoneNumber: string
+): Promise<{ ok: true; spending_unlocked: boolean } | { ok: false; error: string }> {
+  const supabase = getSupabase();
+  if (!supabase) return { ok: false, error: 'Supabase not available' };
+  const trimmed = phoneNumber?.trim();
+  if (!trimmed) return { ok: false, error: 'Phone number required.' };
+  try {
+    const { data, error } = await (supabase as any)
+      .from('user_profiles')
+      .select('spending_unlocked')
+      .eq('phone_number', trimmed)
+      .maybeSingle();
+    if (error) return { ok: false, error: error.message ?? 'Failed to get spending_unlocked' };
+    const spending_unlocked = data?.spending_unlocked === true;
+    return { ok: true, spending_unlocked };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false, error: msg };
+  }
+}

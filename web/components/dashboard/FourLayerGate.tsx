@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { JetBrains_Mono } from 'next/font/google';
 import {
   resolveSovereignByPresence,
+  verifyHubEnrollment,
   AuthLayer,
   AuthStatus,
   type BiometricAuthResult,
@@ -46,10 +47,10 @@ import {
 import { maskPhoneForDisplay } from '@/lib/phoneMask';
 import { setHumanityScoreVerified } from '@/lib/humanityScore';
 import { mintFoundationSeigniorage } from '@/lib/foundationSeigniorage';
-import { setMintStatus, getMintStatus, MINT_STATUS_PENDING_HARDWARE, MINT_STATUS_MINTED } from '@/lib/mintStatus';
+import { setMintStatus, getMintStatus, ensureMintedAndBalance, MINT_STATUS_PENDING_HARDWARE, MINT_STATUS_MINTED } from '@/lib/mintStatus';
 import { hasSignedConstitution } from '@/lib/legalApprovals';
 import { setIdentityAnchorForSession, getIdentityAnchorPhone, isSentinelActive } from '@/lib/sentinelActivation';
-import { getCurrentUserRole, setRoleCookie, canAccessMaster, canAccessGovernment, getProfileWithPrimarySentinel } from '@/lib/roleAuth';
+import { getCurrentUserRole, setRoleCookie, getProfileWithPrimarySentinel } from '@/lib/roleAuth';
 import { ensureGenesisIfEmpty } from '@/lib/auth';
 import { SovereignConstitution } from '@/components/auth/SovereignConstitution';
 import { setSessionIdentity } from '@/lib/sessionIsolation';
@@ -64,7 +65,8 @@ import {
   pick3RandomIndices,
   verify3Words,
 } from '@/lib/recoverySeed';
-import { storeRecoverySeed, hasRecoverySeed, confirmRecoverySeedStored } from '@/lib/recoverySeedStorage';
+import { storeRecoverySeedWithFaceAndMint, hasRecoverySeed, confirmRecoverySeedStored, confirmFaceAndSeedStored } from '@/lib/recoverySeedStorage';
+import { getStoredBiometricAnchors } from '@/lib/biometricAnchorSync';
 import type { DeviceInfo } from '@/lib/multiDeviceVitalization';
 import { RecoverMyAccountScreen } from '@/components/auth/RecoverMyAccountScreen';
 import { BiometricPillar } from '@/components/auth/BiometricPillar';
@@ -123,9 +125,6 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
   const [guardianRecoveryRequestId, setGuardianRecoveryRequestId] = useState<string | null>(null);
   /** DEVICE HANDSHAKE: true when login failed on new/unrecognized device — show "Verify from an authorized device" */
   const [showVerifyFromAuthorizedDevice, setShowVerifyFromAuthorizedDevice] = useState(false);
-  /** Admin Portal: 3-of-4 biometric for admin; only MASTER_ARCHITECT or GOVERNMENT_ADMIN can open panel */
-  const [adminPortalScanning, setAdminPortalScanning] = useState(false);
-  const [adminPortalError, setAdminPortalError] = useState<string | null>(null);
   /** Sovereign Constitution Entry Gate: must sign constitution before 10 VIDA mint; re-sign if version changed */
   const [showConstitutionGate, setShowConstitutionGate] = useState(false);
   /** 5s scan timeout: show Retry or Master Device Bypass */
@@ -141,9 +140,6 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
   const [showLocationPermissionPopup, setShowLocationPermissionPopup] = useState(false);
   /** GPS taking >3s — show "Syncing with Local Mesh..." (indoor mode) */
   const [gpsTakingLong, setGpsTakingLong] = useState(false);
-  /** First-time MASTER_ARCHITECT: role is Master but device ID empty — show Enrollment Mode to capture Master Key */
-  const [showEnrollmentModeForMaster, setShowEnrollmentModeForMaster] = useState(false);
-  const [enrollmentCapturing, setEnrollmentCapturing] = useState(false);
   /** New Device Authorization: device_fingerprint does not match primary_sentinel_device_id — require 5s Face Pulse then update binding */
   const [showNewDeviceAuthorization, setShowNewDeviceAuthorization] = useState(false);
   const [newDeviceMigrationScanning, setNewDeviceMigrationScanning] = useState(false);
@@ -166,6 +162,8 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
   const [lastExternalFingerprintHash, setLastExternalFingerprintHash] = useState<string | null>(null);
   /** Mobile short-circuit: hide Fingerprint pillar; Complete Initial Registration and set mint_status PENDING_HARDWARE. */
   const [isMobile, setIsMobile] = useState(false);
+  /** Hard Navigation Lock: 1s transition spinner before replace to dashboard so DB can catch up; prevents back-stack re-entry. */
+  const [transitioningToDashboard, setTransitioningToDashboard] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const { setPresenceVerified } = useGlobalPresenceGateway();
@@ -253,18 +251,6 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
       // ignore invalid stored identity
     }
   }, []);
-
-  // First-time flag: MASTER_ARCHITECT with empty device ID → Enrollment Mode (bypass verification)
-  useEffect(() => {
-    if (!identityAnchor?.phone) return;
-    getProfileWithPrimarySentinel(identityAnchor.phone).then((profile) => {
-      if (!profile) return;
-      const emptyDevice = !profile.primary_sentinel_device_id || profile.primary_sentinel_device_id.trim() === '';
-      if (profile.role === 'MASTER_ARCHITECT' && emptyDevice) {
-        setShowEnrollmentModeForMaster(true);
-      }
-    });
-  }, [identityAnchor?.phone]);
 
   // ZERO-PERSISTENCE SESSION INITIALIZATION
   // Reset to Layer 1 on every entry (app initialization or foreground)
@@ -428,15 +414,23 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
         await mintFoundationSeigniorage(identityAnchor.phone);
       }
     }
+    await ensureMintedAndBalance(identityAnchor.phone);
     setIdentityAnchorForSession(identityAnchor.phone);
     ensureGenesisIfEmpty(identityAnchor.phone, identityAnchor.name).catch(() => {});
     setPresenceVerified(true);
     setSessionIdentity(identityAnchor.phone);
     await logGuestAccessIfNeeded();
     if (hubVerification) {
-      router.push('/dashboard?minted=1');
+      setAuthStatus(AuthStatus.IDLE);
+      setCurrentLayer(null);
+      setTransitioningToDashboard(true);
+      setTimeout(() => {
+        router.replace('/dashboard?minted=1');
+      }, 1000);
       return;
     }
+    setAuthStatus(AuthStatus.IDLE);
+    setCurrentLayer(null);
     setShowVaultAnimation(true);
   }, [identityAnchor, hubVerification, router]);
 
@@ -491,6 +485,18 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     }
 
     const isNewDevice = !(await isDeviceAuthorized(identityAnchor.phone, compositeDeviceId));
+
+    // Hub: verify face first so person at Hub matches original phone signup, then accept external fingerprint
+    if (hubVerification) {
+      const faceOk = await verifyHubEnrollment(identityAnchor.phone);
+      if (!faceOk.ok) {
+        setAuthStatus(AuthStatus.FAILED);
+        setResult({ success: false, status: AuthStatus.FAILED, layer: AuthLayer.BIOMETRIC_SIGNATURE, errorMessage: faceOk.error, layersPassed: [] });
+        biometricPendingRef.current = false;
+        return;
+      }
+    }
+
     const authResult = await resolveSovereignByPresence(
       identityAnchor.phone,
       (layer, status) => {
@@ -669,12 +675,15 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
   };
 
   const handleVaultAnimationComplete = () => {
+    setTransitioningToDashboard(true);
     const next = searchParams.get('next');
-    if (next && typeof next === 'string' && next.startsWith('/') && !next.startsWith('//')) {
-      router.push(next);
-    } else {
-      router.push('/dashboard');
-    }
+    const target = next && typeof next === 'string' && next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard';
+    setTimeout(() => {
+      if (typeof window !== 'undefined') {
+        window.history.replaceState({}, '', target);
+      }
+      router.replace(target);
+    }, 1000);
   };
 
   const handleDebugInfo = async () => {
@@ -703,6 +712,8 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     setIdentityAnchorForSession(identityAnchor.phone);
     setPresenceVerified(true);
     setSessionIdentity(identityAnchor.phone);
+    setAuthStatus(AuthStatus.IDLE);
+    setCurrentLayer(null);
     setShowVaultAnimation(true);
   };
 
@@ -738,44 +749,6 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
         : null
     );
     setShowGuardianRecovery(true);
-  };
-
-  /** Admin Portal: 3-of-4 biometric scan; only MASTER_ARCHITECT or GOVERNMENT_ADMIN can open panel */
-  const handleAdminPortalClick = async () => {
-    if (!identityAnchor) return;
-    setAdminPortalError(null);
-    setAdminPortalScanning(true);
-    try {
-      const authResult = await resolveSovereignByPresence(
-        identityAnchor.phone,
-        (layer, status) => {
-          setCurrentLayer(layer);
-          setAuthStatus(status);
-        },
-        { skipVoiceLayer: true, requireAllLayers: false }
-      );
-      if (authResult.success && authResult.identity) {
-        const role = await getCurrentUserRole(identityAnchor.phone);
-        setRoleCookie(role);
-        if (canAccessMaster(role)) {
-          router.push('/master/dashboard');
-          return;
-        }
-        if (canAccessGovernment(role)) {
-          router.push('/government/treasury');
-          return;
-        }
-        setAdminPortalError('Unauthorized Access. Only MASTER_ARCHITECT or GOVERNMENT_ADMIN can open the Admin Portal.');
-      } else {
-        setAdminPortalError('Biometric verification failed. Access denied.');
-      }
-    } catch {
-      setAdminPortalError('Verification failed. Access denied.');
-    } finally {
-      setAdminPortalScanning(false);
-      setAuthStatus(AuthStatus.IDLE);
-      setCurrentLayer(null);
-    }
   };
 
   const handleGuardianRecoveryRequestCreated = (requestId: string) => {
@@ -829,43 +802,6 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     setAuthStatus(AuthStatus.IDLE);
     setCurrentLayer(null);
     setResult(null);
-  };
-
-  /** Enrollment Mode: MASTER_ARCHITECT with empty device — capture current device as Master Key (bypass full verification). */
-  const handleEnrollmentCaptureMasterKey = async () => {
-    if (!identityAnchor) return;
-    setEnrollmentCapturing(true);
-    try {
-      const compositeDeviceId = await getCompositeDeviceFingerprint();
-      const deviceInfo = getCurrentDeviceInfo();
-      const ipAddress = 'unknown';
-      const geolocation = { city: 'Lagos', country: 'Nigeria', latitude: 6.5244, longitude: 3.3792 };
-      await assignPrimarySentinel(
-        identityAnchor.phone,
-        identityAnchor.name,
-        deviceInfo,
-        ipAddress,
-        geolocation,
-        compositeDeviceId
-      );
-      setShowEnrollmentModeForMaster(false);
-      const signed = await hasSignedConstitution(identityAnchor.phone);
-      if (!signed) {
-        setShowConstitutionGate(true);
-        return;
-      }
-      await mintFoundationSeigniorage(identityAnchor.phone);
-      setIdentityAnchorForSession(identityAnchor.phone);
-      ensureGenesisIfEmpty(identityAnchor.phone, identityAnchor.name).catch(() => {});
-      setPresenceVerified(true);
-      setSessionIdentity(identityAnchor.phone);
-      setShowVaultAnimation(true);
-    } catch (e) {
-      console.error('[Enrollment Mode] Capture failed:', e);
-      alert('Failed to save Master Key. Try again.');
-    } finally {
-      setEnrollmentCapturing(false);
-    }
   };
 
   /** New Device Authorization: 5-second Face Pulse then update primary_sentinel_device_id and send Security Alert */
@@ -941,7 +877,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     setShowSeedVerification(true);
   };
 
-  /** Seed verification passed — store seed, confirm DB has recovery_seed_hash, then show Success shield. */
+  /** Seed verification passed — wait for face_hash to be ready, then save face_hash + recovery_seed_hash + is_minted + 5 VIDA. */
   const handleSeedVerificationPassed = async (answers: string[]) => {
     if (!identityAnchor || !generatedSeed || verificationIndices.length !== 3 || !sacredRecordDeviceContext) return;
     if (!verify3Words(generatedSeed, verificationIndices, answers)) {
@@ -951,14 +887,25 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     setSeedVerificationError(null);
     setSeedVerificationLoading(true);
     try {
-      const storeResult = await storeRecoverySeed(identityAnchor.phone, generatedSeed, identityAnchor.name);
+      const anchors = await getStoredBiometricAnchors(identityAnchor.phone);
+      const faceHash = anchors.ok && anchors.anchors.face_hash?.trim() ? anchors.anchors.face_hash : null;
+      if (!faceHash) {
+        setSeedVerificationError('Complete Face Pulse first. Face hash is required before saving recovery seed.');
+        return;
+      }
+      const storeResult = await storeRecoverySeedWithFaceAndMint(
+        identityAnchor.phone,
+        generatedSeed,
+        identityAnchor.name,
+        faceHash
+      );
       if (!storeResult.ok) {
         setSeedVerificationError(storeResult.error ?? 'Failed to save recovery seed.');
         return;
       }
-      const confirmed = await confirmRecoverySeedStored(identityAnchor.phone);
-      if (!confirmed) {
-        setSeedVerificationError('Recovery seed was not confirmed in the database. Try again or use Admin Schema Refresh.');
+      const bothConfirmed = await confirmFaceAndSeedStored(identityAnchor.phone);
+      if (!bothConfirmed) {
+        setSeedVerificationError('Face hash and recovery seed must both be confirmed in Supabase before continuing. Try again or use Admin Schema Refresh.');
         return;
       }
       setShowSeedVerification(false);
@@ -968,9 +915,14 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     }
   };
 
-  /** After Success shield — assign primary sentinel and proceed to dashboard (seed already stored and confirmed). */
+  /** After Success shield — only when face_hash and recovery_seed_hash both confirmed in Supabase, assign sentinel and trigger navigation.reset to Vault. */
   const handleSeedSuccessContinue = async () => {
     if (!identityAnchor || !sacredRecordDeviceContext) return;
+    const bothConfirmed = await confirmFaceAndSeedStored(identityAnchor.phone);
+    if (!bothConfirmed) {
+      alert('Face hash and recovery seed must both be confirmed in Supabase before entering the Vault.');
+      return;
+    }
     const ctx = sacredRecordDeviceContext;
     setGeneratedSeed(null);
     setSacredRecordDeviceContext(null);
@@ -1120,6 +1072,15 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     );
   }
 
+  if (transitioningToDashboard) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#050505]" role="status" aria-live="polite">
+        <div className="w-16 h-16 border-4 border-[#D4AF37] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+        <p className="text-lg text-[#D4AF37] font-semibold">Loading Vault...</p>
+      </div>
+    );
+  }
+
   if (showVaultAnimation) {
     return <VaultDoorAnimation onComplete={handleVaultAnimationComplete} />;
   }
@@ -1227,53 +1188,6 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
           loading={newDeviceMigrationScanning}
           error={newDeviceMigrationError}
         />
-      </div>
-    );
-  }
-
-  // First-time MASTER_ARCHITECT: device ID empty — Enrollment Mode (bypass verification, capture Master Key)
-  if (showEnrollmentModeForMaster && identityAnchor) {
-    return (
-      <div className="min-h-screen bg-[#050505] flex items-center justify-center p-4">
-        <div
-          className="absolute inset-0 opacity-20 pointer-events-none"
-          style={{
-            background: 'radial-gradient(circle at center, rgba(212, 175, 55, 0.2) 0%, rgba(5, 5, 5, 0) 70%)',
-          }}
-          aria-hidden="true"
-        />
-        <div
-          className="relative z-10 rounded-2xl border-2 p-8 max-w-md w-full text-center"
-          style={{
-            background: 'linear-gradient(135deg, rgba(212, 175, 55, 0.08) 0%, rgba(0, 0, 0, 0.9) 100%)',
-            borderColor: 'rgba(212, 175, 55, 0.4)',
-            boxShadow: '0 0 60px rgba(212, 175, 55, 0.2)',
-          }}
-        >
-          <div className="text-5xl mb-4">🔑</div>
-          <h2 className={`text-xl font-bold text-[#D4AF37] uppercase tracking-wider mb-3 ${jetbrains.className}`}>
-            Enrollment Mode — Master Key
-          </h2>
-          <p className="text-sm text-[#a0a0a5] mb-6">
-            Your device ID is empty. Capture your current phone&apos;s fingerprint (Canvas + Hardware UUID) as the Master Key. This is not a thumbprint — it&apos;s the Device ID.
-          </p>
-          <button
-            type="button"
-            onClick={handleEnrollmentCaptureMasterKey}
-            disabled={enrollmentCapturing}
-            className="relative z-50 w-full py-4 rounded-lg bg-gradient-to-r from-[#D4AF37] to-[#C9A227] hover:from-[#e8c547] hover:to-[#D4AF37] text-black font-bold text-lg uppercase tracking-wider transition-all duration-300 cursor-pointer disabled:opacity-70"
-            style={{ boxShadow: '0 0 30px rgba(212, 175, 55, 0.5)' }}
-          >
-            {enrollmentCapturing ? 'Capturing…' : 'Capture Master Key'}
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowEnrollmentModeForMaster(false)}
-            className="mt-4 w-full py-2 rounded-lg border border-[#D4AF37]/50 text-[#a0a0a5] hover:bg-[#D4AF37]/10 text-sm transition-colors"
-          >
-            Skip — Do full verification
-          </button>
-        </div>
       </div>
     );
   }
@@ -1610,19 +1524,6 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
           <p className="text-xs text-[#4a4a4e] mt-1">
             Architect: Isreal Okoro (mrfundzman)
           </p>
-          <button
-            type="button"
-            onClick={handleAdminPortalClick}
-            disabled={adminPortalScanning}
-            className="relative z-50 mt-4 text-[10px] text-[#4a4a4e] hover:text-[#6b6b70] underline underline-offset-2 transition-colors disabled:opacity-50 cursor-pointer"
-          >
-            {adminPortalScanning ? 'Verifying...' : 'Admin Portal'}
-          </button>
-          {adminPortalError && (
-            <p className="mt-2 text-xs text-red-500 max-w-sm mx-auto" role="alert">
-              {adminPortalError}
-            </p>
-          )}
         </div>
       </div>
 

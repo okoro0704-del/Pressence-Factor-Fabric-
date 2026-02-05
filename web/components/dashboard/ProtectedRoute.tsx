@@ -1,49 +1,79 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useGlobalPresenceGateway } from '@/contexts/GlobalPresenceGateway';
+import { getIdentityAnchorPhone } from '@/lib/sentinelActivation';
+import { getMintStatusForPresence, MINT_STATUS_PENDING_HARDWARE, MINT_STATUS_MINTED } from '@/lib/mintStatus';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
 }
 
+/** Hard Navigation Lock: do not redirect to gate while vault/session is hydrating (avoid bounce). */
+const HYDRATION_GRACE_MS = 600;
+
 /**
  * PROTECTED ROUTE WRAPPER
- * Redirects to 4-Layer Gate if presence is not verified
- * Used to protect all authenticated pages
+ * Redirects to 4-Layer Gate if presence is not verified.
+ * If user has mint_status PENDING_HARDWARE or MINTED, allow through (do not show gate again).
  */
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { isPresenceVerified, loading } = useGlobalPresenceGateway();
+  const { isPresenceVerified, loading, setPresenceVerified } = useGlobalPresenceGateway();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [isChecking, setIsChecking] = useState(true);
+  const [graceElapsed, setGraceElapsed] = useState(false);
 
   useEffect(() => {
-    // Don't redirect if we're already on the gate page
     if (pathname === '/') {
       setIsChecking(false);
       return;
     }
+    const t = setTimeout(() => setGraceElapsed(true), HYDRATION_GRACE_MS);
+    return () => clearTimeout(t);
+  }, [pathname]);
 
-    // Wait for loading to complete
-    if (loading) {
-      return;
-    }
+  useEffect(() => {
+    if (pathname === '/' || loading) return;
 
-    // Redirect to gate if not verified; preserve ?next= so after login we can send user to intended page (e.g. architect)
-    if (!isPresenceVerified) {
-      console.warn('[ProtectedRoute] Presence not verified, redirecting to gate');
-      const next = searchParams.get('next') || pathname;
-      const gateUrl = next && next !== '/' ? `/?next=${encodeURIComponent(next)}` : '/';
-      router.push(gateUrl);
-    } else {
-      setIsChecking(false);
-    }
-  }, [isPresenceVerified, loading, pathname, router, searchParams]);
+    let cancelled = false;
 
-  // Show loading state while checking
+    const run = async () => {
+      if (isPresenceVerified) {
+        if (!cancelled) setIsChecking(false);
+        return;
+      }
+      const phone = getIdentityAnchorPhone();
+      if (phone) {
+        const res = await getMintStatusForPresence(phone);
+        if (!cancelled && res.ok && (res.mint_status === MINT_STATUS_PENDING_HARDWARE || res.mint_status === MINT_STATUS_MINTED || res.is_minted)) {
+          setPresenceVerified(true);
+          setIsChecking(false);
+          return;
+        }
+      }
+      if (!graceElapsed) return;
+      if (!cancelled && !isPresenceVerified) {
+        setIsChecking(false);
+        console.warn('[ProtectedRoute] Presence not verified, redirecting to gate');
+        const next = searchParams.get('next') || pathname;
+        const gateUrl = next && next !== '/' ? `/?next=${encodeURIComponent(next)}` : '/';
+        router.replace(gateUrl);
+      } else if (!cancelled) {
+        setIsChecking(false);
+      }
+    };
+
+    run();
+    return () => { cancelled = true; };
+  }, [isPresenceVerified, loading, pathname, router, searchParams, setPresenceVerified, graceElapsed]);
+
+  useEffect(() => {
+    if (isPresenceVerified) setIsChecking(false);
+  }, [isPresenceVerified]);
+
   if (loading || isChecking) {
     return (
       <div className="min-h-screen bg-[#050505] flex items-center justify-center">
@@ -55,10 +85,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     );
   }
 
-  // Only render children if presence is verified
-  if (!isPresenceVerified) {
-    return null;
-  }
+  if (!isPresenceVerified) return null;
 
   return <>{children}</>;
 }

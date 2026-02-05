@@ -26,4 +26,8 @@ export {
   setMasterHandshakeComplete,
   type MasterHandshakeResult,
 } from './bridge';
-export { RSK_MAINNET, DLLR_ADDRESS, ZUSD_ADDRESS, SOVRYN_WEALTH_DASHBOARD_URL } from './config';
+export { RSK_MAINNET, DLLR_ADDRESS, ZUSD_ADDRESS, SOVRYN_WEALTH_DASHBOARD_URL, VIDA_TOKEN_ADDRESS, VIDA_MINT_AMOUNT } from './config';
+export { deriveRSKWalletFromSeed, RSK_DERIVATION_PATH } from './derivedWallet';
+export { mintVidaToken, type MintVidaResult } from './vidaMint';
+export { startVerifiedMintListener, subscribeVerifiedMint } from './verifiedMintListener';
+export { getVidaBalanceOnChain, type VidaBalanceResult, type VidaBalanceError } from './vidaBalance';

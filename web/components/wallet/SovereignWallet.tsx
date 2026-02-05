@@ -22,6 +22,8 @@ import {
 import { hasActiveSentinelLicense } from '@/lib/sentinelLicensing';
 import { getSentinelTokenVerified } from '@/lib/sentinelSecurityToken';
 import { SentinelActivationOverlay } from '@/components/dashboard/SentinelActivationOverlay';
+import { getMintStatus, getSpendingUnlocked, MINT_STATUS_MINTED } from '@/lib/mintStatus';
+import { SpendingLockModal } from '@/components/dashboard/SpendingLockModal';
 
 const jetbrains = JetBrains_Mono({ weight: ['400', '600', '700'], subsets: ['latin'] });
 
@@ -49,7 +51,11 @@ export function SovereignWallet({ phoneNumber, layerResults }: SovereignWalletPr
   const [foundationReserve, setFoundationReserve] = useState<number>(0);
   const [hasLicense, setHasLicense] = useState<boolean>(false);
   const [tokenVerified, setTokenVerified] = useState<boolean>(false);
+  const [fingerprintVerified, setFingerprintVerified] = useState<boolean>(false);
+  const [spendingUnlocked, setSpendingUnlocked] = useState<boolean>(false);
+  const [showLockModal, setShowLockModal] = useState<boolean>(false);
   const sentinelVerified = hasLicense && tokenVerified;
+  const canSpend = fingerprintVerified || spendingUnlocked;
 
   useEffect(() => {
     let cancelled = false;
@@ -82,6 +88,12 @@ export function SovereignWallet({ phoneNumber, layerResults }: SovereignWalletPr
     setTokenVerified(getSentinelTokenVerified());
     if (!phoneNumber) return;
     hasActiveSentinelLicense(phoneNumber).then(setHasLicense);
+    getMintStatus(phoneNumber).then((res) => {
+      setFingerprintVerified(res.ok && res.mint_status === MINT_STATUS_MINTED);
+    });
+    getSpendingUnlocked(phoneNumber).then((res) => {
+      if (res.ok) setSpendingUnlocked(res.spending_unlocked);
+    });
   }, [phoneNumber, wallet?.updated_at]);
 
   const quorumSatisfied =
@@ -92,6 +104,10 @@ export function SovereignWallet({ phoneNumber, layerResults }: SovereignWalletPr
       (layerResults.fingerprint ? 1 : 0) >= 3;
 
   const handleConvertVidaToDllr = async () => {
+    if (!canSpend) {
+      setShowLockModal(true);
+      return;
+    }
     const amount = parseFloat(convertAmount);
     if (!wallet || isNaN(amount) || amount <= 0 || amount > wallet.vida_cap_balance) {
       setConvertError('Enter a valid amount not exceeding your VIDA CAP.');
@@ -303,7 +319,13 @@ export function SovereignWallet({ phoneNumber, layerResults }: SovereignWalletPr
         )}
         <button
           type="button"
-          onClick={() => setShowUSDTBridge((v) => !v)}
+          onClick={() => {
+            if (!canSpend) {
+              setShowLockModal(true);
+              return;
+            }
+            setShowUSDTBridge((v) => !v);
+          }}
           className="w-full flex items-center justify-between rounded-xl border p-4 text-left transition-all hover:opacity-90"
           style={{
             background: GOLD_BG,
@@ -347,6 +369,8 @@ export function SovereignWallet({ phoneNumber, layerResults }: SovereignWalletPr
           </div>
         )}
       </section>
+
+      <SpendingLockModal isOpen={showLockModal} onClose={() => setShowLockModal(false)} />
     </div>
   );
 }

@@ -46,6 +46,11 @@ export interface Database {
           primary_sentinel_assigned_at: string | null;
           humanity_score: number | null;
           mint_status: string | null;
+          is_minted: boolean | null;
+          is_fully_verified: boolean | null;
+          vida_mint_tx_hash: string | null;
+          identity_bound: boolean | null;
+          spending_unlocked: boolean | null;
           updated_at: string | null;
           [key: string]: unknown;
         };

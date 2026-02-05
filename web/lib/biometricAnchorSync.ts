@@ -75,9 +75,8 @@ export async function deriveFaceHashFromCredential(credential: { id?: string; ra
 }
 
 /**
- * Persist face template (mathematical face vector) as face_hash in Supabase.
- * FacePulse / verifyBiometricSignature should pass the derived face template hash (e.g. SHA-256 of credential).
- * BIOMETRIC DATA IS HASHED AND ENCRYPTED. RAW IMAGES ARE NEVER PERSISTED.
+ * Persist face template (unique mathematical signature) to face_hash column in user_profiles.
+ * Target: face_hash column in profiles table. Upserts so the column is set even if no row existed.
  */
 export async function persistFaceHash(
   phoneNumber: string,
@@ -86,23 +85,74 @@ export async function persistFaceHash(
   const supabase = getSupabase();
   if (!supabase) return { ok: false, error: 'Supabase not available' };
   const trimmed = phoneNumber?.trim();
-  if (!trimmed || !faceTemplateHash?.trim()) {
+  const hash = faceTemplateHash?.trim();
+  if (!trimmed || !hash) {
     return { ok: false, error: 'Phone number and face_hash required.' };
   }
   try {
-    const { error } = await (supabase as any)
+    const payload = { face_hash: hash, updated_at: new Date().toISOString() };
+    const { data: existing } = await (supabase as any)
       .from('user_profiles')
-      .update({
-        face_hash: faceTemplateHash.trim(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('phone_number', trimmed);
-    if (error) return { ok: false, error: error.message ?? 'Failed to persist face_hash' };
+      .select('id')
+      .eq('phone_number', trimmed)
+      .maybeSingle();
+    if (existing?.id) {
+      const { error } = await (supabase as any)
+        .from('user_profiles')
+        .update(payload)
+        .eq('phone_number', trimmed);
+      if (error) {
+        const isRlsOrPermission = /policy|RLS|permission|row-level|current_setting/i.test(error.message ?? '');
+        if (isRlsOrPermission) {
+          const { data: rpcData, error: rpcError } = await (supabase as any).rpc('update_user_profile_face_hash', {
+            p_phone_number: trimmed,
+            p_face_hash: hash,
+          });
+          if (rpcError) return { ok: false, error: rpcError.message ?? 'RPC update_user_profile_face_hash failed' };
+          const out = (rpcData ?? {}) as { ok?: boolean; error?: string };
+          if (out.ok === true) return { ok: true };
+          return { ok: false, error: out.error ?? 'RPC update_user_profile_face_hash failed' };
+        }
+        return { ok: false, error: error.message ?? 'Failed to persist face_hash' };
+      }
+    } else {
+      const { error } = await (supabase as any)
+        .from('user_profiles')
+        .insert({ phone_number: trimmed, ...payload });
+      if (error) {
+        const isRlsOrPermission = /policy|RLS|permission|row-level|current_setting/i.test(error.message ?? '');
+        if (isRlsOrPermission) {
+          const { data: rpcData, error: rpcError } = await (supabase as any).rpc('update_user_profile_face_hash', {
+            p_phone_number: trimmed,
+            p_face_hash: hash,
+          });
+          if (rpcError) return { ok: false, error: rpcError.message ?? 'RPC update_user_profile_face_hash failed' };
+          const out = (rpcData ?? {}) as { ok?: boolean; error?: string };
+          if (out.ok === true) return { ok: true };
+          return { ok: false, error: out.error ?? 'RPC update_user_profile_face_hash failed' };
+        }
+        return { ok: false, error: error.message ?? 'Failed to insert face_hash' };
+      }
+    }
     return { ok: true };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return { ok: false, error: msg };
   }
+}
+
+/** Confirm face_hash column was updated in Supabase (for Success trigger). */
+export async function confirmFaceHashStored(phoneNumber: string): Promise<boolean> {
+  const supabase = getSupabase();
+  if (!supabase) return false;
+  const { data, error } = await (supabase as any)
+    .from('user_profiles')
+    .select('face_hash')
+    .eq('phone_number', phoneNumber.trim())
+    .maybeSingle();
+  if (error || !data) return false;
+  const val = data.face_hash;
+  return typeof val === 'string' && val.trim().length > 0;
 }
 
 export interface StoredBiometricAnchors {

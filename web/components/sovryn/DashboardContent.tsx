@@ -19,7 +19,14 @@ import { getCurrentUserRole, canAccessStaffPortal } from '@/lib/roleAuth';
 import { resetBiometrics } from '@/lib/resetBiometrics';
 import { isMerchantMode, getMerchantWalletAddress } from '@/lib/merchantMode';
 
-export function DashboardContent() {
+export function DashboardContent({
+  vaultStable = false,
+  mintTxHash = null,
+}: {
+  vaultStable?: boolean;
+  /** When set, show "5 VIDA MINTED ON BITCOIN LAYER 2" with golden checkmark (tx mined). */
+  mintTxHash?: string | null;
+}) {
   const [showPresenceModal, setShowPresenceModal] = useState(false);
   const [resettingBiometrics, setResettingBiometrics] = useState(false);
   const [resetBiometricsMessage, setResetBiometricsMessage] = useState<string | null>(null);
@@ -27,8 +34,6 @@ export function DashboardContent() {
   const [merchantWallet, setMerchantWallet] = useState<string | null>(null);
   const [merchantModeOn, setMerchantModeOn] = useState(false);
   const [showStaffPortal, setShowStaffPortal] = useState(false);
-  const [showAdminPortal, setShowAdminPortal] = useState(false);
-  const ADMIN_PHONE = typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_ADMIN_PHONE?.trim() ?? '' : '';
   useEffect(() => {
     setMerchantModeOn(isMerchantMode());
     setMerchantWallet(getMerchantWalletAddress() ?? getIdentityAnchorPhone());
@@ -37,8 +42,7 @@ export function DashboardContent() {
     const phone = getIdentityAnchorPhone();
     if (!phone) return;
     getCurrentUserRole(phone).then((role) => setShowStaffPortal(canAccessStaffPortal(role)));
-    setShowAdminPortal(!!ADMIN_PHONE && phone.replace(/\s/g, '') === ADMIN_PHONE.replace(/\s/g, ''));
-  }, [ADMIN_PHONE]);
+  }, []);
   const handleMerchantModeChange = (enabled: boolean, wallet: string | null) => {
     setMerchantModeOn(enabled);
     setMerchantWallet(wallet);
@@ -80,14 +84,6 @@ export function DashboardContent() {
               className="relative z-50 text-sm font-medium text-[#c9a227] hover:text-[#e8c547] transition-colors cursor-pointer"
             >
               Staff Portal
-            </Link>
-            )}
-            {showAdminPortal && (
-            <Link
-              href="/master/dashboard"
-              className="relative z-50 text-sm font-medium text-[#D4AF37] hover:text-[#e8c547] transition-colors cursor-pointer"
-            >
-              Admin Portal
             </Link>
             )}
             <Link
@@ -144,7 +140,7 @@ export function DashboardContent() {
           </div>
           {/* User Profile & Minted Cap / Sovereign Liquidity */}
           <div>
-            <UserProfileBalance />
+            <UserProfileBalance vaultStable={vaultStable} mintTxHash={mintTxHash} />
           </div>
 
           {/* National Reserve Charts */}
