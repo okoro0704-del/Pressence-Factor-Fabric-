@@ -6,6 +6,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { vitalizationService, type MockPresenceProof, type MockVidaCapResult, type MockVidaBalance } from '@/lib/mockService';
 import { BiometricScanningHUD } from './BiometricScanningHUD';
 import { ArchitectVisionCapture } from './auth/ArchitectVisionCapture';
+import { getVitalizationPhone } from '@/lib/deviceId';
 // To switch to real API, change the import above to:
 // import { vitalizationService } from '@/lib/realVitalizationService';
 
@@ -22,12 +23,22 @@ export function VitalizationScreen() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const isResetFlow = searchParams.get('reset') === '1';
+  const phoneFromQuery = searchParams.get('phone');
+  const [handoffPhone, setHandoffPhone] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fromStorage = getVitalizationPhone();
+    const phone = phoneFromQuery ?? fromStorage ?? null;
+    setHandoffPhone(phone);
+  }, [phoneFromQuery]);
 
   const [step, setStep] = useState<'idle' | 'scanning' | 'minting' | 'success' | 'error'>('idle');
   const [presenceProof, setPresenceProof] = useState<MockPresenceProof | null>(null);
   const [vidaCapResult, setVidaCapResult] = useState<MockVidaCapResult | null>(null);
   const [vidaBalance, setVidaBalance] = useState<MockVidaBalance | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** Zero-click camera: show Architect Vision full-screen on mount for new registrations */
+  const [showVision, setShowVision] = useState(true);
 
   // Load initial balance on mount
   useEffect(() => {
@@ -130,6 +141,18 @@ export function VitalizationScreen() {
     );
   }
 
+  // Zero-click camera: new registration — show Architect Vision full-screen on mount (no Start Camera button)
+  if (showVision) {
+    return (
+      <ArchitectVisionCapture
+        isOpen={true}
+        verificationSuccess={null}
+        onClose={() => setShowVision(false)}
+        closeLabel="Cancel"
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#0d0d0f] text-[#f5f5f5]">
       <BiometricScanningHUD 
@@ -145,6 +168,11 @@ export function VitalizationScreen() {
         <p className="text-[#6b6b70] text-sm">
           Prove your presence. Mint your VIDA CAP.
         </p>
+        {handoffPhone && (
+          <p className="text-xs font-mono mt-2 px-3 py-2 rounded-lg bg-[#16161a] border border-[#2a2a2e] text-[#a0a0a5] inline-block">
+            Identity anchor: {handoffPhone}
+          </p>
+        )}
       </header>
 
       {/* Main Content */}

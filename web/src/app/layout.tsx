@@ -3,6 +3,7 @@ import './globals.css';
 import { HowToInstallTooltip } from '@/components/HowToInstallTooltip';
 import { GlobalPresenceGatewayProvider } from '@/contexts/GlobalPresenceGateway';
 import { SovereignSeedProvider } from '@/contexts/SovereignSeedContext';
+import { GhostSessionGuard } from '@/components/GhostSessionGuard';
 import { RegisterServiceWorker } from '@/components/RegisterServiceWorker';
 import Script from 'next/script';
 
@@ -251,10 +252,12 @@ export default function RootLayout({
       <body className="bg-[#0d0d0f] text-[#f5f5f5] antialiased">
         <GlobalPresenceGatewayProvider>
           <SovereignSeedProvider>
-            {/* app-root: base layer; overlays when inactive must unmount or use pointer-events-none to avoid dead screen */}
-            <div id="app-root" className="relative z-0 min-h-screen">
-              {children}
-            </div>
+            <GhostSessionGuard>
+              {/* app-root: base layer; overlays when inactive must unmount or use pointer-events-none to avoid dead screen */}
+              <div id="app-root" className="relative z-0 min-h-screen">
+                {children}
+              </div>
+            </GhostSessionGuard>
           </SovereignSeedProvider>
           <HowToInstallTooltip />
           <RegisterServiceWorker />

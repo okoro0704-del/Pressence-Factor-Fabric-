@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { JetBrains_Mono } from 'next/font/google';
 import { fetchIdentityAnchor, type BiometricIdentityRecord } from '@/lib/universalIdentityComparison';
 import { formatPhoneE164 } from '@/lib/supabaseClient';
@@ -9,10 +10,13 @@ import {
   DEFAULT_PHONE_COUNTRY,
   filterPhoneCountries,
   getNationalPlaceholder,
+  getCountryByCode,
   type PhoneCountry,
 } from '@/lib/phoneCountries';
 import { linkGuardianToIdentity } from '@/lib/sentinelActivation';
 import { saveUserProfileCountryCode } from '@/lib/userProfileCountry';
+import { getDetectedCountryCode } from '@/lib/detectedCountry';
+import { ensureDeviceId, setVitalizationPhone } from '@/lib/deviceId';
 
 const jetbrains = JetBrains_Mono({ weight: ['400', '600', '700'], subsets: ['latin'] });
 
@@ -36,6 +40,10 @@ interface IdentityAnchorInputProps {
   onCancel?: () => void;
   title?: string;
   subtitle?: string;
+  /** Pre-detected ISO Alpha-2 from parent (e.g. GPS/LocationLayer). If set, used as initial country before async detection. */
+  initialCountryCode?: string;
+  /** When true (default), detect country from IP and sessionStorage cache and update the phone input. User can still override manually. */
+  autoDetectCountry?: boolean;
 }
 
 export function IdentityAnchorInput({
@@ -43,26 +51,50 @@ export function IdentityAnchorInput({
   onCancel,
   title = 'Identity Anchor Required',
   subtitle = 'Enter your phone number to proceed to hardware biometric scan. Verification occurs after the scan.',
+  initialCountryCode,
+  autoDetectCountry = true,
 }: IdentityAnchorInputProps) {
-  const [country, setCountry] = useState<PhoneCountry>(DEFAULT_PHONE_COUNTRY);
+  const initialCountry = initialCountryCode ? getCountryByCode(initialCountryCode) : undefined;
+  const [country, setCountry] = useState<PhoneCountry>(initialCountry ?? DEFAULT_PHONE_COUNTRY);
   const [nationalNumber, setNationalNumber] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [error, setError] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
   const [countrySearch, setCountrySearch] = useState('');
   const pickerRef = useRef<HTMLDivElement>(null);
+  const userHasChangedCountryRef = useRef(false);
+  const detectionDoneRef = useRef(false);
   /** After anchor verified: when Minor/Elder, show Link Guardian step. */
   const [anchorResult, setAnchorResult] = useState<{
     phoneNumber: string;
     fullName: string;
     identity: BiometricIdentityRecord;
   } | null>(null);
-  const [guardianCountry, setGuardianCountry] = useState<PhoneCountry>(DEFAULT_PHONE_COUNTRY);
+  const [guardianCountry, setGuardianCountry] = useState<PhoneCountry>(initialCountry ?? DEFAULT_PHONE_COUNTRY);
   const [guardianNationalNumber, setGuardianNationalNumber] = useState('');
   const [guardianVerifying, setGuardianVerifying] = useState(false);
   const [guardianPickerOpen, setGuardianPickerOpen] = useState(false);
   const [guardianCountrySearch, setGuardianCountrySearch] = useState('');
   const guardianPickerRef = useRef<HTMLDivElement>(null);
+  const [detectedCountryApplied, setDetectedCountryApplied] = useState(false);
+  /** When Supabase returns no user (not yet vitalized), show high-status prompt instead of red error. */
+  const [notYetVitalized, setNotYetVitalized] = useState<{ phone: string } | null>(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!autoDetectCountry || detectionDoneRef.current) return;
+    detectionDoneRef.current = true;
+    getDetectedCountryCode().then((code) => {
+      if (code && !userHasChangedCountryRef.current) {
+        const detected = getCountryByCode(code);
+        if (detected) {
+          setCountry(detected);
+          setGuardianCountry(detected);
+          setDetectedCountryApplied(true);
+        }
+      }
+    });
+  }, [autoDetectCountry]);
 
   useEffect(() => {
     const close = (e: MouseEvent) => {
@@ -91,6 +123,16 @@ export function IdentityAnchorInput({
       const result = await fetchIdentityAnchor(formatted.e164);
 
       if (!result.success || !result.identity) {
+        const isNotFound =
+          result.error?.includes('No active identity') ||
+          result.error?.toLowerCase().includes('not found') ||
+          result.error?.includes('Please register first');
+        if (isNotFound) {
+          setError('');
+          setNotYetVitalized({ phone: formatted.e164 });
+          setIsVerifying(false);
+          return;
+        }
         setError(result.error || 'Identity not found. Please register first.');
         setIsVerifying(false);
         return;
@@ -168,6 +210,66 @@ export function IdentityAnchorInput({
     if (e.key === 'Enter' && fullPhone && !isVerifying) handleVerifyAnchor();
   };
 
+  useEffect(() => {
+    if (notYetVitalized) ensureDeviceId();
+  }, [notYetVitalized]);
+
+  const handleBeginVitalization = () => {
+    if (!notYetVitalized?.phone) return;
+    ensureDeviceId();
+    setVitalizationPhone(notYetVitalized.phone);
+    router.push(`/vitalization?phone=${encodeURIComponent(notYetVitalized.phone)}`);
+  };
+
+  // Citizen Not Yet Vitalized — high-status prompt and Begin Vitalization (no red error)
+  if (notYetVitalized) {
+    return (
+      <div
+        className="rounded-2xl border p-8"
+        style={{
+          background: 'linear-gradient(135deg, rgba(212, 175, 55, 0.08) 0%, rgba(0, 0, 0, 0.9) 100%)',
+          borderColor: 'rgba(212, 175, 55, 0.4)',
+          boxShadow: '0 0 60px rgba(212, 175, 55, 0.15)',
+        }}
+      >
+        <div className="text-center mb-8">
+          <div className="text-5xl mb-4">✨</div>
+          <h2 className="text-2xl font-black mb-3" style={{ color: '#D4AF37' }}>
+            Citizen Not Yet Vitalized
+          </h2>
+          <p className="text-sm leading-relaxed" style={{ color: '#a0a0a5' }}>
+            Would you like to anchor your identity to this device?
+          </p>
+          <p className="text-xs font-mono mt-2" style={{ color: '#6b6b70' }}>
+            {notYetVitalized.phone}
+          </p>
+        </div>
+        <div className="flex flex-col gap-3">
+          <button
+            type="button"
+            onClick={handleBeginVitalization}
+            className="w-full py-4 rounded-xl font-bold text-base uppercase tracking-wider transition-all hover:opacity-95 active:scale-[0.98]"
+            style={{
+              background: 'linear-gradient(135deg, #D4AF37 0%, #c9a227 100%)',
+              color: '#0d0d0f',
+              boxShadow: '0 0 24px rgba(212, 175, 55, 0.3)',
+            }}
+          >
+            Begin Vitalization
+          </button>
+          <button
+            type="button"
+            onClick={() => { setNotYetVitalized(null); setError(''); }}
+            className="w-full py-3 rounded-xl font-medium text-sm uppercase tracking-wider transition-all hover:opacity-90"
+            style={{ background: 'rgba(42,42,46,0.8)', color: '#a0a0a5', border: '1px solid rgba(212, 175, 55, 0.2)' }}
+          >
+            Back
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // Link Guardian step (Minor/Elder — Account Type requires Guardian)
   if (anchorResult) {
     return (
@@ -226,7 +328,12 @@ export function IdentityAnchorInput({
                       <button
                         key={c.code}
                         type="button"
-                        onClick={() => { setGuardianCountry(c); setGuardianCountrySearch(''); setGuardianPickerOpen(false); }}
+                        onClick={() => {
+                          userHasChangedCountryRef.current = true;
+                          setGuardianCountry(c);
+                          setGuardianCountrySearch('');
+                          setGuardianPickerOpen(false);
+                        }}
                         className="flex items-center gap-2 w-full px-3 py-2 text-left hover:bg-[#D4AF37]/10"
                         style={{ color: c.code === guardianCountry.code ? '#D4AF37' : '#a0a0a5' }}
                       >
@@ -367,6 +474,7 @@ export function IdentityAnchorInput({
                       key={c.code}
                       type="button"
                       onClick={() => {
+                        userHasChangedCountryRef.current = true;
                         setCountry(c);
                         setCountrySearch('');
                         setPickerOpen(false);
@@ -395,6 +503,11 @@ export function IdentityAnchorInput({
         </div>
         <p className="text-xs mt-2" style={{ color: '#6b6b70' }}>
           Select country (flag) then enter national number. Validation matches {country.name} format. E.164 applied automatically.
+          {detectedCountryApplied && (
+            <span className="block mt-1" style={{ color: '#6b6b70' }}>
+              Country detected from your location. Change it above if you use a foreign SIM.
+            </span>
+          )}
         </p>
       </div>
 

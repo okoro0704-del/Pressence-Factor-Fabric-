@@ -72,6 +72,13 @@ export const PHONE_COUNTRIES: PhoneCountry[] = buildPhoneCountries();
 export const DEFAULT_PHONE_COUNTRY: PhoneCountry =
   PHONE_COUNTRIES.find((c) => c.code === 'NG') ?? PHONE_COUNTRIES[0];
 
+/** Look up PhoneCountry by ISO 3166-1 alpha-2 (e.g. from GPS/IP detection). */
+export function getCountryByCode(code: string): PhoneCountry | undefined {
+  const upper = code?.trim().toUpperCase();
+  if (!upper || upper.length !== 2) return undefined;
+  return PHONE_COUNTRIES.find((c) => c.code === upper);
+}
+
 /** Filter countries by search (name, code, or dial code). */
 export function filterPhoneCountries(search: string): PhoneCountry[] {
   const q = search.trim().toLowerCase();

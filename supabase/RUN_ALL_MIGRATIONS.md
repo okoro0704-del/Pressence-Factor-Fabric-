@@ -56,6 +56,8 @@ Run each file in `supabase/migrations/` in this order:
 41. `20260243000000_login_requests_delete_policy.sql`
 42. `20260244000000_sovereign_ledger_transaction_label.sql`
 43. **`20260245000000_user_profiles_country_code.sql`** ← adds `country_code`
+44. **`20260246000000_user_profiles_spendable_vida.sql`** ← adds `spendable_vida` (Treasury display; default 1 VIDA)
+45. **`20260247000000_sovereign_ledger_phone_number.sql`** ← adds `phone_number` to sovereign_ledger (Recent Activity filter)
 
 ---
 

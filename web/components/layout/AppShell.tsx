@@ -5,10 +5,12 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { LayoutDashboard, Landmark, Vote, Shield, Settings2, ChevronLeft, Menu } from 'lucide-react';
+import { useTripleTapReset } from '@/lib/useTripleTapReset';
 
+/** Bottom tab bar and sidebar: exactly Dashboard, Treasury, Elections, Master, Command. All financial assets live under Treasury. */
 const NAV = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/government/treasury', label: 'Treasury', icon: Landmark },
+  { href: '/treasury', label: 'Treasury', icon: Landmark },
   { href: '/government/elections', label: 'Elections', icon: Vote },
   { href: '/master/dashboard', label: 'Master', icon: Shield },
   { href: '/master/command-center', label: 'Command', icon: Settings2 },
@@ -17,6 +19,7 @@ const NAV = [
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const handleLogoClick = useTripleTapReset();
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-[#0d0d0f]">
@@ -29,14 +32,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         `}
       >
         <div className="p-3 flex items-center justify-between min-h-[48px] border-b border-[#2a2a2e]">
-          {sidebarOpen ? (
-            <span className="text-xs font-bold text-[#D4AF37] uppercase tracking-wider flex items-center gap-2">
-              <Image src="/icons/icon-96.png" alt="PFF" width={24} height={24} className="shrink-0" priority />
-              PFF
-            </span>
-          ) : (
-            <Image src="/icons/icon-96.png" alt="PFF" width={32} height={32} className="shrink-0 mx-auto" priority />
-          )}
+          <button
+            type="button"
+            onClick={handleLogoClick}
+            className="flex items-center gap-2 min-w-0 shrink cursor-pointer bg-transparent border-0 p-0 text-left focus:outline-none focus:ring-0"
+            aria-label="PFF Sovereign Protocol"
+          >
+            {sidebarOpen ? (
+              <span className="text-xs font-bold text-[#D4AF37] uppercase tracking-wider flex items-center gap-2">
+                <Image src="/icons/icon-96.png" alt="PFF" width={24} height={24} className="shrink-0" priority />
+                PFF
+              </span>
+            ) : (
+              <Image src="/icons/icon-96.png" alt="PFF" width={32} height={32} className="shrink-0 mx-auto" priority />
+            )}
+          </button>
           <button
             type="button"
             onClick={() => setSidebarOpen((o) => !o)}

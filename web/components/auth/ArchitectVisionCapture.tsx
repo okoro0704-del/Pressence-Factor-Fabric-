@@ -93,6 +93,9 @@ export function ArchitectVisionCapture({
   const frozenRef = useRef(false);
   const frozenDrawnRef = useRef(false);
   const [faceDetected, setFaceDetected] = useState(false);
+  type CameraStatus = 'initializing' | 'ready' | 'denied';
+  const [cameraStatus, setCameraStatus] = useState<CameraStatus>('initializing');
+  const [retryCount, setRetryCount] = useState(0);
 
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -100,10 +103,11 @@ export function ArchitectVisionCapture({
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
   }, []);
 
-  // Initialize camera at highest resolution
+  // Initialize camera at highest resolution (runs on mount and on Retry)
   useEffect(() => {
     if (!isOpen) return;
     setError(null);
+    setCameraStatus('initializing');
     setMeshGold(false);
     setFaceDetected(false);
     frozenRef.current = false;
@@ -111,6 +115,7 @@ export function ArchitectVisionCapture({
     setAiConfidence(0);
     setLiveness('Scanning');
     setHashStatus('Calculating...');
+    stopCamera();
 
     const video = videoRef.current;
     if (!video) return;
@@ -125,14 +130,15 @@ export function ArchitectVisionCapture({
       .then((stream) => {
         streamRef.current = stream;
         video.srcObject = stream;
-        video.play().catch(() => {});
+        video.play().then(() => setCameraStatus('ready')).catch(() => setCameraStatus('ready'));
       })
       .catch((err) => {
+        setCameraStatus('denied');
         setError(err?.message || 'Camera access denied');
       });
 
     return () => stopCamera();
-  }, [isOpen, stopCamera]);
+  }, [isOpen, stopCamera, retryCount]);
 
   // Simulate face detection after a short delay (in production, plug in MediaPipe via CDN or real detector)
   useEffect(() => {
@@ -239,13 +245,13 @@ export function ArchitectVisionCapture({
           <span>Hash Status: {hashStatus}</span>
         </div>
 
-        {/* Diagnostic: "The Machine is Watching" when face detected (before success) */}
+        {/* Detection lock: show when face detected (before success) */}
         {faceDetected && !meshGold && (
           <div
             className="absolute bottom-4 left-0 right-0 z-20 text-center text-sm font-mono tracking-wider"
             style={{ color: BLUE_MESH, textShadow: '0 0 12px rgba(59,130,246,0.8)' }}
           >
-            The Machine is Watching.
+            Face Detected: Hold Still for Pulse
           </div>
         )}
 
@@ -258,17 +264,57 @@ export function ArchitectVisionCapture({
         )}
       </div>
 
-      {error && (
-        <p className="mt-4 text-red-400 text-sm text-center max-w-md">{error}</p>
+      {/* Initializing overlay: sleek loader while camera is warming up */}
+      {cameraStatus === 'initializing' && (
+        <div className="absolute inset-0 z-[200] flex flex-col items-center justify-center bg-black/90">
+          <div className="h-8 w-8 rounded-full border-2 border-[#e8c547] border-t-transparent animate-spin mb-4" />
+          <p className="text-[#e8c547] font-mono text-sm tracking-wider">
+            Initializing Sovereign Vision...
+          </p>
+        </div>
       )}
 
-      <button
-        type="button"
-        onClick={onClose}
-        className="mt-6 px-6 py-2 rounded-lg border-2 border-[#D4AF37]/60 text-[#e8c547] hover:bg-[#D4AF37]/10 transition-colors"
-      >
-        {closeLabel}
-      </button>
+      {/* Full-screen permission denied: Sovereign Identity requires a Biometric Anchor */}
+      {cameraStatus === 'denied' && (
+        <div className="absolute inset-0 z-[200] flex flex-col items-center justify-center bg-[#0d0d0f] px-6 text-center">
+          <p className="text-[#e8c547] text-lg font-semibold mb-2">
+            Sovereign Identity requires a Biometric Anchor
+          </p>
+          <p className="text-[#6b6b70] text-sm mb-6 max-w-sm">
+            Camera access is required to anchor your identity to this device.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setError(null);
+                setCameraStatus('initializing');
+                setRetryCount((c) => c + 1);
+              }}
+              className="rounded-xl bg-[#c9a227] px-6 py-3 text-base font-bold text-[#0d0d0f] hover:bg-[#e8c547] transition-colors"
+            >
+              Retry
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-xl border-2 border-[#2a2a2e] px-6 py-3 text-base font-medium text-[#a0a0a5] hover:bg-[#16161a] transition-colors"
+            >
+              {closeLabel}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {cameraStatus !== 'denied' && (
+        <button
+          type="button"
+          onClick={onClose}
+          className="mt-6 px-6 py-2 rounded-lg border-2 border-[#D4AF37]/60 text-[#e8c547] hover:bg-[#D4AF37]/10 transition-colors"
+        >
+          {closeLabel}
+        </button>
+      )}
 
       <style dangerouslySetInnerHTML={{
         __html: `

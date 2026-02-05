@@ -14,9 +14,11 @@ interface ProtectedRouteProps {
 const HYDRATION_GRACE_MS = 600;
 
 /**
- * PROTECTED ROUTE WRAPPER
+ * PROTECTED ROUTE WRAPPER (Clean State Guard)
+ * Dashboard and protected pages load only when:
+ * - Auth session + user_profiles row exist (enforced by GhostSessionGuard at app start; ghost sessions are cleared and redirected to /vitalization).
+ * - Biometric / presence is verified (checked here via isPresenceVerified or mint_status PENDING_HARDWARE/MINTED).
  * Redirects to 4-Layer Gate if presence is not verified.
- * If user has mint_status PENDING_HARDWARE or MINTED, allow through (do not show gate again).
  */
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { isPresenceVerified, loading, setPresenceVerified } = useGlobalPresenceGateway();

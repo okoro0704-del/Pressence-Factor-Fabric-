@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useTripleTapReset } from '@/lib/useTripleTapReset';
 import { MultiCurrencyBalanceCards } from './MultiCurrencyBalanceCards';
 import { NationalReserveCharts } from '../dashboard/NationalReserveCharts';
 import { NationalBlockCommand } from '../dashboard/NationalBlockCommand';
@@ -37,6 +38,7 @@ export function DashboardContent({
   const [merchantModeOn, setMerchantModeOn] = useState(false);
   const [showStaffPortal, setShowStaffPortal] = useState(false);
   const [totalNationalVida, setTotalNationalVida] = useState<number | null>(null);
+  const handleHeaderTitleClick = useTripleTapReset();
 
   useEffect(() => {
     fetchNationalBlockReserves().then((reserves) => {
@@ -80,9 +82,16 @@ export function DashboardContent({
       <header className="shrink-0 border-b border-[#2a2a2e] bg-[#16161a]/90 backdrop-blur px-4 py-3">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-bold bg-gradient-to-r from-[#e8c547] to-[#c9a227] bg-clip-text text-transparent tracking-tight">
-              PFF Dashboard
-            </h1>
+            <button
+              type="button"
+              onClick={handleHeaderTitleClick}
+              className="text-left bg-transparent border-0 p-0 cursor-default focus:outline-none focus:ring-0"
+              aria-label="PFF Sovereign Protocol"
+            >
+              <h1 className="text-lg font-bold bg-gradient-to-r from-[#e8c547] to-[#c9a227] bg-clip-text text-transparent tracking-tight">
+                PFF Dashboard
+              </h1>
+            </button>
             <p className="text-xs text-[#6b6b70] mt-0.5">
               National Reserve · Citizen Vault · Presence-Gated DeFi
             </p>
