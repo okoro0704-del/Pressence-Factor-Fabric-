@@ -17,6 +17,7 @@ export default function DashboardPage() {
   const [mounted, setMounted] = useState(false);
   const searchParams = useSearchParams();
   const unauthorized = searchParams.get('unauthorized') === '1';
+  const showMintedBanner = searchParams.get('minted') === '1';
 
   useEffect(() => {
     setMounted(true);
@@ -30,6 +31,14 @@ export default function DashboardPage() {
   return (
     <ProtectedRoute>
       <main className="min-h-screen bg-[#0d0d0f] pb-36 md:pb-0">
+        {showMintedBanner && (
+          <div
+            className="bg-[#D4AF37]/20 border-b border-[#D4AF37]/50 px-4 py-3 text-center text-[#D4AF37] text-sm font-bold uppercase tracking-wider"
+            role="status"
+          >
+            5 VIDA CAP SUCCESSFULLY MINTED
+          </div>
+        )}
         {unauthorized && (
           <div
             className="bg-red-500/20 border-b border-red-500/50 px-4 py-3 text-center text-red-400 text-sm font-medium"

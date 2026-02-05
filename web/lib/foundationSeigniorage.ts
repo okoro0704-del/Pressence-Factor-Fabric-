@@ -2,11 +2,13 @@
  * Foundation Seigniorage Protocol — Dual-Minting on 3-of-4 Biometric Gate Clear.
  * Per new identity verified: 10 VIDA CAP to user wallet, 1 VIDA to PFF_FOUNDATION_VAULT (foundation_vault_ledger).
  * Grant trigger: 10 VIDA minting only begins AFTER the Sovereign Constitution is signed and recorded in legal_approvals.
+ * Anti-Bot: Mint only executes if humanity_score is 1.0 and biometric_anchor is from an external device.
  */
 
 import { supabase } from './supabase';
 import { getOrCreateSovereignWallet } from './sovereignInternalWallet';
 import { hasSignedConstitution } from './legalApprovals';
+import { getHumanityCheck, isEligibleForMint } from './humanityScore';
 
 /** VIDA CAP minted to user when 3-of-4 gate clears. */
 export const USER_VIDA_ON_VERIFY = 10;
@@ -34,6 +36,18 @@ export async function mintFoundationSeigniorage(
     const signed = await hasSignedConstitution(phoneNumber);
     if (!signed) {
       return { ok: false, error: 'Constitution must be signed before grant. Complete the Biometric Signature on the Sovereign Constitution.' };
+    }
+
+    // Anti-Bot Protocol: Mint only if humanity_score is 1.0 and biometric is from external device.
+    const humanityResult = await getHumanityCheck(phoneNumber);
+    if (!humanityResult.ok) {
+      return { ok: false, error: humanityResult.error };
+    }
+    if (!isEligibleForMint(humanityResult.data)) {
+      return {
+        ok: false,
+        error: 'Proof of Personhood required. Complete a Triple-Pillar scan with an external biometric device to unlock minting.',
+      };
     }
 
     // Idempotent: already minted for this citizen?

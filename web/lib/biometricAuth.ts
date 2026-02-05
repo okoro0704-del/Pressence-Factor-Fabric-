@@ -13,6 +13,8 @@ import {
   getSessionLanguage,
   SessionStatus,
 } from './sessionManagement';
+import { waitForExternalFingerprint } from './externalScannerBridge';
+import { hashExternalFingerprintRaw } from './biometricAnchorSync';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -54,6 +56,10 @@ export interface BiometricAuthResult {
   silentModeUsed?: boolean;
   /** True when location failed due to permission — show gold popup to allow access */
   locationPermissionRequired?: boolean;
+  /** Industrial-only: external fingerprint hash from USB/Bluetooth scanner (dual-biometric with Face). */
+  externalFingerprintHash?: string;
+  /** Industrial-only: serial number of the scanner that minted VIDA (Sentinel ID tagging). */
+  externalScannerSerialNumber?: string;
 }
 
 /** Scan timeout: all three pillars must resolve in under 5 seconds total */
@@ -124,6 +130,12 @@ export async function verifyBiometricSignature(
         error: matchResult.error,
         variance: matchResult.variance
       };
+    }
+
+    const { persistFaceHash, deriveFaceHashFromCredential } = await import('./biometricAnchorSync');
+    const faceTemplateHash = await deriveFaceHashFromCredential(mockBiometricData);
+    if (faceTemplateHash?.trim()) {
+      await persistFaceHash(identityAnchorPhone, faceTemplateHash);
     }
 
     return {
@@ -388,6 +400,7 @@ export function startLocationRequestFromUserGesture(identityAnchor?: string): vo
     };
 
     const ipPromise = getLocationByIP();
+    const IP_EARLY_MS = 1200;
 
     const gpsOptions: PositionOptions = {
       enableHighAccuracy: false,
@@ -405,6 +418,15 @@ export function startLocationRequestFromUserGesture(identityAnchor?: string): vo
         }
       });
     }, GPS_TIMEOUT_MS);
+
+    // After 1.2s use IP if available so we don't stick on "Locating GPS"
+    setTimeout(() => {
+      if (resolved) return;
+      ipPromise.then((ipLoc) => {
+        if (resolved || !ipLoc) return;
+        saveAndResolve({ latitude: ipLoc.latitude, longitude: ipLoc.longitude }, true, ipLoc.country_code, false);
+      });
+    }, IP_EARLY_MS);
 
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
       clearTimeout(timeoutId);
@@ -931,6 +953,8 @@ export interface ResolveSovereignOptions {
   onPillarComplete?: (pillar: PresencePillar) => void;
   /** ISO country code for IP fallback: pillar gold only if IP country matches (e.g. "NG") */
   registeredCountryCode?: string;
+  /** Industrial-only enrollment: disable phone fingerprint; Biometric Pillar waits for External USB/Bluetooth Scanner. 5 VIDA MINTED only when Face Pulse AND External Fingerprint are captured. */
+  useExternalScanner?: boolean;
 }
 
 /** SOVEREIGN THRESHOLD: minimum layers that must pass to grant access (3-out-of-4 quorum) */
@@ -950,6 +974,7 @@ export async function resolveSovereignByPresence(
   const onSilentMode = options?.onSilentMode;
   const onPillarComplete = options?.onPillarComplete;
   const registeredCountryCode = options?.registeredCountryCode;
+  const useExternalScanner = options?.useExternalScanner === true;
 
   const fail = (layer: AuthLayer | null, message: string, timedOut?: boolean, twoPillarsOnly?: boolean): BiometricAuthResult => ({
     success: false,
@@ -982,9 +1007,11 @@ export async function resolveSovereignByPresence(
       voice: null as (VerifyVoicePrintResult | { success: true; voicePrint: string }) | null,
       tpm: null as { success: boolean; deviceHash?: string; error?: string } | null,
       location: null as { success: boolean; coords?: { latitude: number; longitude: number }; error?: string } | null,
+      /** Industrial-only: External USB/Bluetooth scanner signal (dual-biometric with Face). */
+      externalScanner: null as { fingerprintHash: string; scannerSerialNumber: string } | null,
     };
 
-    // ——— PARALLEL: Face, Voice, Device ID, GPS all start on Start (Promise.all) ———
+    // ——— PARALLEL: Face, Voice, Device (phone fingerprint OR external scanner), GPS ———
     onProgress?.(AuthLayer.BIOMETRIC_SIGNATURE, AuthStatus.SCANNING);
     onProgress?.(AuthLayer.VOICE_PRINT, AuthStatus.SCANNING);
     onProgress?.(AuthLayer.HARDWARE_TPM, AuthStatus.SCANNING);
@@ -992,17 +1019,26 @@ export async function resolveSovereignByPresence(
 
     const bioP = verifyBiometricSignature(identityAnchorPhone).then((r) => {
       state.bio = r;
-      if (r.success) onPillarComplete?.('face');
+      if (r.success && r.credential != null) onPillarComplete?.('face');
       return r;
     });
-    const tpmP = verifyHardwareTPM(identityAnchorPhone).then((r) => {
-      state.tpm = r;
-      if (r.success) onPillarComplete?.('device');
-      return r;
-    });
+    const EXTERNAL_SCANNER_TIMEOUT_MS = 60_000;
+    const tpmP = useExternalScanner
+      ? waitForExternalFingerprint(EXTERNAL_SCANNER_TIMEOUT_MS).then(async (sig) => {
+          const fingerprintHashSha256 = await hashExternalFingerprintRaw(sig.fingerprintHash);
+          state.externalScanner = { fingerprintHash: fingerprintHashSha256, scannerSerialNumber: sig.scannerSerialNumber };
+          state.tpm = { success: true, deviceHash: fingerprintHashSha256 };
+          if (fingerprintHashSha256 && sig.scannerSerialNumber) onPillarComplete?.('device');
+          return state.tpm;
+        })
+      : verifyHardwareTPM(identityAnchorPhone).then((r) => {
+          state.tpm = r;
+          if (r.success && r.deviceHash != null && r.deviceHash !== '') onPillarComplete?.('device');
+          return r;
+        });
     const locationP = verifyLocation(registeredCountryCode, identityAnchorPhone).then((r) => {
       state.location = r;
-      if (r.success) onPillarComplete?.('location');
+      if (r.success && r.coords != null) onPillarComplete?.('location');
       return r;
     });
     const voiceP = skipVoiceLayer
@@ -1013,7 +1049,7 @@ export async function resolveSovereignByPresence(
         })
       : verifyVoicePrint(identityAnchorPhone, voiceOptions).then((r) => {
           state.voice = r;
-          if (r.success) onPillarComplete?.('voice');
+          if (r.success && (r.voicePrint != null || r.silentModeSuggested)) onPillarComplete?.('voice');
           if (r.silentModeSuggested) onSilentMode?.();
           return r;
         });
@@ -1028,11 +1064,16 @@ export async function resolveSovereignByPresence(
     });
 
     const checkQuorum = () => {
-      const faceOk = state.bio?.success;
-      const deviceOk = state.tpm?.success;
-      const locationOk = state.location?.success;
-      const voiceOk = state.voice?.success || (state.voice as VerifyVoicePrintResult)?.silentModeSuggested || skipVoiceLayer;
-      if (faceOk && deviceOk && locationOk && voiceOk) quorumResolve!();
+      const faceOk = state.bio?.success === true && state.bio?.credential != null;
+      const deviceOk = useExternalScanner
+        ? state.externalScanner != null && state.externalScanner.fingerprintHash != null && state.externalScanner.scannerSerialNumber != null
+        : (state.tpm?.success === true && state.tpm?.deviceHash != null && state.tpm.deviceHash !== '');
+      const voiceOk =
+        state.voice?.success === true ||
+        (state.voice as VerifyVoicePrintResult)?.silentModeSuggested === true ||
+        skipVoiceLayer;
+      // Dual-biometric (industrial): Face Pulse AND External Fingerprint required for 5 VIDA MINTED
+      if (faceOk && deviceOk && voiceOk) quorumResolve!();
     };
 
     bioP.then(checkQuorum);
@@ -1044,10 +1085,14 @@ export async function resolveSovereignByPresence(
       await Promise.race([quorumP, timeoutP]);
     } catch (err) {
       if (err instanceof Error && err.message === 'SCAN_TIMEOUT') {
-        if (state.bio?.success) layersPassed.push(AuthLayer.BIOMETRIC_SIGNATURE);
-        if (state.voice?.success && !(state.voice as VerifyVoicePrintResult).silentModeSuggested) layersPassed.push(AuthLayer.VOICE_PRINT);
-        if (state.tpm?.success) layersPassed.push(AuthLayer.HARDWARE_TPM);
-        if (state.location?.success) layersPassed.push(AuthLayer.GPS_LOCATION);
+        if (state.bio?.success === true && state.bio?.credential != null) layersPassed.push(AuthLayer.BIOMETRIC_SIGNATURE);
+        if (state.voice?.success === true && !(state.voice as VerifyVoicePrintResult).silentModeSuggested) layersPassed.push(AuthLayer.VOICE_PRINT);
+        if (useExternalScanner) {
+          if (state.externalScanner != null) layersPassed.push(AuthLayer.HARDWARE_TPM);
+        } else if (state.tpm?.success === true && state.tpm?.deviceHash != null) {
+          layersPassed.push(AuthLayer.HARDWARE_TPM);
+        }
+        if (state.location?.success === true && state.location?.coords != null) layersPassed.push(AuthLayer.GPS_LOCATION);
         const passed = layersPassed.length;
         const twoPillarsOnly = passed === 2;
         const locPerm = state.location && (state.location as LocationResult).permissionRequired === true;
@@ -1064,7 +1109,15 @@ export async function resolveSovereignByPresence(
       throw err;
     }
 
-    await Promise.all([bioP, voiceP, tpmP, locationP]);
+    await Promise.all([bioP, voiceP, tpmP]);
+    // Resolve location with short wait so we don't block on slow GPS; use result when available
+    const locationResultOrTimeout = await Promise.race([
+      locationP,
+      new Promise<LocationResult>((r) =>
+        setTimeout(() => r({ success: false, error: 'Location timeout', permissionRequired: false }), 2000)
+      ),
+    ]);
+    state.location = state.location ?? locationResultOrTimeout;
 
     const biometricResult = state.bio!;
     const voiceResult = state.voice!;
@@ -1084,7 +1137,7 @@ export async function resolveSovereignByPresence(
       return fail(null, 'Identity Mismatch. This device is registered to another Sovereign Citizen.');
     }
 
-    if (biometricResult.success) {
+    if (biometricResult.success && biometricResult.credential != null) {
       layersPassed.push(AuthLayer.BIOMETRIC_SIGNATURE);
       const scannedPhone = biometricResult.identity?.phone_number ?? identityAnchorPhone;
       if (scannedPhone !== identityAnchorPhone && requireAllLayers) {
@@ -1092,8 +1145,8 @@ export async function resolveSovereignByPresence(
       }
       if (scannedPhone === identityAnchorPhone) phoneNumber = scannedPhone;
     }
-    if (requireAllLayers && !biometricResult.success) {
-      return fail(AuthLayer.BIOMETRIC_SIGNATURE, biometricResult.error || 'Biometric verification failed.');
+    if (requireAllLayers && (!biometricResult.success || biometricResult.credential == null)) {
+      return fail(AuthLayer.BIOMETRIC_SIGNATURE, biometricResult.error || 'Biometric verification failed. Complete face or fingerprint scan.');
     }
     if (skipVoiceLayer) {
       layersPassed.push(AuthLayer.VOICE_PRINT);
@@ -1106,13 +1159,19 @@ export async function resolveSovereignByPresence(
     } else if (requireAllLayers) {
       return fail(AuthLayer.VOICE_PRINT, (voiceResult as VerifyVoicePrintResult).error || 'Voice verification failed.');
     }
-    if (tpmResult.success) {
+    const devicePillarOk = useExternalScanner
+      ? state.externalScanner != null
+      : (tpmResult.success && tpmResult.deviceHash != null && tpmResult.deviceHash !== '');
+    if (devicePillarOk) {
       layersPassed.push(AuthLayer.HARDWARE_TPM);
       await markLayerPassed(3, identityAnchorPhone);
     } else if (requireAllLayers) {
-      return fail(AuthLayer.HARDWARE_TPM, tpmResult.error || 'Device not authorized.');
+      return fail(
+        AuthLayer.HARDWARE_TPM,
+        useExternalScanner ? 'External fingerprint scanner required. Connect USB/Bluetooth scanner and scan finger.' : (tpmResult.error || 'Device not authorized.')
+      );
     }
-    if (locationResult.success) {
+    if (locationResult.success && locationResult.coords != null) {
       layersPassed.push(AuthLayer.GPS_LOCATION);
     } else if (requireAllLayers && !silentModeUsed) {
       // Location optional unless Silent Mode (Face+Device+Location required)
@@ -1177,6 +1236,10 @@ export async function resolveSovereignByPresence(
       layersPassed,
       ...(silentModeUsed && { silentModeUsed: true }),
       ...(locationPermissionRequired && { locationPermissionRequired: true }),
+      ...(useExternalScanner && state.externalScanner && {
+        externalFingerprintHash: state.externalScanner.fingerprintHash,
+        externalScannerSerialNumber: state.externalScanner.scannerSerialNumber,
+      }),
     };
   } catch (error) {
     console.error('Sovereign presence resolution failed:', error);

@@ -153,6 +153,9 @@ export function FourLayerGate() {
   } | null>(null);
   /** Success shield after 3-word verification: "5 VIDA CAP SUCCESSFULLY MINTED" in gold (minting press visual) */
   const [showSeedSuccessShield, setShowSeedSuccessShield] = useState(false);
+  /** Industrial-only: scanner serial + fingerprint hash from last successful verification (for Sentinel ID tagging). */
+  const [lastExternalScannerSerial, setLastExternalScannerSerial] = useState<string | null>(null);
+  const [lastExternalFingerprintHash, setLastExternalFingerprintHash] = useState<string | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
   const { setPresenceVerified } = useGlobalPresenceGateway();
@@ -170,6 +173,31 @@ export function FourLayerGate() {
       // ignore
     }
   }, [identityAnchor?.phone]);
+
+  /** Reset all Approved statuses so user must do a fresh scan every time (e.g. on exit). */
+  const resetVerification = useCallback(() => {
+    setPillarDevice(false);
+    setPillarLocation(false);
+    setPillarFace(false);
+    setResult(null);
+    setAuthStatus(AuthStatus.IDLE);
+    setCurrentLayer(null);
+    setShowTimeoutBypass(false);
+    setShowVerifyFromAuthorizedDevice(false);
+    setGpsTakingLong(false);
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const keys: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k?.startsWith('pff_pillar_')) keys.push(k);
+        }
+        keys.forEach((k) => localStorage.removeItem(k));
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
 
   // Hydration sync + restore language/identity so redirect from architect (or any protected route) doesn't bounce back to language
   useEffect(() => {
@@ -249,6 +277,13 @@ export function FourLayerGate() {
     return () => clearInterval(interval);
   }, []);
 
+  // On exit: clear all Approved statuses so next entry requires fresh scan
+  useEffect(() => {
+    return () => {
+      resetVerification();
+    };
+  }, [resetVerification]);
+
   // When GPS pillar is active and scanning, after 3s show "Syncing with Local Mesh..." (indoor mode)
   useEffect(() => {
     if (currentLayer !== AuthLayer.GPS_LOCATION || authStatus !== AuthStatus.SCANNING) return;
@@ -281,7 +316,7 @@ export function FourLayerGate() {
       case AuthLayer.VOICE_PRINT:
         return 'Hardware Fingerprint Verified';
       case AuthLayer.HARDWARE_TPM:
-        return 'Device Signature';
+        return 'External Fingerprint Scanner';
       case AuthLayer.GENESIS_HANDSHAKE:
         return 'Genesis Handshake';
       case AuthLayer.GPS_LOCATION:
@@ -298,7 +333,7 @@ export function FourLayerGate() {
     }
     switch (layer) {
       case AuthLayer.HARDWARE_TPM:
-        return 'Scanning Device Signature...';
+        return 'Waiting for USB/Bluetooth Scanner...';
       case AuthLayer.GPS_LOCATION:
         return 'Acquiring GPS Presence...';
       case AuthLayer.BIOMETRIC_SIGNATURE:
@@ -428,13 +463,14 @@ export function FourLayerGate() {
     const authResult = await resolveSovereignByPresence(
       identityAnchor.phone,
       (layer, status) => {
-        setCurrentLayer(layer);
+        if (layer !== AuthLayer.GPS_LOCATION) setCurrentLayer(layer);
         setAuthStatus(status);
       },
       {
         skipVoiceLayer: true,
         requireAllLayers: isNewDevice,
         registeredCountryCode: 'NG',
+        useExternalScanner: true,
         onPillarComplete: (pillar: PresencePillar) => {
           if (pillar === 'device') setPillarDevice(true);
           if (pillar === 'location') setPillarLocation(true);
@@ -444,6 +480,10 @@ export function FourLayerGate() {
     );
 
     setResult(authResult);
+    if (authResult.success && authResult.externalScannerSerialNumber != null) {
+      setLastExternalScannerSerial(authResult.externalScannerSerialNumber);
+      setLastExternalFingerprintHash(authResult.externalFingerprintHash ?? null);
+    }
     if (authResult.locationPermissionRequired) setShowLocationPermissionPopup(true);
 
     if (authResult.timedOut) {
@@ -496,10 +536,12 @@ export function FourLayerGate() {
             deviceInfo,
             ipAddress,
             geolocation,
-            compositeDeviceId
+            compositeDeviceId,
+            authResult.externalScannerSerialNumber ?? null,
+            authResult.externalFingerprintHash ?? null
           );
 
-          console.log('✅ PRIMARY_SENTINEL assigned - check constitution then proceed');
+          console.log('✅ PRIMARY_SENTINEL assigned (scanner:', authResult.externalScannerSerialNumber ?? '—', ') - check constitution then proceed');
           await goToDashboard();
           return;
         }
@@ -520,7 +562,9 @@ export function FourLayerGate() {
           deviceInfo,
           ipAddress,
           geolocation,
-          compositeDeviceId
+          compositeDeviceId,
+          authResult.externalScannerSerialNumber ?? null,
+          authResult.externalFingerprintHash ?? null
         );
 
         // Show "Awaiting Master Authorization" screen
@@ -534,6 +578,11 @@ export function FourLayerGate() {
       }
 
       await updateDeviceLastUsed(compositeDeviceId);
+
+      // Elite Status: set Proof of Personhood when Triple-Pillar succeeded with external biometric device.
+      if (authResult.externalScannerSerialNumber != null) {
+        await setHumanityScoreVerified(identityAnchor.phone);
+      }
 
       // Triple-Pillar success (Device + GPS + Face): go to dashboard — no Voice step
       await goToDashboard();
@@ -804,6 +853,7 @@ export function FourLayerGate() {
           requireAllLayers: true,
           migrationMode: true,
           registeredCountryCode: 'NG',
+          useExternalScanner: true,
           onPillarComplete: (pillar: PresencePillar) => {
             if (pillar === 'device') setPillarDevice(true);
             if (pillar === 'location') setPillarLocation(true);
@@ -856,7 +906,7 @@ export function FourLayerGate() {
     setShowSeedVerification(true);
   };
 
-  /** Seed verification passed — store seed, confirm DB has recovery_seed_encrypted, then show Success shield. */
+  /** Seed verification passed — store seed, confirm DB has recovery_seed_hash, then show Success shield. */
   const handleSeedVerificationPassed = async (answers: string[]) => {
     if (!identityAnchor || !generatedSeed || verificationIndices.length !== 3 || !sacredRecordDeviceContext) return;
     if (!verify3Words(generatedSeed, verificationIndices, answers)) {
@@ -900,8 +950,12 @@ export function FourLayerGate() {
       deviceInfo,
       ipAddress,
       geolocation,
-      compositeDeviceId
+      compositeDeviceId,
+      lastExternalScannerSerial,
+      lastExternalFingerprintHash
     );
+    setLastExternalScannerSerial(null);
+    setLastExternalFingerprintHash(null);
     const signed = await hasSignedConstitution(identityAnchor.phone);
     if (!signed) {
       setShowConstitutionGate(true);
@@ -1482,6 +1536,7 @@ export function FourLayerGate() {
                 type="button"
                 onClick={() => {
                   setShowTimeoutBypass(false);
+                  resetVerification();
                   handleStartAuthentication();
                 }}
                 className="relative z-50 w-full py-3 rounded-lg bg-red-500 hover:bg-red-600 text-white font-bold uppercase tracking-wider transition-all duration-200 cursor-pointer"

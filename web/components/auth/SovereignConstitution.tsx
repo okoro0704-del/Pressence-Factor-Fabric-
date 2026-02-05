@@ -2,11 +2,10 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { resolveSovereignByPresence, AuthLayer, AuthStatus } from '@/lib/biometricAuth';
-import { recordConstitutionSignature, CURRENT_CONSTITUTION_VERSION } from '@/lib/legalApprovals';
+import { CURRENT_CONSTITUTION_VERSION, signConstitutionWithBiometrics } from '@/lib/legalApprovals';
 import { getCurrentUserRole } from '@/lib/roleAuth';
 import { ARTICLES_OF_THE_MESH, CONSTITUTION_PREAMBLE } from '@/data/articlesOfTheMesh';
-import { FileSignature, Loader2 } from 'lucide-react';
+import { FileSignature, Loader2, CheckCircle } from 'lucide-react';
 
 const GOLD = '#D4AF37';
 const GOLD_TRIM = 'rgba(212, 175, 55, 0.6)';
@@ -31,9 +30,9 @@ export function SovereignConstitution({
   onAccept,
   skipVoiceLayer = false,
 }: SovereignConstitutionProps) {
+  /** Hard-lock: Accept is disabled until LocalAuthentication (biometric) returns success. */
+  const [biometricVerified, setBiometricVerified] = useState(false);
   const [signing, setSigning] = useState(false);
-  const [layer, setLayer] = useState<AuthLayer | null>(null);
-  const [status, setStatus] = useState<AuthStatus>(AuthStatus.IDLE);
   const [error, setError] = useState<string | null>(null);
   /** State Consent checkbox — shown only for GOVERNMENT_ADMIN (and MASTER_ARCHITECT). */
   const [showStateConsent, setShowStateConsent] = useState(false);
@@ -48,7 +47,8 @@ export function SovereignConstitution({
     });
   }, [identityAnchorPhone]);
 
-  const handleBiometricSignature = async () => {
+  /** Phase 1: Verify with biometric only. No manual click bypass — button stays disabled until success. */
+  const handleVerifyBiometric = async () => {
     if (!identityAnchorPhone?.trim()) {
       setError('Identity Anchor is required.');
       return;
@@ -57,41 +57,28 @@ export function SovereignConstitution({
     biometricPendingRef.current = true;
     setError(null);
     setSigning(true);
-    setLayer(null);
-    setStatus(AuthStatus.SCANNING);
     try {
-      const result = await resolveSovereignByPresence(
-        identityAnchorPhone.trim(),
-        (l, s) => {
-          setLayer(l ?? null);
-          setStatus(s);
-        },
-        { skipVoiceLayer, requireAllLayers: false }
-      );
-      if (!result.success) {
-        setError(result.errorMessage ?? 'Biometric verification failed. Please try again.');
-        setStatus(AuthStatus.FAILED);
-        return;
-      }
-      const recorded = await recordConstitutionSignature(
+      const result = await signConstitutionWithBiometrics(
         identityAnchorPhone.trim(),
         CURRENT_CONSTITUTION_VERSION
       );
-      if (!recorded.ok) {
-        setError(recorded.error ?? 'Failed to record signature.');
-        setStatus(AuthStatus.FAILED);
+      if (!result.ok) {
+        setError(result.error ?? 'Biometric verification failed. Complete face or fingerprint scan.');
         return;
       }
-      setStatus(AuthStatus.IDENTIFIED);
-      await onAccept();
+      setBiometricVerified(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Verification failed.');
-      setStatus(AuthStatus.FAILED);
     } finally {
       setSigning(false);
-      setLayer(null);
       biometricPendingRef.current = false;
     }
+  };
+
+  /** Phase 2: Accept Constitution — only enabled after biometricVerified. Signature already recorded. */
+  const handleAccept = async () => {
+    if (!biometricVerified) return;
+    await onAccept();
   };
 
   return (
@@ -156,7 +143,7 @@ export function SovereignConstitution({
             </label>
           )}
           <p className="text-xs text-center" style={{ color: '#5c4d3a' }}>
-            Acceptance is recorded only after 3-of-4 Biometric verification. Your signature and timestamp are stored in the legal ledger.
+            Accept is disabled until biometric (face or fingerprint) returns success. Your signature and device ID are stored in the legal ledger.
           </p>
           {error && (
             <div
@@ -166,34 +153,52 @@ export function SovereignConstitution({
               {error}
             </div>
           )}
-          <motion.button
-            type="button"
-            onClick={handleBiometricSignature}
-            disabled={signing || (showStateConsent && !stateConsentChecked)}
-            className="w-full min-h-[48px] py-4 px-6 rounded-lg font-bold uppercase tracking-wider flex items-center justify-center gap-3 transition-all disabled:opacity-70 touch-manipulation"
-            style={{
-              background: signing ? 'rgba(212, 175, 55, 0.5)' : `linear-gradient(135deg, ${GOLD}, #C9A227)`,
-              color: '#1a1510',
-              border: `2px solid ${GOLD_TRIM}`,
-              boxShadow: '0 4px 20px rgba(212, 175, 55, 0.3)',
-            }}
-            whileTap={{ scale: 0.98 }}
-            transition={{ type: 'spring', stiffness: 400, damping: 17 }}
-          >
-            {signing ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                {status === AuthStatus.SCANNING && layer
-                  ? `Verifying ${layer.replace(/_/g, ' ')}…`
-                  : 'Verifying…'}
-              </>
-            ) : (
-              <>
-                <FileSignature className="w-5 h-5" />
-                Biometric Signature — Accept Constitution
-              </>
-            )}
-          </motion.button>
+          {!biometricVerified ? (
+            <motion.button
+              type="button"
+              onClick={handleVerifyBiometric}
+              disabled={signing || (showStateConsent && !stateConsentChecked)}
+              className="w-full min-h-[48px] py-4 px-6 rounded-lg font-bold uppercase tracking-wider flex items-center justify-center gap-3 transition-all disabled:opacity-70 disabled:cursor-not-allowed touch-manipulation"
+              style={{
+                background: signing ? 'rgba(212, 175, 55, 0.5)' : `linear-gradient(135deg, ${GOLD}, #C9A227)`,
+                color: '#1a1510',
+                border: `2px solid ${GOLD_TRIM}`,
+                boxShadow: '0 4px 20px rgba(212, 175, 55, 0.3)',
+              }}
+              whileTap={signing ? undefined : { scale: 0.98 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+            >
+              {signing ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Verifying biometric…
+                </>
+              ) : (
+                <>
+                  <FileSignature className="w-5 h-5" />
+                  Verify with Biometric (Face or Fingerprint)
+                </>
+              )}
+            </motion.button>
+          ) : (
+            <motion.button
+              type="button"
+              onClick={handleAccept}
+              disabled={signing}
+              className="w-full min-h-[48px] py-4 px-6 rounded-lg font-bold uppercase tracking-wider flex items-center justify-center gap-3 transition-all disabled:opacity-70 touch-manipulation"
+              style={{
+                background: `linear-gradient(135deg, ${GOLD}, #C9A227)`,
+                color: '#1a1510',
+                border: `2px solid ${GOLD_TRIM}`,
+                boxShadow: '0 4px 20px rgba(212, 175, 55, 0.3)',
+              }}
+              whileTap={{ scale: 0.98 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+            >
+              <CheckCircle className="w-5 h-5" />
+              Accept Constitution
+            </motion.button>
+          )}
         </div>
       </div>
     </div>

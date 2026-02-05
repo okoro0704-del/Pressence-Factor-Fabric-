@@ -2,6 +2,7 @@
  * MULTI-DEVICE VITALIZATION CONFIRMATION SYSTEM
  * Handles secondary device authorization via primary device
  * Architect: Isreal Okoro (mrfundzman)
+ * BIOMETRIC DATA IS HASHED AND ENCRYPTED. RAW IMAGES ARE NEVER PERSISTED.
  */
 
 import { supabase } from './biometricAuth';
@@ -168,6 +169,7 @@ export async function getPrimaryDevice(phoneNumber: string): Promise<{ device_id
 /**
  * Assign Primary Sentinel Device (First Device).
  * Uses compositeDeviceId (Canvas Fingerprint | Hardware UUID) when provided — this is the Device ID, not thumbprint.
+ * Industrial-only: optional external_scanner_serial_number and external_fingerprint_hash for Sentinel ID tagging.
  */
 export async function assignPrimarySentinel(
   phoneNumber: string,
@@ -175,7 +177,9 @@ export async function assignPrimarySentinel(
   deviceInfo: DeviceInfo,
   ipAddress: string,
   geolocation: VitalizationRequest['geolocation'],
-  compositeDeviceId?: string
+  compositeDeviceId?: string,
+  externalScannerSerialNumber?: string | null,
+  externalFingerprintHash?: string | null
 ): Promise<void> {
   const deviceIdToStore = compositeDeviceId ?? deviceInfo.deviceId;
 
@@ -185,21 +189,35 @@ export async function assignPrimarySentinel(
     .eq('phone_number', phoneNumber)
     .single();
 
+  const basePayload: Record<string, unknown> = {
+    primary_sentinel_device_id: deviceIdToStore,
+    primary_sentinel_assigned_at: new Date().toISOString(),
+  };
+  if (externalScannerSerialNumber != null && externalScannerSerialNumber !== '') {
+    basePayload.external_scanner_serial_number = externalScannerSerialNumber;
+  }
+  if (externalFingerprintHash != null && externalFingerprintHash !== '') {
+    basePayload.external_fingerprint_hash = externalFingerprintHash;
+  }
+  // Elite Status: successful Triple-Pillar with external device sets Proof of Personhood.
+  if (
+    (externalScannerSerialNumber != null && externalScannerSerialNumber !== '') ||
+    (externalFingerprintHash != null && externalFingerprintHash !== '')
+  ) {
+    basePayload.humanity_score = 1.0;
+  }
+
   if (!existingProfile) {
     await supabase.from('user_profiles').insert({
       phone_number: phoneNumber,
       full_name: fullName,
-      primary_sentinel_device_id: deviceIdToStore,
-      primary_sentinel_assigned_at: new Date().toISOString(),
+      ...basePayload,
       guardian_recovery_enabled: false,
     });
   } else {
     await supabase
       .from('user_profiles')
-      .update({
-        primary_sentinel_device_id: deviceIdToStore,
-        primary_sentinel_assigned_at: new Date().toISOString(),
-      })
+      .update(basePayload)
       .eq('phone_number', phoneNumber);
   }
 
@@ -227,29 +245,39 @@ export async function assignPrimarySentinel(
 /**
  * Create Vitalization Request.
  * When compositeDeviceId is provided (Canvas | UUID), store it as device_id so approval grants this device.
+ * Industrial-only: optional external_scanner_serial_number and external_fingerprint_hash for Sentinel ID tagging.
  */
 export async function createVitalizationRequest(
   phoneNumber: string,
   deviceInfo: DeviceInfo,
   ipAddress: string,
   geolocation: VitalizationRequest['geolocation'],
-  compositeDeviceId?: string
+  compositeDeviceId?: string,
+  externalScannerSerialNumber?: string | null,
+  externalFingerprintHash?: string | null
 ): Promise<string> {
   const deviceIdToStore = compositeDeviceId ?? deviceInfo.deviceId;
+  const insertPayload: Record<string, unknown> = {
+    phone_number: phoneNumber,
+    device_id: deviceIdToStore,
+    device_type: deviceInfo.deviceType,
+    device_name: deviceInfo.deviceName,
+    hardware_hash: deviceInfo.hardwareHash,
+    user_agent: deviceInfo.userAgent,
+    ip_address: ipAddress,
+    geolocation,
+    status: 'PENDING',
+    requested_at: new Date().toISOString(),
+  };
+  if (externalScannerSerialNumber != null && externalScannerSerialNumber !== '') {
+    insertPayload.external_scanner_serial_number = externalScannerSerialNumber;
+  }
+  if (externalFingerprintHash != null && externalFingerprintHash !== '') {
+    insertPayload.external_fingerprint_hash = externalFingerprintHash;
+  }
   const { data, error } = await supabase
     .from('vitalization_requests')
-    .insert({
-      phone_number: phoneNumber,
-      device_id: deviceIdToStore,
-      device_type: deviceInfo.deviceType,
-      device_name: deviceInfo.deviceName,
-      hardware_hash: deviceInfo.hardwareHash,
-      user_agent: deviceInfo.userAgent,
-      ip_address: ipAddress,
-      geolocation,
-      status: 'PENDING',
-      requested_at: new Date().toISOString(),
-    })
+    .insert(insertPayload)
     .select('id')
     .single();
 
@@ -337,6 +365,20 @@ export async function approveVitalizationRequest(requestId: string, primaryDevic
 
   if (insertError) {
     throw new Error('Failed to authorize device');
+  }
+
+  // Proof of Personhood: if this request used external biometric, set humanity_score = 1.0.
+  const hasExternalBiometric =
+    (request.external_scanner_serial_number != null && String(request.external_scanner_serial_number).trim() !== '') ||
+    (request.external_fingerprint_hash != null && String(request.external_fingerprint_hash).trim() !== '');
+  if (hasExternalBiometric && request.phone_number) {
+    await supabase
+      .from('user_profiles')
+      .update({
+        humanity_score: 1.0,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('phone_number', request.phone_number);
   }
 }
 

@@ -72,6 +72,12 @@ function MasterDashboardContent() {
           </div>
           <div className="flex items-center gap-3">
             <Link
+              href="/master/evg-partners"
+              className="text-sm font-medium text-[#D4AF37] hover:text-[#e8c547] transition-colors"
+            >
+              Authorized Partners (EVG)
+            </Link>
+            <Link
               href="/master/command-center"
               className="text-sm font-medium text-[#D4AF37] hover:text-[#e8c547] transition-colors"
             >

@@ -2,6 +2,7 @@
  * Sovereign Recovery Key storage — Supabase user_profiles.
  * Stores recovery_seed_hash (for recovery verification) and AES-256 encrypted seed.
  * Decryption key is only available after Authenticated Face Pulse (session-gated).
+ * BIOMETRIC DATA IS HASHED AND ENCRYPTED. RAW IMAGES ARE NEVER PERSISTED.
  */
 
 import { getSupabase } from './supabase';
@@ -144,7 +145,7 @@ export async function storeRecoverySeed(
 }
 
 /**
- * Confirm that recovery_seed_encrypted was persisted (database has the column set).
+ * Confirm that recovery_seed_hash was persisted (database has the column set).
  * Call after storeRecoverySeed to ensure Success screen only shows once DB is updated.
  */
 export async function confirmRecoverySeedStored(phoneNumber: string): Promise<boolean> {
@@ -152,11 +153,11 @@ export async function confirmRecoverySeedStored(phoneNumber: string): Promise<bo
   if (!supabase) return false;
   const { data, error } = await (supabase as any)
     .from('user_profiles')
-    .select('recovery_seed_encrypted')
+    .select('recovery_seed_hash')
     .eq('phone_number', phoneNumber.trim())
     .maybeSingle();
   if (error || !data) return false;
-  const val = data.recovery_seed_encrypted;
+  const val = data.recovery_seed_hash;
   return typeof val === 'string' && val.length > 0;
 }
 

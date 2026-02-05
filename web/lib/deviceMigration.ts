@@ -9,6 +9,10 @@ import { getSupabase } from './supabase';
 const SECURITY_ALERT_MESSAGE =
   'Your Sovereign Account has been bound to a new device. Access from the previous device is now revoked.';
 
+/** Push/alert when account is accessed on a new device (Remote Device Handshake). */
+export const NEW_DEVICE_ACCESS_ALERT_MESSAGE =
+  'Your account was accessed on a new device. If this wasn\'t you, use your Recovery Seed immediately.';
+
 /**
  * Update primary_sentinel_device_id in user_profiles to the new device's fingerprint.
  * Call after successful migration face match.
@@ -88,4 +92,51 @@ export async function sendDeviceMigrationSecurityAlert(phoneNumber: string): Pro
   }
 
   console.warn('[deviceMigration] Security alert not sent (no Supabase security_alerts or API). Payload:', payload);
+}
+
+/**
+ * Send push/alert when account is accessed on a new device (Remote Device Handshake).
+ * Message: "Your account was accessed on a new device. If this wasn't you, use your Recovery Seed immediately."
+ */
+export async function sendNewDeviceAccessAlert(phoneNumber: string): Promise<void> {
+  const payload = {
+    phone_number: phoneNumber.trim(),
+    message: NEW_DEVICE_ACCESS_ALERT_MESSAGE,
+    type: 'NEW_DEVICE_ACCESS_ALERT',
+    at: new Date().toISOString(),
+  };
+
+  try {
+    const supabase = getSupabase();
+    if (supabase) {
+      const { error } = await (supabase as any).from('security_alerts').insert({
+        phone_number: payload.phone_number,
+        alert_type: payload.type,
+        message: payload.message,
+        created_at: payload.at,
+      });
+      if (!error) {
+        console.log('[deviceMigration] New device access alert queued for', payload.phone_number);
+        return;
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  const apiUrl = process.env.NEXT_PUBLIC_PFF_BACKEND_URL || process.env.NEXT_PUBLIC_API_URL;
+  if (apiUrl) {
+    try {
+      await fetch(`${apiUrl.replace(/\/$/, '')}/api/security-alert`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      return;
+    } catch {
+      // ignore
+    }
+  }
+
+  console.warn('[deviceMigration] New device access alert not sent. Payload:', payload);
 }

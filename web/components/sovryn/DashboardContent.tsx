@@ -7,6 +7,7 @@ import { LaunchSovereignVaultButton } from './LaunchSovereignVaultButton';
 import { NationalReserveCharts } from '../dashboard/NationalReserveCharts';
 import { NationalBlockCommand } from '../dashboard/NationalBlockCommand';
 import { UserProfileBalance } from '../dashboard/UserProfileBalance';
+import { SovereignIdCard } from '../dashboard/SovereignIdCard';
 import { PresenceOverrideModal } from '../dashboard/PresenceOverrideModal';
 import { SentinelAccessBanner } from '../dashboard/SentinelAccessBanner';
 import { FamilyVault } from '../dashboard/FamilyVault';
@@ -134,6 +135,13 @@ export function DashboardContent() {
         ) : (
           <>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          {/* Sovereign ID Card — Proof of Personhood (Verified Human) */}
+          <div>
+            <h2 className="text-sm font-semibold text-[#6b6b70] uppercase tracking-wider mb-3">
+              Sovereign ID
+            </h2>
+            <SovereignIdCard />
+          </div>
           {/* User Profile & Minted Cap / Sovereign Liquidity */}
           <div>
             <UserProfileBalance />
@@ -231,6 +239,12 @@ export function DashboardContent() {
           </section>
 
           <div className="mt-6 flex flex-wrap gap-3">
+            <Link
+              href="/humanity"
+              className="text-sm font-medium text-[#c9a227] hover:text-[#e8c547] transition-colors"
+            >
+              Humanity Ledger →
+            </Link>
             <Link
               href="/pulse"
               className="text-sm font-medium text-[#c9a227] hover:text-[#e8c547] transition-colors"
