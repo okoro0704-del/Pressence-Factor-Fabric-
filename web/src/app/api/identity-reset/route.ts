@@ -9,7 +9,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseServer } from '@/lib/supabaseServer';
 
-export const dynamic = 'force-dynamic';
+// Note: With output: 'export' (static site), this route is not deployed to Netlify.
+// For serverless: add as Netlify Function or call an external backend. Client still clears local state and redirects.
 
 export async function POST(request: NextRequest) {
   const supabase = getSupabaseServer();
@@ -52,6 +53,7 @@ export async function POST(request: NextRequest) {
         primary_sentinel_assigned_at: null,
         face_hash: null,
         recovery_seed_hash: null,
+        is_fully_verified: false,
       })
       .eq('id', profile.id);
 
