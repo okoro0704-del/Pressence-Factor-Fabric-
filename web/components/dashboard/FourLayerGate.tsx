@@ -65,6 +65,7 @@ import {
 import { storeRecoverySeed, hasRecoverySeed, confirmRecoverySeedStored } from '@/lib/recoverySeedStorage';
 import type { DeviceInfo } from '@/lib/multiDeviceVitalization';
 import { RecoverMyAccountScreen } from '@/components/auth/RecoverMyAccountScreen';
+import { BiometricPillar } from '@/components/auth/BiometricPillar';
 
 const jetbrains = JetBrains_Mono({ weight: ['400', '600', '700'], subsets: ['latin'] });
 
@@ -1397,6 +1398,12 @@ export function FourLayerGate() {
               faceVerified={pillarFace}
               showVoice={false}
             />
+            {/* Hardware Handshake: Connect Scanner → USB session → finger data → hash & store → Biometric Anchor Secured */}
+            {identityAnchor && (
+              <div className="mt-6">
+                <BiometricPillar phoneNumber={identityAnchor.phone} />
+              </div>
+            )}
           </div>
         )}
 

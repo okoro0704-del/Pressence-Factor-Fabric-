@@ -16,9 +16,51 @@ export async function sha256Hex(input: string): Promise<string> {
   return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
+/** Hash raw Uint8Array (e.g. scanner transfer buffer) to SHA-256 hex. BIOMETRIC DATA IS HASHED. RAW NEVER PERSISTED. */
+export async function sha256FromUint8Array(buffer: Uint8Array): Promise<string> {
+  const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
 /** Hash raw external fingerprint output with SHA-256 before persisting. */
 export async function hashExternalFingerprintRaw(rawOutput: string): Promise<string> {
   return sha256Hex(rawOutput.trim());
+}
+
+/**
+ * Persist fingerprint hash to recovery_seed_hash (and external_fingerprint_hash) in Supabase.
+ * Call after external scanner returns raw buffer → hash with sha256FromUint8Array → then this.
+ */
+export async function persistFingerprintHashToRecoverySeed(
+  phoneNumber: string,
+  fingerprintHashHex: string,
+  options?: { alsoSetExternalFingerprintHash?: boolean }
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = getSupabase();
+  if (!supabase) return { ok: false, error: 'Supabase not available' };
+  const trimmed = phoneNumber?.trim();
+  if (!trimmed || !fingerprintHashHex?.trim()) {
+    return { ok: false, error: 'Phone number and fingerprint hash required.' };
+  }
+  try {
+    const payload: Record<string, unknown> = {
+      recovery_seed_hash: fingerprintHashHex.trim(),
+      updated_at: new Date().toISOString(),
+    };
+    if (options?.alsoSetExternalFingerprintHash) {
+      payload.external_fingerprint_hash = fingerprintHashHex.trim();
+    }
+    const { error } = await (supabase as any)
+      .from('user_profiles')
+      .update(payload)
+      .eq('phone_number', trimmed);
+    if (error) return { ok: false, error: error.message ?? 'Failed to persist recovery_seed_hash' };
+    return { ok: true };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false, error: msg };
+  }
 }
 
 /** Derive face template hash from credential (for face_hash column). BIOMETRIC DATA IS HASHED. RAW IMAGES ARE NEVER PERSISTED. */
