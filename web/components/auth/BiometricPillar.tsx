@@ -7,7 +7,15 @@ import { dispatchExternalFingerprint } from '@/lib/externalScannerBridge';
 
 const jetbrains = JetBrains_Mono({ weight: ['400', '600'], subsets: ['latin'] });
 
-type ScannerState = 'waiting' | 'connecting' | 'waiting_for_finger' | 'finger_detected' | 'hashing' | 'secured' | 'error';
+type ScannerState =
+  | 'waiting'
+  | 'connecting'
+  | 'ready_to_capture'
+  | 'capturing'
+  | 'finger_detected'
+  | 'hashing'
+  | 'secured'
+  | 'error';
 
 interface BiometricPillarProps {
   phoneNumber: string;
@@ -29,6 +37,48 @@ function findInEndpoint(device: USBDevice): number | null {
   }
 }
 
+/** Find first OUT endpoint on interface 0 (for sending capture command). */
+function findOutEndpoint(device: USBDevice): number | null {
+  try {
+    const config = device.configuration;
+    if (!config?.interfaces?.[0]) return null;
+    const iface = config.interfaces[0];
+    const alt = iface.alternate ?? (iface as { alternates?: { endpoints: USBEndpoint[] }[] }).alternates?.[0];
+    const endpoints = alt?.endpoints ?? [];
+    const outEp = endpoints.find((e) => e.direction === 'out');
+    return outEp ? outEp.endpointNumber : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Send a capture request to the scanner (vendor/class command or bulk OUT). Many scanners accept 0x01 = capture. */
+async function sendCaptureRequest(device: USBDevice): Promise<void> {
+  const outEp = findOutEndpoint(device);
+  if (outEp != null) {
+    try {
+      await device.transferOut(outEp, new Uint8Array([0x01]));
+    } catch {
+      // Ignore; some scanners don't need OUT or use different command
+    }
+    return;
+  }
+  try {
+    await device.controlTransferOut(
+      {
+        requestType: 'vendor',
+        recipient: 'interface',
+        request: 0x01,
+        value: 0,
+        index: 0,
+      },
+      new Uint8Array([0x01])
+    );
+  } catch {
+    // Ignore; scanner may use interrupt IN only and trigger on finger presence
+  }
+}
+
 /** Poll for transfer result (finger data). Max length 64 bytes typical for interrupt IN. */
 async function waitForTransferIn(device: USBDevice, endpointNumber: number, maxWaitMs: number): Promise<Uint8Array> {
   const length = 64;
@@ -45,15 +95,16 @@ async function waitForTransferIn(device: USBDevice, endpointNumber: number, maxW
     }
     await new Promise((r) => setTimeout(r, 100));
   }
-  throw new Error('No fingerprint data received within timeout. Place finger on scanner.');
+  throw new Error('No fingerprint data received. Place your finger on the scanner and tap Capture Fingerprint again.');
 }
 
 export function BiometricPillar({ phoneNumber, onComplete }: BiometricPillarProps) {
   const [state, setState] = useState<ScannerState>('waiting');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const deviceRef = useRef<USBDevice | null>(null);
+  const inEndpointRef = useRef<number | null>(null);
 
-  const connectAndListen = useCallback(async () => {
+  const connectScanner = useCallback(async () => {
     const nav = typeof navigator !== 'undefined' ? navigator : null;
     const usb = nav?.usb;
     if (!usb) {
@@ -75,8 +126,6 @@ export function BiometricPillar({ phoneNumber, onComplete }: BiometricPillarProp
       }
       await device.claimInterface(0);
 
-      setState('waiting_for_finger');
-
       const endpointNumber = findInEndpoint(device);
       if (endpointNumber == null) {
         setState('error');
@@ -84,7 +133,31 @@ export function BiometricPillar({ phoneNumber, onComplete }: BiometricPillarProp
         return;
       }
 
-      const rawBuffer = await waitForTransferIn(device, endpointNumber, 90_000);
+      inEndpointRef.current = endpointNumber;
+      setState('ready_to_capture');
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setState('error');
+      setErrorMessage(msg);
+    }
+  }, []);
+
+  const captureFingerprint = useCallback(async () => {
+    const device = deviceRef.current;
+    const inEp = inEndpointRef.current;
+    if (!device || inEp == null) {
+      setState('error');
+      setErrorMessage('Scanner not connected. Tap Connect Scanner first.');
+      return;
+    }
+
+    setState('capturing');
+    setErrorMessage(null);
+
+    try {
+      await sendCaptureRequest(device);
+
+      const rawBuffer = await waitForTransferIn(device, inEp, 30_000);
       setState('finger_detected');
 
       setState('hashing');
@@ -107,7 +180,7 @@ export function BiometricPillar({ phoneNumber, onComplete }: BiometricPillarProp
       onComplete?.({ fingerprintHash: hashHex, scannerSerialNumber: serial });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      setState('error');
+      setState('ready_to_capture');
       setErrorMessage(msg);
     }
   }, [phoneNumber, onComplete]);
@@ -118,8 +191,10 @@ export function BiometricPillar({ phoneNumber, onComplete }: BiometricPillarProp
         return 'Waiting for Scanner';
       case 'connecting':
         return 'Connecting…';
-      case 'waiting_for_finger':
-        return 'Waiting for Scanner';
+      case 'ready_to_capture':
+        return 'Scanner ready';
+      case 'capturing':
+        return 'Capturing…';
       case 'finger_detected':
         return 'Finger Detected';
       case 'hashing':
@@ -148,14 +223,28 @@ export function BiometricPillar({ phoneNumber, onComplete }: BiometricPillarProp
       {state === 'waiting' && (
         <button
           type="button"
-          onClick={connectAndListen}
+          onClick={connectScanner}
           className="w-full py-4 rounded-lg bg-[#D4AF37] text-[#0d0d0f] font-bold text-sm uppercase tracking-wider hover:opacity-90 transition-opacity"
         >
           Connect Scanner
         </button>
       )}
 
-      {state !== 'waiting' && (
+      {state === 'ready_to_capture' && (
+        <>
+          <p className="text-sm font-medium text-[#e8c547] mb-4">{getStatusText()}</p>
+          <p className="text-xs text-[#6b6b70] mb-4">Place your finger on the scanner, then tap the button below.</p>
+          <button
+            type="button"
+            onClick={captureFingerprint}
+            className="w-full py-4 rounded-lg bg-[#D4AF37] text-[#0d0d0f] font-bold text-sm uppercase tracking-wider hover:opacity-90 transition-opacity"
+          >
+            Capture Fingerprint
+          </button>
+        </>
+      )}
+
+      {state !== 'waiting' && state !== 'ready_to_capture' && (
         <p
           className={`text-sm font-medium ${
             state === 'secured' ? 'text-green-400' : state === 'error' ? 'text-red-400' : 'text-[#e8c547]'
@@ -165,8 +254,8 @@ export function BiometricPillar({ phoneNumber, onComplete }: BiometricPillarProp
         </p>
       )}
 
-      {state === 'waiting_for_finger' && (
-        <p className="text-xs text-[#6b6b70] mt-2">Place your finger on the scanner when prompted by the device.</p>
+      {state === 'capturing' && (
+        <p className="text-xs text-[#6b6b70] mt-2">Place your finger on the scanner now…</p>
       )}
 
       {state === 'secured' && (
@@ -174,6 +263,12 @@ export function BiometricPillar({ phoneNumber, onComplete }: BiometricPillarProp
       )}
 
       {state === 'error' && errorMessage && (
+        <p className="text-xs text-red-400 mt-2" role="alert">
+          {errorMessage}
+        </p>
+      )}
+
+      {state === 'ready_to_capture' && errorMessage && (
         <p className="text-xs text-red-400 mt-2" role="alert">
           {errorMessage}
         </p>

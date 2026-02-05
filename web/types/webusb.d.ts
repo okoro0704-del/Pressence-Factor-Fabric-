@@ -35,8 +35,23 @@ interface USBDevice {
   claimInterface(interfaceNumber: number): Promise<void>;
   releaseInterface(interfaceNumber: number): Promise<void>;
   transferIn(endpointNumber: number, length: number): Promise<USBInTransferResult>;
+  transferOut(endpointNumber: number, data: BufferSource): Promise<USBOutTransferResult>;
+  controlTransferOut(setup: USBControlTransferParameters, data?: BufferSource): Promise<USBOutTransferResult>;
   configuration: USBConfiguration | undefined;
   serialNumber?: string;
+}
+
+interface USBControlTransferParameters {
+  requestType: 'standard' | 'class' | 'vendor';
+  recipient: 'device' | 'interface' | 'endpoint' | 'other';
+  request: number;
+  value: number;
+  index: number;
+}
+
+interface USBOutTransferResult {
+  status: 'ok' | 'stall' | 'babble';
+  bytesWritten: number;
 }
 
 interface USB {
