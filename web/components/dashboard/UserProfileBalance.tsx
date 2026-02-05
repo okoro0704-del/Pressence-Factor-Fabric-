@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { fetchCitizenVault, type CitizenVault } from '@/lib/supabaseTelemetry';
+import { fetchCitizenVault, getVitalizedCitizensCount, type CitizenVault } from '@/lib/supabaseTelemetry';
 import { getCitizenVaultData } from '@/lib/mockDataService';
 import { SendVidaModal } from './SendVidaModal';
 import { VIDASwapModal } from './VIDASwapModal';
@@ -66,7 +66,8 @@ export function UserProfileBalance({
   const effectiveSpendableVida = BETA_LIQUIDITY_TEST ? BETA_SPENDABLE_VIDA : CURRENT_POWER_SPENDABLE_VIDA;
   const effectiveSpendableUsd = BETA_LIQUIDITY_TEST ? BETA_SPENDABLE_USD : CURRENT_POWER_SPENDABLE_USD;
 
-  const CURRENT_USERS = 1247;
+  /** Total Vitalized Citizens — from DB (user_profiles where is_fully_verified = true). Displays 1 until a new entry is created. */
+  const [vitalizedCount, setVitalizedCount] = useState<number>(1);
 
   useEffect(() => {
     async function loadVaultData() {
@@ -319,7 +320,7 @@ export function UserProfileBalance({
             <p className="text-3xl font-bold font-mono text-[#e8c547] tracking-tight">
               {TOTAL_WEALTH_VIDA} VIDA
             </p>
-            <p className="text-sm text-[#6b6b70] mt-1">Total Wealth (4 locked, {BETA_LIQUIDITY_TEST ? '$1,000' : '$900'} spendable{BETA_LIQUIDITY_TEST ? ' — no fees' : ' after Sentinel'})</p>
+            <p className="text-sm text-[#6b6b70] mt-1">Total Wealth (4 locked, {effectiveSpendableUsd.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 })} spendable{BETA_LIQUIDITY_TEST ? ' — no fees' : ' after Sentinel'})</p>
             <div className="mt-3 flex flex-col gap-2">
               <button
                 type="button"
@@ -345,7 +346,7 @@ export function UserProfileBalance({
         )}
         <TripleVaultDisplay
           sentinelFeePaidUsd={sentinelFeePaidUsd}
-          globalUserCount={CURRENT_USERS}
+          globalUserCount={vitalizedCount}
           faceVerified={showBalanceAsMinted}
           betaLiquidityTest={BETA_LIQUIDITY_TEST}
         />
@@ -403,7 +404,7 @@ export function UserProfileBalance({
                 {showBalanceAsMinted ? `${TOTAL_WEALTH_VIDA} VIDA` : '•••••• VIDA'}
               </span>
             </div>
-            <p className="text-xs text-[#6b6b70] mt-1">{showBalanceAsMinted ? `Future Value 4 VIDA locked · Current Power $${effectiveSpendableUsd.toLocaleString()} spendable` : 'Verify face to view'}</p>
+            <p className="text-xs text-[#6b6b70] mt-1">{showBalanceAsMinted ? `Future Value 4 VIDA locked · Current Power ${effectiveSpendableUsd.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 })} spendable` : 'Verify face to view'}</p>
           </div>
 
           <div className="p-4 bg-[#0d0d0f] rounded-lg border border-[#2a2a2e]">
@@ -438,10 +439,10 @@ export function UserProfileBalance({
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-bold text-emerald-400 uppercase tracking-wider">= Sovereign Liquidity (Vault C)</span>
               <span className="text-2xl font-bold text-emerald-300" title={!showBalanceAsMinted ? 'Verify face to view' : undefined}>
-                {showBalanceAsMinted ? `$${availableCashUsd.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : '••••••'}
+                {showBalanceAsMinted ? availableCashUsd.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }) : '••••••'}
               </span>
             </div>
-            <p className="text-xs text-[#6b6b70] mt-1">{showBalanceAsMinted ? 'Sentinel Network Fee: 0.1 VIDA to authorize minting protocol. Liquid after fee: $900.' : 'Verify face (95%+ match) to view'}</p>
+            <p className="text-xs text-[#6b6b70] mt-1">{showBalanceAsMinted ? `Sentinel Network Fee: 0.1 VIDA ($100 / $1,000) to authorize minting protocol. Liquid after fee: ${CURRENT_POWER_SPENDABLE_USD.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 })}.` : 'Verify face (95%+ match) to view'}</p>
           </div>
 
           <div className="p-4 bg-[#0d0d0f] rounded-lg border border-[#2a2a2e]">

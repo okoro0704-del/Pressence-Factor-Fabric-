@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { executeSovereignSwap, calculateDLLROutput } from '@/lib/sovryn/sovereignSwap';
+import { useSovereignSeed } from '@/contexts/SovereignSeedContext';
+import { VIDA_USD_VALUE } from '@/lib/economic';
 
 interface VIDASwapModalProps {
   isOpen: boolean;
@@ -21,20 +23,20 @@ export function VIDASwapModal({
   phoneNumber,
   onSwapSuccess
 }: VIDASwapModalProps) {
+  const sovereignSeed = useSovereignSeed();
   const [vidaAmount, setVidaAmount] = useState('');
   const [swapping, setSwapping] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [txHash, setTxHash] = useState('');
 
-  const VIDA_PRICE_USD = 1000;
   const NAIRA_RATE = 1400;
 
   if (!isOpen) return null;
 
   const vidaNum = parseFloat(vidaAmount) || 0;
   const dllrOutput = calculateDLLROutput(vidaNum);
-  const usdValue = vidaNum * VIDA_PRICE_USD;
+  const usdValue = vidaNum * VIDA_USD_VALUE;
   const nairaValue = usdValue * NAIRA_RATE;
 
   const handleSwap = async () => {
@@ -60,10 +62,16 @@ export function VIDASwapModal({
         vidaCapAmount: vidaNum,
         citizenId,
         phoneNumber,
+        refreshUserSession: sovereignSeed?.refreshUserSession,
+        encryptedSeed: sovereignSeed?.encryptedSeed ?? undefined,
       });
 
       if (!result.success) {
-        setError(result.error || 'Swap failed');
+        setError(
+          result.missingSeed
+            ? 'Identity Re-Link Required: Please perform a Face Pulse to re-authorize your wallet.'
+            : (result.error || 'Swap failed')
+        );
         setSwapping(false);
         return;
       }

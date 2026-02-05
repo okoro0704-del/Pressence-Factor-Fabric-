@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { PFFSentinel } from '@/components/partners/PFFSentinel';
 import { PlanSelector } from '@/components/sentinel/PlanSelector';
 import { getIdentityAnchorPhone, activateSentinelHandshake, isSentinelActive } from '@/lib/sentinelActivation';
+import { getVitalizedCitizensCount } from '@/lib/supabaseTelemetry';
 
 const jetbrains = JetBrains_Mono({ weight: ['400', '600', '700'], subsets: ['latin'] });
 
@@ -84,6 +85,9 @@ export default function SentinelPage() {
           </h1>
           <p className={`text-sm ${jetbrains.className}`} style={{ color: GOLD_DIM, opacity: 0.9 }}>
             3-of-4 Biometric Guardian · Mandatory for full DLLR functionality
+          </p>
+          <p className={`text-xs ${jetbrains.className} mt-2`} style={{ color: GOLD_DIM, opacity: 0.8 }}>
+            Total Vitalized Citizens: <span className="font-bold" style={{ color: GOLD }}>{vitalizedCount.toLocaleString('en-US')}</span>
           </p>
         </div>
 

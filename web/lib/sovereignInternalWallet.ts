@@ -4,6 +4,7 @@
  */
 
 import { supabase } from './supabase';
+import { VIDA_USD_VALUE } from './economic';
 
 export interface SovereignInternalWalletRow {
   id: string;
@@ -98,8 +99,8 @@ export function getStaticUSDTAddresses(phoneNumber: string): { erc20: string; tr
   };
 }
 
-/** Conversion rate: 1 VIDA = 1,000 DLLR. */
-export const VIDA_TO_DLLR_RATE = 1000;
+/** Conversion rate: 1 VIDA = $1,000 = 1,000 DLLR (from economic anchor). */
+export const VIDA_TO_DLLR_RATE = VIDA_USD_VALUE;
 
 /** 2% conversion levy routed to PFF_FOUNDATION_VAULT (user receives DLLR on 98% of VIDA). */
 const CONVERSION_LEVY_PERCENT = 0.02;

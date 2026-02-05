@@ -5,6 +5,7 @@
  */
 
 import { supabase, hasSupabase } from './supabase';
+import { VIDA_USD_VALUE } from './economic';
 
 // ============================================================================
 // SOVEREIGN BLOCK EXCHANGE RATES & 10-CAP MASTER MATH
@@ -19,11 +20,8 @@ import { supabase, hasSupabase } from './supabase';
 export const TOTAL_MINTED = 10;
 export const SOVEREIGN_SHARE = 5; // The 50% split
 
-/**
- * VIDA CAP to USD Exchange Rate
- * 1 VIDA CAP = $1,000 USD
- */
-export const VIDA_PRICE_USD = 1000;
+/** VIDA CAP to USD — use economic anchor (1 VIDA = $1,000). */
+export const VIDA_PRICE_USD = VIDA_USD_VALUE;
 
 /**
  * USD to Naira Exchange Rate
@@ -209,6 +207,27 @@ export async function fetchCitizenVault(): Promise<CitizenVault | null> {
     return citizenVault;
   } catch (err) {
     return null;
+  }
+}
+
+/**
+ * Total Vitalized Citizens — count of user_profiles where is_fully_verified = true.
+ * Used on Dashboard and Sentinel Analytics. Displays 1 until a new is_fully_verified entry is created.
+ */
+export async function getVitalizedCitizensCount(): Promise<number> {
+  try {
+    if (!hasSupabase()) return 0;
+    const { count, error } = await (supabase as any)
+      .from('user_profiles')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_fully_verified', true);
+    if (error) {
+      console.warn('[getVitalizedCitizensCount]', error.message);
+      return 0;
+    }
+    return typeof count === 'number' ? Math.max(0, count) : 0;
+  } catch {
+    return 0;
   }
 }
 

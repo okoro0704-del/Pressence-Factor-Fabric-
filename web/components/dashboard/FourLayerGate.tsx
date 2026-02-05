@@ -71,6 +71,8 @@ import type { DeviceInfo } from '@/lib/multiDeviceVitalization';
 import { RecoverMyAccountScreen } from '@/components/auth/RecoverMyAccountScreen';
 import { BiometricPillar, type BiometricPillarHandle } from '@/components/auth/BiometricPillar';
 import { AwaitingLoginApproval } from '@/components/auth/AwaitingLoginApproval';
+import { ArchitectVisionCapture } from '@/components/auth/ArchitectVisionCapture';
+import { speakSovereignAlignmentFailed } from '@/lib/sovereignVoice';
 import { createLoginRequest, completeLoginBridge } from '@/lib/loginRequest';
 
 const jetbrains = JetBrains_Mono({ weight: ['400', '600', '700'], subsets: ['latin'] });
@@ -161,6 +163,18 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
   const [showSeedSuccessShield, setShowSeedSuccessShield] = useState(false);
   /** Industrial-only: scanner serial + fingerprint hash from last successful verification (for Sentinel ID tagging). */
   const [lastExternalScannerSerial, setLastExternalScannerSerial] = useState<string | null>(null);
+  /** Architect Vision: camera + face mesh overlay during Face Pulse; closes when face verified (gold freeze) or on cancel/fail */
+  const [showArchitectVision, setShowArchitectVision] = useState(false);
+  /** When true, Architect Vision shows gold freeze then onComplete; when false/null, scanning or closed */
+  const [architectVerificationSuccess, setArchitectVerificationSuccess] = useState<boolean | null>(null);
+  const architectSuccessRef = useRef<{
+    authResult: BiometricAuthResult;
+    identityAnchor: { phone: string; name: string; vocalExempt?: boolean; isMinor?: boolean; guardianPhone?: string; isDependent?: boolean };
+    isNewDevice: boolean;
+    deviceInfo: DeviceInfo;
+    compositeDeviceId: string;
+    effectiveMobile: boolean;
+  } | null>(null);
   const [lastExternalFingerprintHash, setLastExternalFingerprintHash] = useState<string | null>(null);
   /** Mobile short-circuit: hide Fingerprint pillar; Complete Initial Registration and set mint_status PENDING_HARDWARE. */
   const [isMobile, setIsMobile] = useState(false);
@@ -506,6 +520,8 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
       }
     }
 
+    setShowArchitectVision(true);
+
     const authResult = await resolveSovereignByPresence(
       identityAnchor.phone,
       (layer, status) => {
@@ -537,109 +553,29 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     if (authResult.locationPermissionRequired) setShowLocationPermissionPopup(true);
 
     if (authResult.timedOut) {
+      setShowArchitectVision(false);
+      speakSovereignAlignmentFailed();
       setAuthStatus(AuthStatus.FAILED);
       setShowTimeoutBypass(true);
       setShowVerifyFromAuthorizedDevice(true);
       return;
     }
 
-    // Triple-Pillar success: Device + GPS + Face verified (no Voice). → goToDashboard().
+    // Triple-Pillar success: show Architect Vision gold freeze (0.5s) then run success flow in onComplete
     if (authResult.success && authResult.identity) {
-      const isAuthorized = !isNewDevice;
-
-      if (!isAuthorized) {
-        // SECONDARY DEVICE DETECTED - Show "Awaiting Master Authorization" screen
-        console.log('🔐 Secondary device detected - requesting vitalization');
-
-        // Get primary device info
-        const primaryDevice = await getPrimaryDevice(identityAnchor.phone);
-
-        if (!primaryDevice) {
-          // No primary device found - this is the FIRST DEVICE
-          const hasSeed = await hasRecoverySeed(identityAnchor.phone);
-          if (!hasSeed) {
-            // Sovereign Recovery Key: generate 12-word phrase, show Sacred Record, then 3-word verification
-            console.log('✅ First device detected - generating Master Key (Sacred Record)');
-            const seed = generateMnemonic12();
-            setGeneratedSeed(seed);
-            setSacredRecordDeviceContext({ deviceInfo, compositeDeviceId });
-            setShowSacredRecord(true);
-            setAuthStatus(AuthStatus.IDLE);
-            biometricPendingRef.current = false;
-            return;
-          }
-
-          // Already has recovery seed — assign as PRIMARY_SENTINEL
-          console.log('✅ First device detected - assigning as PRIMARY_SENTINEL');
-
-          const ipAddress = 'unknown';
-          const geolocation = {
-            city: 'Lagos',
-            country: 'Nigeria',
-            latitude: 6.5244,
-            longitude: 3.3792,
-          };
-
-          await assignPrimarySentinel(
-            identityAnchor.phone,
-            identityAnchor.name,
-            deviceInfo,
-            ipAddress,
-            geolocation,
-            compositeDeviceId,
-            authResult.externalScannerSerialNumber ?? null,
-            authResult.externalFingerprintHash ?? null
-          );
-
-          if (effectiveMobile) {
-            await setMintStatus(identityAnchor.phone, MINT_STATUS_PENDING_HARDWARE);
-          }
-          console.log('✅ PRIMARY_SENTINEL assigned (scanner:', authResult.externalScannerSerialNumber ?? '—', ') - check constitution then proceed');
-          await goToDashboard();
-          return;
-        }
-
-        // Get IP address (simplified - in production use a proper IP detection service)
-        const ipAddress = 'unknown';
-
-        // Get geolocation (simplified - in production use browser Geolocation API)
-        const geolocation = {
-          city: 'Lagos',
-          country: 'Nigeria',
-          latitude: 6.5244,
-          longitude: 3.3792,
-        };
-
-        const requestId = await createVitalizationRequest(
-          identityAnchor.phone,
-          deviceInfo,
-          ipAddress,
-          geolocation,
-          compositeDeviceId,
-          authResult.externalScannerSerialNumber ?? null,
-          authResult.externalFingerprintHash ?? null
-        );
-
-        // Show "Awaiting Master Authorization" screen
-        setVitalizationRequestId(requestId);
-        setPrimaryDeviceInfo({
-          device_name: primaryDevice.device_name,
-          last_4_digits: primaryDevice.last_4_digits,
-        });
-        setShowAwaitingAuth(true);
-        return;
-      }
-
-      await updateDeviceLastUsed(compositeDeviceId);
-
-      // Elite Status: set Proof of Personhood when Triple-Pillar succeeded with external biometric device.
-      if (authResult.externalScannerSerialNumber != null) {
-        await setHumanityScoreVerified(identityAnchor.phone);
-      }
-
-      // Triple-Pillar success (Device + GPS + Face): go to dashboard — no Voice step
-      await goToDashboard();
+      architectSuccessRef.current = {
+        authResult,
+        identityAnchor,
+        isNewDevice,
+        deviceInfo,
+        compositeDeviceId,
+        effectiveMobile,
+      };
+      setArchitectVerificationSuccess(true);
+      return;
     } else {
+      setShowArchitectVision(false);
+      speakSovereignAlignmentFailed();
       setAuthStatus(AuthStatus.FAILED);
       const deviceInfo = getCurrentDeviceInfo();
       const compositeForCheck = await getCompositeDeviceFingerprint();
@@ -675,6 +611,52 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
       biometricPendingRef.current = false;
     }
   }, [identityAnchor, goToDashboard, isMobile, hubVerification]);
+
+  /** After Architect Vision gold freeze (0.5s), run the success flow (dashboard / Sacred Record / Awaiting Auth). */
+  const handleArchitectVisionComplete = useCallback(async () => {
+    setShowArchitectVision(false);
+    setArchitectVerificationSuccess(null);
+    const p = architectSuccessRef.current;
+    architectSuccessRef.current = null;
+    if (!p) return;
+    const { authResult, identityAnchor: anchor, isNewDevice: newDev, deviceInfo, compositeDeviceId: compId, effectiveMobile: mobile } = p;
+    if (authResult.externalScannerSerialNumber != null) {
+      setLastExternalScannerSerial(authResult.externalScannerSerialNumber);
+      setLastExternalFingerprintHash(authResult.externalFingerprintHash ?? null);
+    }
+    const isAuthorized = !newDev;
+    if (!isAuthorized) {
+      const primaryDevice = await getPrimaryDevice(anchor.phone);
+      if (!primaryDevice) {
+        const hasSeed = await hasRecoverySeed(anchor.phone);
+        if (!hasSeed) {
+          const seed = generateMnemonic12();
+          setGeneratedSeed(seed);
+          setSacredRecordDeviceContext({ deviceInfo, compositeDeviceId: compId });
+          setShowSacredRecord(true);
+          setAuthStatus(AuthStatus.IDLE);
+          biometricPendingRef.current = false;
+          return;
+        }
+        const ipAddress = 'unknown';
+        const geolocation = { city: 'Lagos', country: 'Nigeria', latitude: 6.5244, longitude: 3.3792 };
+        await assignPrimarySentinel(anchor.phone, anchor.name, deviceInfo, ipAddress, geolocation, compId, authResult.externalScannerSerialNumber ?? null, authResult.externalFingerprintHash ?? null);
+        if (mobile) await setMintStatus(anchor.phone, MINT_STATUS_PENDING_HARDWARE);
+        await goToDashboard();
+        return;
+      }
+      const ipAddress = 'unknown';
+      const geolocation = { city: 'Lagos', country: 'Nigeria', latitude: 6.5244, longitude: 3.3792 };
+      const requestId = await createVitalizationRequest(anchor.phone, deviceInfo, ipAddress, geolocation, compId, authResult.externalScannerSerialNumber ?? null, authResult.externalFingerprintHash ?? null);
+      setVitalizationRequestId(requestId);
+      setPrimaryDeviceInfo({ device_name: primaryDevice.device_name, last_4_digits: primaryDevice.last_4_digits });
+      setShowAwaitingAuth(true);
+      return;
+    }
+    await updateDeviceLastUsed(compId);
+    if (authResult.externalScannerSerialNumber != null) await setHumanityScoreVerified(anchor.phone);
+    await goToDashboard();
+  }, [goToDashboard]);
 
   const handleMismatchDismiss = () => {
     setShowMismatchScreen(false);
@@ -1667,6 +1649,19 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
           onDenied={handleGuardianRecoveryDenied}
         />
       )}
+
+      {/* Architect Vision: Face Pulse camera + face mesh overlay, HUD, blue laser, gold freeze on success */}
+      <ArchitectVisionCapture
+        isOpen={showArchitectVision}
+        onClose={() => {
+          setShowArchitectVision(false);
+          setArchitectVerificationSuccess(null);
+          architectSuccessRef.current = null;
+          setAuthStatus(AuthStatus.IDLE);
+        }}
+        verificationSuccess={architectVerificationSuccess}
+        onComplete={handleArchitectVisionComplete}
+      />
     </div>
   );
 }

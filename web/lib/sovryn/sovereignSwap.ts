@@ -8,16 +8,16 @@
 import { Contract, parseUnits } from 'ethers';
 import { DLLR_ADDRESS, SOVRYN_SWAP_CONTRACT_ADDRESS } from './config';
 import { getBrowserProvider, getRbtcBalance } from './wallet';
-import { getInternalSigner, MIN_RBTC_FOR_GAS } from './internalSigner';
+import { getInternalSigner, MIN_RBTC_FOR_GAS, type EncryptedSeedPayload } from './internalSigner';
 import { requestRelayerGasForSwap } from './relayerGas';
 import { swapByPath, getVidaToDllrPath } from './sovrynSwapContract';
 import { VIDA_TOKEN_ADDRESS } from './config';
 import { hasSupabase, supabase } from '../supabase';
+import { VIDA_USD_VALUE } from '../economic';
 
-// Pricing Constants
-const VIDA_CAP_USD_PRICE = 1000; // $1,000 per VIDA CAP
+// Pricing: 1 VIDA CAP = $1,000 USD (anchor from economic.ts)
 const DLLR_USD_PRICE = 1; // $1.00 per DLLR (pegged)
-const VIDA_TO_DLLR_RATE = VIDA_CAP_USD_PRICE / DLLR_USD_PRICE; // 1 VIDA CAP = 1,000 DLLR
+const VIDA_TO_DLLR_RATE = VIDA_USD_VALUE / DLLR_USD_PRICE; // 1 VIDA CAP = 1,000 DLLR
 
 // ERC20 ABI for DLLR minting/transfer
 const DLLR_ABI = [
@@ -26,11 +26,19 @@ const DLLR_ABI = [
   'function decimals() view returns (uint8)',
 ];
 
+export type RefreshUserSessionResult =
+  | { ok: true }
+  | { ok: false; error: string; missingSeed?: boolean };
+
 export interface SovereignSwapParams {
   vidaCapAmount: number; // Amount of VIDA CAP to swap
   citizenId?: string; // Optional citizen ID for Supabase lookup
   /** When set, use internal signer (no Connect Wallet popup). */
   phoneNumber?: string;
+  /** Call before getting signer to hydrate encrypted seed from Supabase (e.g. from SovereignSeedContext). */
+  refreshUserSession?: () => Promise<RefreshUserSessionResult>;
+  /** Encrypted seed from context; when provided, signer uses it instead of fetching from DB. */
+  encryptedSeed?: EncryptedSeedPayload | null;
 }
 
 export interface SovereignSwapResult {
@@ -39,6 +47,8 @@ export interface SovereignSwapResult {
   txHash?: string;
   ledgerEntry?: SovereignLedgerEntry;
   error?: string;
+  /** True when recovery seed is missing in DB; show Identity Re-Link (Face Pulse) prompt. */
+  missingSeed?: boolean;
 }
 
 export interface SovereignLedgerEntry {
@@ -175,10 +185,13 @@ async function logToSovereignLedger(entry: Omit<SovereignLedgerEntry, 'id'>): Pr
  * Gas: if RBTC below MIN_RBTC_FOR_GAS, triggers Relayer for first swap.
  * Contract: Sovryn convertByPath when SOVRYN_SWAP_CONTRACT configured; else DLLR credit path.
  */
+const IDENTITY_RELINK_MESSAGE =
+  'Identity Re-Link Required: Please perform a Face Pulse to re-authorize your wallet.';
+
 export async function executeSovereignSwap(
   params: SovereignSwapParams
 ): Promise<SovereignSwapResult> {
-  const { vidaCapAmount, citizenId, phoneNumber } = params;
+  const { vidaCapAmount, citizenId, phoneNumber, refreshUserSession, encryptedSeed } = params;
 
   try {
     if (vidaCapAmount <= 0) {
@@ -188,8 +201,18 @@ export async function executeSovereignSwap(
     // Get signer: when phoneNumber set use internal only (no window.ethereum)
     let signer;
     if (phoneNumber?.trim()) {
-      signer = await getInternalSigner(phoneNumber.trim());
-      if (!signer) return { success: false, error: 'Recovery seed not available. Complete setup first.' };
+      if (refreshUserSession) {
+        const refresh = await refreshUserSession();
+        if (!refresh.ok && refresh.missingSeed) {
+          return { success: false, error: IDENTITY_RELINK_MESSAGE, missingSeed: true };
+        }
+      }
+      signer = await getInternalSigner(phoneNumber.trim(), {
+        encryptedSeed: encryptedSeed ?? undefined,
+      });
+      if (!signer) {
+        return { success: false, error: IDENTITY_RELINK_MESSAGE, missingSeed: true };
+      }
     } else {
       const provider = await getBrowserProvider();
       if (!provider) return { success: false, error: 'No wallet provider found' };

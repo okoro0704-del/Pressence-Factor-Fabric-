@@ -1,9 +1,11 @@
 'use client';
 
+import { VIDA_USD_VALUE } from '@/lib/economic';
+
 export interface PlanUpgradeConfirmationModalProps {
   open: boolean;
   onClose: () => void;
-  /** Amount in USD (e.g. 200). Shown as VIDA using $1000 = 1 VIDA. */
+  /** Amount in USD (e.g. 200). Shown as VIDA using VIDA_USD_VALUE ($1,000 = 1 VIDA). */
   amountUsd: number;
   deviceLimit: number;
 }
@@ -15,7 +17,7 @@ export function PlanUpgradeConfirmationModal({
   deviceLimit,
 }: PlanUpgradeConfirmationModalProps) {
   if (!open) return null;
-  const amountVida = amountUsd / 1000;
+  const amountVida = amountUsd / VIDA_USD_VALUE;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">

@@ -24,9 +24,15 @@ export const SENTINEL_SINGLE_USD = 50;
 /** Sentinel Activation: Multi device. Deducted from Liquid ($100 → $900 after fee). */
 export const SENTINEL_MULTI_USD = 100;
 
-/** Sovereign Hub Access Fee — 0.1 VIDA = $100 USD. Deducted from Liquid; transferred to the device owner's primary wallet. */
-export const HUB_SERVICE_FEE_VIDA = 0.1;
+/** Price anchor: 1 VIDA = $1,000 USD. Single source of truth for all VIDA value calculations. */
+export const VIDA_USD_VALUE = 1_000;
+
+/** VIDA = $1,000 USD for display/ledger. Use VIDA_USD_VALUE. */
+export const VIDA_PRICE_USD = VIDA_USD_VALUE;
+
+/** Sovereign Hub Access Fee — $100 USD = 0.1 VIDA (derived from anchor). Deducted from Liquid; transferred to the device owner's primary wallet. */
 export const HUB_SERVICE_FEE_USD = 100;
+export const HUB_SERVICE_FEE_VIDA = HUB_SERVICE_FEE_USD / VIDA_USD_VALUE;
 /** Minimum new-user balance (VIDA) before hub fee transfer (transaction only after grant is issued). */
 export const MIN_BALANCE_FOR_HUB_FEE_VIDA = 1.0;
 /** Transaction history label for the hub fee. */
@@ -34,9 +40,6 @@ export const SOVEREIGN_HUB_ACCESS_FEE_LABEL = 'Sovereign Hub Access Fee';
 
 /** Global user count required to unlock Sovereign Lock vault. */
 export const GLOBAL_UNLOCK_COUNT = 1_000_000_000;
-
-/** VIDA = $1,000 USD for display/ledger. */
-export const VIDA_PRICE_USD = 1_000;
 
 /** VIDA equivalents for UI/backend alignment. */
 export const NATIONAL_RESERVE_VIDA = NATIONAL_RESERVE_VAULT_USD / VIDA_PRICE_USD;

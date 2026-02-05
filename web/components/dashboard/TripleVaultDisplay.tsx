@@ -28,8 +28,9 @@ export function TripleVaultDisplay({
   betaLiquidityTest = false,
 }: TripleVaultDisplayProps) {
   const currentPowerUsd = betaLiquidityTest ? FULL_SPENDABLE_USD : CURRENT_POWER_SPENDABLE_USD;
+  /** 1 VIDA liquid = $1,000.00 USD (exact display). */
   const formatUsd = (n: number) =>
-    n.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    n.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const formatVida = (n: number) =>
     `${n.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} VIDA`;
   const showVida = (n: number) => (faceVerified ? formatVida(n) : BALANCE_MASK);
@@ -49,10 +50,16 @@ export function TripleVaultDisplay({
         </svg>
       </div>
       {faceVerified && (
-        <div className="mb-4 p-3 bg-[#c9a227]/10 border border-[#c9a227]/40 rounded-lg flex items-center justify-between">
-          <span className="text-xs font-bold text-[#e8c547] uppercase tracking-wider">Total Wealth</span>
-          <span className="text-lg font-bold font-mono text-[#e8c547]">{formatVida(TOTAL_WEALTH_VIDA)}</span>
-        </div>
+        <>
+          <div className="mb-2 p-2 bg-[#1a1a1e] border border-[#2a2a2e] rounded-lg flex items-center justify-between">
+            <span className="text-xs font-bold text-[#6b6b70] uppercase tracking-wider">Total Vitalized Citizens</span>
+            <span className="text-sm font-bold font-mono text-[#e8c547]">{globalUserCount.toLocaleString('en-US')}</span>
+          </div>
+          <div className="mb-4 p-3 bg-[#c9a227]/10 border border-[#c9a227]/40 rounded-lg flex items-center justify-between">
+            <span className="text-xs font-bold text-[#e8c547] uppercase tracking-wider">Total Wealth</span>
+            <span className="text-lg font-bold font-mono text-[#e8c547]">{formatVida(TOTAL_WEALTH_VIDA)}</span>
+          </div>
+        </>
       )}
 
       {/* Balance 1 — Total Wealth: 5 VIDA */}

@@ -31,8 +31,15 @@ export async function getSovereignSigner(decryptedMnemonic: string): Promise<Wal
   }
 }
 
+/** Encrypted seed payload (e.g. from SovereignSeedContext). Decryption uses identity anchor (phone) or PIN when supported. */
+export interface EncryptedSeedPayload {
+  recovery_seed_encrypted: string;
+  recovery_seed_iv: string;
+  recovery_seed_salt: string;
+}
+
 /** Get decrypted mnemonic from DB (for internal signer). Mnemonic only in memory. */
-async function getDecryptedMnemonic(phoneNumber: string): Promise<string | null> {
+async function getDecryptedMnemonicFromDB(phoneNumber: string): Promise<string | null> {
   const trimmed = phoneNumber?.trim();
   if (!trimmed) return null;
 
@@ -56,12 +63,48 @@ async function getDecryptedMnemonic(phoneNumber: string): Promise<string | null>
 }
 
 /**
- * Return an ethers Wallet connected to RSK for the identity anchor (phone).
- * Fetches encrypted seed from DB, decrypts in memory, derives signer — key never persisted.
- * Use for Swap/Send so no Connect Wallet popup is shown.
+ * Decrypt seed using identity anchor (phone). PIN-based decryption can be added when seed is stored with PIN-derived key.
+ * Returns raw 12 words for ethers.Wallet.fromPhrase / getSovereignSigner.
  */
-export async function getInternalSigner(phoneNumber: string): Promise<Wallet | null> {
-  const mnemonic = await getDecryptedMnemonic(phoneNumber);
+export async function decryptSeedToMnemonic(
+  payload: EncryptedSeedPayload,
+  identityAnchor: string,
+  _pin?: string
+): Promise<string | null> {
+  try {
+    const mnemonic = await decryptSeed(
+      payload.recovery_seed_encrypted,
+      payload.recovery_seed_iv,
+      payload.recovery_seed_salt,
+      identityAnchor
+    );
+    return mnemonic?.trim() ? mnemonic : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Return an ethers Wallet connected to RSK for the identity anchor (phone).
+ * When encryptedSeed is provided (e.g. from SovereignSeedContext), uses it and decrypts with phone — no DB fetch.
+ * Otherwise fetches from DB, decrypts in memory, derives signer. Key never persisted.
+ */
+export async function getInternalSigner(
+  phoneNumber: string,
+  options?: { encryptedSeed?: EncryptedSeedPayload }
+): Promise<Wallet | null> {
+  const trimmed = phoneNumber?.trim();
+  if (!trimmed) return null;
+
+  let mnemonic: string | null = null;
+
+  if (options?.encryptedSeed) {
+    mnemonic = await decryptSeedToMnemonic(options.encryptedSeed, trimmed);
+  }
+  if (!mnemonic) {
+    mnemonic = await getDecryptedMnemonicFromDB(trimmed);
+  }
+
   if (!mnemonic) return null;
   return getSovereignSigner(mnemonic);
 }
