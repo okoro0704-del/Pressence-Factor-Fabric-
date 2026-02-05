@@ -11,3 +11,15 @@
   NEXT_TELEMETRY_DISABLED = "1"
   NETLIFY_NEXT_PLUGIN_SKIP = "true"
   NODE_OPTIONS = "--max-old-space-size=4096"
+
+# Functions live in web/netlify/functions (relative to base)
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+# Rewrite /api/identity-reset to Netlify Function so Reset Identity clears Supabase on live site
+[[redirects]]
+  from = "/api/identity-reset"
+  to = "/.netlify/functions/identity-reset"
+  status = 200
+  force = true
