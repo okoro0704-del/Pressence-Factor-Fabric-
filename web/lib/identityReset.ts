@@ -1,64 +1,20 @@
 /**
  * Hard Identity Reset for the current device.
  * 1. Sends device_id to API to purge profile binding (primary_sentinel_device_id, face_hash, etc.).
- * 2. Clears localStorage, sessionStorage, and cached biometric/pillar state.
- * 3. Redirects to /vitalization?reset=1 for camera diagnostic and re-registration.
+ * 2. Signs out Supabase auth, then full session wipe (localStorage.clear + sessionStorage.clear).
+ * 3. Redirects to /vitalization?reset=1 for camera and re-registration.
  */
 
-import { clearBiometricState } from './sessionIsolation';
+import { supabase } from './biometricAuth';
 
-const DEVICE_KEYS = ['device_id', 'pff_device_id'];
-const GATE_KEY = 'pff_gate_identity_anchor';
-
-/** All known PFF/local keys to clear (sessionIsolation + gate + device). */
-function getAllKeysToClear(): string[] {
-  const fromSessionIsolation = [
-    'pff_pillar_location',
-    'pff_pillar_location_ts',
-    'pff_pillar_hw_hash',
-    'pff_pillar_hw_ts',
-    'pff_presence_verified',
-    'pff_presence_timestamp',
-    'pff_presence_expiry',
-    'pff_identity_hash',
-    'pff_face_verified',
-    'pff_face_verified_ts',
-    'pff_session_phone',
-    'pff_session_uid',
-    'pff_portal_locked_until',
-    'pff_identity_anchor_phone',
-    'pff_user_role',
-    'pff_id',
-    'pff_token',
-    'presence_verified',
-    'device_authorized',
-    'isLocked',
-    'isAuthorized',
-    'hardware_tpm_hash',
-    'pff_sentinel_token_verified',
-  ];
-  const prefixes = ['pff_pillar_location_', 'pff_pillar_location_ts_', 'pff_pillar_hw_hash_', 'pff_pillar_hw_ts_'];
-  const keys = [...fromSessionIsolation, ...DEVICE_KEYS, GATE_KEY];
-  if (typeof localStorage !== 'undefined') {
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k && prefixes.some((p) => k.startsWith(p))) keys.push(k);
-    }
-  }
-  return [...new Set(keys)];
-}
-
-function clearAllPFFStorage(): void {
+/** Full session wipe so the device forgets the old identity. */
+function sessionWipe(): void {
   if (typeof localStorage === 'undefined' && typeof sessionStorage === 'undefined') return;
-  const keys = getAllKeysToClear();
   try {
-    for (const key of keys) {
-      localStorage?.removeItem(key);
-      sessionStorage?.removeItem(key);
-    }
-    clearBiometricState();
+    localStorage.clear();
+    sessionStorage.clear();
   } catch (e) {
-    console.error('[identityReset] clearAllPFFStorage failed:', e);
+    console.error('[identityReset] sessionWipe failed:', e);
   }
 }
 
@@ -88,11 +44,15 @@ export async function executeHardIdentityReset(): Promise<HardIdentityResetResul
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         console.warn('[identityReset] API returned', res.status, data);
-        // Continue to clear local state even if API fails (e.g. no profile bound)
+        // Continue to wipe and redirect even if API fails (e.g. no profile bound)
       }
     }
 
-    clearAllPFFStorage();
+    if (supabase?.auth?.signOut) {
+      await supabase.auth.signOut().catch(() => {});
+    }
+
+    sessionWipe();
     window.location.href = '/vitalization?reset=1';
     return { ok: true };
   } catch (e) {

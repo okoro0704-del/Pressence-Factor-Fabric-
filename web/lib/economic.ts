@@ -24,11 +24,14 @@ export const SENTINEL_SINGLE_USD = 50;
 /** Sentinel Activation: Multi device. Deducted from Liquid ($100 → $900 after fee). */
 export const SENTINEL_MULTI_USD = 100;
 
-/** Price anchor: 1 VIDA = $1,000 USD. Single source of truth for all VIDA value calculations. */
+/** Price anchor: 1 VIDA = $1,000 USD. Single source of truth for all VIDA value calculations and UI. */
 export const VIDA_USD_VALUE = 1_000;
 
 /** VIDA = $1,000 USD for display/ledger. Use VIDA_USD_VALUE. */
 export const VIDA_PRICE_USD = VIDA_USD_VALUE;
+
+/** Global UI constant: display string for 1 VIDA (e.g. "$1,000" or "1 VIDA = $1,000"). Use for all UI. */
+export const VIDA_USD_DISPLAY = '$1,000';
 
 /** Sovereign Hub Access Fee — $100 USD = 0.1 VIDA (derived from anchor). Deducted from Liquid; transferred to the device owner's primary wallet. */
 export const HUB_SERVICE_FEE_USD = 100;

@@ -261,7 +261,13 @@ export function DashboardContent({
                 setResetBiometricsMessage(null);
                 const result = await resetBiometrics(phone);
                 setResettingBiometrics(false);
-                setResetBiometricsMessage(result.ok ? '✓ Biometrics reset. Re-verify at the gate to re-enroll.' : (result.error ?? 'Reset failed.'));
+                if (result.ok) {
+                  localStorage.clear();
+                  sessionStorage.clear();
+                  window.location.href = '/vitalization?reset=1';
+                  return;
+                }
+                setResetBiometricsMessage(result.error ?? 'Reset failed.');
               }}
               className="px-4 py-2 rounded-lg border border-amber-500/50 text-amber-400 hover:bg-amber-500/10 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >

@@ -15,9 +15,11 @@ import { speakSovereignSuccess } from '@/lib/sovereignVoice';
 const BLUE_LASER = 'rgba(59, 130, 246, 0.95)';
 const MESH_COLOR = 'rgba(212, 175, 55, 0.6)';
 const MESH_SUCCESS_COLOR = '#D4AF37';
+/** AI Mesh Overlay: blue dots always visible; brighter when face detected. */
 const BLUE_MESH = 'rgba(59, 130, 246, 0.85)';
+const BLUE_MESH_DIM = 'rgba(59, 130, 246, 0.45)';
 
-/** Simple mesh: face oval + radial lines. Blue when face detected (diagnostic), gold on success. */
+/** AI Mesh Overlay: face oval + radial lines (blue dots). Always drawn; gold on success. */
 function drawPlaceholderMesh(
   ctx: CanvasRenderingContext2D,
   w: number,
@@ -29,7 +31,7 @@ function drawPlaceholderMesh(
   const cy = h / 2;
   const rx = w * 0.35;
   const ry = h * 0.45;
-  const strokeColor = gold ? MESH_SUCCESS_COLOR : faceDetected ? BLUE_MESH : MESH_COLOR;
+  const strokeColor = gold ? MESH_SUCCESS_COLOR : faceDetected ? BLUE_MESH : BLUE_MESH_DIM;
   ctx.strokeStyle = strokeColor;
   ctx.lineWidth = gold ? 2.5 : 1.5;
   ctx.beginPath();
@@ -59,13 +61,13 @@ export interface ArchitectVisionCaptureProps {
   closeLabel?: string;
 }
 
-/** Highest practical resolution for unique/permanent Face Hash (hardware verification) */
+/** Front camera only, highest practical resolution. Force front camera immediately when entering registration/face capture. */
 function getMaxResolutionConstraints(): MediaTrackConstraints {
   if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getSupportedConstraints) {
-    return { facingMode: 'user', width: { ideal: 1920 }, height: { ideal: 1080 } };
+    return { facingMode: { ideal: 'user' }, width: { ideal: 1920 }, height: { ideal: 1080 } };
   }
   return {
-    facingMode: 'user',
+    facingMode: { ideal: 'user' },
     width: { ideal: 1920, min: 640 },
     height: { ideal: 1080, min: 480 },
   };

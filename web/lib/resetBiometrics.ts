@@ -47,6 +47,11 @@ export async function resetBiometrics(identityAnchorPhone: string): Promise<Rese
       // Not fatal — user may not have a sentinel_identities row
     }
 
+    // Hard clear: sign out so the app forgets the broken identity
+    if ((supabase as any).auth?.signOut) {
+      await (supabase as any).auth.signOut().catch(() => {});
+    }
+
     return { ok: true };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

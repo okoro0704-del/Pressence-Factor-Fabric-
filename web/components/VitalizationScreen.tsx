@@ -110,15 +110,23 @@ export function VitalizationScreen() {
     setError(null);
   };
 
-  // Hard Identity Reset: show camera with mirror + AI mesh; "The Machine is Watching"; then re-register
+  // Hard Identity Reset: greeting banner + camera wakes up immediately with AI Mesh
   if (isResetFlow) {
     return (
-      <ArchitectVisionCapture
-        isOpen={true}
-        verificationSuccess={null}
-        onClose={() => router.push('/')}
-        closeLabel="Continue to re-register"
-      />
+      <>
+        <div
+          className="fixed top-0 left-0 right-0 z-[310] px-4 py-3 text-center text-sm font-medium text-[#e8c547] bg-[#0d0d0f]/95 border-b border-[#D4AF37]/30"
+          role="status"
+        >
+          Identity Reset Successful. Please perform a fresh Face Pulse to anchor your 1 VIDA.
+        </div>
+        <ArchitectVisionCapture
+          isOpen={true}
+          verificationSuccess={null}
+          onClose={() => router.push('/')}
+          closeLabel="Continue to re-register"
+        />
+      </>
     );
   }
 

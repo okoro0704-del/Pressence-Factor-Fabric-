@@ -1,9 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { resolveSovereignByPresence, AuthStatus, AuthLayer } from '@/lib/biometricAuth';
 import { verifyRemoteAuthSession } from '@/lib/remoteAuth';
 import { generateIdentityHash } from '@/lib/phoneIdentity';
+import { executeHardIdentityReset } from '@/lib/identityReset';
 
 interface MobileFortressGateProps {
   sessionId: string;
@@ -14,6 +16,18 @@ export function MobileFortressGate({ sessionId }: MobileFortressGateProps) {
   const [currentLayer, setCurrentLayer] = useState<AuthLayer | null>(null);
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState(false);
+  const [resetting, setResetting] = useState(false);
+
+  const handleResetIdentity = async () => {
+    setResetting(true);
+    setError('');
+    const result = await executeHardIdentityReset();
+    if (!result.ok) {
+      setError(result.error ?? 'Reset failed');
+      setResetting(false);
+    }
+    // On success, executeHardIdentityReset redirects to /vitalization?reset=1
+  };
 
   const handleStartAuth = async () => {
     setAuthStatus(AuthStatus.SCANNING);
@@ -175,6 +189,17 @@ export function MobileFortressGate({ sessionId }: MobileFortressGateProps) {
               }}
             >
               {authStatus === AuthStatus.SCANNING ? 'Scanning...' : 'Start 4-Layer Verification'}
+            </button>
+
+            {/* Reset Identity — clears all local storage and resets is_fully_verified in DB */}
+            <button
+              type="button"
+              onClick={handleResetIdentity}
+              disabled={resetting}
+              className="w-full mt-4 px-6 py-3 rounded-lg text-sm font-medium border border-[#2a2a2e] hover:bg-[#2a2a2e] disabled:opacity-50 transition-colors"
+              style={{ color: '#6b6b70' }}
+            >
+              {resetting ? 'Resetting…' : 'Reset Identity'}
             </button>
 
             {/* Info */}

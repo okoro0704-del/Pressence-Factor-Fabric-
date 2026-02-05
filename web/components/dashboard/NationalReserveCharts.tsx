@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { fetchNationalReserve, type NationalReserve } from '@/lib/supabaseTelemetry';
 import { getNationalReserveData } from '@/lib/mockDataService';
+import { VIDA_USD_DISPLAY } from '@/lib/economic';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_PFF_BACKEND_URL || '';
 
@@ -163,7 +164,7 @@ export function NationalReserveCharts() {
         <h4 className="text-xs font-bold text-[#D4AF37] uppercase tracking-wider mb-2">🔐 Genesis Hash Seal</h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-[#6b6b70]">
           <div>
-            <span className="font-mono text-[#D4AF37]">1 VIDA CAP</span> = <span className="font-mono text-[#3B82F6]">$1,000 USD</span>
+            <span className="font-mono text-[#D4AF37]">1 VIDA CAP</span> = <span className="font-mono text-[#3B82F6]">{VIDA_USD_DISPLAY} USD</span>
           </div>
           <div>
             <span className="font-mono text-[#D4AF37]">1 USD</span> = <span className="font-mono text-[#00ff41]">₦1,400</span>
