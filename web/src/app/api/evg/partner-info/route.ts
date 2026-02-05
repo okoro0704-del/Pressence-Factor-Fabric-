@@ -1,6 +1,7 @@
 /**
  * EVG: Public partner info for consent screen (name only).
  * GET ?client_id=xxx → { name } or 400 if invalid/revoked.
+ * Static export: return stub at build time so route does not use searchParams during prerender.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -9,6 +10,9 @@ import { getEvgPartner } from '@/lib/evg';
 export const dynamic = 'force-static';
 
 export async function GET(request: NextRequest) {
+  if (process.env.NEXT_STATIC_EXPORT === '1') {
+    return NextResponse.json({ error: 'client_id required' }, { status: 400 });
+  }
   const clientId = request.nextUrl.searchParams.get('client_id')?.trim() ?? '';
   if (!clientId) {
     return NextResponse.json({ error: 'client_id required' }, { status: 400 });
