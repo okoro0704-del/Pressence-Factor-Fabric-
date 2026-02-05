@@ -26,7 +26,7 @@ export function RegisterDependentModal({ isOpen, onClose, guardianPhone }: Regis
 
     // Validate phone number
     if (!validatePhoneNumber(phoneNumber)) {
-      setError('Invalid phone number. Use E.164 format (e.g., +2348012345678)');
+      setError('Invalid phone number. Use E.164 with country code (e.g., +1 202 555 0123 or +234 801 234 5678)');
       setLoading(false);
       return;
     }
@@ -132,10 +132,10 @@ export function RegisterDependentModal({ isOpen, onClose, guardianPhone }: Regis
               onChange={(e) => setPhoneNumber(e.target.value)}
               required
               className="w-full px-4 py-4 bg-[#0d0d0f] border border-[#2a2a2e] rounded-lg text-[#f5f5f5] text-lg font-mono focus:border-[#3b82f6] focus:outline-none transition-colors"
-              placeholder="+2348012345678"
+              placeholder="+1 202 555 0123"
             />
             <p className="text-xs text-[#6b6b70] mt-2">
-              Use E.164 format with country code (e.g., +234 for Nigeria)
+              Use E.164 with country code (e.g., +1 US, +44 UK, +234 NG)
             </p>
           </div>
 

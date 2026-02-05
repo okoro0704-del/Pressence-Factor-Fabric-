@@ -127,7 +127,11 @@ export default function DashboardPage() {
             Unauthorized Access. You do not have the required role for that page.
           </div>
         )}
-        <DashboardContent vaultStable={vaultStable} mintTxHash={mintTxHash} />
+        <DashboardContent
+          vaultStable={vaultStable}
+          mintTxHash={mintTxHash}
+          openSwapFromUrl={searchParams.get('openSwap') === '1'}
+        />
         <InstallSmartBanner />
         {identityPhone && <VitalizationRequestListener phoneNumber={identityPhone} />}
         {identityPhone && <LoginRequestListener phoneNumber={identityPhone} />}

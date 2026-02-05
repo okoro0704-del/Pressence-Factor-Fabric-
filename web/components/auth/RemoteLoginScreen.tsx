@@ -200,7 +200,7 @@ export function RemoteLoginScreen({ onSuccess, onCancel }: RemoteLoginScreenProp
           type="tel"
           value={sovereignId}
           onChange={(e) => setSovereignId(e.target.value)}
-          placeholder="+234 801 234 5678"
+          placeholder="+1 202 555 0123"
           className="w-full px-4 py-3 rounded-xl bg-black/40 border text-white placeholder-[#6b6b70] mb-4"
           style={{ borderColor: 'rgba(212, 175, 55, 0.4)' }}
           disabled={loading}

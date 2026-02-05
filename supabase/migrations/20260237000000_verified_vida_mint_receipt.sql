@@ -1,15 +1,22 @@
 -- Connect Supabase 'Verified' status to Sovryn Smart Contract.
 -- is_fully_verified: when TRUE, app triggers mintVidaToken (5 VIDA to derived RSK wallet).
 -- vida_mint_tx_hash: receipt of minting on Sovryn chain.
--- Ensure face_hash and recovery_seed_hash exist (required by trigger); add if missing.
+-- Safe to run only when user_profiles exists (no-op otherwise).
 
-ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS face_hash TEXT;
-ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS recovery_seed_hash TEXT;
-ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS is_fully_verified BOOLEAN DEFAULT false;
-COMMENT ON COLUMN public.user_profiles.is_fully_verified IS 'When TRUE, listener triggers mintVidaToken (5 VIDA to RSK wallet). Set when face_hash and recovery_seed_hash are both present.';
-
-ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS vida_mint_tx_hash TEXT;
-COMMENT ON COLUMN public.user_profiles.vida_mint_tx_hash IS 'Transaction hash of 5 VIDA mint on Sovryn chain (receipt).';
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'user_profiles'
+  ) THEN
+    ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS face_hash TEXT;
+    ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS recovery_seed_hash TEXT;
+    ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS is_fully_verified BOOLEAN DEFAULT false;
+    ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS vida_mint_tx_hash TEXT;
+    EXECUTE 'COMMENT ON COLUMN public.user_profiles.is_fully_verified IS ''When TRUE, listener triggers mintVidaToken (5 VIDA to RSK wallet). Set when face_hash and recovery_seed_hash are both present.''';
+    EXECUTE 'COMMENT ON COLUMN public.user_profiles.vida_mint_tx_hash IS ''Transaction hash of 5 VIDA mint on Sovryn chain (receipt).''';
+  END IF;
+END $$;
 
 -- Optional: set is_fully_verified when both anchors are present (can also be set by app).
 CREATE OR REPLACE FUNCTION sync_is_fully_verified()
@@ -26,11 +33,16 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS before_user_profiles_sync_is_fully_verified ON public.user_profiles;
-CREATE TRIGGER before_user_profiles_sync_is_fully_verified
-  BEFORE INSERT OR UPDATE OF face_hash, recovery_seed_hash ON public.user_profiles
-  FOR EACH ROW
-  EXECUTE PROCEDURE sync_is_fully_verified();
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'user_profiles') THEN
+    DROP TRIGGER IF EXISTS before_user_profiles_sync_is_fully_verified ON public.user_profiles;
+    CREATE TRIGGER before_user_profiles_sync_is_fully_verified
+      BEFORE INSERT OR UPDATE OF face_hash, recovery_seed_hash ON public.user_profiles
+      FOR EACH ROW
+      EXECUTE PROCEDURE sync_is_fully_verified();
+  END IF;
+END $$;
 
 -- RPC: Save vida_mint_tx_hash (receipt) after Sovryn mint. Call from API when RLS blocks direct update.
 CREATE OR REPLACE FUNCTION save_vida_mint_tx_hash(p_phone_number TEXT, p_tx_hash TEXT)

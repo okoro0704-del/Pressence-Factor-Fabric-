@@ -148,7 +148,7 @@ export function SendVidaModal({ isOpen, onClose, senderPhone, maxAmount }: SendV
                 }}
                 required
                 className="flex-1 px-4 py-4 bg-[#0d0d0f] border border-[#2a2a2e] rounded-lg text-[#f5f5f5] text-lg font-mono focus:border-[#e8c547] focus:outline-none transition-colors"
-                placeholder="+2348012345678"
+                placeholder="+1 202 555 0123"
               />
               <button
                 type="button"

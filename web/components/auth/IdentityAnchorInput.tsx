@@ -4,8 +4,15 @@ import { useState, useRef, useEffect } from 'react';
 import { JetBrains_Mono } from 'next/font/google';
 import { fetchIdentityAnchor, type BiometricIdentityRecord } from '@/lib/universalIdentityComparison';
 import { formatPhoneE164 } from '@/lib/supabaseClient';
-import { PHONE_COUNTRIES, DEFAULT_PHONE_COUNTRY, type PhoneCountry } from '@/lib/phoneCountries';
+import {
+  PHONE_COUNTRIES,
+  DEFAULT_PHONE_COUNTRY,
+  filterPhoneCountries,
+  getNationalPlaceholder,
+  type PhoneCountry,
+} from '@/lib/phoneCountries';
 import { linkGuardianToIdentity } from '@/lib/sentinelActivation';
+import { saveUserProfileCountryCode } from '@/lib/userProfileCountry';
 
 const jetbrains = JetBrains_Mono({ weight: ['400', '600', '700'], subsets: ['latin'] });
 
@@ -19,6 +26,8 @@ export interface AnchorVerifiedPayload {
   guardianPhone?: string;
   /** True when account is Minor/Elder with linked Guardian (skip full biometric; use Guardian Authorization). */
   isDependent?: boolean;
+  /** ISO 3166-1 alpha-2 from country picker (e.g. NG, US, GB). Saved to user_profiles.country_code for global distribution. */
+  countryCode?: string;
 }
 
 interface IdentityAnchorInputProps {
@@ -40,6 +49,7 @@ export function IdentityAnchorInput({
   const [isVerifying, setIsVerifying] = useState(false);
   const [error, setError] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [countrySearch, setCountrySearch] = useState('');
   const pickerRef = useRef<HTMLDivElement>(null);
   /** After anchor verified: when Minor/Elder, show Link Guardian step. */
   const [anchorResult, setAnchorResult] = useState<{
@@ -50,10 +60,15 @@ export function IdentityAnchorInput({
   const [guardianCountry, setGuardianCountry] = useState<PhoneCountry>(DEFAULT_PHONE_COUNTRY);
   const [guardianNationalNumber, setGuardianNationalNumber] = useState('');
   const [guardianVerifying, setGuardianVerifying] = useState(false);
+  const [guardianPickerOpen, setGuardianPickerOpen] = useState(false);
+  const [guardianCountrySearch, setGuardianCountrySearch] = useState('');
+  const guardianPickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const close = (e: MouseEvent) => {
-      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) setPickerOpen(false);
+      const target = e.target as Node;
+      if (pickerRef.current && !pickerRef.current.contains(target)) setPickerOpen(false);
+      if (guardianPickerRef.current && !guardianPickerRef.current.contains(target)) setGuardianPickerOpen(false);
     };
     document.addEventListener('click', close);
     return () => document.removeEventListener('click', close);
@@ -66,7 +81,7 @@ export function IdentityAnchorInput({
 
     const formatted = formatPhoneE164(fullPhone || `${country.dialCode}${nationalNumber}`, country.code);
     if (!formatted.ok) {
-      setError(formatted.error || 'Invalid phone number. Use E.164 (e.g. +234 801 234 5678).');
+      setError(formatted.error || `Invalid number for ${country.name}. Use national format (e.g. ${getNationalPlaceholder(country.code)}).`);
       return;
     }
 
@@ -95,12 +110,14 @@ export function IdentityAnchorInput({
         return;
       }
 
+      await saveUserProfileCountryCode(formatted.e164, country.code);
       onAnchorVerified({
         phoneNumber: formatted.e164,
         fullName: identity.full_name,
         identity,
         guardianPhone: hasGuardian ? identity.guardian_phone : undefined,
         isDependent: needsGuardian,
+        countryCode: country.code,
       });
     } catch (err) {
       console.error('Identity anchor verification error:', err);
@@ -129,12 +146,14 @@ export function IdentityAnchorInput({
         setGuardianVerifying(false);
         return;
       }
+      await saveUserProfileCountryCode(anchorResult.phoneNumber, guardianCountry.code);
       onAnchorVerified({
         phoneNumber: anchorResult.phoneNumber,
         fullName: anchorResult.fullName,
         identity: anchorResult.identity,
         guardianPhone: formatted.e164,
         isDependent: true,
+        countryCode: guardianCountry.code,
       });
       setAnchorResult(null);
       setGuardianNationalNumber('');
@@ -176,10 +195,10 @@ export function IdentityAnchorInput({
         <div className="mb-6">
           <label className="block text-sm font-bold mb-2" style={{ color: '#D4AF37' }}>Guardian Phone Number</label>
           <div className="flex rounded-lg border overflow-hidden" style={{ borderColor: 'rgba(212, 175, 55, 0.3)' }}>
-            <div className="relative" ref={pickerRef}>
+            <div className="relative" ref={guardianPickerRef}>
               <button
                 type="button"
-                onClick={() => setPickerOpen((o) => !o)}
+                onClick={() => setGuardianPickerOpen((o) => !o)}
                 className="flex items-center gap-2 px-3 py-3 border-r min-w-[120px] hover:bg-neutral-800/50 transition-colors"
                 style={{ borderColor: 'rgba(212, 175, 55, 0.3)', background: '#0d0d0f', color: '#D4AF37' }}
               >
@@ -187,24 +206,36 @@ export function IdentityAnchorInput({
                 <span className={`text-sm font-mono ${jetbrains.className}`}>{guardianCountry.dialCode}</span>
                 <span className="ml-auto text-neutral-500">▾</span>
               </button>
-              {pickerOpen && (
+              {guardianPickerOpen && (
                 <div
-                  className="absolute left-0 top-full z-50 mt-1 max-h-64 overflow-y-auto rounded-lg border shadow-xl"
-                  style={{ background: '#0d0d0f', borderColor: 'rgba(212, 175, 55, 0.3)', minWidth: 200 }}
+                  className="absolute left-0 top-full z-50 mt-1 rounded-lg border shadow-xl flex flex-col"
+                  style={{ background: '#0d0d0f', borderColor: 'rgba(212, 175, 55, 0.3)', minWidth: 260, maxHeight: 320 }}
                 >
-                  {PHONE_COUNTRIES.map((c) => (
-                    <button
-                      key={c.code}
-                      type="button"
-                      onClick={() => { setGuardianCountry(c); setPickerOpen(false); }}
-                      className="flex items-center gap-2 w-full px-3 py-2 text-left hover:bg-[#D4AF37]/10"
-                      style={{ color: c.code === guardianCountry.code ? '#D4AF37' : '#a0a0a5' }}
-                    >
-                      <span className="text-lg">{c.flag}</span>
-                      <span className="font-mono text-sm">{c.dialCode}</span>
-                      <span className="text-sm truncate">{c.name}</span>
-                    </button>
-                  ))}
+                  <div className="p-2 border-b border-[#D4AF37]/20 sticky top-0 bg-[#0d0d0f]">
+                    <input
+                      type="text"
+                      value={guardianCountrySearch}
+                      onChange={(e) => setGuardianCountrySearch(e.target.value)}
+                      placeholder="Search country (e.g. Ghana, UK, USA)"
+                      className="w-full px-3 py-2 rounded text-sm bg-[#16161a] border border-[#D4AF37]/30 text-[#f5f5f5] placeholder-[#6b6b70] outline-none"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </div>
+                  <div className="overflow-y-auto max-h-64">
+                    {filterPhoneCountries(guardianCountrySearch).map((c) => (
+                      <button
+                        key={c.code}
+                        type="button"
+                        onClick={() => { setGuardianCountry(c); setGuardianCountrySearch(''); setGuardianPickerOpen(false); }}
+                        className="flex items-center gap-2 w-full px-3 py-2 text-left hover:bg-[#D4AF37]/10"
+                        style={{ color: c.code === guardianCountry.code ? '#D4AF37' : '#a0a0a5' }}
+                      >
+                        <span className="text-lg">{c.flag}</span>
+                        <span className="font-mono text-sm">{c.dialCode}</span>
+                        <span className="text-sm truncate">{c.name}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -212,7 +243,7 @@ export function IdentityAnchorInput({
               type="tel"
               value={guardianNationalNumber}
               onChange={(e) => setGuardianNationalNumber(e.target.value)}
-              placeholder="801 234 5678"
+              placeholder={getNationalPlaceholder(guardianCountry.code)}
               disabled={guardianVerifying}
               className={`flex-1 px-4 py-3 font-mono text-lg bg-[#0d0d0f] text-[#D4AF37] placeholder-neutral-500 outline-none ${jetbrains.className}`}
             />
@@ -312,29 +343,43 @@ export function IdentityAnchorInput({
             </button>
             {pickerOpen && (
               <div
-                className="absolute left-0 top-full z-50 mt-1 max-h-64 overflow-y-auto rounded-lg border shadow-xl"
+                className="absolute left-0 top-full z-50 mt-1 rounded-lg border shadow-xl flex flex-col"
                 style={{
                   background: '#0d0d0f',
                   borderColor: 'rgba(212, 175, 55, 0.3)',
-                  minWidth: 200,
+                  minWidth: 260,
+                  maxHeight: 320,
                 }}
               >
-                {PHONE_COUNTRIES.map((c) => (
-                  <button
-                    key={c.code}
-                    type="button"
-                    onClick={() => {
-                      setCountry(c);
-                      setPickerOpen(false);
-                    }}
-                    className="flex items-center gap-2 w-full px-3 py-2 text-left hover:bg-[#D4AF37]/10"
-                    style={{ color: c.code === country.code ? '#D4AF37' : '#a0a0a5' }}
-                  >
-                    <span className="text-lg">{c.flag}</span>
-                    <span className="font-mono text-sm">{c.dialCode}</span>
-                    <span className="text-sm truncate">{c.name}</span>
-                  </button>
-                ))}
+                <div className="p-2 border-b border-[#D4AF37]/20 sticky top-0 bg-[#0d0d0f]">
+                  <input
+                    type="text"
+                    value={countrySearch}
+                    onChange={(e) => setCountrySearch(e.target.value)}
+                    placeholder="Search country (e.g. Ghana, UK, USA)"
+                    className="w-full px-3 py-2 rounded text-sm bg-[#16161a] border border-[#D4AF37]/30 text-[#f5f5f5] placeholder-[#6b6b70] outline-none"
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </div>
+                <div className="overflow-y-auto max-h-64">
+                  {filterPhoneCountries(countrySearch).map((c) => (
+                    <button
+                      key={c.code}
+                      type="button"
+                      onClick={() => {
+                        setCountry(c);
+                        setCountrySearch('');
+                        setPickerOpen(false);
+                      }}
+                      className="flex items-center gap-2 w-full px-3 py-2 text-left hover:bg-[#D4AF37]/10"
+                      style={{ color: c.code === country.code ? '#D4AF37' : '#a0a0a5' }}
+                    >
+                      <span className="text-lg">{c.flag}</span>
+                      <span className="font-mono text-sm">{c.dialCode}</span>
+                      <span className="text-sm truncate">{c.name}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -343,13 +388,13 @@ export function IdentityAnchorInput({
             value={nationalNumber}
             onChange={(e) => setNationalNumber(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="801 234 5678"
+            placeholder={getNationalPlaceholder(country.code)}
             disabled={isVerifying}
             className={`flex-1 px-4 py-3 font-mono text-lg bg-[#0d0d0f] text-[#D4AF37] placeholder-neutral-500 outline-none ${jetbrains.className}`}
           />
         </div>
         <p className="text-xs mt-2" style={{ color: '#6b6b70' }}>
-          Select country (flag) then enter number without country code. E.164 applied automatically.
+          Select country (flag) then enter national number. Validation matches {country.name} format. E.164 applied automatically.
         </p>
       </div>
 

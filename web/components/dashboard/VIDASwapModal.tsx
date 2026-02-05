@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { executeSovereignSwap, calculateDLLROutput } from '@/lib/sovryn/sovereignSwap';
 import { useSovereignSeed } from '@/contexts/SovereignSeedContext';
 import { VIDA_USD_VALUE } from '@/lib/economic';
+import { IdentityReLinkModal } from './IdentityReLinkModal';
 
 interface VIDASwapModalProps {
   isOpen: boolean;
@@ -13,6 +14,9 @@ interface VIDASwapModalProps {
   /** When set, swap uses getSovereignSigner (internal) — no external wallet. */
   phoneNumber?: string;
   onSwapSuccess?: () => void;
+  /** After Identity Re-Link return: pre-fill amount and auto-trigger swap. */
+  initialAmount?: string;
+  autoSwap?: boolean;
 }
 
 export function VIDASwapModal({
@@ -21,7 +25,9 @@ export function VIDASwapModal({
   maxAmount,
   citizenId,
   phoneNumber,
-  onSwapSuccess
+  onSwapSuccess,
+  initialAmount = '',
+  autoSwap = false,
 }: VIDASwapModalProps) {
   const sovereignSeed = useSovereignSeed();
   const [vidaAmount, setVidaAmount] = useState('');
@@ -29,8 +35,45 @@ export function VIDASwapModal({
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [txHash, setTxHash] = useState('');
+  const [showRelinkModal, setShowRelinkModal] = useState(false);
+  const autoSwapDoneRef = useRef(false);
 
   const NAIRA_RATE = 1400;
+
+  // After return from Face Pulse: pre-fill amount and auto-trigger swap
+  useEffect(() => {
+    if (!isOpen || !initialAmount || !autoSwap) return;
+    if (autoSwapDoneRef.current) return;
+    setVidaAmount(initialAmount);
+    autoSwapDoneRef.current = true;
+    const amt = parseFloat(initialAmount);
+    if (amt <= 0 || amt > maxAmount) return;
+    const t = setTimeout(() => {
+      setSwapping(true);
+      setError('');
+      executeSovereignSwap({
+        vidaCapAmount: amt,
+        citizenId,
+        phoneNumber,
+        refreshUserSession: sovereignSeed?.refreshUserSession,
+        encryptedSeed: sovereignSeed?.encryptedSeed ?? undefined,
+      }).then((result) => {
+        if (result.success) {
+          setSuccess(true);
+          setTxHash(result.txHash || '');
+          onSwapSuccess?.();
+          setTimeout(() => { onClose(); setSuccess(false); setTxHash(''); setVidaAmount(''); }, 3000);
+        } else if (result.missingSeed) {
+          setShowRelinkModal(true);
+        } else {
+          setError(result.error || 'Swap failed');
+        }
+      }).catch((err) => {
+        setError(err instanceof Error ? err.message : 'Swap failed');
+      }).finally(() => setSwapping(false));
+    }, 600);
+    return () => clearTimeout(t);
+  }, [isOpen, initialAmount, autoSwap, maxAmount, citizenId, phoneNumber, sovereignSeed?.refreshUserSession, sovereignSeed?.encryptedSeed, onSwapSuccess, onClose]);
 
   if (!isOpen) return null;
 
@@ -67,11 +110,11 @@ export function VIDASwapModal({
       });
 
       if (!result.success) {
-        setError(
-          result.missingSeed
-            ? 'Identity Re-Link Required: Please perform a Face Pulse to re-authorize your wallet.'
-            : (result.error || 'Swap failed')
-        );
+        if (result.missingSeed) {
+          setShowRelinkModal(true);
+        } else {
+          setError(result.error || 'Swap failed');
+        }
         setSwapping(false);
         return;
       }
@@ -258,6 +301,13 @@ export function VIDASwapModal({
           </>
         )}
       </div>
+
+      {/* Identity Re-Link: modal when recovery seed missing — Perform Face Pulse → redirect then auto-resume swap */}
+      <IdentityReLinkModal
+        isOpen={showRelinkModal}
+        onClose={() => setShowRelinkModal(false)}
+        pendingAmount={vidaAmount}
+      />
     </div>
   );
 }

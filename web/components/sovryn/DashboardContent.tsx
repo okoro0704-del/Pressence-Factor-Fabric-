@@ -16,14 +16,18 @@ import { getIdentityAnchorPhone } from '@/lib/sentinelActivation';
 import { getCurrentUserRole, canAccessStaffPortal } from '@/lib/roleAuth';
 import { resetBiometrics } from '@/lib/resetBiometrics';
 import { isMerchantMode, getMerchantWalletAddress } from '@/lib/merchantMode';
+import { fetchNationalBlockReserves } from '@/lib/supabaseTelemetry';
 
 export function DashboardContent({
   vaultStable = false,
   mintTxHash = null,
+  openSwapFromUrl = false,
 }: {
   vaultStable?: boolean;
   /** When set, show "5 VIDA MINTED ON BITCOIN LAYER 2" with golden checkmark (tx mined). */
   mintTxHash?: string | null;
+  /** After Identity Re-Link: open swap modal and auto-resume with pending amount. */
+  openSwapFromUrl?: boolean;
 }) {
   const [showPresenceModal, setShowPresenceModal] = useState(false);
   const [resettingBiometrics, setResettingBiometrics] = useState(false);
@@ -32,6 +36,22 @@ export function DashboardContent({
   const [merchantWallet, setMerchantWallet] = useState<string | null>(null);
   const [merchantModeOn, setMerchantModeOn] = useState(false);
   const [showStaffPortal, setShowStaffPortal] = useState(false);
+  const [totalNationalVida, setTotalNationalVida] = useState<number | null>(null);
+
+  useEffect(() => {
+    fetchNationalBlockReserves().then((reserves) => {
+      if (reserves) {
+        const total =
+          reserves.national_vault_vida_cap +
+          reserves.vida_cap_liquidity +
+          reserves.national_vida_pool_vida_cap;
+        setTotalNationalVida(total);
+      } else {
+        setTotalNationalVida(null);
+      }
+    });
+  }, []);
+
   useEffect(() => {
     setMerchantModeOn(isMerchantMode());
     setMerchantWallet(getMerchantWalletAddress() ?? getIdentityAnchorPhone());
@@ -133,40 +153,66 @@ export function DashboardContent({
           </div>
         ) : (
           <>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          {/* Sovereign ID Card — Proof of Personhood (Verified Human) */}
-          <div>
-            <h2 className="text-sm font-semibold text-[#6b6b70] uppercase tracking-wider mb-3">
-              Sovereign ID
-            </h2>
-            <SovereignIdCard />
+        {/* ——— Personal Treasury (top section): utility ——— */}
+        <section className="rounded-2xl border-2 border-[#2a2a2e] bg-[#16161a]/80 p-6 mb-8 shadow-inner">
+          <h2 className="text-xl font-bold text-[#e8c547] uppercase tracking-wider mb-1">
+            Personal Treasury
+          </h2>
+          <p className="text-xs text-[#6b6b70] mb-6">
+            Quick access to your $1,000 liquid VIDA — Swap, Send, and Receive.
+          </p>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div>
+              <h3 className="text-sm font-semibold text-[#6b6b70] uppercase tracking-wider mb-3">
+                Sovereign ID
+              </h3>
+              <SovereignIdCard />
+            </div>
+            <div>
+              <UserProfileBalance
+                vaultStable={vaultStable}
+                mintTxHash={mintTxHash}
+                openSwapFromUrl={openSwapFromUrl}
+              />
+            </div>
+            <div className="lg:col-span-2">
+              <FamilyVault />
+            </div>
           </div>
-          {/* User Profile & Minted Cap / Sovereign Liquidity */}
-          <div>
-            <UserProfileBalance vaultStable={vaultStable} mintTxHash={mintTxHash} />
-          </div>
+        </section>
 
-          {/* National Reserve Charts */}
-          <div>
-            <h2 className="text-sm font-semibold text-[#6b6b70] uppercase tracking-wider mb-4">
-              The Architect's Sovereign Portfolio
-            </h2>
-            <NationalReserveCharts />
-          </div>
-
-          {/* Family Vault — Guardian: linked dependents and VIDA balances */}
-          <div>
-            <FamilyVault />
-          </div>
-
-          {/* National Block Command */}
-          <div className="mt-8">
-            <h2 className="text-sm font-semibold text-[#6b6b70] uppercase tracking-wider mb-4">
-              National Block Command
-            </h2>
-            <NationalBlockCommand />
-          </div>
+        {/* Visual divider: Personal (utility) vs National (transparency) */}
+        <div className="flex items-center gap-4 mb-6">
+          <div className="flex-1 h-px bg-gradient-to-r from-transparent via-[#3b82f6]/50 to-transparent" />
+          <span className="text-[10px] font-semibold text-[#6b6b70] uppercase tracking-widest">
+            National transparency
+          </span>
+          <div className="flex-1 h-px bg-gradient-to-r from-transparent via-[#3b82f6]/50 to-transparent" />
         </div>
+
+        {/* ——— National Treasury (bottom section): transparency ——— */}
+        <section className="rounded-2xl border-2 border-[#3b82f6]/30 bg-[#0d0d0f]/90 p-6 mb-8">
+          <h2 className="text-xl font-bold text-[#3b82f6] uppercase tracking-wider mb-1">
+            National Treasury
+          </h2>
+          <p className="text-sm text-[#a0a0a5] mb-6">
+            Total Sovereign Assets in Reserve:{' '}
+            <span className="font-mono font-semibold text-[#3b82f6]">
+              {totalNationalVida != null
+                ? `${totalNationalVida.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VIDA`
+                : '—'}
+            </span>
+          </p>
+          <div className="space-y-6">
+            <NationalReserveCharts />
+            <div>
+              <h3 className="text-sm font-semibold text-[#6b6b70] uppercase tracking-wider mb-4">
+                National Block Command
+              </h3>
+              <NationalBlockCommand />
+            </div>
+          </div>
+        </section>
 
         <div className="max-w-2xl">
           <section className="mb-6">

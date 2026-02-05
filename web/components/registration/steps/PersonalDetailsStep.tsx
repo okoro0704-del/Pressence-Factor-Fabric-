@@ -21,7 +21,7 @@ export function PersonalDetailsStep({ identity, onComplete, onBack }: PersonalDe
 
     // Validate phone number
     if (!validatePhoneNumber(phoneNumber)) {
-      newErrors.phone = 'Invalid phone number. Use E.164 format (e.g., +2348012345678)';
+      newErrors.phone = 'Invalid phone number. Use E.164 with country code (e.g., +1 202 555 0123)';
     }
 
     // Validate full name
@@ -68,7 +68,7 @@ export function PersonalDetailsStep({ identity, onComplete, onBack }: PersonalDe
             type="tel"
             value={phoneNumber}
             onChange={(e) => setPhoneNumber(e.target.value)}
-            placeholder="+2348012345678"
+            placeholder="+1 202 555 0123"
             className="w-full px-4 py-3 rounded-lg font-mono text-sm"
             style={{
               background: 'rgba(0, 0, 0, 0.6)',

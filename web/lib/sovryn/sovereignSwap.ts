@@ -51,17 +51,22 @@ export interface SovereignSwapResult {
   missingSeed?: boolean;
 }
 
+/** Transaction types that are allowed to touch the National Vault. Personal swaps must not. */
+export const NATIONAL_VAULT_ALLOWED_TYPES = ['INITIAL_MINT', 'NATIONAL_CONVERSION'] as const;
+
 export interface SovereignLedgerEntry {
   id: string;
   timestamp: Date;
-  fromVault: 'NATIONAL_BLOCK';
-  toVault: 'GLOBAL_BLOCK';
+  fromVault: string;
+  toVault: string;
   vidaCapDeducted: number;
   dllrCredited: number;
   exchangeRate: number;
   walletAddress: string;
   txHash: string;
   status: 'PENDING' | 'CONFIRMED' | 'FAILED';
+  /** Distinguishes 'Personal Asset Conversion' from 'National Distribution'. */
+  transactionLabel?: string;
 }
 
 /**
@@ -80,8 +85,10 @@ export function calculateVIDAInput(dllrAmount: number): number {
 }
 
 /**
- * Deduct VIDA CAP from Supabase citizen vault (20% spendable balance)
- * Returns updated balance or null if insufficient funds
+ * Deduct VIDA from the user's personal row only.
+ * Source: spendable_balance_vida in citizen_vaults (Supabase). On-chain VIDA is debited from the
+ * user's private wallet by the swap contract — this function only updates the ledger balance.
+ * National Vault is never touched for personal swaps (see NATIONAL_VAULT_LOCK).
  */
 async function deductVIDAFromVault(
   citizenId: string,
@@ -92,7 +99,6 @@ async function deductVIDAFromVault(
   }
 
   try {
-    // Get current balance
     const { data: vaultData, error: fetchError } = await supabase
       .from('citizen_vaults')
       .select('vida_cap_balance, spendable_balance_vida')
@@ -103,27 +109,25 @@ async function deductVIDAFromVault(
       return { success: false, error: 'Vault not found' };
     }
 
-    const currentBalance = parseFloat(vaultData.spendable_balance_vida || vaultData.vida_cap_balance);
-    
-    // Check if sufficient balance (20% spendable)
-    const spendableBalance = currentBalance * 0.20;
+    const spendableBalance = parseFloat(
+      vaultData.spendable_balance_vida != null ? String(vaultData.spendable_balance_vida) : '0'
+    );
+
     if (spendableBalance < amount) {
-      return { 
-        success: false, 
-        error: `Insufficient spendable balance. Available: ${spendableBalance.toFixed(4)} VIDA CAP` 
+      return {
+        success: false,
+        error: `Insufficient spendable balance. Available: ${spendableBalance.toFixed(4)} VIDA`,
       };
     }
 
-    // Deduct from balance
-    const newBalance = currentBalance - amount;
+    const newSpendable = spendableBalance - amount;
 
-    // Update Supabase
+    // Update only spendable_balance_vida (personal row). Do not modify vida_cap_balance for personal swaps.
     const { error: updateError } = await supabase
       .from('citizen_vaults')
-      .update({ 
-        vida_cap_balance: newBalance,
-        spendable_balance_vida: newBalance * 0.20,
-        updated_at: new Date().toISOString()
+      .update({
+        spendable_balance_vida: newSpendable,
+        updated_at: new Date().toISOString(),
       })
       .eq('citizen_id', citizenId);
 
@@ -131,18 +135,19 @@ async function deductVIDAFromVault(
       return { success: false, error: updateError.message };
     }
 
-    return { success: true, newBalance };
+    return { success: true, newBalance: newSpendable };
   } catch (error) {
     console.error('[deductVIDAFromVault] Error:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Failed to deduct VIDA CAP' 
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to deduct VIDA',
     };
   }
 }
 
 /**
- * Log swap transaction to Sovereign Ledger (VLT)
+ * Log swap transaction to Sovereign Ledger (VLT).
+ * Uses transaction_label for history display (e.g. 'Personal Asset Conversion' vs 'National Distribution').
  */
 async function logToSovereignLedger(entry: Omit<SovereignLedgerEntry, 'id'>): Promise<string | null> {
   if (!hasSupabase() || !supabase) {
@@ -151,19 +156,24 @@ async function logToSovereignLedger(entry: Omit<SovereignLedgerEntry, 'id'>): Pr
   }
 
   try {
+    const row: Record<string, unknown> = {
+      timestamp: entry.timestamp.toISOString(),
+      from_vault: entry.fromVault,
+      to_vault: entry.toVault,
+      vida_cap_deducted: entry.vidaCapDeducted,
+      dllr_credited: entry.dllrCredited,
+      exchange_rate: entry.exchangeRate,
+      wallet_address: entry.walletAddress,
+      tx_hash: entry.txHash,
+      status: entry.status,
+    };
+    if (entry.transactionLabel != null) {
+      row.transaction_label = entry.transactionLabel;
+    }
+
     const { data, error } = await supabase
       .from('sovereign_ledger')
-      .insert({
-        timestamp: entry.timestamp.toISOString(),
-        from_vault: entry.fromVault,
-        to_vault: entry.toVault,
-        vida_cap_deducted: entry.vidaCapDeducted,
-        dllr_credited: entry.dllrCredited,
-        exchange_rate: entry.exchangeRate,
-        wallet_address: entry.walletAddress,
-        tx_hash: entry.txHash,
-        status: entry.status,
-      })
+      .insert(row)
       .select('id')
       .single();
 
@@ -180,10 +190,14 @@ async function logToSovereignLedger(entry: Omit<SovereignLedgerEntry, 'id'>): Pr
 }
 
 /**
- * Execute Sovereign Swap: VIDA CAP → DLLR
- * Uses getSovereignSigner (internal) when phoneNumber set — no external provider.
- * Gas: if RBTC below MIN_RBTC_FOR_GAS, triggers Relayer for first swap.
- * Contract: Sovryn convertByPath when SOVRYN_SWAP_CONTRACT configured; else DLLR credit path.
+ * Execute Sovereign Swap: VIDA CAP → DLLR (personal swap only).
+ *
+ * Deduction source: user's spendable_balance_vida (Supabase citizen_vaults row) and VIDA tokens
+ * in their private wallet (on-chain). VIDA goes into the Liquidity Pool; DLLR is issued from that pool.
+ *
+ * Vault isolation (National Vault Lock): The National Block is not touched in this flow. Only
+ * transaction types in NATIONAL_VAULT_ALLOWED_TYPES (INITIAL_MINT, NATIONAL_CONVERSION) may
+ * read/write the National Vault. This function never accesses national_reserve or National Block.
  */
 const IDENTITY_RELINK_MESSAGE =
   'Identity Re-Link Required: Please perform a Face Pulse to re-authorize your wallet.';
@@ -266,16 +280,20 @@ export async function executeSovereignSwap(
       txHash = receipt.hash;
     }
 
+    // Personal swap: VIDA from user's wallet → Liquidity Pool; DLLR from pool → user.
+    // National Vault Lock: we do not read or write national_reserve / National Block here.
+    // Only transaction types INITIAL_MINT and NATIONAL_CONVERSION may touch the National Vault.
     const ledgerEntry: Omit<SovereignLedgerEntry, 'id'> = {
       timestamp: new Date(),
-      fromVault: 'NATIONAL_BLOCK',
-      toVault: 'GLOBAL_BLOCK',
+      fromVault: 'PERSONAL_VAULT',
+      toVault: 'LIQUIDITY_POOL',
       vidaCapDeducted: vidaCapAmount,
       dllrCredited: dllrAmount,
       exchangeRate: VIDA_TO_DLLR_RATE,
       walletAddress,
       txHash,
       status: 'CONFIRMED',
+      transactionLabel: 'Personal Asset Conversion',
     };
 
     const ledgerId = await logToSovereignLedger(ledgerEntry);

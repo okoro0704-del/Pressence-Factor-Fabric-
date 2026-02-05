@@ -6,7 +6,8 @@
 -- =====================================================
 
 -- Session Destruction Log
--- Tracks when sessions are destroyed and why
+-- Tracks when sessions are destroyed and why.
+-- phone_number is TEXT only (no FK) so this migration runs without global_identity_registry.
 CREATE TABLE IF NOT EXISTS session_destruction_log (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   session_id TEXT NOT NULL,
@@ -14,13 +15,7 @@ CREATE TABLE IF NOT EXISTS session_destruction_log (
   layers_passed INTEGER[],
   duration_ms BIGINT,
   destruction_reason TEXT,
-  timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  
-  -- Indexes
-  CONSTRAINT session_destruction_log_phone_number_fkey 
-    FOREIGN KEY (phone_number) 
-    REFERENCES global_identity_registry(phone_number) 
-    ON DELETE CASCADE
+  timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- Indexes for performance
@@ -33,6 +28,10 @@ CREATE INDEX IF NOT EXISTS idx_session_destruction_log_session_id
 
 -- Row Level Security (RLS)
 ALTER TABLE session_destruction_log ENABLE ROW LEVEL SECURITY;
+
+-- Drop policies if they exist so this migration is safe to re-run
+DROP POLICY IF EXISTS session_destruction_log_select_policy ON session_destruction_log;
+DROP POLICY IF EXISTS session_destruction_log_insert_policy ON session_destruction_log;
 
 -- Users can only see their own session destruction logs
 CREATE POLICY session_destruction_log_select_policy 

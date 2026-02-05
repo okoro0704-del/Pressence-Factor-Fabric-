@@ -198,7 +198,7 @@ export function RecoverMyAccountScreen({ onComplete, onCancel }: RecoverMyAccoun
             type="tel"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            placeholder="+2348012345678"
+            placeholder="+1 202 555 0123"
             className="w-full px-4 py-3 rounded-lg bg-[#16161a] border border-[#2a2a2e] text-[#f5f5f5] font-mono focus:border-[#e8c547] focus:outline-none"
           />
         </div>

@@ -141,7 +141,7 @@ export default function SentinelVaultPage() {
               type="tel"
               value={ownerInput}
               onChange={(e) => setOwnerInput(e.target.value)}
-              placeholder="+234 801 234 5678"
+              placeholder="+1 202 555 0123"
               className={`w-full px-4 py-3 rounded-lg bg-black/50 border font-mono text-sm ${jetbrains.className}`}
               style={{ borderColor: BORDER, color: GOLD }}
             />

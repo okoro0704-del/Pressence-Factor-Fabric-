@@ -1,10 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { fetchCitizenVault, getVitalizedCitizensCount, type CitizenVault } from '@/lib/supabaseTelemetry';
 import { getCitizenVaultData } from '@/lib/mockDataService';
 import { SendVidaModal } from './SendVidaModal';
 import { VIDASwapModal } from './VIDASwapModal';
+import { ReceiveModal } from '../treasury/ReceiveModal';
 import { UBABrandingCard } from './UBABrandingCard';
 import { PresenceOverrideModal } from './PresenceOverrideModal';
 import { GenesisHandshakeIndicator } from './GenesisHandshakeIndicator';
@@ -29,6 +31,7 @@ import { isFaceVerifiedForBalance } from '@/lib/biometricAuth';
 import { getMintStatus, getSpendingUnlocked, getBiometricSpendingActive, MINT_STATUS_MINTED } from '@/lib/mintStatus';
 import { hasFaceAndSeed } from '@/lib/recoverySeedStorage';
 import { SpendingLockModal } from './SpendingLockModal';
+import { getPendingSwapAfterRelink } from './IdentityReLinkModal';
 import { deriveRSKWalletFromSeed } from '@/lib/sovryn/derivedWallet';
 import { getVidaBalanceOnChain } from '@/lib/sovryn/vidaBalance';
 import { RSK_MAINNET } from '@/lib/sovryn/config';
@@ -39,15 +42,22 @@ const BIOMETRIC_SPENDING_ACTIVE = 'Biometric Spending Active';
 export function UserProfileBalance({
   vaultStable = false,
   mintTxHash = null,
+  openSwapFromUrl = false,
 }: {
   vaultStable?: boolean;
   /** When set (tx mined), show golden checkmark + "5 VIDA MINTED ON BITCOIN LAYER 2". */
   mintTxHash?: string | null;
+  /** When true (e.g. /dashboard?openSwap=1), open swap modal and auto-resume with pending amount from sessionStorage. */
+  openSwapFromUrl?: boolean;
 }) {
+  const router = useRouter();
   const [vaultData, setVaultData] = useState<CitizenVault | null>(null);
   const [loading, setLoading] = useState(true);
   const [showSendVida, setShowSendVida] = useState(false);
   const [showSwapModal, setShowSwapModal] = useState(false);
+  const [showReceiveModal, setShowReceiveModal] = useState(false);
+  /** After Face Pulse return: amount to pre-fill and trigger swap. */
+  const [pendingResumeAmount, setPendingResumeAmount] = useState('');
   const [showPresenceModal, setShowPresenceModal] = useState(false);
   const [showLockModal, setShowLockModal] = useState(false);
   const [fingerprintVerified, setFingerprintVerified] = useState(false);
@@ -90,6 +100,17 @@ export function UserProfileBalance({
 
     loadVaultData();
   }, []);
+
+  // After Face Pulse return: open swap modal with pending amount and auto-trigger swap
+  useEffect(() => {
+    if (!openSwapFromUrl) return;
+    const amount = getPendingSwapAfterRelink();
+    if (amount != null && amount !== '') {
+      setPendingResumeAmount(amount);
+      setShowSwapModal(true);
+      router.replace('/dashboard', { scroll: false });
+    }
+  }, [openSwapFromUrl, router]);
 
   // Check presence verification status
   useEffect(() => {
@@ -351,8 +372,9 @@ export function UserProfileBalance({
           betaLiquidityTest={BETA_LIQUIDITY_TEST}
         />
 
+        {/* Unified Swap · Send · Receive — clustered for quick access to $1,000 liquid VIDA */}
         <div className="relative rounded-xl mt-6 mb-6 transition-all duration-300">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <button
               onClick={handleSwapClick}
               disabled={!isPresenceVerified || !canSpend}
@@ -366,7 +388,15 @@ export function UserProfileBalance({
               disabled={!isPresenceVerified || !canSpend}
               className={`relative bg-gradient-to-br from-[#c9a227]/30 to-[#e8c547]/20 hover:from-[#c9a227]/40 hover:to-[#e8c547]/30 text-[#e8c547] font-bold py-3 px-4 rounded-lg border border-[#c9a227]/50 transition-all duration-300 group ${!isPresenceVerified || !canSpend ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
-              <span className="relative z-10 text-sm uppercase tracking-wider">📤 Send</span>
+              <span className="relative z-10 text-sm uppercase tracking-wider">Send</span>
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[#e8c547]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowReceiveModal(true)}
+              className="relative bg-gradient-to-br from-[#c9a227]/30 to-[#e8c547]/20 hover:from-[#c9a227]/40 hover:to-[#e8c547]/30 text-[#e8c547] font-bold py-3 px-4 rounded-lg border border-[#c9a227]/50 transition-all duration-300 group"
+            >
+              <span className="relative z-10 text-sm uppercase tracking-wider">Receive</span>
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[#e8c547]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
             </button>
           </div>
@@ -461,7 +491,7 @@ export function UserProfileBalance({
       <SendVidaModal
         isOpen={showSendVida}
         onClose={() => setShowSendVida(false)}
-        senderPhone="+2348012345678"
+        senderPhone={getIdentityAnchorPhone() ?? ''}
         maxAmount={CURRENT_POWER_SPENDABLE_VIDA}
       />
 
@@ -471,10 +501,19 @@ export function UserProfileBalance({
         maxAmount={CURRENT_POWER_SPENDABLE_VIDA}
         citizenId={getIdentityAnchorPhone() ?? undefined}
         phoneNumber={getIdentityAnchorPhone() ?? undefined}
+        initialAmount={pendingResumeAmount}
+        autoSwap={!!pendingResumeAmount}
         onSwapSuccess={() => {
           setShowSwapModal(false);
+          setPendingResumeAmount('');
           window.dispatchEvent(new CustomEvent('protocol-vault-swap-success'));
         }}
+      />
+
+      <ReceiveModal
+        isOpen={showReceiveModal}
+        onClose={() => setShowReceiveModal(false)}
+        phoneNumber={getIdentityAnchorPhone() ?? ''}
       />
 
       <PresenceOverrideModal

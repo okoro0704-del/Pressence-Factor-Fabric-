@@ -26,7 +26,7 @@ export function DependentRegistrationStep({
 
   const handleAddDependent = async () => {
     if (!validatePhoneNumber(dependentPhone)) {
-      alert('Invalid phone number. Use E.164 format (e.g., +2348012345678)');
+      alert('Invalid phone number. Use E.164 with country code (e.g., +1 202 555 0123)');
       return;
     }
 
@@ -166,7 +166,7 @@ export function DependentRegistrationStep({
               type="tel"
               value={dependentPhone}
               onChange={(e) => setDependentPhone(e.target.value)}
-              placeholder="+2348012345678"
+              placeholder="+1 202 555 0123"
               className="w-full px-4 py-3 rounded-lg font-mono text-sm"
               style={{
                 background: 'rgba(0, 0, 0, 0.6)',

@@ -241,7 +241,7 @@ export function DependentDashboard({ identity }: DependentDashboardProps) {
                   type="tel"
                   value={emergencyPhone}
                   onChange={(e) => setEmergencyPhone(e.target.value)}
-                  placeholder="+234 801 234 5678"
+                  placeholder="+1 202 555 0123"
                   className="px-4 py-3 rounded-xl bg-[#0d0d0f] border border-[#2a2a2e] text-[#f5f5f5] font-mono text-lg max-w-xs"
                 />
                 <button

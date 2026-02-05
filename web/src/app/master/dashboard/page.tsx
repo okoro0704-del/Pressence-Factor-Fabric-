@@ -102,7 +102,7 @@ function MasterDashboardContent() {
               type="tel"
               value={searchPhone}
               onChange={(e) => setSearchPhone(e.target.value)}
-              placeholder="+234 801 234 5678"
+              placeholder="+1 202 555 0123"
               className="flex-1 min-w-[200px] px-4 py-3 rounded-lg bg-[#16161a] border border-[#2a2a2e] text-[#f5f5f5] font-mono text-sm placeholder:text-[#6b6b70] focus:border-[#D4AF37]/50 focus:outline-none"
             />
             <button
