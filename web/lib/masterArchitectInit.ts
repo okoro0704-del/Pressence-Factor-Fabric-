@@ -6,20 +6,20 @@
 
 import { getSupabase } from './supabase';
 
-const DAY_ZERO_API = '/api/day-zero';
-
 export type FirstRegistrationResult = { isFirst: true } | { isFirst: false };
 
 /**
- * Check if the database is empty (no profiles). Use to show Low sensitivity and assign Architect on first registration.
+ * Check if the database is empty (no profiles). Uses Supabase RPC get_user_profiles_count (client-side) for static export.
  */
 export async function isFirstRegistration(): Promise<FirstRegistrationResult> {
   if (typeof window === 'undefined') return { isFirst: false };
   try {
-    const res = await fetch(DAY_ZERO_API, { cache: 'no-store' });
-    const json = await res.json();
-    if (json && json.empty === true) return { isFirst: true };
-    return { isFirst: false };
+    const supabase = getSupabase();
+    if (!supabase) return { isFirst: false };
+    const { data, error } = await (supabase as any).rpc('get_user_profiles_count');
+    if (error) return { isFirst: false };
+    const count = typeof data === 'number' ? data : Number(data ?? 0);
+    return count === 0 ? { isFirst: true } : { isFirst: false };
   } catch {
     return { isFirst: false };
   }

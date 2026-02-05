@@ -1,22 +1,25 @@
 /**
  * Master Architect Initialization — Day Zero detection and nuclear local clear.
  * When the database has been cleared (no profiles), force the app into a "Day Zero" state.
+ * Uses Supabase RPC get_user_profiles_count (client-side) so static export build does not require API routes.
  */
 
-const DAY_ZERO_API = '/api/day-zero';
+import { getSupabase } from './supabase';
 
 export type DayZeroResult = { empty: true } | { empty: false };
 
 /**
- * Check if the database has zero user_profiles (cleared). Requires RPC get_user_profiles_count in Supabase.
+ * Check if the database has zero user_profiles (cleared). Calls RPC get_user_profiles_count via Supabase client.
  */
 export async function checkDatabaseEmpty(): Promise<DayZeroResult> {
   if (typeof window === 'undefined') return { empty: false };
   try {
-    const res = await fetch(DAY_ZERO_API, { cache: 'no-store' });
-    const json = await res.json();
-    if (json && json.empty === true) return { empty: true };
-    return { empty: false };
+    const supabase = getSupabase();
+    if (!supabase) return { empty: false };
+    const { data, error } = await (supabase as any).rpc('get_user_profiles_count');
+    if (error) return { empty: false };
+    const count = typeof data === 'number' ? data : Number(data ?? 0);
+    return count === 0 ? { empty: true } : { empty: false };
   } catch {
     return { empty: false };
   }
