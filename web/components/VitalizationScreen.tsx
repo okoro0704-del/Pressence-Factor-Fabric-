@@ -7,6 +7,7 @@ import { vitalizationService, type MockPresenceProof, type MockVidaCapResult, ty
 import { BiometricScanningHUD } from './BiometricScanningHUD';
 import { ArchitectVisionCapture } from './auth/ArchitectVisionCapture';
 import { getVitalizationPhone } from '@/lib/deviceId';
+import { isFirstRegistration } from '@/lib/masterArchitectInit';
 // To switch to real API, change the import above to:
 // import { vitalizationService } from '@/lib/realVitalizationService';
 
@@ -39,6 +40,14 @@ export function VitalizationScreen() {
   const [error, setError] = useState<string | null>(null);
   /** Zero-click camera: show Architect Vision full-screen on mount for new registrations */
   const [showVision, setShowVision] = useState(true);
+  /** Master Architect Initialization: first run uses Low sensitivity so Creator is not blocked by lighting. */
+  const [isFirstRun, setIsFirstRun] = useState(false);
+
+  useEffect(() => {
+    isFirstRegistration().then((r) => {
+      if (r.isFirst) setIsFirstRun(true);
+    });
+  }, []);
 
   // Load initial balance on mount
   useEffect(() => {
@@ -136,6 +145,7 @@ export function VitalizationScreen() {
           verificationSuccess={null}
           onClose={() => router.push('/')}
           closeLabel="Continue to re-register"
+          isMasterArchitectInit={isFirstRun}
         />
       </>
     );
@@ -149,6 +159,7 @@ export function VitalizationScreen() {
         verificationSuccess={null}
         onClose={() => setShowVision(false)}
         closeLabel="Cancel"
+        isMasterArchitectInit={isFirstRun}
       />
     );
   }

@@ -121,7 +121,11 @@ export async function ensureMintedAndBalance(phoneNumber: string): Promise<{ ok:
 
     const { error: profileError } = await (supabase as any)
       .from('user_profiles')
-      .update({ is_minted: true, updated_at: new Date().toISOString() })
+      .update({
+        is_minted: true,
+        spendable_vida: 1,
+        updated_at: new Date().toISOString(),
+      })
       .eq('phone_number', trimmed);
     if (profileError) return { ok: false, error: profileError.message ?? 'Failed to set is_minted' };
 

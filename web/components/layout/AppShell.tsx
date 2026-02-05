@@ -4,8 +4,20 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Landmark, Vote, Shield, Settings2, ChevronLeft, Menu } from 'lucide-react';
+import {
+  LayoutDashboard,
+  Landmark,
+  Vote,
+  Shield,
+  Settings2,
+  SlidersHorizontal,
+  ChevronLeft,
+  Menu,
+} from 'lucide-react';
 import { useTripleTapReset } from '@/lib/useTripleTapReset';
+
+/** Settings nav icon: use named ref so bundler does not drop it (avoids "SlidersHorizontal is not defined"). */
+const SettingsNavIcon = SlidersHorizontal;
 
 /** Bottom tab bar and sidebar: Dashboard, Treasury, Elections, Master, Command, Settings. */
 const NAV = [
@@ -14,7 +26,7 @@ const NAV = [
   { href: '/government/elections', label: 'Elections', icon: Vote },
   { href: '/master/dashboard', label: 'Master', icon: Shield },
   { href: '/master/command-center', label: 'Command', icon: Settings2 },
-  { href: '/settings', label: 'Settings', icon: SlidersHorizontal },
+  { href: '/settings', label: 'Settings', icon: SettingsNavIcon },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {

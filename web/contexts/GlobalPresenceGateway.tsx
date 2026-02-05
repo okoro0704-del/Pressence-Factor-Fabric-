@@ -10,6 +10,7 @@ import { hasActiveSentinelLicense } from '@/lib/sentinelLicensing';
 import { getCurrentUserRole, setRoleCookie } from '@/lib/roleAuth';
 import { checkSessionIsolation, setSessionIdentity } from '@/lib/sessionIsolation';
 import { getSupabase, testConnection } from '@/lib/supabase';
+import { runDayZeroCheckAndClear } from '@/lib/dayZeroCheck';
 
 interface GlobalPresenceGatewayContextType {
   isPresenceVerified: boolean;
@@ -126,6 +127,8 @@ export function GlobalPresenceGatewayProvider({ children }: { children: ReactNod
       setLoading(true);
       setConnecting(true);
       setProtocolReconnecting(false);
+      // Master Architect Initialization: if database has no profiles, nuclear local clear (Day Zero)
+      await runDayZeroCheckAndClear();
       const timeoutId = setTimeout(() => {
         if (cancelled) return;
         setConnecting(false);

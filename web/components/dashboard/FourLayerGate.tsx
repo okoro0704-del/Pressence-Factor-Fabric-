@@ -52,6 +52,7 @@ import { hasSignedConstitution } from '@/lib/legalApprovals';
 import { setIdentityAnchorForSession, getIdentityAnchorPhone, isSentinelActive } from '@/lib/sentinelActivation';
 import { getCurrentUserRole, setRoleCookie, getProfileWithPrimarySentinel } from '@/lib/roleAuth';
 import { ensureGenesisIfEmpty } from '@/lib/auth';
+import { isFirstRegistration, creditArchitectVidaGrant } from '@/lib/masterArchitectInit';
 import { SovereignConstitution } from '@/components/auth/SovereignConstitution';
 import { setSessionIdentity } from '@/lib/sessionIsolation';
 import { enterGuestMode, isGuestMode, logGuestAccessIfNeeded } from '@/lib/guestMode';
@@ -185,6 +186,8 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
   const [showAwaitingLoginApproval, setShowAwaitingLoginApproval] = useState(false);
   /** Hard Navigation Lock: 1s transition spinner before replace to dashboard so DB can catch up; prevents back-stack re-entry. */
   const [transitioningToDashboard, setTransitioningToDashboard] = useState(false);
+  /** Master Architect Initialization: first person to register in empty DB gets Low sensitivity + Architect role + 5 VIDA. */
+  const [isFirstRun, setIsFirstRun] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const { setPresenceVerified } = useGlobalPresenceGateway();
@@ -194,6 +197,14 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
       setIsMobile(/Android|iPhone|iPad|iPod|webOS|Mobile/i.test(navigator.userAgent));
     }
   }, []);
+
+  // Master Architect Initialization: detect empty DB so first registrant gets Low sensitivity and Architect role
+  useEffect(() => {
+    if (!identityAnchor?.phone) return;
+    isFirstRegistration().then((r) => {
+      if (r.isFirst) setIsFirstRun(true);
+    });
+  }, [identityAnchor?.phone]);
 
   // Restore pillar state from localStorage so refresh doesn't require re-verifying HW/GPS
   useEffect(() => {
@@ -643,7 +654,11 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
         }
         const ipAddress = 'unknown';
         const geolocation = { city: 'Lagos', country: 'Nigeria', latitude: 6.5244, longitude: 3.3792 };
-        await assignPrimarySentinel(anchor.phone, anchor.name, deviceInfo, ipAddress, geolocation, compId, authResult.externalScannerSerialNumber ?? null, authResult.externalFingerprintHash ?? null);
+        await assignPrimarySentinel(anchor.phone, anchor.name, deviceInfo, ipAddress, geolocation, compId, authResult.externalScannerSerialNumber ?? null, authResult.externalFingerprintHash ?? null, isFirstRun);
+        if (isFirstRun) {
+          const grant = await creditArchitectVidaGrant(anchor.phone);
+          if (!grant.ok) console.warn('[PFF] Architect 5 VIDA grant failed:', grant.error);
+        }
         if (mobile) await setMintStatus(anchor.phone, MINT_STATUS_PENDING_HARDWARE);
         await goToDashboard();
         return;
@@ -659,7 +674,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     await updateDeviceLastUsed(compId);
     if (authResult.externalScannerSerialNumber != null) await setHumanityScoreVerified(anchor.phone);
     await goToDashboard();
-  }, [goToDashboard, setBiometricSessionVerified]);
+  }, [goToDashboard, setBiometricSessionVerified, isFirstRun]);
 
   const handleMismatchDismiss = () => {
     setShowMismatchScreen(false);
@@ -1020,7 +1035,8 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
       geolocation,
       compositeDeviceId,
       lastExternalScannerSerial,
-      lastExternalFingerprintHash
+      lastExternalFingerprintHash,
+      isFirstRun
     );
     setLastExternalScannerSerial(null);
     setLastExternalFingerprintHash(null);
@@ -1664,6 +1680,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
         }}
         verificationSuccess={architectVerificationSuccess}
         onComplete={handleArchitectVisionComplete}
+        isMasterArchitectInit={isFirstRun}
       />
     </div>
   );

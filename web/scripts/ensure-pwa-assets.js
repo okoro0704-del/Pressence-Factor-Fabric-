@@ -13,7 +13,8 @@ const MINIMAL_PNG = Buffer.from(
   'base64'
 );
 
-const SIZES = [72, 96, 128, 144, 152, 192, 384, 512];
+// 144 omitted: required exact dimensions cause "Resource size is not correct" if placeholder is used
+const SIZES = [72, 96, 128, 152, 192, 384, 512];
 
 fs.mkdirSync(ICONS, { recursive: true });
 SIZES.forEach((s) => {

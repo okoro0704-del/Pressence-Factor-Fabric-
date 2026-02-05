@@ -71,6 +71,8 @@ export interface ArchitectVisionCaptureProps {
   confidenceThreshold?: number;
   /** When true, enforce "Increase Lighting" warning. Ignored while bypass active. */
   enforceBrightnessCheck?: boolean;
+  /** Master Architect Initialization: first run uses Low sensitivity (0.4, no lighting block) so Creator is not blocked. */
+  isMasterArchitectInit?: boolean;
 }
 
 /** Front camera only, highest practical resolution. Force front camera immediately when entering registration/face capture. */
@@ -94,7 +96,10 @@ export function ArchitectVisionCapture({
   closeLabel = 'Cancel',
   confidenceThreshold = 0.4,
   enforceBrightnessCheck = false,
+  isMasterArchitectInit = false,
 }: ArchitectVisionCaptureProps) {
+  const effectiveConfidence = isMasterArchitectInit ? 0.4 : confidenceThreshold;
+  const effectiveBrightness = isMasterArchitectInit ? false : enforceBrightnessCheck;
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -116,8 +121,8 @@ export function ArchitectVisionCapture({
   const [bypassSecondsLeft, setBypassSecondsLeft] = useState(0);
   const bypassIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const effectiveConfidenceThreshold = isSensitivityBypassed ? BYPASS_CONFIDENCE_THRESHOLD : confidenceThreshold;
-  const effectiveEnforceBrightness = enforceBrightnessCheck && !isSensitivityBypassed;
+  const effectiveConfidenceThreshold = isSensitivityBypassed ? BYPASS_CONFIDENCE_THRESHOLD : effectiveConfidence;
+  const effectiveEnforceBrightness = effectiveBrightness && !isSensitivityBypassed;
   const effectiveThresholdPercent = Math.round(effectiveConfidenceThreshold * 100);
   /** Face detected when confidence meets effective threshold (or legacy: explicit state after 500ms). */
   const facePassesThreshold = aiConfidence >= effectiveThresholdPercent;
@@ -216,6 +221,11 @@ export function ArchitectVisionCapture({
 
       const cw = canvas.width;
       const ch = canvas.height;
+      // Flawless camera flow: show Blue AI Mesh immediately (even while camera warms). Set default size so mesh draws from first frame.
+      if (cw === 0 || ch === 0) {
+        canvas.width = 640;
+        canvas.height = 480;
+      }
 
       if (!frozen && video.readyState >= 2 && video.videoWidth > 0) {
         if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
@@ -225,8 +235,8 @@ export function ArchitectVisionCapture({
         ctx.drawImage(video, 0, 0);
       }
 
-      const w = canvas.width || cw || 640;
-      const h = canvas.height || ch || 480;
+      const w = canvas.width || 640;
+      const h = canvas.height || 480;
       drawPlaceholderMesh(ctx, w, h, meshGold, showAsFaceDetected);
 
       if (frozen) frozenDrawnRef.current = true;

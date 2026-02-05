@@ -31,7 +31,8 @@ export default function RootLayout({
         {/* No link rel="preload" for scripts: avoid console noise; add only if pointing to an existing file with as="script". */}
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#0A0A0A" />
-        {/* iOS: standalone web app, no Safari UI */}
+        {/* Standalone web app. Prefer mobile-web-app-capable; apple-* kept for iOS Add to Home Screen. */}
+        <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="PFF" />

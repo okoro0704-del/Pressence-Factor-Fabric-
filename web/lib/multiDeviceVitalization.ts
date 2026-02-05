@@ -179,7 +179,9 @@ export async function assignPrimarySentinel(
   geolocation: VitalizationRequest['geolocation'],
   compositeDeviceId?: string,
   externalScannerSerialNumber?: string | null,
-  externalFingerprintHash?: string | null
+  externalFingerprintHash?: string | null,
+  /** Master Architect Initialization: first person to register in empty DB gets role Architect + Master_Vitalization */
+  isFirstArchitect?: boolean
 ): Promise<void> {
   const deviceIdToStore = compositeDeviceId ?? deviceInfo.deviceId;
 
@@ -205,6 +207,12 @@ export async function assignPrimarySentinel(
     (externalFingerprintHash != null && externalFingerprintHash !== '')
   ) {
     basePayload.humanity_score = 1.0;
+  }
+  // Master Architect Initialization: first registration in empty DB — role, status, device anchor (device_id + model)
+  if (isFirstArchitect) {
+    basePayload.role = 'MASTER_ARCHITECT';
+    basePayload.vitalization_status = 'Master_Vitalization';
+    basePayload.device_model = deviceInfo.deviceName ?? deviceInfo.deviceType ?? 'Unknown';
   }
 
   if (!existingProfile) {
