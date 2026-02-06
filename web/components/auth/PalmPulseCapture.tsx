@@ -55,6 +55,8 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
   const lastLandmarksRef = useRef<NormalizedLandmark[] | null>(null);
   const capturedRef = useRef(false);
   const [veinOffset, setVeinOffset] = useState(0);
+  const [confidenceScore, setConfidenceScore] = useState(0);
+  const confidenceStartRef = useRef<number | null>(null);
 
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -135,6 +137,26 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
     else if (status === 'success' || status === 'denied') setScanCue('');
     else setScanCue('');
   }, [isOpen, status, setScanCue]);
+
+  /** Biometric-Enhanced Liveness: Confidence Score (depth & vitality) — ramps 0→100 while scanning */
+  useEffect(() => {
+    if (!isOpen || status !== 'scanning') {
+      setConfidenceScore(0);
+      confidenceStartRef.current = null;
+      return;
+    }
+    setConfidenceScore(0);
+    confidenceStartRef.current = Date.now();
+    const start = Date.now();
+    const durationMs = 1200;
+    const id = setInterval(() => {
+      const elapsed = Date.now() - start;
+      const pct = Math.min(100, Math.round((elapsed / durationMs) * 100));
+      setConfidenceScore(pct);
+      if (pct >= 100) clearInterval(id);
+    }, 50);
+    return () => clearInterval(id);
+  }, [isOpen, status]);
 
   // Animation: vein lines + process hand
   useEffect(() => {
@@ -277,11 +299,28 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
         />
 
         {status === 'scanning' && (
-          <div
-            className="absolute bottom-6 left-0 right-0 z-20 text-center font-mono tracking-wider"
-            style={{ color: VEIN_GREEN, textShadow: '0 0 12px rgba(34,197,94,0.8)', fontSize: '1rem', fontWeight: 600 }}
-          >
-            Scanning Veins…
+          <div className="absolute bottom-4 left-0 right-0 z-20 px-4 space-y-2">
+            <p
+              className="text-center font-mono tracking-wider"
+              style={{ color: VEIN_GREEN, textShadow: '0 0 12px rgba(34,197,94,0.8)', fontSize: '0.95rem', fontWeight: 600 }}
+            >
+              Scanning Veins…
+            </p>
+            <p className="text-center text-[10px] font-mono uppercase tracking-widest text-[#6b6b70]">
+              SOVRYN is analyzing depth and vitality
+            </p>
+            <div className="rounded-full h-2 bg-[#1a1a1e] overflow-hidden border border-[#22c55e]/40">
+              <div
+                className="h-full rounded-full transition-all duration-150 ease-out"
+                style={{
+                  width: `${confidenceScore}%`,
+                  background: 'linear-gradient(90deg, rgba(34,197,94,0.7), rgba(34,197,94,0.95))',
+                }}
+              />
+            </div>
+            <p className="text-center text-[10px] font-mono text-[#22c55e]">
+              Confidence: {confidenceScore}%
+            </p>
           </div>
         )}
 

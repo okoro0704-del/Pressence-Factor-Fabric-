@@ -4,16 +4,77 @@ import { useState, useEffect, useRef } from 'react';
 import {
   AUTO_GREETING,
   getManifestoCompanionResponse,
+  getReWelcomeForLanguage,
+  type CompanionResponse,
+  type CompanionLangCode,
 } from '@/lib/manifestoCompanionKnowledge';
 import { isArchitect } from '@/lib/manifestoUnveiling';
+import {
+  isRecognitionRequest,
+  getRecognitionName,
+  buildRecognitionMessage,
+  detectLangFromRecognitionMessage,
+} from '@/lib/sovereignRecognition';
+import {
+  isPffMetricsRequest,
+  formatVerifiedPffMetrics,
+  type VltPffMetricsPayload,
+} from '@/lib/vltLedgerCompanion';
 
 const GOLD = '#D4AF37';
 const GOLD_DIM = 'rgba(212, 175, 55, 0.6)';
 const BORDER = 'rgba(212, 175, 55, 0.3)';
 
-type Message = { id: string; role: 'user' | 'assistant'; text: string };
+type Message = { id: string; role: 'user' | 'assistant'; text: string; codeSnippet?: string };
 
-function speak(text: string): void {
+const LANG_MAP: Record<string, string> = {
+  en: 'en-US',
+  fr: 'fr-FR',
+  es: 'es-ES',
+  yo: 'yo-NG',
+  ig: 'ig-NG',
+  ha: 'ha-NG',
+  zh: 'zh-CN',
+  ar: 'ar-SA',
+};
+
+const LANG_OPTIONS: { code: CompanionLangCode | null; label: string }[] = [
+  { code: null, label: 'Auto' },
+  { code: 'en', label: 'English' },
+  { code: 'yo', label: 'Yoruba' },
+  { code: 'ig', label: 'Igbo' },
+  { code: 'ha', label: 'Hausa' },
+  { code: 'fr', label: 'French' },
+  { code: 'es', label: 'Spanish' },
+  { code: 'zh', label: 'Mandarin' },
+  { code: 'ar', label: 'Arabic' },
+];
+
+/** Dynamic Translation Badge: flag emoji per language (Yoruba/Igbo/Hausa → Nigerian flag). */
+const LANG_FLAG: Record<CompanionLangCode, string> = {
+  en: '🇺🇸',
+  fr: '🇫🇷',
+  es: '🇪🇸',
+  yo: '🇳🇬',
+  ig: '🇳🇬',
+  ha: '🇳🇬',
+  zh: '🇨🇳',
+  ar: '🇸🇦',
+};
+
+/** Display name for tooltip. */
+const LANG_NAME: Record<CompanionLangCode, string> = {
+  en: 'English',
+  fr: 'French',
+  es: 'Spanish',
+  yo: 'Yoruba',
+  ig: 'Igbo',
+  ha: 'Hausa',
+  zh: 'Mandarin',
+  ar: 'Arabic',
+};
+
+function speak(text: string, lang?: string): void {
   if (typeof window === 'undefined' || !text?.trim()) return;
   try {
     window.speechSynthesis?.cancel();
@@ -21,7 +82,7 @@ function speak(text: string): void {
     u.rate = 0.9;
     u.pitch = 1;
     u.volume = 1;
-    u.lang = 'en-US';
+    u.lang = (lang && LANG_MAP[lang]) || 'en-US';
     window.speechSynthesis?.speak(u);
   } catch {
     // ignore
@@ -34,14 +95,22 @@ export function PublicSovereignCompanion() {
   const [input, setInput] = useState('');
   const [greetingSpoken, setGreetingSpoken] = useState(false);
   const [architect, setArchitect] = useState(false);
+  const [preferredLang, setPreferredLang] = useState<CompanionLangCode | null>(null);
+  const [langDropdownOpen, setLangDropdownOpen] = useState(false);
+  const [isScanningRecognition, setIsScanningRecognition] = useState(false);
+  const [isFetchingMetrics, setIsFetchingMetrics] = useState(false);
+  const [lastResponseLang, setLastResponseLang] = useState<CompanionLangCode | null>(null);
+  const [badgeHover, setBadgeHover] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   const greetingInjectedRef = useRef(false);
+  const langDropdownRef = useRef<HTMLDivElement>(null);
+
+  const displayLang: CompanionLangCode = preferredLang ?? lastResponseLang ?? 'en';
 
   useEffect(() => {
     setArchitect(isArchitect());
   }, []);
 
-  // Auto-greeting on page load (speak once)
   useEffect(() => {
     if (greetingSpoken) return;
     const t = setTimeout(() => {
@@ -51,7 +120,6 @@ export function PublicSovereignCompanion() {
     return () => clearTimeout(t);
   }, [greetingSpoken]);
 
-  // When user opens the panel, show greeting as first message once (and speak if not yet)
   useEffect(() => {
     if (!open || greetingInjectedRef.current) return;
     greetingInjectedRef.current = true;
@@ -68,19 +136,107 @@ export function PublicSovereignCompanion() {
     }
   }, [open, messages]);
 
-  const sendMessage = (text: string) => {
+  useEffect(() => {
+    if (!langDropdownOpen) return;
+    const close = (e: MouseEvent) => {
+      if (langDropdownRef.current && !langDropdownRef.current.contains(e.target as Node)) {
+        setLangDropdownOpen(false);
+      }
+    };
+    document.addEventListener('click', close);
+    return () => document.removeEventListener('click', close);
+  }, [langDropdownOpen]);
+
+  const sendMessage = async (text: string) => {
     const t = text.trim();
     if (!t) return;
     const userMsg: Message = { id: `u-${Date.now()}`, role: 'user', text: t };
     setMessages((prev) => [...prev, userMsg]);
     setInput('');
-    const reply = getManifestoCompanionResponse(t, architect);
+
+    if (isPffMetricsRequest(t)) {
+      setIsFetchingMetrics(true);
+      const lang = preferredLang ?? 'en';
+      try {
+        const res = await fetch('/api/vlt-ledger/pff-metrics');
+        const data = (await res.json()) as VltPffMetricsPayload;
+        const text = formatVerifiedPffMetrics(lang, data);
+        setMessages((prev) => [
+          ...prev,
+          { id: `vlt-${Date.now()}`, role: 'assistant', text },
+        ]);
+        setLastResponseLang(lang);
+      } catch {
+        setMessages((prev) => [
+          ...prev,
+          { id: `vlt-err-${Date.now()}`, role: 'assistant', text: 'The VLT Ledger could not be reached. This response is not a verified fact from the chain. Try again later.' },
+        ]);
+      } finally {
+        setIsFetchingMetrics(false);
+      }
+      return;
+    }
+
+    if (isRecognitionRequest(t)) {
+      setIsScanningRecognition(true);
+      const name = getRecognitionName(t);
+      const lang = preferredLang ?? detectLangFromRecognitionMessage(t);
+      try {
+        const res = await fetch('/api/sovereign-recognition', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, lang }),
+        });
+        if (!res.ok) throw new Error(res.statusText);
+        const data = await res.json();
+        const { name: resName, role, location, keyInterest } = data;
+        const fullText = buildRecognitionMessage(
+          lang,
+          resName || name,
+          role || 'Citizen',
+          location || 'the Vanguard',
+          keyInterest || 'the Protocol'
+        );
+        setMessages((prev) => [
+          ...prev,
+          { id: `rec-${Date.now()}`, role: 'assistant', text: fullText },
+        ]);
+        setLastResponseLang(lang);
+        speak(fullText, lang);
+      } catch {
+        const fallback = 'I could not reach the digital archives this time. Try again, or ask me about the Covenant, the 9-day ritual, or the Roadmap.';
+        setMessages((prev) => [
+          ...prev,
+          { id: `rec-err-${Date.now()}`, role: 'assistant', text: fallback },
+        ]);
+      } finally {
+        setIsScanningRecognition(false);
+      }
+      return;
+    }
+
+    const res: CompanionResponse = getManifestoCompanionResponse(t, architect, preferredLang ?? undefined);
     setTimeout(() => {
       setMessages((prev) => [
         ...prev,
-        { id: `a-${Date.now()}`, role: 'assistant', text: reply },
+        { id: `a-${Date.now()}`, role: 'assistant', text: res.text, codeSnippet: res.codeSnippet },
       ]);
+      setLastResponseLang((res.lang as CompanionLangCode) ?? null);
     }, 400);
+  };
+
+  const selectLanguage = (code: CompanionLangCode | null) => {
+    setPreferredLang(code);
+    if (code) setLastResponseLang(code);
+    setLangDropdownOpen(false);
+    if (code) {
+      const reWelcome = getReWelcomeForLanguage(code);
+      setMessages((prev) => [
+        ...prev,
+        { id: `re welcome-${Date.now()}`, role: 'assistant', text: reWelcome },
+      ]);
+      speak(reWelcome, code);
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -90,40 +246,113 @@ export function PublicSovereignCompanion() {
 
   return (
     <>
-      {/* Floating Sovereign Seal — bottom right, golden aura */}
       <div className="fixed bottom-6 right-6 z-[100] flex flex-col items-end gap-2">
         {open && (
           <div
             className="rounded-2xl border-2 shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 duration-300"
             style={{
               width: 'min(380px, calc(100vw - 3rem))',
-              maxHeight: 'min(420px, 60vh)',
+              maxHeight: 'min(480px, 65vh)',
               background: '#0d0d0f',
               borderColor: BORDER,
               boxShadow: `0 0 40px ${GOLD_DIM}, 0 0 80px rgba(212,175,55,0.1)`,
             }}
           >
             <div
-              className="shrink-0 px-4 py-3 border-b flex items-center justify-between"
+              className="shrink-0 px-4 py-3 border-b flex items-center justify-between gap-2"
               style={{ borderColor: BORDER, background: 'rgba(212,175,55,0.08)' }}
             >
-              <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: GOLD }}>
-                Ask the Protocol
-              </h3>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="p-1.5 rounded-lg hover:bg-white/10 text-[#a0a0a5] hover:text-white transition-colors"
-                aria-label="Close"
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M18 6L6 18M6 6l12 12" />
-                </svg>
-              </button>
+              <div className="flex items-center gap-2 min-w-0">
+                <h3 className="text-sm font-bold uppercase tracking-wider truncate" style={{ color: GOLD }}>
+                  Ask the Protocol
+                </h3>
+                <div
+                  className="relative shrink-0"
+                  onMouseEnter={() => setBadgeHover(true)}
+                  onMouseLeave={() => setBadgeHover(false)}
+                >
+                  <span
+                    key={displayLang}
+                    className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-sm border border-[#D4AF37]/40 bg-[#16161a] animate-in fade-in zoom-in-95 duration-300 cursor-default"
+                    style={{ boxShadow: `0 0 12px ${GOLD_DIM}` }}
+                    title={`Language Detected: ${LANG_NAME[displayLang]} - Verified by SOVRYN AI`}
+                    aria-label={`Language: ${LANG_NAME[displayLang]}`}
+                  >
+                    {LANG_FLAG[displayLang]}
+                  </span>
+                  {badgeHover && (
+                    <div
+                      className="absolute left-1/2 bottom-full mb-1.5 -translate-x-1/2 px-2.5 py-1.5 rounded-lg border text-[10px] font-medium whitespace-nowrap z-[120] animate-in fade-in zoom-in-95 duration-200"
+                      style={{
+                        background: '#0d0d0f',
+                        borderColor: GOLD_DIM,
+                        color: '#e0e0e0',
+                        boxShadow: `0 0 16px ${GOLD_DIM}`,
+                      }}
+                    >
+                      Language Detected: {LANG_NAME[displayLang]} — Verified by SOVRYN AI
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <div className="relative" ref={langDropdownRef}>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setLangDropdownOpen((o) => !o); }}
+                    className="p-2 rounded-lg hover:bg-white/10 text-[#a0a0a5] hover:text-[#D4AF37] transition-colors focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/50"
+                    aria-label="Choose language"
+                    title="Language"
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                      <circle cx="12" cy="12" r="10" />
+                      <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                    </svg>
+                  </button>
+                  {langDropdownOpen && (
+                    <div
+                      className="absolute right-0 top-full mt-1 py-1 rounded-xl border-2 shadow-xl z-[110] min-w-[160px] max-h-[280px] overflow-y-auto"
+                      style={{
+                        background: '#0d0d0f',
+                        borderColor: BORDER,
+                        boxShadow: `0 0 24px ${GOLD_DIM}`,
+                      }}
+                    >
+                      {LANG_OPTIONS.map(({ code, label }) => (
+                        <button
+                          key={code ?? 'auto'}
+                          type="button"
+                          onClick={() => selectLanguage(code)}
+                          className="w-full px-3 py-2.5 text-left text-sm hover:bg-white/10 transition-colors first:rounded-t-[10px] last:rounded-b-[10px] flex items-center justify-between gap-2"
+                          style={{
+                            color: preferredLang === code ? GOLD : '#e0e0e0',
+                            background: preferredLang === code ? 'rgba(212,175,55,0.12)' : 'transparent',
+                          }}
+                        >
+                          <span>{label}</span>
+                          {preferredLang === code && (
+                            <span className="text-[10px] uppercase tracking-wider" style={{ color: GOLD }}>✓</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  className="p-1.5 rounded-lg hover:bg-white/10 text-[#a0a0a5] hover:text-white transition-colors"
+                  aria-label="Close"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M18 6L6 18M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
             </div>
             <div
               ref={listRef}
-              className="flex-1 overflow-y-auto p-4 space-y-3 min-h-[200px] max-h-[280px]"
+              className="flex-1 overflow-y-auto p-4 space-y-3 min-h-[200px] max-h-[320px]"
             >
               {messages.length === 0 && (
                 <p className="text-xs text-[#6b6b70]">The Sovereign Companion is speaking…</p>
@@ -133,19 +362,75 @@ export function PublicSovereignCompanion() {
                   key={m.id}
                   className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
-                  <div
-                    className="rounded-xl px-3 py-2 max-w-[90%] text-sm"
-                    style={{
-                      background: m.role === 'user' ? 'rgba(212,175,55,0.15)' : 'rgba(42,42,46,0.9)',
-                      borderColor: m.role === 'user' ? GOLD_DIM : BORDER,
-                      borderWidth: 1,
-                      color: m.role === 'user' ? GOLD : '#e0e0e0',
-                    }}
-                  >
-                    {m.text}
+                  <div className="flex flex-col gap-2 max-w-[90%]">
+                    <div
+                      className="rounded-xl px-3 py-2 text-sm"
+                      style={{
+                        background: m.role === 'user' ? 'rgba(212,175,55,0.15)' : 'rgba(42,42,46,0.9)',
+                        borderColor: m.role === 'user' ? GOLD_DIM : BORDER,
+                        borderWidth: 1,
+                        color: m.role === 'user' ? GOLD : '#e0e0e0',
+                      }}
+                    >
+                      <span className="whitespace-pre-wrap">{m.text}</span>
+                    </div>
+                    {m.codeSnippet && (
+                      <pre
+                        className="rounded-lg px-3 py-2 text-[11px] overflow-x-auto border"
+                        style={{
+                          background: 'rgba(0,0,0,0.4)',
+                          borderColor: GOLD_DIM,
+                          color: '#a0a0a5',
+                          fontFamily: 'ui-monospace, monospace',
+                        }}
+                      >
+                        <code>{m.codeSnippet}</code>
+                      </pre>
+                    )}
                   </div>
                 </div>
               ))}
+              {isFetchingMetrics && (
+                <div className="flex justify-start">
+                  <div
+                    className="rounded-xl px-4 py-3 border-2 max-w-[90%]"
+                    style={{
+                      background: 'rgba(42,42,46,0.95)',
+                      borderColor: GOLD_DIM,
+                      boxShadow: `0 0 20px ${GOLD_DIM}`,
+                    }}
+                  >
+                    <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: GOLD }}>
+                      Querying VLT Ledger…
+                    </p>
+                    <p className="text-[10px] text-[#6b6b70] mt-1">Verified fact from chain only.</p>
+                  </div>
+                </div>
+              )}
+              {isScanningRecognition && (
+                <div className="flex justify-start">
+                  <div
+                    className="rounded-xl px-4 py-3 border-2 overflow-hidden max-w-[90%]"
+                    style={{
+                      background: 'rgba(42,42,46,0.95)',
+                      borderColor: GOLD_DIM,
+                      boxShadow: `0 0 20px ${GOLD_DIM}`,
+                    }}
+                  >
+                    <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: GOLD }}>
+                      Analyzing Digital Footprint…
+                    </p>
+                    <div className="flex gap-1.5 items-center">
+                      <span className="w-2 h-2 rounded-full bg-[#D4AF37] animate-[sovereignScanPulse_1.2s_ease-in-out_infinite]" style={{ animationDelay: '0ms' }} />
+                      <span className="w-2 h-2 rounded-full bg-[#D4AF37] animate-[sovereignScanPulse_1.2s_ease-in-out_infinite]" style={{ animationDelay: '200ms' }} />
+                      <span className="w-2 h-2 rounded-full bg-[#D4AF37] animate-[sovereignScanPulse_1.2s_ease-in-out_infinite]" style={{ animationDelay: '400ms' }} />
+                    </div>
+                    <div className="mt-2 h-0.5 rounded-full overflow-hidden bg-[#1a1a1e]">
+                      <div className="h-full w-1/3 rounded-full bg-[#D4AF37] animate-[sovereignScanLine_2s_ease-in-out_infinite]" />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
             <form onSubmit={handleSubmit} className="shrink-0 p-3 border-t" style={{ borderColor: BORDER }}>
               <div className="flex gap-2">
@@ -153,7 +438,7 @@ export function PublicSovereignCompanion() {
                   type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder="Ask about the Covenant…"
+                  placeholder="Ask about the Covenant or the code…"
                   className="flex-1 min-w-0 px-3 py-2 rounded-lg text-sm bg-[#16161a] border text-white placeholder-[#6b6b70] focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/50"
                   style={{ borderColor: BORDER }}
                 />
@@ -169,7 +454,6 @@ export function PublicSovereignCompanion() {
           </div>
         )}
 
-        {/* Seal button — golden aura */}
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}

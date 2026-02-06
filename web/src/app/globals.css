@@ -89,6 +89,16 @@ body {
   animation: sentinel-scan 1.5s ease-in-out infinite;
 }
 
+/* Sovereign Recognition — digital footprint scanning */
+@keyframes sovereignScanPulse {
+  0%, 100% { opacity: 0.4; transform: scale(0.9); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+@keyframes sovereignScanLine {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
+
 /* Command Center — scrolling ticker */
 @keyframes ticker {
   0% { transform: translateX(0); }
