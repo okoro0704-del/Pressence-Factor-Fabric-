@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { getCountdownTarget, isArchitect } from '@/lib/manifestoUnveiling';
 import { insertWaitlistEntry } from '@/lib/waitlist';
+import { PublicSovereignCompanion } from '@/components/manifesto/PublicSovereignCompanion';
 
 const GOLD = '#D4AF37';
 const GOLD_DIM = 'rgba(212, 175, 55, 0.6)';
@@ -876,6 +877,9 @@ export function SovereignManifestoLanding() {
           )}
         </div>
       </footer>
+
+      {/* Public Sovereign Companion — visible to all (including un-vitalized). Ask the Protocol. */}
+      <PublicSovereignCompanion />
     </main>
   );
 }
