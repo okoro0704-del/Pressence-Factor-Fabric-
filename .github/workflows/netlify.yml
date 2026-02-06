@@ -1,7 +1,7 @@
 # PFF — Automated Netlify deployment via GitHub Actions
 # Triggers on every push to main. Builds the web app and deploys with netlify-cli.
-# Required secrets: NETLIFY_AUTH_TOKEN, NETLIFY_SITE_ID
-# Optional (for Supabase features): NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY
+# Required secrets for deploy: NETLIFY_AUTH_TOKEN, NETLIFY_SITE_ID
+# Optional (for Supabase): NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY
 
 name: Netlify Deploy
 
@@ -21,16 +21,18 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Check Netlify secrets
+        id: netlify-secrets
         run: |
-          if [ -z "${{ secrets.NETLIFY_AUTH_TOKEN }}" ]; then
-            echo "::error::NETLIFY_AUTH_TOKEN is not set. Add it in Settings → Secrets and variables → Actions."
-            exit 1
+          if [ -n "$NETLIFY_AUTH_TOKEN" ] && [ -n "$NETLIFY_SITE_ID" ]; then
+            echo "ready=true" >> $GITHUB_OUTPUT
+            echo "Netlify secrets are set. Deploy will run after build."
+          else
+            echo "ready=false" >> $GITHUB_OUTPUT
+            echo "::warning::NETLIFY_AUTH_TOKEN or NETLIFY_SITE_ID not set. Build will run but deploy will be skipped. Add them in Settings → Secrets and variables → Actions. See docs/NETLIFY-AUTO-DEPLOY-OPTION-1.md"
           fi
-          if [ -z "${{ secrets.NETLIFY_SITE_ID }}" ]; then
-            echo "::error::NETLIFY_SITE_ID is not set. Add it in Settings → Secrets and variables → Actions."
-            exit 1
-          fi
-          echo "Netlify secrets present."
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -55,14 +57,21 @@ jobs:
         working-directory: web
         run: |
           if [ ! -d out ] || [ -z "$(ls -A out 2>/dev/null)" ]; then
-            echo "::error::Build did not produce web/out. Check the Build step log for errors."
+            echo "::error::Build did not produce web/out. Check the Build step above for errors."
             exit 1
           fi
           echo "Build output: $(ls -la out | head -20)"
 
       - name: Deploy to Netlify
+        if: steps.netlify-secrets.outputs.ready == 'true'
         working-directory: web
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
         run: npx netlify-cli deploy --prod --dir=out --auth="$NETLIFY_AUTH_TOKEN" --site="$NETLIFY_SITE_ID"
+
+      - name: Deploy skipped (no secrets)
+        if: steps.netlify-secrets.outputs.ready != 'true'
+        run: |
+          echo "::notice::Deploy was skipped because NETLIFY_AUTH_TOKEN and/or NETLIFY_SITE_ID are not set in repository secrets."
+          echo "Add them in GitHub: Settings → Secrets and variables → Actions. See docs/NETLIFY-AUTO-DEPLOY-OPTION-1.md"
