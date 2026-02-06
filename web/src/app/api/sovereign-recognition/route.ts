@@ -12,7 +12,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { CompanionLangCode } from '@/lib/manifestoCompanionKnowledge';
 
-export const dynamic = 'force-dynamic';
+export const dynamic = 'force-static';
 
 export interface SovereignRecognitionPayload {
   name: string;

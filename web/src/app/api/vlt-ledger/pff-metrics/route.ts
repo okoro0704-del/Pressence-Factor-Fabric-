@@ -7,7 +7,7 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseServer } from '@/lib/supabaseServer';
 
-export const dynamic = 'force-dynamic';
+export const dynamic = 'force-static';
 
 export interface VltPffMetrics {
   source: 'vlt_ledger';
