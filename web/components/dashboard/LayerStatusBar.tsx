@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { JetBrains_Mono } from 'next/font/google';
-import { ScanLine, Fingerprint, Smartphone } from 'lucide-react';
+import { ScanLine, Hand, Smartphone } from 'lucide-react';
 import { getSessionStatus, SessionStatus } from '@/lib/sessionManagement';
 import { getTripleAnchorState } from '@/lib/tripleAnchor';
 
@@ -15,8 +15,8 @@ const RED = '#ef4444';
 
 /**
  * Triple-Anchor Security Status Bar
- * Shows three icons: Face, Fingerprint, Device. All three must turn Gold before 1 VIDA is unlocked.
- * Aligns PC and Mobile auth; reads from tripleAnchor state (and legacy session for backward compat).
+ * Shows three icons: Face, Palm, Device. All three must turn Gold before 1 VIDA is unlocked.
+ * Second pillar is Palm Pulse (contactless); state key remains "fingerprint" for backward compat.
  */
 export function LayerStatusBar() {
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>(SessionStatus.NO_SESSION);
@@ -46,12 +46,12 @@ export function LayerStatusBar() {
   const count = [tripleAnchor.face, tripleAnchor.fingerprint, tripleAnchor.device].filter(Boolean).length;
   const borderColor = allGold ? GREEN : count >= 1 ? GOLD : RED;
   const statusText = allGold ? 'TRIPLE ANCHOR VERIFIED' : `ANCHOR ${count}/3`;
-  const subText = allGold ? '1 VIDA Unlocked' : 'Face → Fingerprint → Device';
+  const subText = allGold ? '1 VIDA Unlocked' : 'Face → Palm → Device';
 
   type IconProps = { size?: number; className?: string; 'aria-hidden'?: boolean };
   const icons: { key: 'face' | 'fingerprint' | 'device'; verified: boolean; Icon: React.ComponentType<IconProps>; label: string }[] = [
     { key: 'face', verified: tripleAnchor.face, Icon: ScanLine as React.ComponentType<IconProps>, label: 'Face' },
-    { key: 'fingerprint', verified: tripleAnchor.fingerprint, Icon: Fingerprint as React.ComponentType<IconProps>, label: 'Fingerprint' },
+    { key: 'fingerprint', verified: tripleAnchor.fingerprint, Icon: Hand as React.ComponentType<IconProps>, label: 'Palm' },
     { key: 'device', verified: tripleAnchor.device, Icon: Smartphone as React.ComponentType<IconProps>, label: 'Device' },
   ];
 
@@ -79,8 +79,8 @@ export function LayerStatusBar() {
             </div>
           </div>
 
-          {/* Triple-Anchor icons: Face, Finger, Device — turn Gold when verified */}
-          <div className="flex items-center gap-2" role="status" aria-label="Security: Face, Fingerprint, Device">
+          {/* Triple-Anchor icons: Face, Palm, Device — turn Gold when verified */}
+          <div className="flex items-center gap-2" role="status" aria-label="Security: Face, Palm, Device">
             {icons.map(({ key, verified, Icon, label }) => (
               <div
                 key={key}

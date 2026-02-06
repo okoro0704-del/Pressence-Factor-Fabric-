@@ -37,7 +37,7 @@ export function VitalizationCountdown({ phoneNumber }: VitalizationCountdownProp
         Day {day} of {STREAK_TARGET}: Mastering your DNA…
       </p>
       <p className="text-center text-xs text-[#6b6b70] mt-1">
-        Complete a Face + Fingerprint scan each day. On Day 9, 0.9 VIDA unlocks to spendable and biometric sensitivity switches to High.
+        Complete a Face + Palm scan each day. On Day 9, 0.9 VIDA unlocks to spendable and biometric sensitivity switches to High.
       </p>
     </div>
   );

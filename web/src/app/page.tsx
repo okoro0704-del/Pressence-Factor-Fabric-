@@ -38,6 +38,7 @@ export default function Home() {
         style={{ color: '#6b6b70' }}
         aria-busy="true"
         aria-live="polite"
+        data-testid="home-loading"
       >
         <p className="text-sm">Loading...</p>
       </div>

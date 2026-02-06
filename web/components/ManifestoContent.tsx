@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ProvePresenceButton } from './ProvePresenceButton';
 import { SyncStatusIndicator } from './SyncStatusIndicator';
+import staticManifesto from '@/data/manifesto.json';
 
 interface Slide {
   id: string;
@@ -21,26 +22,28 @@ interface ManifestoData {
 }
 
 export function ManifestoContent() {
-  const [data, setData] = useState<ManifestoData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<ManifestoData | null>(staticManifesto as ManifestoData);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch('/api/manifesto')
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error('Failed to load'))))
-      .then(setData)
-      .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load'))
+      .then((json) => setData(json))
+      .catch(() => {
+        // Static export has no API; keep static data (already set from import)
+      })
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) {
+  if (loading && !data) {
     return (
-      <div className="min-h-[40vh] flex items-center justify-center text-[#6b6b70]">
+      <div className="min-h-[40vh] flex items-center justify-center text-[#6b6b70]" data-testid="manifesto-loading">
         Loading…
       </div>
     );
   }
-  if (error || !data) {
+  if (!data) {
     return (
       <div className="min-h-[40vh] flex items-center justify-center text-[#6b6b70]">
         {error ?? 'Unable to load manifesto.'} Try again when you’re back online.
@@ -51,7 +54,7 @@ export function ManifestoContent() {
   const { tagline, slides } = data;
 
   return (
-    <main className="min-h-screen py-12 px-6 max-w-3xl mx-auto">
+    <main className="min-h-screen py-12 px-6 max-w-3xl mx-auto" data-testid="manifesto-page">
       <header className="text-center mb-16">
         <h1 className="text-2xl font-extrabold tracking-tight text-[#e8c547]">
           PFF — Presence Factor Fabric

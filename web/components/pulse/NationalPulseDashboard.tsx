@@ -12,7 +12,7 @@ export function NationalPulseDashboard() {
   const pulsingNations = usePulsingNations();
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen" data-testid="pulse-page">
       <header className="shrink-0 border-b border-[#2a2a2e] bg-obsidian-surface/90 backdrop-blur px-4 py-3 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-lg font-bold bg-gradient-to-r from-gold-bright to-gold bg-clip-text text-transparent tracking-tight">

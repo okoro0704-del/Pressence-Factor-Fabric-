@@ -214,7 +214,7 @@ export function PresenceOverrideModal({
             <h4 className="text-lg font-bold text-[#e8c547] mb-3 text-center">SECURITY LAYERS</h4>
             <div className="grid grid-cols-2 gap-3">
               {[
-                { layer: AuthLayer.BIOMETRIC_SIGNATURE, icon: '👤', name: 'Face/Fingerprint' },
+                { layer: AuthLayer.BIOMETRIC_SIGNATURE, icon: '👤', name: 'Face/Palm' },
                 { layer: AuthLayer.VOICE_PRINT, icon: '🎤', name: 'Voice Print' },
                 { layer: AuthLayer.HARDWARE_TPM, icon: '🔒', name: 'Device Check' },
                 { layer: AuthLayer.GENESIS_HANDSHAKE, icon: '🤝', name: 'Genesis Vault' },
