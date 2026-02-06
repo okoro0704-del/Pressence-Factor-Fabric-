@@ -53,6 +53,18 @@ export function SovereignManifestoLanding() {
 
   useEffect(() => setMounted(true), []);
 
+  // Scroll to hash on load (e.g. /manifesto/#ecosystem-roadmap)
+  useEffect(() => {
+    if (!mounted || typeof window === 'undefined') return;
+    const hash = window.location.hash?.replace('#', '');
+    if (!hash) return;
+    const t = setTimeout(() => {
+      const el = document.getElementById(hash);
+      el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 300);
+    return () => clearTimeout(t);
+  }, [mounted]);
+
   const architect = mounted && isArchitect();
 
   const handleVanguardSubmit = async (e: React.FormEvent) => {
@@ -850,7 +862,7 @@ export function SovereignManifestoLanding() {
           PFF — Presence Factor Fabric. Born in Lagos. Built for the World.
         </p>
         <div className="flex flex-wrap justify-center gap-4 text-sm">
-          <Link href="#ecosystem-roadmap" className="hover:underline" style={{ color: GOLD_DIM }}>
+          <Link href="/manifesto/#ecosystem-roadmap" className="hover:underline" style={{ color: GOLD_DIM }}>
             Ecosystem Roadmap
           </Link>
           <Link href="/manifesto/" className="hover:underline" style={{ color: GOLD_DIM }}>
