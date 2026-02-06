@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { AccountType, type GlobalIdentity, generateIdentityHash, validatePhoneNumber } from '@/lib/phoneIdentity';
-import { resolveSovereignByPresence, AuthStatus } from '@/lib/biometricAuth';
+import { resolveSovereignByPresence, AuthStatus, type AuthLayer } from '@/lib/biometricAuth';
 
 interface DependentRegistrationStepProps {
   parentIdentity: GlobalIdentity;
@@ -51,7 +51,7 @@ export function DependentRegistrationStep({
     setScanning(true);
 
     // Simulate 4-layer scan for dependent
-    const authResult = await resolveSovereignByPresence((layer, status) => {
+    const authResult = await resolveSovereignByPresence(dependentPhone, (_layer: AuthLayer | null, _status: AuthStatus) => {
       // Progress callback
     });
 

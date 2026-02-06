@@ -18,7 +18,7 @@ export async function sha256Hex(input: string): Promise<string> {
 
 /** Hash raw Uint8Array (e.g. scanner transfer buffer) to SHA-256 hex. BIOMETRIC DATA IS HASHED. RAW NEVER PERSISTED. */
 export async function sha256FromUint8Array(buffer: Uint8Array): Promise<string> {
-  const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', buffer as unknown as BufferSource);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
 }

@@ -27,7 +27,7 @@ interface SovereignSeedContextValue {
 
 const SovereignSeedContext = createContext<SovereignSeedContextValue | null>(null);
 
-export function SovereignSeedProvider({ children }: { children: React.ReactNode }): React.JSX.Element {
+export function SovereignSeedProvider({ children }: { children: React.ReactNode }): React.ReactElement {
   const [encryptedSeed, setEncryptedSeed] = useState<EncryptedSeedPayload | null>(null);
   const [loading, setLoading] = useState(false);
 

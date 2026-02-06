@@ -21,7 +21,8 @@ import zhLocale from './locales/zh.json';
 
 type TranslationData = typeof enLocale;
 
-const locales: Record<LanguageCode, TranslationData> = {
+/** Supported locales (subset of LanguageCode); missing codes fall back to en */
+const locales: Partial<Record<LanguageCode, TranslationData>> = {
   en: enLocale,
   yo: yoLocale,
   ha: haLocale,
@@ -84,7 +85,7 @@ export function TranslationProvider({ children }: TranslationProviderProps) {
    */
   const t = (key: string, fallback?: string): string => {
     const keys = key.split('.');
-    let value: any = locales[language];
+    let value: any = locales[language] ?? locales.en;
 
     for (const k of keys) {
       if (value && typeof value === 'object' && k in value) {

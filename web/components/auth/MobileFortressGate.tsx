@@ -43,7 +43,7 @@ export function MobileFortressGate({ sessionId }: MobileFortressGateProps) {
       }
       // Perform 4-layer biometric scan
       const authResult = await resolveSovereignByPresence(phone, (layer: AuthLayer | null, status: AuthStatus) => {
-        setCurrentLayer(layer != null ? 1 : 0);
+        setCurrentLayer(layer);
         setAuthStatus(status);
       });
 

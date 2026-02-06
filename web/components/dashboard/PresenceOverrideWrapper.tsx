@@ -5,7 +5,7 @@ import { PresenceOverrideModal } from './PresenceOverrideModal';
 import type { GlobalIdentity } from '@/lib/phoneIdentity';
 
 interface PresenceOverrideWrapperProps {
-  children: React.ReactNode;
+  children: React.ReactNode | ((args: { identity: GlobalIdentity; isPresenceOverride: boolean }) => React.ReactNode);
   deviceOwnerIdentity: GlobalIdentity; // The child's account (device owner)
 }
 

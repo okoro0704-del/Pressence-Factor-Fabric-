@@ -32,7 +32,7 @@ export function SecurityAlertsDashboard({ phoneNumber }: { phoneNumber: string }
     fetchAuditLogs();
 
     // Subscribe to real-time updates
-    const subscription = supabase
+    const channel = (supabase as any)
       .channel('audit_logs')
       .on(
         'postgres_changes',
@@ -42,14 +42,19 @@ export function SecurityAlertsDashboard({ phoneNumber }: { phoneNumber: string }
           table: 'sovereign_audit_log',
           filter: `phone_number=eq.${phoneNumber}`,
         },
-        (payload) => {
-          setAuditLogs((prev) => [payload.new as AuditLogEntry, ...prev]);
+        (payload: { new?: Record<string, unknown> }) => {
+          const row = payload?.new;
+          if (row) setAuditLogs((prev) => [row as unknown as AuditLogEntry, ...prev]);
         }
-      )
-      .subscribe();
+      );
+    channel.subscribe();
 
     return () => {
-      subscription.unsubscribe();
+      try {
+        (channel as { unsubscribe?: () => void }).unsubscribe?.();
+      } catch {
+        (supabase as any).removeChannel?.(channel);
+      }
     };
   }, [phoneNumber]);
 

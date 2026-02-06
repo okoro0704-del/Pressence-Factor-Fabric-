@@ -20,7 +20,7 @@ export function VitalizationRequestListener({ phoneNumber }: VitalizationRequest
 
   useEffect(() => {
     // Subscribe to new vitalization requests for this user
-    const subscription = supabase
+    const channel = (supabase as any)
       .channel('vitalization_requests_listener')
       .on(
         'postgres_changes',
@@ -30,8 +30,9 @@ export function VitalizationRequestListener({ phoneNumber }: VitalizationRequest
           table: 'vitalization_requests',
           filter: `phone_number=eq.${phoneNumber}`,
         },
-        (payload) => {
-          const newRequest = payload.new as VitalizationRequest;
+        (payload: { new?: Record<string, unknown> }) => {
+          const newRequest = payload?.new as unknown as VitalizationRequest | undefined;
+          if (!newRequest) return;
           console.log('🔔 New vitalization request received:', newRequest);
 
           // Only show notification if this is the primary device
@@ -41,8 +42,8 @@ export function VitalizationRequestListener({ phoneNumber }: VitalizationRequest
             setShowNotification(true);
           }
         }
-      )
-      .subscribe();
+      );
+    channel.subscribe();
 
     // Check for existing pending requests on mount
     const checkPendingRequests = async () => {
@@ -67,7 +68,11 @@ export function VitalizationRequestListener({ phoneNumber }: VitalizationRequest
     checkPendingRequests();
 
     return () => {
-      subscription.unsubscribe();
+      try {
+        (channel as { unsubscribe?: () => void }).unsubscribe?.();
+      } catch {
+        (supabase as any).removeChannel?.(channel);
+      }
     };
   }, [phoneNumber]);
 

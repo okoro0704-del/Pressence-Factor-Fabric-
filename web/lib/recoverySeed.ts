@@ -71,10 +71,12 @@ async function deriveKey(identityAnchor: string, salt: Uint8Array): Promise<Cryp
     false,
     ['deriveBits', 'deriveKey']
   );
+  const saltCopy = new Uint8Array(salt.length);
+  saltCopy.set(salt);
   return crypto.subtle.deriveKey(
     {
       name: 'PBKDF2',
-      salt,
+      salt: saltCopy as unknown as BufferSource,
       iterations: 100000,
       hash: 'SHA-256',
     },

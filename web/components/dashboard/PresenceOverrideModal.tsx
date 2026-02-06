@@ -96,7 +96,7 @@ export function PresenceOverrideModal({
     setAuthStatus(AuthStatus.SCANNING);
     setResult(null);
 
-    const authResult = await resolveSovereignByPresence((layer, status) => {
+    const authResult = await resolveSovereignByPresence(currentDeviceOwner ?? '', (layer: AuthLayer | null, status: AuthStatus) => {
       setCurrentLayer(layer);
       setAuthStatus(status);
     });

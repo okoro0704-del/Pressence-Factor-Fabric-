@@ -131,7 +131,7 @@ export async function seedArchitectDevice(): Promise<{ success: boolean; message
  * Seed Genesis Telemetry Data
  * Upserts the singleton telemetry record with Architect's initial data
  */
-export async function seedGenesisTelemetry(): Promise<{ success: boolean; message: string }> {
+export async function seedGenesisTelemetry(): Promise<{ success: boolean; message: string; data?: unknown }> {
   try {
     if (!hasSupabase() || !supabase) {
       return { success: false, message: 'Supabase not configured' };

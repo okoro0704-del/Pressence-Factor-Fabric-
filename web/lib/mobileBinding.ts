@@ -314,8 +314,8 @@ export async function checkDualNodeStatus(): Promise<{
       .select('device_type, is_live')
       .eq('is_root_pair', true);
 
-    const laptop = devices?.find(d => d.device_type === 'LAPTOP');
-    const mobile = devices?.find(d => d.device_type === 'MOBILE');
+    const laptop = devices?.find((d: { device_type?: string; is_live?: boolean }) => d.device_type === 'LAPTOP');
+    const mobile = devices?.find((d: { device_type?: string; is_live?: boolean }) => d.device_type === 'MOBILE');
 
     const laptopLive = laptop?.is_live || false;
     const mobileLive = mobile?.is_live || false;

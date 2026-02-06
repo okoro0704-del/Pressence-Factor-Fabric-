@@ -98,7 +98,8 @@ export function GlobalPresenceGatewayProvider({ children }: { children: ReactNod
         setSessionIdentity(identityAnchor);
         getCurrentUserRole(identityAnchor).then((role) => setRoleCookie(role));
       }
-      getSupabase()?.auth?.getUser?.().then(({ data }) => {
+      getSupabase()?.auth?.getUser?.().then((res: { data?: { user?: { id?: string } } }) => {
+        const data = res?.data;
         if (data?.user?.id && identityAnchor) setSessionIdentity(identityAnchor, data.user.id);
       }).catch(() => {});
     } else {

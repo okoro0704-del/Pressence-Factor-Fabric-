@@ -46,7 +46,7 @@ export async function connectSentinelBleBridge(): Promise<{
     const device = await bluetooth.requestDevice({
       filters: [{ name: SENTINEL_BRIDGE_NAME }],
       optionalServices: [NORDIC_UART_SERVICE],
-    });
+    }) as BleRequestDeviceResult & { gatt?: BleGattServer; addEventListener?: (ev: string, fn: () => void) => void };
 
     const server = await device.gatt!.connect();
     const service = await server.getPrimaryService(NORDIC_UART_SERVICE);
@@ -55,7 +55,7 @@ export async function connectSentinelBleBridge(): Promise<{
 
     bridgeHandle = { device, txChar, rxChar };
 
-    device.addEventListener('gattserverdisconnected', () => {
+    device.addEventListener?.('gattserverdisconnected', () => {
       bridgeHandle = null;
     });
 

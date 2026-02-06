@@ -50,7 +50,7 @@ export async function createRemoteAuthSession(deviceId: string): Promise<RemoteA
   };
   
   // Store session in Supabase
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('remote_auth_sessions')
     .insert(session);
   
@@ -69,7 +69,7 @@ export async function updateRemoteAuthSession(
   sessionId: string,
   updates: Partial<RemoteAuthSession>
 ): Promise<void> {
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('remote_auth_sessions')
     .update(updates)
     .eq('session_id', sessionId);
@@ -84,7 +84,7 @@ export async function updateRemoteAuthSession(
  * Get remote auth session by ID
  */
 export async function getRemoteAuthSession(sessionId: string): Promise<RemoteAuthSession | null> {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('remote_auth_sessions')
     .select('*')
     .eq('session_id', sessionId)
@@ -106,7 +106,8 @@ export function subscribeToRemoteAuthSession(
   sessionId: string,
   onUpdate: (session: RemoteAuthSession) => void
 ): () => void {
-  const channel = supabase
+  const client = supabase as any;
+  const channel = client
     .channel(`remote_auth_${sessionId}`)
     .on(
       'postgres_changes',
@@ -115,16 +116,20 @@ export function subscribeToRemoteAuthSession(
         schema: 'public',
         table: 'remote_auth_sessions',
         filter: `session_id=eq.${sessionId}`,
-      },
-      (payload) => {
-        onUpdate(payload.new as RemoteAuthSession);
+      } as any,
+      (payload: { new?: Record<string, unknown> } | undefined) => {
+        const next = payload?.new;
+        if (next) onUpdate(next as unknown as RemoteAuthSession);
       }
-    )
-    .subscribe();
-  
-  // Return unsubscribe function
+    );
+  channel.subscribe();
+
   return () => {
-    supabase.removeChannel(channel);
+    try {
+      client.removeChannel(channel);
+    } catch {
+      // ignore
+    }
   };
 }
 
@@ -183,7 +188,7 @@ export async function isSessionVerified(sessionId: string): Promise<boolean> {
  * Clean up expired sessions (should be run periodically)
  */
 export async function cleanupExpiredSessions(): Promise<void> {
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('remote_auth_sessions')
     .update({ status: 'expired' })
     .lt('expires_at', new Date().toISOString())

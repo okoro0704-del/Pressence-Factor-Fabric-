@@ -68,9 +68,9 @@ export default function NationalLiquidityGrid() {
 
       if (vaultsData) {
         // Transform data to match NationalLiquidity interface
-        const transformedData: NationalLiquidity[] = vaultsData.map((vault, index) => ({
-          nationCode: vault.nation_code,
-          nationName: vault.nation_name,
+        const transformedData: NationalLiquidity[] = vaultsData.map((vault: { nation_code?: string; nation_name?: string; balance_vida?: number; balance_usd?: number }, index: number): NationalLiquidity => ({
+          nationCode: vault.nation_code ?? '',
+          nationName: vault.nation_name ?? '',
           reservesVIDA: Number(vault.balance_vida || 0),
           reservesUSD: Number(vault.balance_usd || 0),
           citizenCount: 0, // TODO: Add citizen count to database
@@ -130,7 +130,7 @@ export default function NationalLiquidityGrid() {
               </tr>
             </thead>
             <tbody>
-              {topNations.map((nation, index) => (
+              {topNations.map((nation: NationalLiquidity, index: number) => (
                 <motion.tr
                   key={nation.nationCode}
                   initial={{ opacity: 0, x: -20 }}

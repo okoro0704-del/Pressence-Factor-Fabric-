@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const supabase = createClient(url, key);
+    const supabase = createClient(url, key) as any;
     const { error } = await supabase.rpc('reload_pgrst_schema');
     if (error) {
       return NextResponse.json(

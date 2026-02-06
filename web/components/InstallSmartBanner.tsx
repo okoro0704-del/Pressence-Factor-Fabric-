@@ -75,10 +75,10 @@ export function InstallSmartBanner() {
               <button
                 type="button"
                 onClick={handleInstall}
-                disabled={installing}
+                disabled={isInstalling}
                 className="rounded-lg bg-[#D4AF37] px-3 py-1.5 text-xs font-semibold text-[#0A0A0A] hover:bg-[#c9a227] disabled:opacity-60 touch-manipulation"
               >
-                {installing ? 'Installing…' : 'Install now'}
+                {isInstalling ? 'Installing…' : 'Install now'}
               </button>
             ) : (
               <span className="text-xs text-[#D4AF37]">

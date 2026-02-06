@@ -136,7 +136,7 @@ export function NationalReserveCharts() {
 
         <div className="bg-[#0d0d0f] rounded-lg p-4 border border-[#2a2a2e]">
           <p className="text-xs text-[#6b6b70] mb-1">Infrastructure Burn</p>
-          <p className="text-xl font-bold text-[#c9a227]">{reserve.burn_rate_infrastructure}</p>
+          <p className="text-xl font-bold text-[#c9a227]">{displayReserve.burn_rate_infrastructure}</p>
           <p className="text-xs text-[#6b6b70] mt-1">Monthly</p>
         </div>
 

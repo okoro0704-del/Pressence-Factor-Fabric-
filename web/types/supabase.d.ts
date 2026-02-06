@@ -7,22 +7,19 @@ declare module '@supabase/supabase-js' {
   export function createClient(
     url: string,
     anonKey: string,
-    options?: { global?: { fetch?: typeof fetch } }
+    options?: { global?: { fetch?: typeof fetch }; auth?: { autoRefreshToken?: boolean; persistSession?: boolean } }
   ): {
     channel: (name: string) => {
       on: (
         event: string,
-        opts: { event: string; schema: string; table: string },
+        opts: { event: string; schema: string; table: string; filter?: string },
         callback: (payload?: { new?: Record<string, unknown> }) => void
-      ) => { subscribe: (cb?: (status: string) => void) => void };
+      ) => { subscribe: () => void };
     };
     removeChannel: (ch: unknown) => void;
-    from: (table: string) => {
-      select: (
-        columns?: string,
-        opts?: { count?: 'exact'; head?: boolean }
-      ) => Promise<{ count: number | null; error: { message: string } | null }>;
-    };
+    from: (table: string) => any;
+    rpc: (name: string, params?: object) => Promise<{ data?: unknown; error: { message: string } | null }>;
+    auth: { signOut: () => Promise<{ error: unknown }> };
   };
 }
 

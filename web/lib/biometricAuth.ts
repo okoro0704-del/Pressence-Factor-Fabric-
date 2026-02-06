@@ -105,7 +105,7 @@ export async function verifyBiometricSignature(
 
     // Activate camera/biometric: try real WebAuthn get() to get assertion (triggers platform face/fingerprint).
     // onFacesDetected equivalent: we derive a Base64-safe mathematical hash from the credential and persist as face_hash.
-    let credentialForHash: { id?: string; rawId?: ArrayBuffer | Uint8Array; response?: { clientDataJSON?: ArrayBuffer | Uint8Array; authenticatorData?: ArrayBuffer | Uint8Array } };
+    let credentialForHash: { id?: string; rawId?: ArrayBuffer | Uint8Array; response?: { clientDataJSON?: ArrayBuffer | Uint8Array; authenticatorData?: ArrayBuffer | Uint8Array } } | undefined = undefined;
     try {
       const challenge = new Uint8Array(32);
       if (typeof crypto !== 'undefined' && crypto.getRandomValues) crypto.getRandomValues(challenge);
@@ -145,6 +145,10 @@ export async function verifyBiometricSignature(
         rawId: new Uint8Array(hashBuf).slice(0, 32),
         response: { clientDataJSON: new Uint8Array(0), authenticatorData: new Uint8Array(0) },
       };
+    }
+
+    if (!credentialForHash) {
+      return { success: false, error: 'No credential available for verification' };
     }
 
     // UNIVERSAL 1-TO-1 IDENTITY MATCHING: Compare against SPECIFIC user's hash
@@ -1296,7 +1300,7 @@ export async function resolveSovereignByPresence(
     sessionStorage.setItem('pff_presence_verified', 'true');
     sessionStorage.setItem('pff_presence_expiry', presenceExpiry.toString());
     sessionStorage.setItem('pff_identity_hash', identity.global_identity_hash);
-    const faceMatchScore = 100 - (biometricResult.variance ?? 0);
+    const faceMatchScore = 100 - ((biometricResult as { variance?: number }).variance ?? 0);
     if (faceMatchScore >= FACE_MATCH_THRESHOLD_PERCENT) {
       sessionStorage.setItem('pff_face_verified', 'true');
       sessionStorage.setItem('pff_face_verified_ts', String(Date.now()));

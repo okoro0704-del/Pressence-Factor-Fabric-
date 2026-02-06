@@ -8,7 +8,7 @@
 import { supabase } from './biometricAuth';
 
 /** Use any to avoid Supabase client chain type errors (select returns Promise in some typings). */
-const db: any = supabase;
+const db = supabase as any;
 
 export interface DeviceInfo {
   deviceId: string;
@@ -583,9 +583,9 @@ export function subscribeToGuardianRecoveryRequest(
         schema: 'public',
         table: 'guardian_recovery_requests',
         filter: `id=eq.${requestId}`,
-      } as any,
+      },
       (payload: { new?: Record<string, unknown> } | undefined) => {
-        const newRow = (payload?.new ?? undefined) as { status?: string; current_approvals?: number } | undefined;
+        const newRow = payload?.new as { status?: string; current_approvals?: number } | undefined;
         const newStatus = newRow?.status;
         const currentApprovals = newRow?.current_approvals ?? 0;
         if (newStatus === 'APPROVED' || newStatus === 'DENIED' || newStatus === 'EXPIRED') {
