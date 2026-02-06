@@ -12,6 +12,7 @@ import { setIdentityAnchorForSession } from '@/lib/sentinelActivation';
 import { useGlobalPresenceGateway } from '@/contexts/GlobalPresenceGateway';
 import { setSessionIdentity } from '@/lib/sessionIsolation';
 import { logGuestAccessIfNeeded } from '@/lib/guestMode';
+import { getLinkedMobileDeviceId } from '@/lib/phoneIdBridge';
 import { Loader2, Smartphone, ShieldCheck } from 'lucide-react';
 
 const jetbrains = JetBrains_Mono({ weight: ['400', '600', '700'], subsets: ['latin'] });
@@ -36,7 +37,9 @@ export function RemoteLoginScreen({ onSuccess, onCancel }: RemoteLoginScreenProp
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showBindNewDevice, setShowBindNewDevice] = useState(false);
+  const [linkedDevice, setLinkedDevice] = useState<{ maskedId: string; deviceName: string | null } | null>(null);
   const pendingPhoneRef = useRef<string | null>(null);
+  const isPc = typeof navigator !== 'undefined' && !/Android|iPhone|iPad|iPod|webOS|Mobile/i.test(navigator.userAgent);
 
   const handleSubmitId = async () => {
     const trimmed = sovereignId.trim().replace(/\D/g, '');
@@ -47,6 +50,11 @@ export function RemoteLoginScreen({ onSuccess, onCancel }: RemoteLoginScreenProp
     const phone = trimmed.startsWith('+') ? trimmed : `+${trimmed}`;
     setError(null);
     setLoading(true);
+    if (isPc) {
+      const info = await getLinkedMobileDeviceId(phone);
+      if (info) setLinkedDevice({ maskedId: info.maskedId, deviceName: info.deviceName });
+      else setLinkedDevice(null);
+    }
     setStep('face');
     try {
       const bioResult = await verifyBiometricSignature(phone);
@@ -210,6 +218,12 @@ export function RemoteLoginScreen({ onSuccess, onCancel }: RemoteLoginScreenProp
             {error}
           </div>
         )}
+        {step === 'face' && linkedDevice && (
+          <p className="text-xs font-mono mb-3 px-3 py-2 rounded-lg border" style={{ color: '#6b6b70', borderColor: 'rgba(212,175,55,0.3)' }}>
+            Phone ID (linked device): {linkedDevice.maskedId}
+            {linkedDevice.deviceName ? ` · ${linkedDevice.deviceName}` : ''}
+          </p>
+        )}
         <div className="flex flex-col gap-3">
           <button
             type="button"
@@ -238,6 +252,12 @@ export function RemoteLoginScreen({ onSuccess, onCancel }: RemoteLoginScreenProp
               Cancel
             </button>
           )}
+          <Link
+            href="/link-device"
+            className="text-center text-sm py-2 text-[#6b6b70] hover:text-[#e8c547] transition-colors"
+          >
+            Link Device — scan laptop QR to approve login
+          </Link>
         </div>
       </div>
     </div>

@@ -17,6 +17,7 @@ import {
 } from '@/lib/biometricAuth';
 import { PresenceProgressRing } from './PresenceProgressRing';
 import type { GlobalIdentity } from '@/lib/phoneIdentity';
+import { resolvePhoneToIdentity } from '@/lib/phoneIdentity';
 import { isVocalResonanceExempt, isIdentityMinor, type BiometricIdentityRecord } from '@/lib/universalIdentityComparison';
 import type { LanguageCode } from '@/lib/i18n/config';
 import { getStoredLanguage } from '@/lib/i18n/config';
@@ -72,10 +73,21 @@ import type { DeviceInfo } from '@/lib/multiDeviceVitalization';
 import { RecoverMyAccountScreen } from '@/components/auth/RecoverMyAccountScreen';
 import { BiometricPillar, type BiometricPillarHandle } from '@/components/auth/BiometricPillar';
 import { AwaitingLoginApproval } from '@/components/auth/AwaitingLoginApproval';
+import { LoginQRDisplay } from '@/components/auth/LoginQRDisplay';
 import { ArchitectVisionCapture } from '@/components/auth/ArchitectVisionCapture';
 import { speakSovereignAlignmentFailed } from '@/lib/sovereignVoice';
 import { useBiometricSession } from '@/contexts/BiometricSessionContext';
 import { createLoginRequest, completeLoginBridge } from '@/lib/loginRequest';
+import { setTripleAnchorVerified } from '@/lib/tripleAnchor';
+import { getAssertion, isWebAuthnSupported } from '@/lib/webauthn';
+import { getLinkedMobileDeviceId } from '@/lib/phoneIdBridge';
+import { useSoftStart, incrementTrustLevel } from '@/lib/trustLevel';
+import { recordDailyScan, getVitalizationStatus, DAILY_UNLOCK_VIDA_AMOUNT } from '@/lib/vitalizationRitual';
+import { getBiometricStrictness, strictnessToConfig } from '@/lib/biometricStrictness';
+import { PalmPulseCapture } from '@/components/auth/PalmPulseCapture';
+import { verifyOrEnrollPalm } from '@/lib/palmHashProfile';
+import { DailyUnlockCelebration } from '@/components/dashboard/DailyUnlockCelebration';
+import { useSovereignCompanion } from '@/contexts/SovereignCompanionContext';
 
 const jetbrains = JetBrains_Mono({ weight: ['400', '600', '700'], subsets: ['latin'] });
 
@@ -188,15 +200,49 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
   const [transitioningToDashboard, setTransitioningToDashboard] = useState(false);
   /** Master Architect Initialization: first person to register in empty DB gets Low sensitivity + Architect role + 5 VIDA. */
   const [isFirstRun, setIsFirstRun] = useState(false);
+  /** Phone ID Bridge: on PC, show linked mobile device ID from profiles (primary_sentinel_device_id). */
+  const [linkedDevice, setLinkedDevice] = useState<{ maskedId: string; deviceName: string | null } | null>(null);
+  /** Soft Start: first 10 logins use LOW sensitivity (no strict lighting/confidence barriers). */
+  const [softStart, setSoftStart] = useState(true);
+  /** Daily Unlock Celebration: full-screen overlay when recordDailyScan confirms $100 (0.1 VIDA) added (Days 2–9). */
+  const [showDailyUnlockCelebration, setShowDailyUnlockCelebration] = useState(false);
+  const [celebrationData, setCelebrationData] = useState<{ streak: number; newSpendableVida?: number; isDay9: boolean } | null>(null);
+  /** Dual-Pillar: after Face Pulse, show Palm Pulse (Palm Wave) to authorize $100 daily unlock; replaces fingerprint. */
+  const [showPalmPulse, setShowPalmPulse] = useState(false);
+  const [palmPulseError, setPalmPulseError] = useState<string | null>(null);
+  /** Face Pulse fail count: after 2 failures show "Use Backup Anchor" (Fingerprint + Device ID only). */
+  const [faceFailCount, setFaceFailCount] = useState(0);
+  /** Biometric sensitivity for Architect Vision: from profile slider; overridden by soft-start (streak < 10 or first run) to 0.3 / no brightness. */
+  const [visionConfidenceThreshold, setVisionConfidenceThreshold] = useState(0.3);
+  const [visionEnforceBrightness, setVisionEnforceBrightness] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const { setPresenceVerified } = useGlobalPresenceGateway();
+  const { setSpendableVidaAnimation } = useSovereignCompanion();
 
   useEffect(() => {
     if (typeof navigator !== 'undefined') {
       setIsMobile(/Android|iPhone|iPad|iPod|webOS|Mobile/i.test(navigator.userAgent));
     }
   }, []);
+
+  // Phone ID Bridge: on PC, fetch linked mobile device ID from profiles for display
+  useEffect(() => {
+    if (!identityAnchor?.phone || isMobile) {
+      setLinkedDevice(null);
+      return;
+    }
+    getLinkedMobileDeviceId(identityAnchor.phone).then((info) => {
+      if (info) setLinkedDevice({ maskedId: info.maskedId, deviceName: info.deviceName });
+      else setLinkedDevice(null);
+    });
+  }, [identityAnchor?.phone, isMobile]);
+
+  // Soft Start: use low sensitivity for first 10 successful logins
+  useEffect(() => {
+    if (!identityAnchor?.phone) return;
+    useSoftStart(identityAnchor.phone).then(setSoftStart);
+  }, [identityAnchor?.phone]);
 
   // Master Architect Initialization: detect empty DB so first registrant gets Low sensitivity and Architect role
   useEffect(() => {
@@ -205,6 +251,29 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
       if (r.isFirst) setIsFirstRun(true);
     });
   }, [identityAnchor?.phone]);
+
+  // Wire Biometric Slider to Face Pulse: fetch strictness + vitalization streak; soft-start (streak < 10 or first run) forces 0.3 / no brightness
+  useEffect(() => {
+    if (!identityAnchor?.phone) return;
+    let cancelled = false;
+    Promise.all([
+      getVitalizationStatus(identityAnchor.phone),
+      getBiometricStrictness(identityAnchor.phone),
+    ]).then(([status, strictness]) => {
+      if (cancelled) return;
+      const streak = status?.streak ?? 0;
+      const enforceSoftStart = streak < 10 || isFirstRun;
+      if (enforceSoftStart) {
+        setVisionConfidenceThreshold(0.3);
+        setVisionEnforceBrightness(false);
+      } else {
+        const config = strictnessToConfig(strictness);
+        setVisionConfidenceThreshold(config.confidenceThreshold);
+        setVisionEnforceBrightness(config.enforceBrightnessCheck);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [identityAnchor?.phone, isFirstRun]);
 
   // Restore pillar state from localStorage so refresh doesn't require re-verifying HW/GPS
   useEffect(() => {
@@ -526,6 +595,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     if (hubVerification) {
       const faceOk = await verifyHubEnrollment(identityAnchor.phone);
       if (!faceOk.ok) {
+        setFaceFailCount((c) => c + 1);
         setAuthStatus(AuthStatus.FAILED);
         setResult({ success: false, status: AuthStatus.FAILED, layer: AuthLayer.BIOMETRIC_SIGNATURE, errorMessage: faceOk.error, layersPassed: [] });
         biometricPendingRef.current = false;
@@ -568,6 +638,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     if (authResult.timedOut) {
       setShowArchitectVision(false);
       speakSovereignAlignmentFailed();
+      setFaceFailCount((c) => c + 1);
       setAuthStatus(AuthStatus.FAILED);
       setShowTimeoutBypass(true);
       setShowVerifyFromAuthorizedDevice(true);
@@ -589,6 +660,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     } else {
       setShowArchitectVision(false);
       speakSovereignAlignmentFailed();
+      setFaceFailCount((c) => c + 1);
       setAuthStatus(AuthStatus.FAILED);
       const deviceInfo = getCurrentDeviceInfo();
       const compositeForCheck = await getCompositeDeviceFingerprint();
@@ -625,56 +697,131 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     }
   }, [identityAnchor, goToDashboard, isMobile, hubVerification]);
 
-  /** After Architect Vision gold freeze (0.5s), run the success flow (dashboard / Sacred Record / Awaiting Auth). */
-  const handleArchitectVisionComplete = useCallback(async () => {
-    setBiometricSessionVerified(); // 15-min Auth-Active so Treasury/Swap don't re-prompt
-    setShowArchitectVision(false);
-    setArchitectVerificationSuccess(null);
-    const p = architectSuccessRef.current;
-    architectSuccessRef.current = null;
-    if (!p) return;
-    const { authResult, identityAnchor: anchor, isNewDevice: newDev, deviceInfo, compositeDeviceId: compId, effectiveMobile: mobile } = p;
-    if (authResult.externalScannerSerialNumber != null) {
-      setLastExternalScannerSerial(authResult.externalScannerSerialNumber);
-      setLastExternalFingerprintHash(authResult.externalFingerprintHash ?? null);
-    }
-    const isAuthorized = !newDev;
-    if (!isAuthorized) {
-      const primaryDevice = await getPrimaryDevice(anchor.phone);
-      if (!primaryDevice) {
-        const hasSeed = await hasRecoverySeed(anchor.phone);
-        if (!hasSeed) {
-          const seed = generateMnemonic12();
-          setGeneratedSeed(seed);
-          setSacredRecordDeviceContext({ deviceInfo, compositeDeviceId: compId });
-          setShowSacredRecord(true);
-          setAuthStatus(AuthStatus.IDLE);
-          biometricPendingRef.current = false;
+  /** Run after second pillar (Palm Pulse or fallback fingerprint) is verified. Uses architect payload p. */
+  const proceedAfterSecondPillar = useCallback(
+    async (p: NonNullable<typeof architectSuccessRef.current>) => {
+      const { authResult, identityAnchor: anchor, isNewDevice: newDev, deviceInfo, compositeDeviceId: compId, effectiveMobile: mobile } = p;
+      const isAuthorized = !newDev;
+      if (!isAuthorized) {
+        const primaryDevice = await getPrimaryDevice(anchor.phone);
+        if (!primaryDevice) {
+          const hasSeed = await hasRecoverySeed(anchor.phone);
+          if (!hasSeed) {
+            const seed = generateMnemonic12();
+            setGeneratedSeed(seed);
+            setSacredRecordDeviceContext({ deviceInfo, compositeDeviceId: compId });
+            setShowSacredRecord(true);
+            setAuthStatus(AuthStatus.IDLE);
+            biometricPendingRef.current = false;
+            return;
+          }
+          const ipAddress = 'unknown';
+          const geolocation = { city: 'Lagos', country: 'Nigeria', latitude: 6.5244, longitude: 3.3792 };
+          await assignPrimarySentinel(anchor.phone, anchor.name, deviceInfo, ipAddress, geolocation, compId, authResult.externalScannerSerialNumber ?? null, authResult.externalFingerprintHash ?? null, isFirstRun);
+          if (isFirstRun) {
+            const grant = await creditArchitectVidaGrant(anchor.phone);
+            if (!grant.ok) console.warn('[PFF] Architect 5 VIDA grant failed:', grant.error);
+          }
+          if (mobile) await setMintStatus(anchor.phone, MINT_STATUS_PENDING_HARDWARE);
+          const ritual = await recordDailyScan(anchor.phone);
+          if (ritual.ok && (ritual.unlockedToday || ritual.justUnlocked)) {
+            setCelebrationData({ streak: ritual.streak, newSpendableVida: ritual.newSpendableVida, isDay9: ritual.justUnlocked ?? false });
+            if (ritual.newSpendableVida != null) {
+              setSpendableVidaAnimation({ from: ritual.newSpendableVida - DAILY_UNLOCK_VIDA_AMOUNT, to: ritual.newSpendableVida });
+            }
+            setShowDailyUnlockCelebration(true);
+          } else {
+            await goToDashboard();
+          }
           return;
         }
         const ipAddress = 'unknown';
         const geolocation = { city: 'Lagos', country: 'Nigeria', latitude: 6.5244, longitude: 3.3792 };
-        await assignPrimarySentinel(anchor.phone, anchor.name, deviceInfo, ipAddress, geolocation, compId, authResult.externalScannerSerialNumber ?? null, authResult.externalFingerprintHash ?? null, isFirstRun);
-        if (isFirstRun) {
-          const grant = await creditArchitectVidaGrant(anchor.phone);
-          if (!grant.ok) console.warn('[PFF] Architect 5 VIDA grant failed:', grant.error);
-        }
-        if (mobile) await setMintStatus(anchor.phone, MINT_STATUS_PENDING_HARDWARE);
-        await goToDashboard();
+        const requestId = await createVitalizationRequest(anchor.phone, deviceInfo, ipAddress, geolocation, compId, authResult.externalScannerSerialNumber ?? null, authResult.externalFingerprintHash ?? null);
+        setVitalizationRequestId(requestId);
+        setPrimaryDeviceInfo({ device_name: primaryDevice.device_name, last_4_digits: primaryDevice.last_4_digits });
+        setShowAwaitingAuth(true);
         return;
       }
-      const ipAddress = 'unknown';
-      const geolocation = { city: 'Lagos', country: 'Nigeria', latitude: 6.5244, longitude: 3.3792 };
-      const requestId = await createVitalizationRequest(anchor.phone, deviceInfo, ipAddress, geolocation, compId, authResult.externalScannerSerialNumber ?? null, authResult.externalFingerprintHash ?? null);
-      setVitalizationRequestId(requestId);
-      setPrimaryDeviceInfo({ device_name: primaryDevice.device_name, last_4_digits: primaryDevice.last_4_digits });
-      setShowAwaitingAuth(true);
-      return;
+      await updateDeviceLastUsed(compId);
+      if (authResult.externalScannerSerialNumber != null) await setHumanityScoreVerified(anchor.phone);
+      await incrementTrustLevel(anchor.phone);
+      const ritual = await recordDailyScan(anchor.phone);
+      if (ritual.ok && (ritual.unlockedToday || ritual.justUnlocked)) {
+        setCelebrationData({ streak: ritual.streak, newSpendableVida: ritual.newSpendableVida, isDay9: ritual.justUnlocked ?? false });
+        if (ritual.newSpendableVida != null) {
+          setSpendableVidaAnimation({ from: ritual.newSpendableVida - DAILY_UNLOCK_VIDA_AMOUNT, to: ritual.newSpendableVida });
+        }
+        setShowDailyUnlockCelebration(true);
+      } else {
+        await goToDashboard();
+      }
+    },
+    [goToDashboard, isFirstRun, setSpendableVidaAnimation]
+  );
+
+  /** Dual-Pillar: Scan 1 Face Pulse (done), Scan 2 Palm Pulse (Palm Wave) to authorize $100 daily unlock. */
+  const handleArchitectVisionComplete = useCallback(async () => {
+    setBiometricSessionVerified();
+    setShowArchitectVision(false);
+    setArchitectVerificationSuccess(null);
+    const p = architectSuccessRef.current;
+    if (!p) return;
+    const { authResult, identityAnchor: anchor } = p;
+    if (authResult.externalScannerSerialNumber != null) {
+      setLastExternalScannerSerial(authResult.externalScannerSerialNumber);
+      setLastExternalFingerprintHash(authResult.externalFingerprintHash ?? null);
     }
-    await updateDeviceLastUsed(compId);
-    if (authResult.externalScannerSerialNumber != null) await setHumanityScoreVerified(anchor.phone);
-    await goToDashboard();
-  }, [goToDashboard, setBiometricSessionVerified, isFirstRun]);
+    setTripleAnchorVerified('face');
+    setTripleAnchorVerified('device');
+    setPalmPulseError(null);
+    setShowPalmPulse(true);
+  }, [setBiometricSessionVerified]);
+
+  const handlePalmSuccess = useCallback(
+    async (palmHash: string) => {
+      const p = architectSuccessRef.current;
+      architectSuccessRef.current = null;
+      setPalmPulseError(null);
+      if (!p) {
+        setShowPalmPulse(false);
+        return;
+      }
+      const verify = await verifyOrEnrollPalm(p.identityAnchor.phone, palmHash);
+      if (!verify.ok) {
+        setPalmPulseError(verify.error);
+        return;
+      }
+      setTripleAnchorVerified('fingerprint');
+      setShowPalmPulse(false);
+      await proceedAfterSecondPillar(p);
+    },
+    [proceedAfterSecondPillar]
+  );
+
+  const handlePalmClose = useCallback(() => {
+    const p = architectSuccessRef.current;
+    setShowPalmPulse(false);
+    setPalmPulseError(null);
+    if (!p) return;
+    if (isWebAuthnSupported()) {
+      getAssertion()
+        .then((fpResult) => {
+          if (fpResult) {
+            setTripleAnchorVerified('fingerprint');
+            architectSuccessRef.current = null;
+            proceedAfterSecondPillar(p);
+          } else {
+            architectSuccessRef.current = null;
+          }
+        })
+        .catch(() => {
+          architectSuccessRef.current = null;
+        });
+    } else {
+      architectSuccessRef.current = null;
+    }
+  }, [proceedAfterSecondPillar]);
 
   const handleMismatchDismiss = () => {
     setShowMismatchScreen(false);
@@ -746,6 +893,55 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     setShowAwaitingAuth(false);
     setShowGuardianRecovery(true);
   };
+
+  /** Backup Anchor: Fingerprint + Device ID only (no face). After 2 face failures, show button; on click verify FP + device then run success flow. */
+  const handleBackupAnchor = useCallback(async () => {
+    if (!identityAnchor) return;
+    try {
+      const fpResult = await getAssertion();
+      if (!fpResult) {
+        setResult((r) => (r ? { ...r, errorMessage: 'Fingerprint verification failed or was cancelled.' } : r));
+        return;
+      }
+      const compId = await getCompositeDeviceFingerprint();
+      const authorized = await isDeviceAuthorized(identityAnchor.phone, compId);
+      if (!authorized) {
+        setResult((r) => (r ? { ...r, errorMessage: 'This device is not authorized. Use an authorized device or Verify from an authorized device.' } : r));
+        return;
+      }
+      const identity = await resolvePhoneToIdentity(identityAnchor.phone);
+      if (!identity) {
+        setResult((r) => (r ? { ...r, errorMessage: 'Could not load identity. Try again or verify from an authorized device.' } : r));
+        return;
+      }
+      const deviceInfo = getCurrentDeviceInfo();
+      const effectiveMobile = /iPhone|iPad|Android/i.test(typeof navigator !== 'undefined' ? navigator.userAgent : '');
+      const authResult: BiometricAuthResult = {
+        success: true,
+        status: AuthStatus.IDENTIFIED,
+        layer: null,
+        identity,
+        layersPassed: [AuthLayer.BIOMETRIC_SIGNATURE],
+      };
+      architectSuccessRef.current = {
+        authResult,
+        identityAnchor,
+        isNewDevice: false,
+        deviceInfo,
+        compositeDeviceId: compId,
+        effectiveMobile,
+      };
+      setAuthStatus(AuthStatus.IDLE);
+      setResult(null);
+      setShowVerifyFromAuthorizedDevice(false);
+      setShowTimeoutBypass(false);
+      setArchitectVerificationSuccess(true);
+      setShowArchitectVision(true);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setResult((r) => (r ? { ...r, errorMessage: `Backup Anchor failed: ${msg}` } : r));
+    }
+  }, [identityAnchor]);
 
   /** DEVICE HANDSHAKE: Verify from an authorized device — fetch primary and show Guardian Recovery */
   const handleVerifyFromAuthorizedDevice = async () => {
@@ -917,10 +1113,17 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     alert('Login was denied on your phone. Try again or use biometrics on this device.');
   }, []);
 
-  /** Computer: create login_request and show "Waiting for approval on your phone". */
+  /** Computer: create login_request with laptop device_id (Trusted Device), then show Session QR. Phone scans → Realtime → Triple Lock animation → Dashboard. */
   const handleLoginViaPhone = useCallback(async () => {
     if (!identityAnchor) return;
-    const deviceInfo = typeof navigator !== 'undefined' ? { userAgent: navigator.userAgent, platform: navigator.platform } : undefined;
+    const deviceInfoObj = getCurrentDeviceInfo();
+    const compositeDeviceId = await getCompositeDeviceFingerprint();
+    const deviceInfo: Record<string, unknown> = {
+      userAgent: navigator.userAgent,
+      platform: navigator.platform,
+      laptop_device_id: compositeDeviceId,
+      laptop_device_name: deviceInfoObj.deviceName ?? 'Trusted Laptop',
+    };
     const res = await createLoginRequest(identityAnchor.phone, identityAnchor.name, deviceInfo);
     if (res.ok) {
       setLoginRequestId(res.requestId);
@@ -1290,7 +1493,16 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     );
   }
 
-  // Login via phone: computer created login_request; waiting for phone to approve. Realtime subscribes to row; on APPROVED → Vault.
+  // Login via phone: Desktop shows Session QR; phone scans via Link Device → Realtime → Triple Lock animation → Dashboard. Laptop stored as Trusted Device.
+  if (showAwaitingLoginApproval && loginRequestId && identityAnchor && !effectiveMobile) {
+    return (
+      <LoginQRDisplay
+        requestId={loginRequestId}
+        onDenied={handleLoginRequestDenied}
+        onError={(msg) => { setShowAwaitingLoginApproval(false); setLoginRequestId(null); alert(msg); }}
+      />
+    );
+  }
   if (showAwaitingLoginApproval && loginRequestId && identityAnchor) {
     return (
       <AwaitingLoginApproval
@@ -1425,6 +1637,13 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
               <p className="text-xs font-mono" style={{ color: '#a0a0a5' }} title="Phone masked for privacy">
                 {maskPhoneForDisplay(identityAnchor.phone)}
               </p>
+              {/* Phone ID Bridge: on PC, show linked mobile device ID from profiles */}
+              {linkedDevice && (
+                <p className="text-xs font-mono mt-2" style={{ color: '#6b6b70' }} title="Linked device (primary_sentinel_device_id)">
+                  Phone ID: {linkedDevice.maskedId}
+                  {linkedDevice.deviceName ? ` · ${linkedDevice.deviceName}` : ''}
+                </p>
+              )}
             </div>
             <div className="text-3xl">🔗</div>
           </div>
@@ -1602,17 +1821,31 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
 
         {authStatus === AuthStatus.FAILED && result && (
           <div className="p-6 rounded-lg bg-red-500/10 border-2 border-red-500 transition-all duration-200">
-            <p className="text-red-500 font-bold text-center mb-4">
-              {result.timedOut ? '⏱️ Verification Timed Out (5s)' : '❌ Authentication Failed'}
-              {result.twoPillarsOnly && ' — Only 2/4 pillars met'}
+            <p className="text-[#e8c547] font-bold text-center mb-2">
+              Still getting to know you...
             </p>
-            <p className="text-sm text-[#6b6b70] text-center mb-4">{result.errorMessage}</p>
+            <p className="text-sm text-[#a0a0a5] text-center mb-4">
+              Try the Backup Anchor if needed.
+            </p>
+            {result.errorMessage && (
+              <p className="text-xs text-[#6b6b70] text-center mb-4">{result.errorMessage}</p>
+            )}
             {(result.timedOut || result.twoPillarsOnly) && (
               <p className="text-xs text-[#e8c547] text-center mb-4">
                 Use Verification with Master Device or Elderly-First Manual Bypass.
               </p>
             )}
             <div className="flex flex-col gap-3">
+              {faceFailCount >= 2 && (
+                <button
+                  type="button"
+                  onClick={handleBackupAnchor}
+                  className="relative z-50 w-full py-3 rounded-lg font-bold uppercase tracking-wider transition-all duration-200 cursor-pointer border-2 text-black"
+                  style={{ background: '#D4AF37', borderColor: '#D4AF37', boxShadow: '0 0 20px rgba(212, 175, 55, 0.5)' }}
+                >
+                  Use Backup Anchor
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => {
@@ -1680,8 +1913,42 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
         }}
         verificationSuccess={architectVerificationSuccess}
         onComplete={handleArchitectVisionComplete}
-        isMasterArchitectInit={isFirstRun}
+        isMasterArchitectInit={isFirstRun || softStart}
+        confidenceThreshold={visionConfidenceThreshold}
+        enforceBrightnessCheck={visionEnforceBrightness}
       />
+
+      {/* Dual-Pillar Scan 2: Palm Pulse (Palm Wave) — contactless palm verification, replaces fingerprint for daily unlock */}
+      {showPalmPulse && (
+        <>
+          {palmPulseError && (
+            <div className="fixed top-20 left-4 right-4 z-[301] rounded-lg bg-red-500/20 border border-red-500/50 px-4 py-2 text-center text-sm text-red-300">
+              {palmPulseError}
+            </div>
+          )}
+          <PalmPulseCapture
+            isOpen={showPalmPulse}
+            onClose={handlePalmClose}
+            onSuccess={handlePalmSuccess}
+            onError={(msg) => setPalmPulseError(msg)}
+          />
+        </>
+      )}
+
+      {/* Daily Unlock Celebration: full-screen overlay when $100 (0.1 VIDA) is added (Days 2–9) or Day 9 full unlock */}
+      {showDailyUnlockCelebration && celebrationData && (
+        <DailyUnlockCelebration
+          streak={celebrationData.streak}
+          newSpendableVida={celebrationData.newSpendableVida}
+          isDay9={celebrationData.isDay9}
+          onClose={() => {
+            setShowDailyUnlockCelebration(false);
+            setCelebrationData(null);
+            goToDashboard();
+          }}
+          playSound
+        />
+      )}
     </div>
   );
 }

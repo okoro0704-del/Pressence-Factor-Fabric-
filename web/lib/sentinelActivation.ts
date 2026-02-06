@@ -29,6 +29,18 @@ export function getIdentityAnchorPhone(): string | null {
   }
 }
 
+/** Clear identity anchor (for Sign Out). Call together with clearPresenceVerification and gate storage clear. */
+export function clearIdentityAnchorForSession(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem(IDENTITY_ANCHOR_STORAGE_KEY);
+    sessionStorage.removeItem('pff_gate_identity_anchor');
+    localStorage.removeItem('pff_gate_identity_anchor');
+  } catch {
+    // ignore
+  }
+}
+
 /**
  * Get Guardian phone for a Dependent (from sentinel_identities.metadata.guardian_phone).
  * Returns null if not a dependent or no guardian linked.

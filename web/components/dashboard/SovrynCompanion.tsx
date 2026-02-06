@@ -35,15 +35,23 @@ export function SovrynCompanion({
   
   const voiceEngineRef = useRef<VoiceRecognitionEngine | null>(null);
 
-  // Initialize voice recognition engine
+  // Initialize voice recognition engine (local Sovereign Intelligence; catch failures so Companion still renders)
   useEffect(() => {
-    const engine = new VoiceRecognitionEngine({
-      wakeWord: 'sovereign',
-      autoSleepMs: 10000,
-      language: 'en-US',
-      continuous: true,
-      interimResults: true,
-    });
+    let engine: VoiceRecognitionEngine | null = null;
+    try {
+      engine = new VoiceRecognitionEngine({
+        wakeWord: 'sovereign',
+        autoSleepMs: 10000,
+        language: 'en-US',
+        continuous: true,
+        interimResults: true,
+      });
+    } catch (e) {
+      console.warn('[SovrynCompanion] Voice recognition unavailable:', e);
+      setGreeting('Sovereign Intelligence — voice offline.');
+      voiceEngineRef.current = null;
+      return;
+    }
 
     // Register voice commands
     const commands: VoiceCommand[] = [
@@ -90,25 +98,28 @@ export function SovrynCompanion({
       },
     ];
 
-    engine.registerCommands(commands);
-
-    // Set up callbacks
-    engine.onTranscript((text, isFinal) => {
-      setTranscript(text);
-      setIsInterim(!isFinal);
-    });
-
-    engine.onCommand((command) => {
-      console.log(`✓ Command executed: ${command}`);
-    });
-
-    engine.onStateChange((listening) => {
-      setIsListening(listening);
-      if (!listening) {
-        setTranscript('');
-        setIsInterim(false);
-      }
-    });
+    try {
+      engine.registerCommands(commands);
+      engine.onTranscript((text, isFinal) => {
+        setTranscript(text);
+        setIsInterim(!isFinal);
+      });
+      engine.onCommand((command) => {
+        console.log(`✓ Command executed: ${command}`);
+      });
+      engine.onStateChange((listening) => {
+        setIsListening(listening);
+        if (!listening) {
+          setTranscript('');
+          setIsInterim(false);
+        }
+      });
+    } catch (e) {
+      console.warn('[SovrynCompanion] Voice setup failed:', e);
+      setGreeting('Sovereign Intelligence — voice offline.');
+      voiceEngineRef.current = null;
+      return;
+    }
 
     voiceEngineRef.current = engine;
 
@@ -117,11 +128,12 @@ export function SovrynCompanion({
     let timeGreeting = 'Good evening';
     if (hour < 12) timeGreeting = 'Good morning';
     else if (hour < 18) timeGreeting = 'Good afternoon';
-    
     setGreeting(`${timeGreeting}, ${userName || 'Architect'}`);
 
     return () => {
-      engine.destroy();
+      try {
+        engine?.destroy?.();
+      } catch {}
     };
   }, [userName, onScrollToBalance, onOpenSwapModal, onShowVitalizationStatus, onTriggerLockdown]);
 

@@ -15,6 +15,7 @@ import {
   Menu,
 } from 'lucide-react';
 import { useTripleTapReset } from '@/lib/useTripleTapReset';
+import { TerminateSessionListener } from '@/components/dashboard/TerminateSessionListener';
 
 /** Settings nav icon: use named ref so bundler does not drop it (avoids "SlidersHorizontal is not defined"). */
 const SettingsNavIcon = SlidersHorizontal;
@@ -92,6 +93,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Main content — single column on mobile, flex-1 on md+ */}
       <main className="flex-1 flex flex-col min-h-0 pb-20 md:pb-0">
+        <TerminateSessionListener />
         {children}
       </main>
 

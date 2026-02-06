@@ -8,6 +8,8 @@ import { NationalReserveCharts } from '../dashboard/NationalReserveCharts';
 import { NationalBlockCommand } from '../dashboard/NationalBlockCommand';
 import { UserProfileBalance } from '../dashboard/UserProfileBalance';
 import { SovereignIdCard } from '../dashboard/SovereignIdCard';
+import { VitalizationCountdown } from '../dashboard/VitalizationCountdown';
+import { SovereignCompanion } from '../dashboard/SovereignCompanion';
 import { PresenceOverrideModal } from '../dashboard/PresenceOverrideModal';
 import { FamilyVault } from '../dashboard/FamilyVault';
 import { MerchantModeSection } from '../dashboard/MerchantModeSection';
@@ -170,6 +172,7 @@ export function DashboardContent({
           <p className="text-xs text-[#6b6b70] mb-6">
             Quick access to your $1,000 liquid VIDA — Swap, Send, and Receive.
           </p>
+          <VitalizationCountdown phoneNumber={getIdentityAnchorPhone()} />
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div>
               <h3 className="text-sm font-semibold text-[#6b6b70] uppercase tracking-wider mb-3">
@@ -330,6 +333,12 @@ export function DashboardContent({
         isOpen={showPresenceModal}
         onClose={() => setShowPresenceModal(false)}
         onPresenceVerified={handlePresenceVerified}
+      />
+
+      {/* Sovereign Companion: daily briefing, credit message, Eyes (voice cues during Face/Palm scan) */}
+      <SovereignCompanion
+        userName="Architect"
+        phoneNumber={getIdentityAnchorPhone()}
       />
     </div>
   );

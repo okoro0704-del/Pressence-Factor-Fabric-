@@ -119,14 +119,21 @@ export async function ensureMintedAndBalance(phoneNumber: string): Promise<{ ok:
       console.warn('[mintStatus] ensure_minted_and_balance_rpc failed, trying direct update:', rpcError.message);
     }
 
-    const { error: profileError } = await (supabase as any)
+    const payload: Record<string, unknown> = {
+      is_minted: true,
+      spendable_vida: 0.1,
+      locked_vida: 4.9,
+      updated_at: new Date().toISOString(),
+    };
+    let { error: profileError } = await (supabase as any)
       .from('user_profiles')
-      .update({
-        is_minted: true,
-        spendable_vida: 1,
-        updated_at: new Date().toISOString(),
-      })
+      .update(payload)
       .eq('phone_number', trimmed);
+    if (profileError && /column.*locked_vida|does not exist/i.test(profileError.message ?? '')) {
+      delete payload.locked_vida;
+      const retry = await (supabase as any).from('user_profiles').update(payload).eq('phone_number', trimmed);
+      profileError = retry.error;
+    }
     if (profileError) return { ok: false, error: profileError.message ?? 'Failed to set is_minted' };
 
     const { data: wallet } = await (supabase as any)

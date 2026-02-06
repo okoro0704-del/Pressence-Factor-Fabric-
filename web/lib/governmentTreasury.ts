@@ -7,7 +7,9 @@
 import { supabase, hasSupabase } from './supabase';
 import { FALLBACK_TOTAL_NATIONAL_RESERVE_ACCUMULATED } from './sovereigntyFallbacks';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_PFF_BACKEND_URL || '';
+/** Only attempt backend fetch when set; otherwise use Supabase/fallback so UI stays functional. */
+const BACKEND_URL = (process.env.NEXT_PUBLIC_PFF_BACKEND_URL ?? '').trim();
+const hasBackend = (): boolean => BACKEND_URL.length > 0;
 const GOVERNMENT_TREASURY_VIDA = 5.0;
 
 export interface CitizenImpactEntry {
@@ -52,7 +54,7 @@ export async function fetchReserveCounter(): Promise<number> {
         return total > 0 ? total : FALLBACK_TOTAL_NATIONAL_RESERVE_ACCUMULATED;
       }
     }
-    if (BACKEND_URL) {
+    if (hasBackend()) {
       const res = await fetch(`${BACKEND_URL}/economic/vida-cap/national-reserve-accumulated`);
       if (res.ok) {
         const data = await res.json();
@@ -87,7 +89,7 @@ export async function fetchCitizenImpactFeed(limit = 50): Promise<CitizenImpactE
         }));
       }
     }
-    if (BACKEND_URL) {
+    if (hasBackend()) {
       const res = await fetch(`${BACKEND_URL}/economic/treasury/citizen-impact?limit=${limit}`);
       if (res.ok) {
         const data = await res.json();
@@ -118,7 +120,7 @@ function getMockCitizenImpactFeed(limit: number): CitizenImpactEntry[] {
 
 /** Treasury growth over last 30 days (cumulative 5 VIDA per citizen). */
 export async function fetchTreasuryGrowthLast30Days(): Promise<TreasuryGrowthDay[]> {
-  if (BACKEND_URL) {
+  if (hasBackend()) {
     try {
       const res = await fetch(`${BACKEND_URL}/economic/treasury/growth?days=30`);
       if (res.ok) {
@@ -155,7 +157,7 @@ function getMockTreasuryGrowth30(): TreasuryGrowthDay[] {
 
 /** Placeholder: total DLLR converted by citizens in block (from Sovryn/bridge). */
 export async function fetchTotalDllrConvertedInBlock(): Promise<number | null> {
-  if (BACKEND_URL) {
+  if (hasBackend()) {
     try {
       const res = await fetch(`${BACKEND_URL}/economic/treasury/dllr-converted`);
       if (res.ok) {

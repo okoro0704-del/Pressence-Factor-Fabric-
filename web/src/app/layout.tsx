@@ -6,6 +6,8 @@ import { SovereignSeedProvider } from '@/contexts/SovereignSeedContext';
 import { GhostSessionGuard } from '@/components/GhostSessionGuard';
 import { RegisterServiceWorker } from '@/components/RegisterServiceWorker';
 import { BiometricSessionProvider } from '@/contexts/BiometricSessionContext';
+import { SovereignCompanionProvider } from '@/contexts/SovereignCompanionContext';
+import { CompanionEyes } from '@/components/dashboard/CompanionEyes';
 import Script from 'next/script';
 
 export const metadata: Metadata = {
@@ -256,12 +258,15 @@ export default function RootLayout({
         <GlobalPresenceGatewayProvider>
           <BiometricSessionProvider>
           <SovereignSeedProvider>
-            <GhostSessionGuard>
-              {/* app-root: base layer; overlays when inactive must unmount or use pointer-events-none to avoid dead screen */}
-              <div id="app-root" className="relative z-0 min-h-screen">
-                {children}
-              </div>
-            </GhostSessionGuard>
+            <SovereignCompanionProvider>
+              <GhostSessionGuard>
+                {/* app-root: base layer; overlays when inactive must unmount or use pointer-events-none to avoid dead screen */}
+                <div id="app-root" className="relative z-0 min-h-screen">
+                  {children}
+                </div>
+              </GhostSessionGuard>
+              <CompanionEyes />
+            </SovereignCompanionProvider>
           </SovereignSeedProvider>
           </BiometricSessionProvider>
           <HowToInstallTooltip />

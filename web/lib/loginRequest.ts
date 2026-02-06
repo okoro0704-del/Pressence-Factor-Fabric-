@@ -15,6 +15,8 @@ export interface LoginRequestRow {
   device_info: Record<string, unknown> | null;
   created_at: string;
   responded_at: string | null;
+  approver_device_id?: string | null;
+  fingerprint_token?: string | null;
 }
 
 /**
@@ -60,6 +62,36 @@ export async function approveLoginRequest(requestId: string): Promise<{ ok: true
     const { error } = await (supabase as any)
       .from('login_requests')
       .update({ status: 'APPROVED', responded_at: new Date().toISOString() })
+      .eq('id', requestId)
+      .eq('status', 'PENDING');
+    if (error) return { ok: false, error: error.message ?? 'Failed to approve' };
+    return { ok: true };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false, error: msg };
+  }
+}
+
+/**
+ * Approve a login request from phone with Device ID + Fingerprint-Signed Token (Link Device / QR scan flow).
+ * Laptop detects this via Realtime and unlocks. Stores approver_device_id and fingerprint_token on the row.
+ */
+export async function approveLoginRequestWithDeviceToken(
+  requestId: string,
+  approverDeviceId: string,
+  fingerprintToken: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = getSupabase();
+  if (!supabase) return { ok: false, error: 'Supabase not available' };
+  try {
+    const { error } = await (supabase as any)
+      .from('login_requests')
+      .update({
+        status: 'APPROVED',
+        responded_at: new Date().toISOString(),
+        approver_device_id: approverDeviceId.trim(),
+        fingerprint_token: fingerprintToken.trim(),
+      })
       .eq('id', requestId)
       .eq('status', 'PENDING');
     if (error) return { ok: false, error: error.message ?? 'Failed to approve' };
@@ -175,11 +207,33 @@ export async function completeLoginBridge(requestId: string): Promise<
   setIdentityAnchorForSession(phone);
   setSessionIdentity(phone, userId);
 
+  // Security Persistence: store laptop as Trusted Device in authorized_devices for faster future logins
+  const deviceInfo = requestRow.device_info as { laptop_device_id?: string; laptop_device_name?: string } | null;
+  if (deviceInfo?.laptop_device_id && phone) {
+    try {
+      await (supabase as any).from('authorized_devices').insert({
+        phone_number: phone,
+        device_id: deviceInfo.laptop_device_id,
+        device_name: deviceInfo.laptop_device_name ?? 'Trusted Laptop',
+        device_type: 'DESKTOP',
+        hardware_hash: '',
+        is_primary: false,
+        status: 'ACTIVE',
+        authorized_at: new Date().toISOString(),
+        authorized_by_device: requestRow.approver_device_id ?? 'LINK_DEVICE_QR',
+        user_agent: (deviceInfo as any).userAgent ?? null,
+        platform: (deviceInfo as any).platform ?? null,
+      });
+    } catch (e) {
+      console.warn('[loginBridge] Could not add laptop as trusted device:', e);
+    }
+  }
+
   if (profile?.recovery_seed_encrypted && profile?.recovery_seed_iv && profile?.recovery_seed_salt) {
     try {
       if (typeof sessionStorage !== 'undefined') {
         sessionStorage.setItem(
-          PFF_REMOTE_LOGIN_SEED_KEY,
+          PFF_REMOTE_LOGIN_SEED,
           JSON.stringify({
             recovery_seed_encrypted: profile.recovery_seed_encrypted,
             recovery_seed_iv: profile.recovery_seed_iv,

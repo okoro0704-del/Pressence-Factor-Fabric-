@@ -76,8 +76,8 @@ export async function sendDeviceMigrationSecurityAlert(phoneNumber: string): Pro
     // ignore
   }
 
-  // Option B: Call backend API if available
-  const apiUrl = process.env.NEXT_PUBLIC_PFF_BACKEND_URL || process.env.NEXT_PUBLIC_API_URL;
+  // Option B: Call backend API only when URL is configured (avoid same-origin/timeout when empty)
+  const apiUrl = (process.env.NEXT_PUBLIC_PFF_BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || '').trim();
   if (apiUrl) {
     try {
       await fetch(`${apiUrl.replace(/\/$/, '')}/api/security-alert`, {
@@ -124,7 +124,7 @@ export async function sendNewDeviceAccessAlert(phoneNumber: string): Promise<voi
     // ignore
   }
 
-  const apiUrl = process.env.NEXT_PUBLIC_PFF_BACKEND_URL || process.env.NEXT_PUBLIC_API_URL;
+  const apiUrl = (process.env.NEXT_PUBLIC_PFF_BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || '').trim();
   if (apiUrl) {
     try {
       await fetch(`${apiUrl.replace(/\/$/, '')}/api/security-alert`, {

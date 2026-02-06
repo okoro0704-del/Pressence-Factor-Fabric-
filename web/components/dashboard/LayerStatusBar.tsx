@@ -2,138 +2,111 @@
 
 import { useEffect, useState } from 'react';
 import { JetBrains_Mono } from 'next/font/google';
+import { ScanLine, Fingerprint, Smartphone } from 'lucide-react';
 import { getSessionStatus, SessionStatus } from '@/lib/sessionManagement';
+import { getTripleAnchorState } from '@/lib/tripleAnchor';
 
 const jetbrains = JetBrains_Mono({ weight: ['400', '600', '700'], subsets: ['latin'] });
 
+const GOLD = '#D4AF37';
+const GRAY = '#6b6b70';
+const GREEN = '#22c55e';
+const RED = '#ef4444';
+
 /**
- * 4/4 LAYERS VERIFIED STATUS BAR
- * Displays security status at top of screen
- * Shows user that all 4 layers are active
+ * Triple-Anchor Security Status Bar
+ * Shows three icons: Face, Fingerprint, Device. All three must turn Gold before 1 VIDA is unlocked.
+ * Aligns PC and Mobile auth; reads from tripleAnchor state (and legacy session for backward compat).
  */
 export function LayerStatusBar() {
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>(SessionStatus.NO_SESSION);
-  const [layersVerified, setLayersVerified] = useState(0);
+  const [tripleAnchor, setTripleAnchor] = useState({ face: false, fingerprint: false, device: false });
 
   useEffect(() => {
-    // Update session status every second
     const interval = setInterval(() => {
       const status = getSessionStatus();
       setSessionStatus(status);
-
-      // Calculate layers verified
-      switch (status) {
-        case SessionStatus.ALL_LAYERS_VERIFIED:
-          setLayersVerified(4);
-          break;
-        case SessionStatus.LAYER_4_PENDING:
-          setLayersVerified(3);
-          break;
-        case SessionStatus.LAYER_3_PENDING:
-          setLayersVerified(2);
-          break;
-        case SessionStatus.LAYER_2_PENDING:
-          setLayersVerified(1);
-          break;
-        default:
-          setLayersVerified(0);
-      }
-    }, 1000);
-
+      const anchor = getTripleAnchorState();
+      // Legacy: when old 4-layer flow is fully verified, show all three anchors Gold
+      const legacyAllVerified = status === SessionStatus.ALL_LAYERS_VERIFIED;
+      setTripleAnchor(
+        legacyAllVerified
+          ? { face: true, fingerprint: true, device: true }
+          : anchor
+      );
+    }, 500);
     return () => clearInterval(interval);
   }, []);
 
-  // Only show status bar if session exists
   if (sessionStatus === SessionStatus.NO_SESSION || sessionStatus === SessionStatus.SESSION_EXPIRED) {
     return null;
   }
 
-  const getStatusColor = () => {
-    if (layersVerified === 4) return '#22c55e'; // Green
-    if (layersVerified >= 2) return '#D4AF37'; // Gold
-    return '#ef4444'; // Red
-  };
+  const allGold = tripleAnchor.face && tripleAnchor.fingerprint && tripleAnchor.device;
+  const count = [tripleAnchor.face, tripleAnchor.fingerprint, tripleAnchor.device].filter(Boolean).length;
+  const borderColor = allGold ? GREEN : count >= 1 ? GOLD : RED;
+  const statusText = allGold ? 'TRIPLE ANCHOR VERIFIED' : `ANCHOR ${count}/3`;
+  const subText = allGold ? '1 VIDA Unlocked' : 'Face → Fingerprint → Device';
 
-  const getStatusText = () => {
-    if (layersVerified === 4) return 'ALL LAYERS VERIFIED';
-    return `LAYER ${layersVerified}/4 VERIFIED`;
-  };
-
-  const getStatusIcon = () => {
-    if (layersVerified === 4) return '✅';
-    return '🔐';
-  };
+  const icons: { key: 'face' | 'fingerprint' | 'device'; verified: boolean; Icon: React.ComponentType<{ size?: number; className?: string }>; label: string }[] = [
+    { key: 'face', verified: tripleAnchor.face, Icon: ScanLine, label: 'Face' },
+    { key: 'fingerprint', verified: tripleAnchor.fingerprint, Icon: Fingerprint, label: 'Fingerprint' },
+    { key: 'device', verified: tripleAnchor.device, Icon: Smartphone, label: 'Device' },
+  ];
 
   return (
     <div
       className="fixed top-0 left-0 right-0 z-50 border-b"
       style={{
         background: 'linear-gradient(135deg, rgba(5, 5, 5, 0.95) 0%, rgba(0, 0, 0, 0.98) 100%)',
-        borderColor: getStatusColor(),
+        borderColor,
         backdropFilter: 'blur(10px)',
-        boxShadow: `0 4px 20px ${getStatusColor()}40`,
+        boxShadow: `0 4px 20px ${borderColor}40`,
       }}
     >
       <div className="max-w-7xl mx-auto px-4 py-3">
         <div className="flex items-center justify-between">
-          {/* Left: Status Icon & Text */}
           <div className="flex items-center gap-3">
-            <div className="text-2xl">{getStatusIcon()}</div>
+            <div className="text-2xl">{allGold ? '✅' : '🔐'}</div>
             <div>
-              <p
-                className={`text-sm font-black tracking-wider ${jetbrains.className}`}
-                style={{ color: getStatusColor() }}
-              >
-                {getStatusText()}
+              <p className={`text-sm font-black tracking-wider ${jetbrains.className}`} style={{ color: borderColor }}>
+                {statusText}
               </p>
-              <p className="text-xs" style={{ color: '#6b6b70' }}>
-                {layersVerified === 4
-                  ? 'Sovereign Vault Unlocked'
-                  : 'Authentication in progress...'}
+              <p className="text-xs" style={{ color: GRAY }}>
+                {subText}
               </p>
             </div>
           </div>
 
-          {/* Right: Layer Indicators */}
-          <div className="flex items-center gap-2">
-            {[1, 2, 3, 4].map((layer) => (
+          {/* Triple-Anchor icons: Face, Finger, Device — turn Gold when verified */}
+          <div className="flex items-center gap-2" role="status" aria-label="Security: Face, Fingerprint, Device">
+            {icons.map(({ key, verified, Icon, label }) => (
               <div
-                key={layer}
-                className="flex items-center justify-center w-10 h-10 rounded-lg border-2 transition-all"
+                key={key}
+                className="flex flex-col items-center justify-center w-12 h-12 rounded-lg border-2 transition-all"
                 style={{
-                  background:
-                    layersVerified >= layer
-                      ? `linear-gradient(135deg, ${getStatusColor()}20 0%, ${getStatusColor()}10 100%)`
-                      : 'rgba(0, 0, 0, 0.5)',
-                  borderColor: layersVerified >= layer ? getStatusColor() : '#6b6b70',
-                  boxShadow:
-                    layersVerified >= layer ? `0 0 15px ${getStatusColor()}40` : 'none',
+                  background: verified ? `linear-gradient(135deg, ${GOLD}20 0%, ${GOLD}10 100%)` : 'rgba(0, 0, 0, 0.5)',
+                  borderColor: verified ? GOLD : GRAY,
+                  boxShadow: verified ? `0 0 15px ${GOLD}40` : 'none',
                 }}
+                title={`${label}: ${verified ? 'Verified' : 'Pending'}`}
               >
-                <span
-                  className={`text-xs font-black ${jetbrains.className}`}
-                  style={{
-                    color: layersVerified >= layer ? getStatusColor() : '#6b6b70',
-                  }}
-                >
-                  {layer}
+                <Icon size={22} style={{ color: verified ? GOLD : GRAY }} aria-hidden />
+                <span className="text-[10px] mt-0.5" style={{ color: verified ? GOLD : GRAY }}>
+                  {label}
                 </span>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Progress Bar */}
-        <div
-          className="mt-2 h-1 rounded-full overflow-hidden"
-          style={{ background: 'rgba(107, 107, 112, 0.2)' }}
-        >
+        <div className="mt-2 h-1 rounded-full overflow-hidden" style={{ background: 'rgba(107, 107, 112, 0.2)' }}>
           <div
             className="h-full transition-all duration-500"
             style={{
-              width: `${(layersVerified / 4) * 100}%`,
-              background: `linear-gradient(90deg, ${getStatusColor()} 0%, ${getStatusColor()}80 100%)`,
-              boxShadow: `0 0 10px ${getStatusColor()}60`,
+              width: `${(count / 3) * 100}%`,
+              background: `linear-gradient(90deg, ${borderColor} 0%, ${borderColor}80 100%)`,
+              boxShadow: `0 0 10px ${borderColor}60`,
             }}
           />
         </div>

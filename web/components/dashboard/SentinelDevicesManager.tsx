@@ -12,6 +12,10 @@ interface SentinelDevicesManagerProps {
   phoneNumber: string;
   /** From user_profiles.device_limit (Sentinel Hub plan). Add Device only allowed when linked count < device_limit. */
   deviceLimit?: number | null;
+  /** Current device ID so we don't show "Terminate Session" for this device. */
+  currentDeviceId?: string | null;
+  /** When user clicks "Terminate Session" for a device, call this (sends Realtime signal so that device reloads). */
+  onTerminateSession?: (deviceId: string) => void;
 }
 
 interface AuthorizedDevice {
@@ -33,7 +37,7 @@ interface AuthorizedDevice {
  * Device Management UI for Sovereign Dashboard
  * Shows all authorized devices with revoke functionality
  */
-export function SentinelDevicesManager({ phoneNumber, deviceLimit }: SentinelDevicesManagerProps) {
+export function SentinelDevicesManager({ phoneNumber, deviceLimit, currentDeviceId, onTerminateSession }: SentinelDevicesManagerProps) {
   const [devices, setDevices] = useState<AuthorizedDevice[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingNickname, setEditingNickname] = useState<string | null>(null);
@@ -181,6 +185,7 @@ export function SentinelDevicesManager({ phoneNumber, deviceLimit }: SentinelDev
                 key={device.id}
                 device={device}
                 onRevoke={handleRevoke}
+                onTerminateSession={device.device_id !== currentDeviceId ? onTerminateSession : undefined}
                 editingNickname={editingNickname === device.device_id}
                 nicknameValue={nicknameValue}
                 onStartEditNickname={handleStartEditNickname}
@@ -205,6 +210,7 @@ export function SentinelDevicesManager({ phoneNumber, deviceLimit }: SentinelDev
                 key={device.id}
                 device={device}
                 onRevoke={handleRevoke}
+                onTerminateSession={undefined}
                 editingNickname={false}
                 nicknameValue=""
                 onStartEditNickname={handleStartEditNickname}
@@ -225,6 +231,7 @@ export function SentinelDevicesManager({ phoneNumber, deviceLimit }: SentinelDev
 interface DeviceCardProps {
   device: AuthorizedDevice;
   onRevoke: (deviceId: string, deviceName: string) => void;
+  onTerminateSession?: (deviceId: string) => void;
   editingNickname: boolean;
   nicknameValue: string;
   onStartEditNickname: (deviceId: string, currentNickname: string | null) => void;
@@ -238,6 +245,7 @@ interface DeviceCardProps {
 function DeviceCard({
   device,
   onRevoke,
+  onTerminateSession,
   editingNickname,
   nicknameValue,
   onStartEditNickname,
@@ -359,6 +367,17 @@ function DeviceCard({
               </div>
             )}
           </div>
+
+          {/* Terminate Session: force that device to reload (kicks to login). Shown for other devices only. */}
+          {!isRevoked && onTerminateSession && (
+            <button
+              type="button"
+              onClick={() => onTerminateSession(device.device_id)}
+              className="mt-4 mr-2 px-4 py-2 bg-[#C9A227] text-[#050505] font-bold font-mono rounded hover:bg-[#D4AF37] transition-colors"
+            >
+              TERMINATE SESSION
+            </button>
+          )}
 
           {/* Revoke Button */}
           {!isRevoked && !device.is_primary && (

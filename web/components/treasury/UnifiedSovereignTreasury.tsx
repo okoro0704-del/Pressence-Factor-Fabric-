@@ -19,6 +19,7 @@ import { RecentActivityList } from './RecentActivityList';
 import { UBABrandingCard } from '@/components/dashboard/UBABrandingCard';
 import { useSovereignSeed } from '@/contexts/SovereignSeedContext';
 import { useBiometricSession } from '@/contexts/BiometricSessionContext';
+import { areAllAnchorsVerified } from '@/lib/tripleAnchor';
 
 const TOKENS = ['VIDA', 'DLLR', 'USDT', 'vNGN'] as const;
 type Token = (typeof TOKENS)[number];
@@ -74,6 +75,12 @@ export function UnifiedSovereignTreasury() {
   const [nationalReserves, setNationalReserves] = useState<NationalBlockReserves | null>(null);
   const [linkedAccounts, setLinkedAccounts] = useState<string[]>([]);
   const [quickAuthMessage, setQuickAuthMessage] = useState<string | null>(null);
+  const [tripleAnchorUnlocked, setTripleAnchorUnlocked] = useState(false);
+  useEffect(() => {
+    setTripleAnchorUnlocked(areAllAnchorsVerified());
+    const t = setInterval(() => setTripleAnchorUnlocked(areAllAnchorsVerified()), 1000);
+    return () => clearInterval(t);
+  }, []);
 
   const refreshInternalWallet = useCallback(async () => {
     if (!phoneNumber?.trim()) return;
@@ -177,6 +184,11 @@ export function UnifiedSovereignTreasury() {
           <p className="text-xs text-[#a0a0a5] mt-0.5">
             Your sovereign balances · 1 VIDA = {VIDA_USD_DISPLAY} anchor
           </p>
+          {!tripleAnchorUnlocked && (
+            <p className="text-xs mt-2 px-3 py-2 rounded-lg border" style={{ color: '#e8c547', borderColor: 'rgba(212,175,55,0.5)', background: 'rgba(212,175,55,0.08)' }}>
+              Complete Face, Fingerprint, and Device (Security bar) to unlock 1 VIDA.
+            </p>
+          )}
         </div>
         <div className="p-5 space-y-4">
           <BalanceRow label="VIDA" value={displayVida} suffix="VIDA" sub={VIDA_USD_DISPLAY} />
@@ -188,6 +200,7 @@ export function UnifiedSovereignTreasury() {
           <button
             type="button"
             onClick={async () => {
+              if (!tripleAnchorUnlocked) return;
               setQuickAuthMessage(null);
               if (isAuthActive) {
                 setShowSend(true);
@@ -197,7 +210,8 @@ export function UnifiedSovereignTreasury() {
               if (ok) setShowSend(true);
               else setQuickAuthMessage('Verification cancelled. Try again or use Face Pulse for high-value moves.');
             }}
-            className="px-6 py-3 rounded-xl font-bold uppercase tracking-wider border transition-all hover:opacity-90"
+            disabled={!tripleAnchorUnlocked}
+            className="px-6 py-3 rounded-xl font-bold uppercase tracking-wider border transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ background: 'rgba(42,42,46,0.6)', color: GOLD, borderColor: GOLD_BORDER }}
           >
             Send
@@ -213,6 +227,7 @@ export function UnifiedSovereignTreasury() {
           <button
             type="button"
             onClick={async () => {
+              if (!tripleAnchorUnlocked) return;
               setQuickAuthMessage(null);
               if (isAuthActive) {
                 setShowSwap(true);
@@ -222,7 +237,8 @@ export function UnifiedSovereignTreasury() {
               if (ok) setShowSwap(true);
               else setQuickAuthMessage('Verification cancelled. Try again or use Face Pulse for high-value moves.');
             }}
-            className="px-6 py-3 rounded-xl font-bold uppercase tracking-wider border transition-all hover:opacity-90"
+            disabled={!tripleAnchorUnlocked}
+            className="px-6 py-3 rounded-xl font-bold uppercase tracking-wider border transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ background: GOLD, color: '#0d0d0f', borderColor: GOLD_BORDER }}
           >
             Swap

@@ -65,6 +65,20 @@ body {
   animation: ticker 40s linear infinite;
 }
 
+/* Spendable VIDA count-up shimmer (gold sweep) */
+@keyframes vida-shimmer {
+  0% { background-position: 200% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.animate-shimmer {
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  background-image: linear-gradient(90deg, var(--gold-bright) 0%, #F5E6A4 35%, var(--gold-bright) 70%, #F5E6A4 100%);
+  background-size: 200% 100%;
+  animation: vida-shimmer 1.2s ease-out;
+}
+
 /* Mobile-first touch targets — min 48px for thumb navigation */
 @media (max-width: 768px) {
   button:not([class*="min-h-"]):not([class*="p-"]),

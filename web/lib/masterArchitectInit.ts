@@ -26,8 +26,8 @@ export async function isFirstRegistration(): Promise<FirstRegistrationResult> {
 }
 
 /**
- * Credit 5 VIDA to the Architect on first Face Pulse: 1 spendable, 4 locked.
- * Updates user_profiles (spendable_vida=1, is_minted=true) and sovereign_internal_wallets (vida_cap_balance=5).
+ * Credit 5 VIDA to the Architect on first Face Pulse: 0.1 spendable ($100), 4.9 locked (9-Day Unlock Ritual).
+ * Updates user_profiles (spendable_vida=0.1, locked_vida=4.9, is_minted=true) and sovereign_internal_wallets (vida_cap_balance=5).
  * Call from ensureMintedAndBalance or from the success handler when isFirstRegistration was true.
  */
 export async function creditArchitectVidaGrant(phoneNumber: string): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -39,8 +39,8 @@ export async function creditArchitectVidaGrant(phoneNumber: string): Promise<{ o
   try {
     const payload: Record<string, unknown> = {
       is_minted: true,
-      spendable_vida: 1,
-      locked_vida: 4,
+      spendable_vida: 0.1,
+      locked_vida: 4.9,
       updated_at: new Date().toISOString(),
     };
     let { error: profileError } = await (supabase as any)

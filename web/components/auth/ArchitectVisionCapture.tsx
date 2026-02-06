@@ -11,6 +11,7 @@
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { speakSovereignSuccess } from '@/lib/sovereignVoice';
+import { useSovereignCompanion } from '@/contexts/SovereignCompanionContext';
 
 const BLUE_LASER = 'rgba(59, 130, 246, 0.95)';
 const MESH_COLOR = 'rgba(212, 175, 55, 0.6)';
@@ -121,12 +122,26 @@ export function ArchitectVisionCapture({
   const [bypassSecondsLeft, setBypassSecondsLeft] = useState(0);
   const bypassIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const { setScanCue } = useSovereignCompanion();
   const effectiveConfidenceThreshold = isSensitivityBypassed ? BYPASS_CONFIDENCE_THRESHOLD : effectiveConfidence;
   const effectiveEnforceBrightness = effectiveBrightness && !isSensitivityBypassed;
   const effectiveThresholdPercent = Math.round(effectiveConfidenceThreshold * 100);
   /** Face detected when confidence meets effective threshold (or legacy: explicit state after 500ms). */
   const facePassesThreshold = aiConfidence >= effectiveThresholdPercent;
   const showAsFaceDetected = faceDetected || facePassesThreshold;
+
+  /** Companion Eyes: guide user during Face Pulse */
+  useEffect(() => {
+    if (!isOpen || meshGold) {
+      setScanCue('');
+      return;
+    }
+    if (cameraStatus === 'ready') {
+      setScanCue(showAsFaceDetected ? 'Hold still' : 'Move closer');
+    } else {
+      setScanCue('');
+    }
+  }, [isOpen, cameraStatus, showAsFaceDetected, meshGold, setScanCue]);
 
   const startBypassTimer = useCallback(() => {
     if (bypassIntervalRef.current) clearInterval(bypassIntervalRef.current);

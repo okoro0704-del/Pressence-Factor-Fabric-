@@ -13,6 +13,7 @@ import {
   setEmergencyGuardian,
   recordPrimaryActivity,
 } from '@/lib/emergencyGuardian';
+import { SpendableVidaCounter } from '@/components/dashboard/SpendableVidaCounter';
 
 interface DependentDashboardProps {
   identity: GlobalIdentity;
@@ -111,10 +112,15 @@ export function DependentDashboard({ identity }: DependentDashboardProps) {
               💰 CURRENT BALANCE
             </h2>
             
-            {/* VIDA Balance */}
+            {/* VIDA Balance — count-up + shimmer when returning from daily unlock celebration */}
             <div className="space-y-2">
               <p className="text-8xl md:text-9xl font-bold text-[#e8c547] font-mono">
-                {identity.spendable_vida.toFixed(2)}
+                <SpendableVidaCounter
+                  value={identity.spendable_vida}
+                  suffix=""
+                  decimals={2}
+                  className="text-[#e8c547]"
+                />
               </p>
               <p className="text-4xl md:text-5xl text-[#f5f5f5] font-semibold">VIDA CAP</p>
             </div>

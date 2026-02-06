@@ -241,7 +241,8 @@ eas submit --platform all
 ### Backend Health Check
 
 ```bash
-curl https://api.your-production-domain.com/health
+# Use your backend URL from NEXT_PUBLIC_PFF_BACKEND_URL (e.g. https://your-api.fly.dev)
+curl "$NEXT_PUBLIC_PFF_BACKEND_URL/health"
 # Expected: {"status":"ok","service":"pff-backend"}
 ```
 

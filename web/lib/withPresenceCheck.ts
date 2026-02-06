@@ -4,6 +4,7 @@
  */
 
 import { hasSupabase, supabase } from './supabase';
+import { clearTripleAnchor } from './tripleAnchor';
 
 const PRESENCE_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
 const STORAGE_KEY = 'pff_presence_verified';
@@ -131,10 +132,12 @@ export function markPresenceVerified(): void {
 }
 
 /**
- * Clear presence verification (for logout or manual reset)
+ * Clear presence verification (for logout or manual reset).
+ * Also clears Triple-Anchor state (Face, Fingerprint, Device) so 1 VIDA stays locked until re-verification.
  */
 export function clearPresenceVerification(): void {
   localStorage.removeItem(STORAGE_KEY);
   localStorage.removeItem(TIMESTAMP_KEY);
+  clearTripleAnchor();
 }
 
