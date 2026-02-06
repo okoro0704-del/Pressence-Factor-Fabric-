@@ -10,6 +10,9 @@ import { SovereignCompanionProvider } from '@/contexts/SovereignCompanionContext
 import { CompanionEyes } from '@/components/dashboard/CompanionEyes';
 import Script from 'next/script';
 
+/** Force static generation for all routes (consolidate to single static site). */
+export const dynamic = 'force-static';
+
 /** Prevent accidental zoom during Palm Scan; same layout on mobile and desktop. */
 export const viewport: Viewport = {
   width: 'device-width',

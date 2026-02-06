@@ -1,18 +1,16 @@
 /**
- * 9-Day Vitalization Unlock Ritual
- * - Starting balance: 0.1 VIDA Spendable ($100) + 4.9 VIDA Locked.
- * - Each day the user completes Face + Palm/Fingerprint scan, streak increments (consecutive days).
- * - Each daily scan is saved as a Training Sample (vitalization_daily_scans).
- * - Daily $100 Unlock: Days 2–9, each successful scan moves 0.1 VIDA from locked_vida to spendable_vida (one unlock per day; no double-unlock).
- * - On Day 9: set biometric_strictness to HIGH.
- * - If a day is missed, streak does not reset but remaining locked VIDA stays until subsequent scans.
+ * 9-Day Ritual Unlock (10 daily releases)
+ * - Citizen_Vault 4/1 lock: 1 VIDA is the spendable portion, released over 10 days.
+ * - Every 24 hours of successful Palm Scan releases $100 worth of VIDA (0.1 VIDA) until the full $1,000 (1 VIDA) is spendable.
+ * - Starting balance: 0.1 VIDA Spendable ($100) + 4.9 VIDA Locked. Days 1–10: each new-day scan adds 0.1 VIDA to spendable (one per day; no double-unlock).
+ * - On Day 10: full 1 VIDA spendable; set biometric_strictness to HIGH.
  */
 
 import { getSupabase } from './supabase';
 import { setBiometricStrictness } from './biometricStrictness';
 
-const STREAK_TARGET = 9;
-/** Per-day unlock: 0.1 VIDA ($100) from locked to spendable on Days 2–9 (prevents double-unlock by only applying on new-day path). */
+const STREAK_TARGET = 10;
+/** Per-day unlock: 0.1 VIDA ($100) from locked to spendable each day until full $1,000 (1 VIDA) is spendable. */
 const DAILY_UNLOCK_VIDA_AMOUNT = 0.1;
 
 export interface VitalizationStatus {
@@ -54,8 +52,8 @@ export async function getVitalizationStatus(phoneNumber: string): Promise<Vitali
  * Record a successful daily Face + Palm/Fingerprint scan.
  * - One increment per calendar day; consecutive day = streak + 1; missed day = streak unchanged (no reset).
  * - Inserts a Training Sample into vitalization_daily_scans.
- * - Daily $100 Unlock: On Days 2–9 (inclusive), each new-day scan moves 0.1 VIDA from locked_vida to spendable_vida. Same-day scans do not double-unlock.
- * - On Day 9: set biometric_strictness to HIGH.
+ * - Daily $100 Unlock: On Days 1–10 (inclusive), each new-day scan moves 0.1 VIDA from locked_vida to spendable_vida until full $1,000 (1 VIDA) is spendable. Same-day scans do not double-unlock.
+ * - On Day 10: set biometric_strictness to HIGH.
  */
 export async function recordDailyScan(phoneNumber: string): Promise<{
   ok: true;
@@ -98,6 +96,8 @@ export async function recordDailyScan(phoneNumber: string): Promise<{
     const yesterday = new Date(Date.now() - 864e5).toISOString().slice(0, 10);
     if (lastScan === yesterday) {
       newStreak = Math.min(STREAK_TARGET, currentStreak + 1);
+    } else if (!lastScan) {
+      newStreak = 1; // First scan = Day 1 of ritual
     }
 
     // Training Sample: insert daily scan record (idempotent per phone+date)
@@ -112,8 +112,8 @@ export async function recordDailyScan(phoneNumber: string): Promise<{
       updated_at: new Date().toISOString(),
     };
 
-    // Daily $100 Unlock: Days 2–9 — move 0.1 VIDA from locked to spendable (only on this new-day path; no double-unlock)
-    const shouldUnlockToday = newStreak >= 2 && newStreak <= STREAK_TARGET;
+    // Daily $100 Unlock: Days 1–10 — move 0.1 VIDA from locked to spendable (only on this new-day path; no double-unlock)
+    const shouldUnlockToday = newStreak >= 1 && newStreak <= STREAK_TARGET;
     if (shouldUnlockToday) {
       const spendable = Number(profile.spendable_vida) || 0;
       const locked = Number(profile.locked_vida) || 0;

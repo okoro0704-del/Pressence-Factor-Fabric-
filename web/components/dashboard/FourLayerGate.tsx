@@ -84,11 +84,18 @@ import { getLinkedMobileDeviceId } from '@/lib/phoneIdBridge';
 import { useSoftStart, incrementTrustLevel } from '@/lib/trustLevel';
 import { recordDailyScan, getVitalizationStatus, DAILY_UNLOCK_VIDA_AMOUNT } from '@/lib/vitalizationRitual';
 import { getBiometricStrictness, strictnessToConfig } from '@/lib/biometricStrictness';
-import { PalmPulseCapture } from '@/components/auth/PalmPulseCapture';
+import dynamic from 'next/dynamic';
 import { verifyOrEnrollPalm } from '@/lib/palmHashProfile';
+
+/** Load only in browser to avoid MediaPipe/SSR issues during static export. */
+const PalmPulseCapture = dynamic(
+  () => import('@/components/auth/PalmPulseCapture').then((m) => ({ default: m.PalmPulseCapture })),
+  { ssr: false }
+);
 import { DailyUnlockCelebration } from '@/components/dashboard/DailyUnlockCelebration';
 import { useSovereignCompanion } from '@/contexts/SovereignCompanionContext';
 import { getNativeAppUrl } from '@/lib/appStoreUrls';
+import { IS_PUBLIC_REVEAL, isVettedUser } from '@/lib/publicRevealAccess';
 
 const jetbrains = JetBrains_Mono({ weight: ['400', '600', '700'], subsets: ['latin'] });
 
@@ -772,7 +779,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     [goToDashboard, isFirstRun, setSpendableVidaAnimation]
   );
 
-  /** Dual-Pillar: Scan 1 Face Pulse (done), Scan 2 Palm Pulse (Palm Wave) to authorize $100 daily unlock. */
+  /** Dual-Pillar: Scan 1 Face Pulse (done), Scan 2 Palm Pulse (Palm Wave) to authorize $100 daily unlock. When IS_PUBLIC_REVEAL && !vetted, skip Palm Scan. */
   const handleArchitectVisionComplete = useCallback(async () => {
     setBiometricSessionVerified();
     setShowArchitectVision(false);
@@ -787,8 +794,13 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     setTripleAnchorVerified('face');
     setTripleAnchorVerified('device');
     setPalmPulseError(null);
+    if (IS_PUBLIC_REVEAL && !isVettedUser()) {
+      setTripleAnchorVerified('fingerprint');
+      await proceedAfterSecondPillar(p);
+      return;
+    }
     setShowPalmPulse(true);
-  }, [setBiometricSessionVerified]);
+  }, [setBiometricSessionVerified, proceedAfterSecondPillar]);
 
   const handlePalmSuccess = useCallback(
     async (palmHash: string) => {

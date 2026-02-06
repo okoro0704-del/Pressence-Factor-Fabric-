@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
   Landmark,
@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useTripleTapReset } from '@/lib/useTripleTapReset';
 import { TerminateSessionListener } from '@/components/dashboard/TerminateSessionListener';
+import { shouldShowFullProtocolSync } from '@/lib/publicRevealAccess';
 
 /** Settings nav icon: use named ref so bundler does not drop it (avoids "SlidersHorizontal is not defined"). */
 const SettingsNavIcon = SlidersHorizontal;
@@ -30,10 +31,33 @@ const NAV = [
   { href: '/settings', label: 'Settings', icon: SettingsNavIcon },
 ];
 
+/**
+ * AppShell — Public Gatekeeper: on production domain, only Authorized Identities see full Protocol.
+ * If URL is production and user is not authorized, redirect to / (Manifesto & Countdown).
+ * Preview URLs (deploy-preview-*) and non-production always show full Protocol. Build-safe (client-only).
+ */
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [redirectToManifesto, setRedirectToManifesto] = useState(false);
   const handleLogoClick = useTripleTapReset();
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!shouldShowFullProtocolSync()) {
+      setRedirectToManifesto(true);
+      router.replace('/');
+    }
+  }, [router]);
+
+  if (redirectToManifesto) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#050505]" style={{ color: '#6b6b70' }}>
+        <p className="text-sm">Redirecting…</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-[#0d0d0f]">

@@ -1,13 +1,17 @@
 /**
  * PFF Backend — VIDA CAP Minting & Management.
- * Sovereign Handshake: 10 VIDA grant with three-way mint (5 gov, 4.98 user, 0.02 sentinel).
- * All three legs recorded in sovereign_mint_ledger with a single batch_id so the 50% government split is never bypassed.
+ * mintOnVitalization: 10 VIDA per new user → 5 National_Vault (70/30 lock), 5 Citizen_Vault (4/1 lock).
+ * After VITALIZATION_CAP: 2 VIDA per user and Burning Mechanism enabled.
  */
 
 import * as crypto from 'crypto';
 import { pool, query } from '../db/client';
 import {
+  VITALIZATION_CAP,
   GROSS_SOVEREIGN_GRANT_VIDA,
+  POST_HALVING_MINT_VIDA,
+  NATIONAL_VAULT_VIDA,
+  CITIZEN_VAULT_VIDA,
   GOVERNMENT_TREASURY_VIDA,
   USER_WALLET_VIDA,
   SENTINEL_BUSINESS_VIDA,
@@ -24,10 +28,145 @@ function generateTransactionHash(): string {
     .digest('hex');
 }
 
+/** Total VIDA CAP minted across all citizens (lifecycle). Used for halving and burn. */
+export async function getTotalVidaCapMinted(): Promise<number> {
+  try {
+    const { rows } = await query<{ total: string }>(
+      `SELECT COALESCE(SUM(total_minted), 0)::text AS total FROM vida_cap_allocations`
+    );
+    return rows.length > 0 ? parseFloat(rows[0].total) : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** True when total minted >= VITALIZATION_CAP; minting halves to 2 VIDA and Burning Mechanism is enabled. */
+export async function isHalvingActive(): Promise<boolean> {
+  const total = await getTotalVidaCapMinted();
+  return total >= VITALIZATION_CAP;
+}
+
+export interface MintOnVitalizationResult extends VidaCapAllocation {
+  halvingActive: boolean;
+  burningEnabled: boolean;
+}
+
 /**
- * Mint VIDA CAP upon Vitalization — Sovereign Handshake (three-way mint).
+ * Mint on Vitalization: 10 VIDA per new user (or 2 after cap).
+ * 50:50 split: 5 → National_Vault (70/30 lock), 5 → Citizen_Vault (4/1 lock).
+ * National: hasSignedSovereignClauses = false → 70% remains untouchable.
+ * Citizen: 1 VIDA released via 9-Day Ritual ($100/day until $1,000 spendable).
+ */
+export async function mintOnVitalization(
+  citizenId: string,
+  pffId: string
+): Promise<MintOnVitalizationResult> {
+  const totalMintedLifecycle = await getTotalVidaCapMinted();
+  const halvingActive = totalMintedLifecycle >= VITALIZATION_CAP;
+  const burningEnabled = halvingActive;
+
+  const totalMinted = halvingActive ? POST_HALVING_MINT_VIDA : GROSS_SOVEREIGN_GRANT_VIDA;
+  const nationalShare = halvingActive ? 1 : NATIONAL_VAULT_VIDA;
+  const citizenShare = halvingActive ? 1 : CITIZEN_VAULT_VIDA;
+
+  const nationalLocked70 = nationalShare * 0.7;
+  const nationalSpendable30 = nationalShare * 0.3;
+  const citizenLocked4 = citizenShare * (4 / 5);
+  const citizenRitual1 = citizenShare * (1 / 5);
+
+  const transactionHash = generateTransactionHash();
+  const batchId = crypto.randomUUID();
+  const NATIONAL_RESERVE_ID = '00000000-0000-0000-0000-000000000001';
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    await client.query(
+      `INSERT INTO vida_cap_allocations 
+       (citizen_id, pff_id, total_minted, citizen_share, national_reserve_share, sentinel_share, batch_id, transaction_hash)
+       VALUES ($1, $2, $3, $4, $5, 0, $6, $7)`,
+      [citizenId, pffId, totalMinted, citizenShare, nationalShare, batchId, transactionHash]
+    );
+
+    await client.query(
+      `INSERT INTO citizen_vaults (citizen_id, pff_id, vida_cap_balance, vida_locked_4, vida_ritual_pool_1)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (citizen_id) DO UPDATE SET
+         vida_cap_balance = citizen_vaults.vida_cap_balance + $3,
+         vida_locked_4 = citizen_vaults.vida_locked_4 + $4,
+         vida_ritual_pool_1 = citizen_vaults.vida_ritual_pool_1 + $5,
+         updated_at = NOW()`,
+      [citizenId, pffId, citizenShare, citizenLocked4, citizenRitual1]
+    );
+
+    await client.query(
+      `INSERT INTO national_reserve (id, vida_cap_balance, vida_locked_70, vida_spendable_30)
+       VALUES ($1::uuid, $2, $3, $4)
+       ON CONFLICT (id) DO UPDATE SET
+         vida_cap_balance = national_reserve.vida_cap_balance + $2,
+         vida_locked_70 = national_reserve.vida_locked_70 + $3,
+         vida_spendable_30 = national_reserve.vida_spendable_30 + $4,
+         last_updated = NOW()`,
+      [NATIONAL_RESERVE_ID, nationalShare, nationalLocked70, nationalSpendable30]
+    );
+
+    await client.query(
+      `INSERT INTO sovereign_mint_ledger (batch_id, citizen_id, pff_id, destination, amount_vida, transaction_hash)
+       VALUES ($1, $2, $3, 'government_treasury_vault', $4, $5),
+              ($1, $2, $3, 'user_wallet', $6, $5)`,
+      [batchId, citizenId, pffId, nationalShare, transactionHash, citizenShare]
+    );
+
+    await client.query(
+      `INSERT INTO vlt_transactions 
+       (transaction_type, transaction_hash, citizen_id, amount, from_vault, to_vault, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [
+        'mint',
+        transactionHash,
+        citizenId,
+        totalMinted,
+        'external',
+        'split',
+        JSON.stringify({
+          nationalShare,
+          citizenShare,
+          nationalLocked70,
+          nationalSpendable30,
+          citizenLocked4,
+          citizenRitual1,
+          halvingActive,
+          burningEnabled,
+          batchId,
+        }),
+      ]
+    );
+
+    await client.query('COMMIT');
+  } catch (e) {
+    await client.query('ROLLBACK');
+    throw e;
+  } finally {
+    client.release();
+  }
+
+  return {
+    totalMinted,
+    citizenShare,
+    nationalReserveShare: nationalShare,
+    sentinelShare: 0,
+    transactionHash,
+    batchId,
+    halvingActive,
+    burningEnabled,
+  };
+}
+
+/**
+ * Mint VIDA CAP upon Vitalization — Legacy Sovereign Handshake (three-way mint).
  * 5.00 VIDA → government_treasury_vault, 4.98 VIDA → user_wallet, 0.02 VIDA → sentinel_business_ledger.
- * All three recorded in sovereign_mint_ledger with one batch_id (atomic).
+ * Prefer mintOnVitalization for new flows (50:50 with 70/30 and 4/1 locks).
  */
 export async function mintVidaCap(
   citizenId: string,
@@ -44,7 +183,6 @@ export async function mintVidaCap(
   try {
     await client.query('BEGIN');
 
-    // 1. Insert allocation record (with batch_id and sentinel_share)
     await client.query(
       `INSERT INTO vida_cap_allocations 
        (citizen_id, pff_id, total_minted, citizen_share, national_reserve_share, sentinel_share, batch_id, transaction_hash)
@@ -52,7 +190,6 @@ export async function mintVidaCap(
       [citizenId, pffId, totalMinted, userShare, governmentShare, sentinelShare, batchId, transactionHash]
     );
 
-    // 2. User wallet (citizen vault) — 4.98 VIDA
     await client.query(
       `INSERT INTO citizen_vaults (citizen_id, pff_id, vida_cap_balance)
        VALUES ($1, $2, $3)
@@ -62,7 +199,6 @@ export async function mintVidaCap(
       [citizenId, pffId, userShare]
     );
 
-    // 3. Government treasury (national reserve) — 5.00 VIDA
     await client.query(
       `INSERT INTO national_reserve (id, vida_cap_balance)
        VALUES ('00000000-0000-0000-0000-000000000001'::uuid, $1)
@@ -72,7 +208,6 @@ export async function mintVidaCap(
       [governmentShare]
     );
 
-    // 4. Sovereign mint ledger — all three transactions with same batch_id (ensures 50% never bypassed)
     await client.query(
       `INSERT INTO sovereign_mint_ledger (batch_id, citizen_id, pff_id, destination, amount_vida, transaction_hash)
        VALUES ($1, $2, $3, 'government_treasury_vault', $4, $5),
@@ -81,7 +216,6 @@ export async function mintVidaCap(
       [batchId, citizenId, pffId, governmentShare, transactionHash, userShare, sentinelShare]
     );
 
-    // 5. VLT log
     await client.query(
       `INSERT INTO vlt_transactions 
        (transaction_type, transaction_hash, citizen_id, amount, from_vault, to_vault, metadata)
@@ -112,6 +246,91 @@ export async function mintVidaCap(
     sentinelShare,
     transactionHash,
     batchId,
+  };
+}
+
+/**
+ * Burning Mechanism: burn VIDA CAP from a citizen vault. Only allowed when total minted >= VITALIZATION_CAP.
+ * Returns success and new balance, or error if burning not enabled or insufficient balance.
+ */
+export async function burnVidaCap(
+  citizenId: string,
+  amount: number
+): Promise<{ ok: true; newBalance: number } | { ok: false; error: string }> {
+  if (amount <= 0) return { ok: false, error: 'Amount must be positive' };
+  const burningEnabled = await isHalvingActive();
+  if (!burningEnabled) return { ok: false, error: 'Burning is not enabled until VITALIZATION_CAP is reached' };
+
+  const client = await pool.connect();
+  try {
+    const { rows } = await client.query<{ vida_cap_balance: string }>(
+      `SELECT vida_cap_balance FROM citizen_vaults WHERE citizen_id = $1`,
+      [citizenId]
+    );
+    if (rows.length === 0) return { ok: false, error: 'Citizen vault not found' };
+    const current = parseFloat(rows[0].vida_cap_balance);
+    if (current < amount) return { ok: false, error: 'Insufficient VIDA CAP to burn' };
+
+    const newBalance = current - amount;
+    const transactionHash = generateTransactionHash();
+
+    await client.query('BEGIN');
+    await client.query(
+      `UPDATE citizen_vaults SET vida_cap_balance = $1, updated_at = NOW() WHERE citizen_id = $2`,
+      [newBalance, citizenId]
+    );
+    await client.query(
+      `INSERT INTO vlt_transactions (transaction_type, transaction_hash, citizen_id, amount, from_vault, to_vault, metadata)
+       VALUES ('burn', $1, $2, $3, 'citizen', 'burn', $4)`,
+      [transactionHash, citizenId, amount, JSON.stringify({ burningEnabled: true })]
+    );
+    await client.query('COMMIT');
+    return { ok: true, newBalance };
+  } catch (e) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Get National Reserve status including diplomatic lock (hasSignedSovereignClauses).
+ * When false, the 70% (vida_locked_70) is untouchable.
+ */
+export async function getNationalReserveWithLocks(): Promise<{
+  totalVidaCap: number;
+  vidaLocked70: number;
+  vidaSpendable30: number;
+  hasSignedSovereignClauses: boolean;
+  lastUpdated: string;
+}> {
+  const { rows } = await query<{
+    vida_cap_balance: string;
+    vida_locked_70: string | null;
+    vida_spendable_30: string | null;
+    has_signed_sovereign_clauses: boolean | null;
+    last_updated: string;
+  }>(
+    `SELECT vida_cap_balance, vida_locked_70, vida_spendable_30, has_signed_sovereign_clauses, last_updated
+     FROM national_reserve WHERE id = '00000000-0000-0000-0000-000000000001'::uuid LIMIT 1`
+  );
+  if (rows.length === 0) {
+    return {
+      totalVidaCap: 0,
+      vidaLocked70: 0,
+      vidaSpendable30: 0,
+      hasSignedSovereignClauses: false,
+      lastUpdated: new Date().toISOString(),
+    };
+  }
+  const r = rows[0];
+  return {
+    totalVidaCap: parseFloat(r.vida_cap_balance),
+    vidaLocked70: r.vida_locked_70 != null ? parseFloat(r.vida_locked_70) : 0,
+    vidaSpendable30: r.vida_spendable_30 != null ? parseFloat(r.vida_spendable_30) : 0,
+    hasSignedSovereignClauses: r.has_signed_sovereign_clauses ?? false,
+    lastUpdated: r.last_updated,
   };
 }
 

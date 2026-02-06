@@ -1,8 +1,8 @@
-# PFF — Deployment pipeline (Expo EAS + Web Manifesto)
+# PFF — Deployment pipeline (Expo EAS for mobile only)
 # - Unit tests on every push
-# - Version bump + EAS build (all platforms) + Vercel deploy on merge to main
-# Secrets: EXPO_TOKEN, EAS_PROJECT_ID, VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID
-# Signing: use EAS credentials / GitHub Secrets; never commit keystores or certificates.
+# - EAS build (iOS/Android) on main when RUN_EAS_BUILD=true
+# Web is deployed via Netlify (see .github/workflows/netlify.yml). No Vercel.
+# Secrets for EAS: EXPO_TOKEN, EAS_PROJECT_ID
 
 name: Deploy
 
@@ -87,47 +87,4 @@ jobs:
           IOS_BUILD_NUMBER: ${{ github.run_number }}
           ANDROID_VERSION_CODE: ${{ github.run_number }}
         run: eas build --platform all --non-interactive --profile production
-        continue-on-error: true
-
-  deploy-web:
-    name: Deploy web manifesto (Vercel)
-    runs-on: ubuntu-latest
-    # Only runs when RUN_VERCEL_DEPLOY is set to 'true' in repo Variables (Settings → Secrets and variables → Actions → Variables)
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.RUN_VERCEL_DEPLOY == 'true'
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: web/package-lock.json
-
-      - name: Install Vercel CLI
-        run: npm i -g vercel@latest
-
-      - name: Install web deps
-        working-directory: web
-        run: npm ci 2>/dev/null || npm install
-
-      - name: Build web
-        working-directory: web
-        run: npm run build
-
-      - name: Link Vercel project
-        working-directory: web
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-        run: |
-          mkdir -p .vercel
-          echo "{\"orgId\":\"$VERCEL_ORG_ID\",\"projectId\":\"$VERCEL_PROJECT_ID\"}" > .vercel/project.json
-        continue-on-error: true
-
-      - name: Deploy to Vercel
-        working-directory: web
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-        run: vercel deploy --prebuilt --prod --token "$VERCEL_TOKEN"
         continue-on-error: true

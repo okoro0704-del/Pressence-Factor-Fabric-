@@ -112,12 +112,15 @@ CREATE INDEX IF NOT EXISTS idx_vida_cap_citizen ON vida_cap_allocations(citizen_
 CREATE INDEX IF NOT EXISTS idx_vida_cap_pff ON vida_cap_allocations(pff_id);
 CREATE INDEX IF NOT EXISTS idx_vida_cap_hash ON vida_cap_allocations(transaction_hash);
 
--- National Reserve Vault (State's 50% share of all VIDA CAP)
+-- National Reserve Vault (National_Vault — National Future). 70/30 lock; Diplomatic Lock: has_signed_sovereign_clauses.
 CREATE TABLE IF NOT EXISTS national_reserve (
-  id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  vida_cap_balance      NUMERIC(20, 8) NOT NULL DEFAULT 0,
-  last_updated          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE(id)            -- Singleton table (id = 1)
+  id                            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  vida_cap_balance              NUMERIC(20, 8) NOT NULL DEFAULT 0,
+  has_signed_sovereign_clauses  BOOLEAN NOT NULL DEFAULT false,
+  vida_locked_70                NUMERIC(20, 8) NOT NULL DEFAULT 0,
+  vida_spendable_30             NUMERIC(20, 8) NOT NULL DEFAULT 0,
+  last_updated                  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(id)
 );
 
 -- Initialize singleton National Reserve (fixed UUID for singleton pattern)
@@ -125,12 +128,14 @@ INSERT INTO national_reserve (id, vida_cap_balance)
 VALUES ('00000000-0000-0000-0000-000000000001'::uuid, 0)
 ON CONFLICT (id) DO NOTHING;
 
--- Citizen Private Vaults (Citizen's 50% share of VIDA CAP)
+-- Citizen Private Vaults (Citizen_Vault — Citizen's Heritage). 4/1 lock: 4 locked, 1 released via 9-Day Ritual.
 CREATE TABLE IF NOT EXISTS citizen_vaults (
   id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   citizen_id            UUID NOT NULL REFERENCES citizens(id) ON DELETE CASCADE,
   pff_id                TEXT NOT NULL REFERENCES citizens(pff_id),
   vida_cap_balance      NUMERIC(20, 8) NOT NULL DEFAULT 0,
+  vida_locked_4        NUMERIC(20, 8) NOT NULL DEFAULT 0,
+  vida_ritual_pool_1   NUMERIC(20, 8) NOT NULL DEFAULT 0,
   created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(citizen_id)

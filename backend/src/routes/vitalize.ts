@@ -8,7 +8,7 @@ import * as crypto from 'crypto';
 import { verifyHandshake } from '../lib/verifyHandshake';
 import { signPresenceToken } from '../lib/jwt';
 import { query } from '../db/client';
-import { mintVidaCap } from '../economic/vidaCap';
+import { mintOnVitalization } from '../economic/vidaCap';
 import { processHubAccessFee } from '../economic/hubAccessFee';
 import type { VitalizeVerifyRequest } from '../types';
 
@@ -79,10 +79,10 @@ vitalizeRouter.post('/register', async (req: Request, res: Response) => {
     const citizenId = insertedRows[0].id;
     const finalPffId = insertedRows[0].pff_id;
 
-    // Mint VIDA CAP with 50/50 split (only for new registrations)
+    // Mint on Vitalization: 10 VIDA (or 2 after cap) — 50/50 National_Vault (70/30) + Citizen_Vault (4/1)
     let vidaCap = null;
     try {
-      vidaCap = await mintVidaCap(citizenId, finalPffId);
+      vidaCap = await mintOnVitalization(citizenId, finalPffId);
     } catch (mintError) {
       // Log error but don't fail registration
       console.error('VIDA CAP minting failed:', mintError);

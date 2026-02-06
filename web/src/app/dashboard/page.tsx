@@ -11,6 +11,7 @@ import { getMintStatus, MINT_STATUS_PENDING_HARDWARE } from '@/lib/mintStatus';
 import { getIdentityAnchorPhone } from '@/lib/sentinelActivation';
 import { getProfileFaceAndSeed } from '@/lib/recoverySeedStorage';
 import { startVerifiedMintListener } from '@/lib/sovryn/verifiedMintListener';
+import { isArchitect } from '@/lib/manifestoUnveiling';
 
 /**
  * DASHBOARD PAGE - PROTECTED (VAULT)
@@ -33,6 +34,14 @@ export default function DashboardPage() {
     setMounted(true);
     console.log('Interaction Layer Active', '(dashboard)');
   }, []);
+
+  // Unveiling Phase: sensitive wallet/biometric only for architects
+  useEffect(() => {
+    if (!mounted) return;
+    if (!isArchitect()) {
+      router.replace('/');
+    }
+  }, [mounted, router]);
 
   useEffect(() => {
     if (mounted) setIdentityPhone(getIdentityAnchorPhone());
@@ -95,6 +104,15 @@ export default function DashboardPage() {
 
   if (!mounted) {
     return null;
+  }
+
+  // Unveiling Phase: do not render wallet/biometric UI for non-architects
+  if (!isArchitect()) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#050505]" style={{ color: '#6b6b70' }}>
+        <p className="text-sm">Redirecting…</p>
+      </div>
+    );
   }
 
   return (

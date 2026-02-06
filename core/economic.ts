@@ -1,14 +1,24 @@
 /**
  * PFF Core — Economic Layer Types & Constants.
  * VIDA CAP, $VIDA, ATE (Autonomous Truth Economy), VLT (Vitalization Ledger Technology).
- * Sovereign Handshake: 10 VIDA grant with 50/50 + Sentinel split.
+ * Sovereign Handshake: 10 VIDA grant per Vitalization; 50/50 National_Vault / Citizen_Vault with locks.
  */
 
-// Sovereign Handshake — 10 VIDA grant ($10,000) per Vitalization
+/** Global cap: once total minted VIDA CAP reaches this, minting halves to 2 VIDA and Burning Mechanism is enabled. */
+export const VITALIZATION_CAP = 1_000_000_000;
+
+// Sovereign Handshake — 10 VIDA grant ($10,000) per Vitalization (pre-halving)
 export const GROSS_SOVEREIGN_GRANT_VIDA = 10;
 
-// Three-way mint (immutable): government 50%, user 49.8%, sentinel 0.2%
-export const GOVERNMENT_TREASURY_VIDA = 5.0;   // 50% → government_treasury_vault
+/** After VITALIZATION_CAP is reached: each new user gets 2 VIDA (1 National, 1 Citizen). */
+export const POST_HALVING_MINT_VIDA = 2;
+
+// 50:50 split — 5 to National_Vault (70/30 lock), 5 to Citizen_Vault (4/1 lock)
+export const NATIONAL_VAULT_VIDA = 5.0;   // 50% → National_Vault (National Future)
+export const CITIZEN_VAULT_VIDA = 5.0;     // 50% → Citizen_Vault (Citizen's Heritage)
+
+// Legacy three-way (kept for backward compatibility)
+export const GOVERNMENT_TREASURY_VIDA = NATIONAL_VAULT_VIDA;
 export const USER_WALLET_VIDA = 4.98;            // 49.8% → user_wallet (Net Spendable)
 export const SENTINEL_BUSINESS_VIDA = 0.02;     // 0.2% → sentinel_business_ledger (Security Activation)
 

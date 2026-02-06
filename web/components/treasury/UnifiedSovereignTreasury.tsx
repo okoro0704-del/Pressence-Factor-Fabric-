@@ -20,6 +20,7 @@ import { UBABrandingCard } from '@/components/dashboard/UBABrandingCard';
 import { useSovereignSeed } from '@/contexts/SovereignSeedContext';
 import { useBiometricSession } from '@/contexts/BiometricSessionContext';
 import { areAllAnchorsVerified } from '@/lib/tripleAnchor';
+import { IS_PUBLIC_REVEAL, isVettedUser } from '@/lib/publicRevealAccess';
 
 const TOKENS = ['VIDA', 'DLLR', 'USDT', 'vNGN'] as const;
 type Token = (typeof TOKENS)[number];
@@ -169,7 +170,7 @@ export function UnifiedSovereignTreasury() {
 
   return (
     <div className="max-w-4xl mx-auto p-4 md:p-6 space-y-8">
-      {/* ——— Personal Treasury (Gold / Wealth) ——— */}
+      {/* ——— Citizen's Heritage (Citizen_Vault) ——— */}
       <section
         className="rounded-2xl border-2 overflow-hidden"
         style={{ background: GOLD_BG, borderColor: GOLD_BORDER }}
@@ -179,10 +180,13 @@ export function UnifiedSovereignTreasury() {
           style={{ borderColor: GOLD_BORDER, background: 'rgba(212, 175, 55, 0.12)' }}
         >
           <h2 className="text-xl font-bold uppercase tracking-wider" style={{ color: GOLD }}>
-            Personal Treasury
+            Citizen&apos;s Heritage
           </h2>
           <p className="text-xs text-[#a0a0a5] mt-0.5">
-            Your sovereign balances · 1 VIDA = {VIDA_USD_DISPLAY} anchor
+            Citizen_Vault · Your 50% · 4/1 lock: 4 VIDA locked, 1 VIDA released over 10 daily Palm Scans ($100/day until $1,000 spendable)
+          </p>
+          <p className="text-xs text-[#a0a0a5] mt-0.5">
+            1 VIDA = {VIDA_USD_DISPLAY} anchor
           </p>
           {!tripleAnchorUnlocked && (
             <p className="text-xs mt-2 px-3 py-2 rounded-lg border" style={{ color: '#e8c547', borderColor: 'rgba(212,175,55,0.5)', background: 'rgba(212,175,55,0.08)' }}>
@@ -250,34 +254,36 @@ export function UnifiedSovereignTreasury() {
           </p>
         )}
 
-        {/* Linked Account — Nigerian Bank exit ramp */}
-        <div className="px-5 pb-5">
-          <h3 className="text-sm font-bold uppercase tracking-wider mb-3" style={{ color: GOLD }}>
-            Linked Account
-          </h3>
-          <UBABrandingCard linkedAccounts={linkedAccounts} />
-          <div className="mt-4 rounded-xl border p-4" style={{ background: 'rgba(42,42,46,0.5)', borderColor: GOLD_BORDER }}>
-            <h4 className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: GOLD }}>
-              vNGN → Bank
-            </h4>
-            <button
-              type="button"
-              disabled
-              className="w-full py-3 rounded-lg font-bold uppercase tracking-wider border opacity-80 cursor-not-allowed text-sm"
-              style={{ background: 'rgba(42,42,46,0.5)', color: '#8b8b95', borderColor: GOLD_BORDER }}
-            >
-              Withdraw to Nigerian Bank
-            </button>
-            <p className="text-xs text-[#6b6b70] mt-2 text-center">
-              Nigerian Bank exit ramp — awaiting final integration.
-            </p>
+        {/* Linked Account — Nigerian Bank exit ramp (hidden for non-vetted when IS_PUBLIC_REVEAL) */}
+        {(!IS_PUBLIC_REVEAL || isVettedUser()) && (
+          <div className="px-5 pb-5">
+            <h3 className="text-sm font-bold uppercase tracking-wider mb-3" style={{ color: GOLD }}>
+              Linked Account
+            </h3>
+            <UBABrandingCard linkedAccounts={linkedAccounts} />
+            <div className="mt-4 rounded-xl border p-4" style={{ background: 'rgba(42,42,46,0.5)', borderColor: GOLD_BORDER }}>
+              <h4 className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: GOLD }}>
+                vNGN → Bank
+              </h4>
+              <button
+                type="button"
+                disabled
+                className="w-full py-3 rounded-lg font-bold uppercase tracking-wider border opacity-80 cursor-not-allowed text-sm"
+                style={{ background: 'rgba(42,42,46,0.5)', color: '#8b8b95', borderColor: GOLD_BORDER }}
+              >
+                Withdraw to Nigerian Bank
+              </button>
+              <p className="text-xs text-[#6b6b70] mt-2 text-center">
+                Nigerian Bank exit ramp — awaiting final integration.
+              </p>
+            </div>
           </div>
-        </div>
+        )}
       </section>
 
       <hr className="border-[#2a2a2e]" aria-hidden />
 
-      {/* ——— National Treasury (Deep Blue / Security) ——— */}
+      {/* ——— National Future (National_Vault) ——— */}
       <section
         className="rounded-2xl border-2 overflow-hidden"
         style={{ background: BLUE_BG, borderColor: BLUE_BORDER }}
@@ -287,10 +293,10 @@ export function UnifiedSovereignTreasury() {
           style={{ borderColor: BLUE_BORDER, background: 'rgba(30, 58, 138, 0.25)' }}
         >
           <h2 className="text-xl font-bold uppercase tracking-wider text-[#93c5fd]">
-            National Treasury
+            National Future
           </h2>
           <p className="text-xs text-[#a0a0a5] mt-0.5">
-            National Block · total reserve of the country
+            National_Vault · State&apos;s 50% · 70/30 lock · Diplomatic Lock: 70% untouchable until Sovereign Clauses are signed
           </p>
         </div>
         <div className="p-5">
@@ -307,12 +313,12 @@ export function UnifiedSovereignTreasury() {
                   {(nationalReserves.national_vault_vida_cap + nationalReserves.vida_cap_liquidity + nationalReserves.national_vida_pool_vida_cap).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VIDA CAP
                 </p>
                 <p className="text-xs text-[#6b6b70] mt-2">
-                  National Stability Reserve · VIDA CAP Liquidity · National VIDA Pool
+                  National Stability Reserve (70%) · VIDA CAP Liquidity · National VIDA Pool
                 </p>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
                 <div className="rounded-lg p-3 border" style={{ borderColor: BLUE_BORDER, background: 'rgba(30, 58, 138, 0.15)' }}>
-                  <p className="text-[10px] text-[#93c5fd] uppercase tracking-wider">Stability (70%)</p>
+                  <p className="text-[10px] text-[#93c5fd] uppercase tracking-wider">Stability (70%) · Diplomatic Lock</p>
                   <p className="font-mono font-bold text-[#3b82f6]">{nationalReserves.national_vault_vida_cap.toLocaleString('en-US', { minimumFractionDigits: 2 })} VIDA</p>
                 </div>
                 <div className="rounded-lg p-3 border" style={{ borderColor: BLUE_BORDER, background: 'rgba(30, 58, 138, 0.15)' }}>

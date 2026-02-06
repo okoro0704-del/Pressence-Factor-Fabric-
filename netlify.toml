@@ -4,7 +4,8 @@
 [build]
   base = "web"
   command = "npm run build"
-  publish = "out"
+  # Publish path from repo root so deploy finds web/out when run from root
+  publish = "web/out"
 
 [build.environment]
   NODE_VERSION = "20.10.0"

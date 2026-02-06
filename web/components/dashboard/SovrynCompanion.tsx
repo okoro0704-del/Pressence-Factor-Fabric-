@@ -37,6 +37,7 @@ export function SovrynCompanion({
 
   // Initialize voice recognition engine (local Sovereign Intelligence; catch failures so Companion still renders)
   useEffect(() => {
+    if (typeof window === 'undefined') return;
     let engine: VoiceRecognitionEngine | null = null;
     try {
       engine = new VoiceRecognitionEngine({

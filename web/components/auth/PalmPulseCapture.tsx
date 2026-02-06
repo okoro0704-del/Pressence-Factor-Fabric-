@@ -7,9 +7,15 @@
  */
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import type { NormalizedLandmark } from '@mediapipe/hands';
 import { palmGeometryDescriptor, palmDescriptorToHash } from '@/lib/palmGeometry';
 import { useSovereignCompanion } from '@/contexts/SovereignCompanionContext';
+
+/** Local type for MediaPipe hand landmarks — avoids importing @mediapipe/hands at build (SSR/static export). */
+interface NormalizedLandmark {
+  x: number;
+  y: number;
+  z?: number;
+}
 
 const SCAN_CIRCLE_RADIUS = 0.22; // normalized (0-1) radius for "palm in circle"
 const SCAN_CENTER_X = 0.5;
@@ -58,9 +64,9 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
     handsRef.current = null;
   }, []);
 
-  // Load MediaPipe Hands and start camera
+  // Load MediaPipe Hands and start camera (browser-only; never run during static build)
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || typeof window === 'undefined') return;
 
     setError(null);
     setStatus('initializing');
