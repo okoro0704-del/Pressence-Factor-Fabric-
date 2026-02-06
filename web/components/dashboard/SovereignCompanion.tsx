@@ -30,6 +30,8 @@ export interface SovereignCompanionProps {
   onOpenSwapModal?: () => void;
   onShowVitalizationStatus?: () => void;
   onTriggerLockdown?: () => void;
+  /** When true (e.g. on the dedicated Companion page), voice starts listening automatically. */
+  autoActivate?: boolean;
 }
 
 /** Speak text via browser Speech Synthesis (local Sovereign Intelligence). */
@@ -55,6 +57,7 @@ export function SovereignCompanion({
   onOpenSwapModal,
   onShowVitalizationStatus,
   onTriggerLockdown,
+  autoActivate = false,
 }: SovereignCompanionProps) {
   const { scanCue, creditJustHit, setCreditJustHit } = useSovereignCompanion();
   const [briefing, setBriefing] = useState<string>('');
@@ -131,6 +134,7 @@ export function SovereignCompanion({
         onOpenSwapModal={onOpenSwapModal}
         onShowVitalizationStatus={onShowVitalizationStatus}
         onTriggerLockdown={onTriggerLockdown}
+        autoStartListening={autoActivate}
       />
 
       {/* Sleek pulsing aura + AI avatar: always visible; briefing + credit + Eyes cues */}

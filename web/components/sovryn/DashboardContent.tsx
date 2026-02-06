@@ -9,7 +9,6 @@ import { NationalBlockCommand } from '../dashboard/NationalBlockCommand';
 import { UserProfileBalance } from '../dashboard/UserProfileBalance';
 import { SovereignIdCard } from '../dashboard/SovereignIdCard';
 import { VitalizationCountdown } from '../dashboard/VitalizationCountdown';
-import { SovereignCompanion } from '../dashboard/SovereignCompanion';
 import { PresenceOverrideModal } from '../dashboard/PresenceOverrideModal';
 import { FamilyVault } from '../dashboard/FamilyVault';
 import { MerchantModeSection } from '../dashboard/MerchantModeSection';
@@ -349,11 +348,7 @@ export function DashboardContent({
         onPresenceVerified={handlePresenceVerified}
       />
 
-      {/* Sovereign Companion: daily briefing, credit message, Eyes (voice cues during Face/Palm scan) */}
-      <SovereignCompanion
-        userName="Architect"
-        phoneNumber={getIdentityAnchorPhone()}
-      />
+      {/* AI Companion moved to last page: /companion (Companion nav item) — activated there. */}
     </div>
   );
 }

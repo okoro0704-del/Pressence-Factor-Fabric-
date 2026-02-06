@@ -12,6 +12,8 @@ interface SovrynCompanionProps {
   onOpenSwapModal?: () => void;
   onShowVitalizationStatus?: () => void;
   onTriggerLockdown?: () => void;
+  /** When true (e.g. on the dedicated Companion page), start listening automatically. */
+  autoStartListening?: boolean;
 }
 
 /**
@@ -26,6 +28,7 @@ export function SovrynCompanion({
   onOpenSwapModal,
   onShowVitalizationStatus,
   onTriggerLockdown,
+  autoStartListening = false,
 }: SovrynCompanionProps) {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
@@ -124,6 +127,16 @@ export function SovrynCompanion({
 
     voiceEngineRef.current = engine;
 
+    // When on the dedicated Companion page, auto-start listening (activate).
+    let startT: ReturnType<typeof setTimeout> | null = null;
+    if (autoStartListening) {
+      startT = setTimeout(() => {
+        try {
+          engine.startListening?.();
+        } catch {}
+      }, 600);
+    }
+
     // Set greeting based on time of day
     const hour = new Date().getHours();
     let timeGreeting = 'Good evening';
@@ -132,11 +145,12 @@ export function SovrynCompanion({
     setGreeting(`${timeGreeting}, ${userName || 'Architect'}`);
 
     return () => {
+      if (startT) clearTimeout(startT);
       try {
         engine?.destroy?.();
       } catch {}
     };
-  }, [userName, onScrollToBalance, onOpenSwapModal, onShowVitalizationStatus, onTriggerLockdown]);
+  }, [userName, onScrollToBalance, onOpenSwapModal, onShowVitalizationStatus, onTriggerLockdown, autoStartListening]);
 
   const handleMicrophoneClick = () => {
     if (!voiceEngineRef.current) return;

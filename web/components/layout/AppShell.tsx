@@ -13,6 +13,7 @@ import {
   SlidersHorizontal,
   ChevronLeft,
   Menu,
+  Bot,
 } from 'lucide-react';
 import { useTripleTapReset } from '@/lib/useTripleTapReset';
 import { TerminateSessionListener } from '@/components/dashboard/TerminateSessionListener';
@@ -21,7 +22,7 @@ import { shouldShowFullProtocolSync } from '@/lib/publicRevealAccess';
 /** Settings nav icon: use named ref so bundler does not drop it (avoids "SlidersHorizontal is not defined"). */
 const SettingsNavIcon = SlidersHorizontal;
 
-/** Bottom tab bar and sidebar: Dashboard, Treasury, Elections, Master, Command, Settings. */
+/** Bottom tab bar and sidebar: Dashboard, Treasury, Elections, Master, Command, Settings, Companion (last). */
 const NAV = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/treasury', label: 'Treasury', icon: Landmark },
@@ -29,6 +30,7 @@ const NAV = [
   { href: '/master/dashboard', label: 'Master', icon: Shield },
   { href: '/master/command-center', label: 'Command', icon: Settings2 },
   { href: '/settings', label: 'Settings', icon: SettingsNavIcon },
+  { href: '/companion', label: 'Companion', icon: Bot },
 ];
 
 /**
