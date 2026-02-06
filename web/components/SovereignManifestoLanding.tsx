@@ -273,6 +273,39 @@ export function SovereignManifestoLanding() {
             </p>
           </div>
 
+          {/* VIDA CAP Tokenomics & Treasury Logic */}
+          <div className="rounded-xl border-2 p-6 mb-10" style={{ borderColor: BORDER, backgroundColor: CARD_BG }}>
+            <h4 className="text-sm font-bold uppercase tracking-wider mb-4" style={{ color: GOLD }}>
+              VIDA CAP Tokenomics &amp; Treasury Logic
+            </h4>
+            <ul className="space-y-4 text-sm" style={{ color: '#e0e0e0' }}>
+              <li className="flex items-start gap-3">
+                <span className="shrink-0 mt-0.5 w-1.5 h-1.5 rounded-full" style={{ backgroundColor: GOLD }} />
+                <span><strong style={{ color: GOLD }}>The Minting Engine:</strong> <code className="text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: 'rgba(212,175,55,0.15)', color: GOLD }}>mintOnVitalization</code> generates 10 VIDA CAP per new user.</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="shrink-0 mt-0.5 w-1.5 h-1.5 rounded-full" style={{ backgroundColor: GOLD }} />
+                <span><strong style={{ color: GOLD }}>The 50:50 Split Logic:</strong> Send 5 VIDA to the National_Vault (70/30 lock). Send 5 VIDA to the Citizen_Vault (4/1 lock).</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="shrink-0 mt-0.5 w-1.5 h-1.5 rounded-full" style={{ backgroundColor: GOLD }} />
+                <span><strong style={{ color: GOLD }}>The Diplomatic Lock:</strong> In the National_Vault, <code className="text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: 'rgba(212,175,55,0.15)', color: GOLD }}>hasSignedSovereignClauses</code>. If false, the 70% remains untouchable.</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="shrink-0 mt-0.5 w-1.5 h-1.5 rounded-full" style={{ backgroundColor: GOLD }} />
+                <span><strong style={{ color: GOLD }}>The 9-Day Ritual Unlock:</strong> Daily release for the 1 VIDA spendable portion. Every 24 hours of successful Palm Scan releases $100 worth of VIDA until the full $1,000 is spendable.</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="shrink-0 mt-0.5 w-1.5 h-1.5 rounded-full" style={{ backgroundColor: GOLD }} />
+                <span><strong style={{ color: GOLD }}>The Halving &amp; Burn Protocol:</strong> Global constant <code className="text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: 'rgba(212,175,55,0.15)', color: GOLD }}>VITALIZATION_CAP = 1,000,000,000</code>. Once the cap is reached, minting drops to 2 VIDA and the Burning Mechanism is enabled.</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="shrink-0 mt-0.5 w-1.5 h-1.5 rounded-full" style={{ backgroundColor: GOLD }} />
+                <span><strong style={{ color: GOLD }}>Visual Manifesto:</strong> The UI shows two vaults clearly—Citizen&apos;s Heritage and National Future.</span>
+              </li>
+            </ul>
+          </div>
+
         </div>
       </section>
 
@@ -640,20 +673,6 @@ export function SovereignManifestoLanding() {
             </Link>
           </div>
         </div>
-      </section>
-
-      {/* Global Impact */}
-      <section className="px-6 py-16 max-w-3xl mx-auto">
-        <h2 className="text-xs font-semibold uppercase tracking-[0.3em] mb-6" style={{ color: GOLD_DIM }}>
-          Global Impact
-        </h2>
-        <p className="text-lg leading-relaxed mb-4" style={{ color: '#e0e0e0' }}>
-          Where resilience is daily life: <strong style={{ color: GOLD }}>low latency, offline-first</strong>. 
-          Every device, every network. The Vitalization Manifesto started in Lagos—and scales everywhere.
-        </p>
-        <p className="text-base leading-relaxed" style={{ color: MUTED }}>
-          Medical and financial records, encrypted and stored with you at the centre. Decryption only when you prove presence—real-time, hardware-bound. The Shadow Economy: unverified identities, fraud. The Vitalized State: hardware-bound proof, zero-knowledge, presence-only.
-        </p>
       </section>
 
       {/* VITALIE: The Sovereign Utopia */}
