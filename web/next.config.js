@@ -17,9 +17,9 @@ const nextConfig = {
   // Disable strict mode to reduce build complexity
   reactStrictMode: false,
 
-  // Disable TypeScript errors during build
+  // TypeScript: errors fail the build (run tsc --noEmit or build to verify)
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
 };
 
