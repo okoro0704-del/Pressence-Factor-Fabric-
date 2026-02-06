@@ -1,6 +1,7 @@
 # PFF — Automated Netlify deployment via GitHub Actions
 # Triggers on every push to main. Builds the web app and deploys with netlify-cli.
-# Secrets: NETLIFY_AUTH_TOKEN, NETLIFY_SITE_ID, NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY
+# Required secrets: NETLIFY_AUTH_TOKEN, NETLIFY_SITE_ID
+# Optional (for Supabase features): NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY
 
 name: Netlify Deploy
 
@@ -19,6 +20,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Check Netlify secrets
+        run: |
+          if [ -z "${{ secrets.NETLIFY_AUTH_TOKEN }}" ]; then
+            echo "::error::NETLIFY_AUTH_TOKEN is not set. Add it in Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+          if [ -z "${{ secrets.NETLIFY_SITE_ID }}" ]; then
+            echo "::error::NETLIFY_SITE_ID is not set. Add it in Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+          echo "Netlify secrets present."
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -33,9 +46,19 @@ jobs:
       - name: Build
         working-directory: web
         env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NODE_OPTIONS: --max-old-space-size=4096
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || '' }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' }}
         run: npm run build
+
+      - name: Verify build output
+        working-directory: web
+        run: |
+          if [ ! -d out ] || [ -z "$(ls -A out 2>/dev/null)" ]; then
+            echo "::error::Build did not produce web/out. Check the Build step log for errors."
+            exit 1
+          fi
+          echo "Build output: $(ls -la out | head -20)"
 
       - name: Deploy to Netlify
         working-directory: web

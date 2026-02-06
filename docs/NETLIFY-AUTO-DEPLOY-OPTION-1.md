@@ -113,6 +113,8 @@ If you don’t use Supabase, you can skip this. The build may still succeed; som
 | **“Site not found” / invalid Site ID** | Confirm `NETLIFY_SITE_ID` is the **API ID** from Netlify (Site configuration → General → Site information). |
 | **Build fails in GitHub Actions** | Open the failed job log. If it’s a Next.js/build error, fix it in `web/`. If it’s “Missing environment variables”, add the optional Supabase secrets (Step 6). |
 | **Workflow doesn’t run on push** | Ensure you pushed to the **`main`** branch. The workflow is set to `on: push: branches: [main]`. |
+| **Other workflow (“Deploy”) failing** | The **“Deploy”** workflow runs tests + optional EAS/Vercel. The one that deploys to Netlify is **“Netlify Deploy”**. If you only use Netlify, ignore “Deploy” failures or ensure **“Netlify Deploy”** has the two Netlify secrets set and is the one that runs. |
+| **Netlify site not updating** | Check **Netlify Deploy** in the Actions tab (not “Deploy”). If it’s green, open Netlify → Deploys and confirm the latest deploy is “Published”. |
 
 Once the secrets are set and one run succeeds, every future **push to `main`** will auto-deploy to Netlify.
 
