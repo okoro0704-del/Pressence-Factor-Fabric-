@@ -398,6 +398,14 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     return () => clearTimeout(t);
   }, [currentLayer, authStatus]);
 
+  // Step 2 of 5: Compulsory App Download — skip on mobile/PWA (friction removal: they're already on app)
+  useEffect(() => {
+    if (!mounted) return;
+    const standalone =
+      window.matchMedia('(display-mode: standalone)').matches || (window as Window & { standalone?: boolean }).standalone === true;
+    if (isMobile || standalone) setAppDownloadStepComplete(true);
+  }, [mounted, isMobile]);
+
   const getLayerIcon = (layer: AuthLayer) => {
     switch (layer) {
       case AuthLayer.BIOMETRIC_SIGNATURE:
@@ -1547,14 +1555,6 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
       </motion.div>
     );
   }
-
-  // Step 2 of 5: Compulsory App Download — skip on mobile/PWA (friction removal: they're already on app)
-  useEffect(() => {
-    if (!mounted) return;
-    const standalone =
-      window.matchMedia('(display-mode: standalone)').matches || (window as Window & { standalone?: boolean }).standalone === true;
-    if (isMobile || standalone) setAppDownloadStepComplete(true);
-  }, [mounted, isMobile]);
 
   // Step 2 of 5: Compulsory App Download — Next disabled until Download button is clicked (mobile-first Sovereign card)
   if (!appDownloadStepComplete) {

@@ -68,6 +68,27 @@ The PFF (Presence Factor Fabric) Protocol eliminates fraud by replacing password
 
 ---
 
+## Auto-deploy to Netlify (push = deploy)
+
+To have **every push to `main`** automatically build and deploy the web app to Netlify:
+
+**Option 1 — GitHub Actions (recommended)**  
+1. In your **GitHub repo** go to **Settings → Secrets and variables → Actions**.  
+2. Add these **secrets**:
+   - `NETLIFY_AUTH_TOKEN` — from [Netlify: Personal access tokens](https://app.netlify.com/user/applications#personal-access-tokens)
+   - `NETLIFY_SITE_ID` — from Netlify: **Site configuration → General → Site information → API ID**
+   - (Optional for full features) `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+3. Push to `main`. The workflow `.github/workflows/netlify.yml` will build `web/` and deploy to Netlify.
+
+**Option 2 — Netlify “Build on push”**  
+1. In [Netlify](https://app.netlify.com): **Add site → Import from Git** (or open the site).  
+2. Connect the GitHub repo and set **Base directory** to `web`, **Build command** to `npm run build`, **Publish directory** to `out`.  
+3. Every push to the linked branch triggers a Netlify build and deploy.
+
+Full details: **`docs/NETLIFY-AUTOPUSH.md`**.
+
+---
+
 ## Deploy (fix "Page Not Found")
 
 If you see **Page Not Found** after deploying:
