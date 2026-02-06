@@ -273,35 +273,34 @@ export function SovereignManifestoLanding() {
             </p>
           </div>
 
-          {/* VIDA CAP Tokenomics & Treasury Logic */}
+          {/* VIDA CAP Tokenomics */}
           <div className="rounded-xl border-2 p-6 mb-10" style={{ borderColor: BORDER, backgroundColor: CARD_BG }}>
             <h4 className="text-sm font-bold uppercase tracking-wider mb-4" style={{ color: GOLD }}>
-              VIDA CAP Tokenomics &amp; Treasury Logic
+              VIDA CAP Tokenomics
             </h4>
-            <ul className="space-y-4 text-sm" style={{ color: '#e0e0e0' }}>
-              <li className="flex items-start gap-3">
+            <p className="text-sm leading-relaxed mb-4" style={{ color: '#e0e0e0' }}>
+              For every human who Vitalizes, <strong style={{ color: GOLD }}>10 VIDA CAP</strong> is minted and put into circulation. When we reach <strong style={{ color: GOLD }}>1 billion Vitalized Citizens</strong> or <strong style={{ color: GOLD }}>10 billion VIDA CAP</strong> in circulation, minting reduces to <strong style={{ color: GOLD }}>2 VIDA CAP</strong> for every Vitalization and <strong style={{ color: GOLD }}>burning starts immediately</strong>.
+            </p>
+            <p className="text-sm leading-relaxed mb-4" style={{ color: '#e0e0e0' }}>
+              The price of <strong style={{ color: GOLD }}>1 VIDA CAP</strong> is pegged at <strong style={{ color: GOLD }}>$1,000 USD</strong>.
+            </p>
+            <p className="text-sm font-semibold mb-3" style={{ color: GOLD }}>
+              This is where our 50:50 principles start from.
+            </p>
+            <p className="text-sm leading-relaxed mb-4" style={{ color: '#e0e0e0' }}>
+              <strong style={{ color: GOLD }}>50%</strong> of the 10 VIDA CAP is released to your <strong style={{ color: GOLD }}>Country of Origin</strong> to aid in infrastructural development, industrialization, and to strengthen the local economy.
+            </p>
+            <p className="text-sm leading-relaxed mb-2" style={{ color: '#e0e0e0' }}>
+              The <strong style={{ color: GOLD }}>5 VIDA CAP</strong> released to your country is further segregated into <strong style={{ color: GOLD }}>70%</strong> and <strong style={{ color: GOLD }}>30%</strong>:
+            </p>
+            <ul className="space-y-2 text-sm mb-0 list-none" style={{ color: '#e0e0e0' }}>
+              <li className="flex items-start gap-2">
                 <span className="shrink-0 mt-0.5 w-1.5 h-1.5 rounded-full" style={{ backgroundColor: GOLD }} />
-                <span><strong style={{ color: GOLD }}>The Minting Engine:</strong> <code className="text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: 'rgba(212,175,55,0.15)', color: GOLD }}>mintOnVitalization</code> generates 10 VIDA CAP per new user.</span>
+                <span><strong style={{ color: GOLD }}>30%</strong> funds liquidity so citizens can convert their VIDA CAP into the National Stable VIDA Currency for day-to-day purchase and activities.</span>
               </li>
-              <li className="flex items-start gap-3">
+              <li className="flex items-start gap-2">
                 <span className="shrink-0 mt-0.5 w-1.5 h-1.5 rounded-full" style={{ backgroundColor: GOLD }} />
-                <span><strong style={{ color: GOLD }}>The 50:50 Split Logic:</strong> Send 5 VIDA to the National_Vault (70/30 lock). Send 5 VIDA to the Citizen_Vault (4/1 lock).</span>
-              </li>
-              <li className="flex items-start gap-3">
-                <span className="shrink-0 mt-0.5 w-1.5 h-1.5 rounded-full" style={{ backgroundColor: GOLD }} />
-                <span><strong style={{ color: GOLD }}>The Diplomatic Lock:</strong> In the National_Vault, <code className="text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: 'rgba(212,175,55,0.15)', color: GOLD }}>hasSignedSovereignClauses</code>. If false, the 70% remains untouchable.</span>
-              </li>
-              <li className="flex items-start gap-3">
-                <span className="shrink-0 mt-0.5 w-1.5 h-1.5 rounded-full" style={{ backgroundColor: GOLD }} />
-                <span><strong style={{ color: GOLD }}>The 9-Day Ritual Unlock:</strong> Daily release for the 1 VIDA spendable portion. Every 24 hours of successful Palm Scan releases $100 worth of VIDA until the full $1,000 is spendable.</span>
-              </li>
-              <li className="flex items-start gap-3">
-                <span className="shrink-0 mt-0.5 w-1.5 h-1.5 rounded-full" style={{ backgroundColor: GOLD }} />
-                <span><strong style={{ color: GOLD }}>The Halving &amp; Burn Protocol:</strong> Global constant <code className="text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: 'rgba(212,175,55,0.15)', color: GOLD }}>VITALIZATION_CAP = 1,000,000,000</code>. Once the cap is reached, minting drops to 2 VIDA and the Burning Mechanism is enabled.</span>
-              </li>
-              <li className="flex items-start gap-3">
-                <span className="shrink-0 mt-0.5 w-1.5 h-1.5 rounded-full" style={{ backgroundColor: GOLD }} />
-                <span><strong style={{ color: GOLD }}>Visual Manifesto:</strong> The UI shows two vaults clearly—Citizen&apos;s Heritage and National Future.</span>
+                <span><strong style={{ color: GOLD }}>70%</strong> is hard locked in a Safe Vault until your country signs the <strong style={{ color: GOLD }}>No Tax on Human Labour</strong> clause and <strong style={{ color: GOLD }}>no Election without the Truth Ledger</strong>.</span>
               </li>
             </ul>
           </div>
