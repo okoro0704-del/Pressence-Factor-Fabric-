@@ -2,9 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/biometricAuth';
-import type { BreachAttempt } from '@/lib/strictBiometricMatching';
 
-interface BreachAlert {
+export interface BreachAlert {
   id: string;
   breach_id: string;
   alert_type: string;
@@ -32,8 +31,10 @@ export function BreachMonitoringDashboard() {
         event: 'INSERT',
         schema: 'public',
         table: 'breach_alerts'
-      }, (payload) => {
-        setBreachAlerts(prev => [payload.new as BreachAlert, ...prev]);
+      }, (payload: { new?: Record<string, unknown> } | undefined) => {
+        if (!payload?.new || typeof payload.new !== 'object') return;
+        const next = payload.new as Record<string, unknown>;
+        setBreachAlerts(prev => [{ ...next } as unknown as BreachAlert, ...prev]);
       })
       .subscribe();
 
@@ -45,20 +46,9 @@ export function BreachMonitoringDashboard() {
   const fetchBreachAlerts = async () => {
     try {
       setLoading(true);
-      
-      let query = supabase
-        .from('breach_alerts')
-        .select(`
-          *,
-          breach_attempts!inner(variance_percentage, layer)
-        `)
-        .order('timestamp', { ascending: false })
-        .limit(50);
-
-      if (filter === 'UNACKNOWLEDGED') {
-        query = query.eq('acknowledged', false);
-      }
-
+      const client = supabase as any;
+      let query = client.from('breach_alerts').select('*').order('timestamp', { ascending: false }).limit(50);
+      if (filter === 'UNACKNOWLEDGED') query = query.eq('acknowledged', false);
       const { data, error } = await query;
 
       if (error) throw error;
@@ -73,7 +63,7 @@ export function BreachMonitoringDashboard() {
 
   const acknowledgeAlert = async (alertId: string) => {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('breach_alerts')
         .update({
           acknowledged: true,

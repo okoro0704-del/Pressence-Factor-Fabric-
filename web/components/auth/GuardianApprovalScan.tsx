@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { resolveSovereignByPresence, AuthStatus } from '@/lib/biometricAuth';
+import { resolveSovereignByPresence, AuthStatus, type AuthLayer } from '@/lib/biometricAuth';
 import { submitGuardianApproval } from '@/lib/multiDeviceVitalization';
+import type { GlobalIdentity } from '@/lib/phoneIdentity';
 
 interface GuardianApprovalScanProps {
   recoveryRequestId: string;
@@ -24,7 +25,7 @@ export function GuardianApprovalScan({
   onCancel,
 }: GuardianApprovalScanProps) {
   const [authStatus, setAuthStatus] = useState<AuthStatus>(AuthStatus.IDLE);
-  const [currentLayer, setCurrentLayer] = useState(0);
+  const [currentLayer, setCurrentLayer] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -36,8 +37,8 @@ export function GuardianApprovalScan({
       // Perform 4-layer biometric authentication
       const authResult = await resolveSovereignByPresence(
         guardianPhoneNumber,
-        (layer, status) => {
-          setCurrentLayer(layer);
+        (layer: AuthLayer | null, status: AuthStatus) => {
+          setCurrentLayer(layer != null ? 1 : 0);
           setAuthStatus(status);
         }
       );
@@ -62,12 +63,14 @@ export function GuardianApprovalScan({
         longitude: 3.3792,
       };
 
+      const identity = authResult.identity as GlobalIdentity & { biometricHash?: string; variance?: number };
+      const ext = identity as { biometricHash?: string; variance?: number };
       await submitGuardianApproval(
         recoveryRequestId,
         guardianPhoneNumber,
         guardianFullName,
-        authResult.identity.biometricHash,
-        authResult.identity.variance,
+        ext.biometricHash ?? '',
+        ext.variance ?? 0,
         ipAddress,
         geolocation
       );

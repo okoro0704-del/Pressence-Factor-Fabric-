@@ -35,8 +35,10 @@ export function DeviceAuthorizationPanel() {
         event: 'INSERT',
         schema: 'public',
         table: 'device_approval_requests'
-      }, (payload) => {
-        setApprovalRequests(prev => [payload.new as DeviceApprovalRequest, ...prev]);
+      }, (payload: { new?: Record<string, unknown> } | undefined) => {
+        if (!payload?.new || typeof payload.new !== 'object') return;
+        const next = payload.new as Record<string, unknown>;
+        setApprovalRequests(prev => [{ ...next } as unknown as DeviceApprovalRequest, ...prev]);
       })
       .subscribe();
 
@@ -48,17 +50,9 @@ export function DeviceAuthorizationPanel() {
   const fetchApprovalRequests = async () => {
     try {
       setLoading(true);
-
-      let query = supabase
-        .from('device_approval_requests')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      if (filter === 'PENDING') {
-        query = query.eq('status', 'PENDING');
-      }
-
+      const client = supabase as any;
+      let query = client.from('device_approval_requests').select('*').order('created_at', { ascending: false }).limit(50);
+      if (filter === 'PENDING') query = query.eq('status', 'PENDING');
       const { data, error } = await query;
 
       if (error) throw error;
@@ -74,7 +68,7 @@ export function DeviceAuthorizationPanel() {
   const approveDevice = async (requestId: string, phoneNumber: string, deviceUUID: string) => {
     try {
       // Update approval request status
-      const { error: updateError } = await supabase
+      const { error: updateError } = await (supabase as any)
         .from('device_approval_requests')
         .update({
           status: 'APPROVED',
@@ -86,17 +80,17 @@ export function DeviceAuthorizationPanel() {
       if (updateError) throw updateError;
 
       // Add device to authorized_device_uuids in sentinel_identities
-      const { data: identity, error: fetchError } = await supabase
+      const { data: identity, error: fetchError } = await (supabase as any)
         .from('sentinel_identities')
         .select('authorized_device_uuids')
         .eq('phone_number', phoneNumber)
         .single();
 
-      if (fetchError) throw fetchError;
+      if (fetchError || !identity) throw fetchError || new Error('Identity not found');
 
-      const updatedDevices = [...(identity.authorized_device_uuids || []), deviceUUID];
+      const updatedDevices = [...((identity as any).authorized_device_uuids || []), deviceUUID];
 
-      const { error: authError } = await supabase
+      const { error: authError } = await (supabase as any)
         .from('sentinel_identities')
         .update({ authorized_device_uuids: updatedDevices })
         .eq('phone_number', phoneNumber);
@@ -118,7 +112,7 @@ export function DeviceAuthorizationPanel() {
 
   const rejectDevice = async (requestId: string, reason: string) => {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('device_approval_requests')
         .update({
           status: 'REJECTED',

@@ -78,6 +78,7 @@ export function getDataSource(): 'MOCK' | 'VLT_LIVE' | 'BACKEND_API' {
 // ============================================================================
 
 async function fetchNationalReserveFromVLT(): Promise<NationalReserveData> {
+  if (!VLT_API_URL?.trim()) return getMockData().national_reserve;
   const response = await fetch(`${VLT_API_URL}/national-reserve`, {
     headers: {
       'Content-Type': 'application/json',
@@ -92,6 +93,7 @@ async function fetchNationalReserveFromVLT(): Promise<NationalReserveData> {
 }
 
 async function fetchNationalReserveFromBackend(): Promise<NationalReserveData> {
+  if (!BACKEND_URL?.trim()) return getMockData().national_reserve;
   const response = await fetch(`${BACKEND_URL}/economic/national-reserve`, {
     headers: {
       'Content-Type': 'application/json',
@@ -132,6 +134,7 @@ export async function getNationalReserveData(): Promise<NationalReserveData> {
 // ============================================================================
 
 async function fetchCitizenVaultFromVLT(citizenId: string): Promise<CitizenVaultData> {
+  if (!VLT_API_URL?.trim()) return getMockData().citizen_vault;
   const response = await fetch(`${VLT_API_URL}/citizen-vault/${citizenId}`, {
     headers: {
       'Content-Type': 'application/json',
@@ -147,6 +150,7 @@ async function fetchCitizenVaultFromVLT(citizenId: string): Promise<CitizenVault
 }
 
 async function fetchCitizenVaultFromBackend(citizenId: string): Promise<CitizenVaultData> {
+  if (!BACKEND_URL?.trim()) return getMockData().citizen_vault;
   const response = await fetch(`${BACKEND_URL}/vault/${citizenId}`, {
     headers: {
       'Content-Type': 'application/json',
@@ -190,6 +194,10 @@ export async function getCitizenVaultData(citizenId?: string): Promise<CitizenVa
 // ============================================================================
 
 async function fetchSystemStatusFromVLT(): Promise<SystemStatus> {
+  if (!VLT_API_URL?.trim()) {
+    const mockData = getMockData();
+    return { system_status: mockData.system_status, protocol: mockData.protocol, last_vitalization: mockData.last_vitalization };
+  }
   const response = await fetch(`${VLT_API_URL}/system/status`, {
     headers: {
       'Content-Type': 'application/json',
@@ -245,6 +253,7 @@ export async function updateCitizenVaultBalance(
   try {
     switch (source) {
       case 'VLT_LIVE':
+        if (!VLT_API_URL?.trim()) throw new Error('VLT API URL not configured');
         const vltResponse = await fetch(`${VLT_API_URL}/citizen-vault/${citizenId}/balance`, {
           method: 'PUT',
           headers: {
@@ -261,6 +270,7 @@ export async function updateCitizenVaultBalance(
         return vltResponse.json();
 
       case 'BACKEND_API':
+        if (!BACKEND_URL?.trim()) throw new Error('Backend URL not configured');
         const backendResponse = await fetch(`${BACKEND_URL}/vault/${citizenId}/balance`, {
           method: 'PUT',
           headers: {

@@ -7,6 +7,9 @@
 
 import { supabase } from './biometricAuth';
 
+/** Use any to avoid Supabase client chain type errors (select returns Promise in some typings). */
+const db: any = supabase;
+
 export interface DeviceInfo {
   deviceId: string;
   deviceType: 'LAPTOP' | 'PHONE' | 'TABLET' | 'DESKTOP' | 'UNKNOWN';
@@ -125,7 +128,7 @@ function generateHardwareHash(userAgent: string, platform: string, screenResolut
  * Check if Device is Authorized
  */
 export async function isDeviceAuthorized(phoneNumber: string, deviceId: string): Promise<boolean> {
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('authorized_devices')
     .select('*')
     .eq('phone_number', phoneNumber)
@@ -144,7 +147,7 @@ export async function isDeviceAuthorized(phoneNumber: string, deviceId: string):
  * Get Primary Device for User
  */
 export async function getPrimaryDevice(phoneNumber: string): Promise<{ device_id: string; device_name: string; last_4_digits: string } | null> {
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('authorized_devices')
     .select('device_id, device_name, phone_number')
     .eq('phone_number', phoneNumber)
@@ -185,7 +188,7 @@ export async function assignPrimarySentinel(
 ): Promise<void> {
   const deviceIdToStore = compositeDeviceId ?? deviceInfo.deviceId;
 
-  const { data: existingProfile } = await supabase
+  const { data: existingProfile } = await db
     .from('user_profiles')
     .select('*')
     .eq('phone_number', phoneNumber)
@@ -216,20 +219,20 @@ export async function assignPrimarySentinel(
   }
 
   if (!existingProfile) {
-    await supabase.from('user_profiles').insert({
+    await db.from('user_profiles').insert({
       phone_number: phoneNumber,
       full_name: fullName,
       ...basePayload,
       guardian_recovery_enabled: false,
     });
   } else {
-    await supabase
+    await db
       .from('user_profiles')
       .update(basePayload)
       .eq('phone_number', phoneNumber);
   }
 
-  await supabase.from('authorized_devices').insert({
+  await db.from('authorized_devices').insert({
     phone_number: phoneNumber,
     device_id: deviceIdToStore,
     device_name: deviceInfo.deviceName,
@@ -283,7 +286,7 @@ export async function createVitalizationRequest(
   if (externalFingerprintHash != null && externalFingerprintHash !== '') {
     insertPayload.external_fingerprint_hash = externalFingerprintHash;
   }
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('vitalization_requests')
     .insert(insertPayload)
     .select('id')
@@ -303,7 +306,7 @@ export function subscribeToVitalizationRequest(
   requestId: string,
   onStatusChange: (status: 'APPROVED' | 'DENIED') => void
 ): () => void {
-  const subscription = supabase
+  const channel = (db as any)
     .channel(`vitalization_request_${requestId}`)
     .on(
       'postgres_changes',
@@ -313,17 +316,21 @@ export function subscribeToVitalizationRequest(
         table: 'vitalization_requests',
         filter: `id=eq.${requestId}`,
       },
-      (payload) => {
-        const newStatus = (payload.new as VitalizationRequest).status;
+      (payload: { new?: VitalizationRequest }) => {
+        const newStatus = payload.new?.status;
         if (newStatus === 'APPROVED' || newStatus === 'DENIED') {
           onStatusChange(newStatus);
         }
       }
-    )
-    .subscribe();
+    );
+  channel.subscribe();
 
   return () => {
-    subscription.unsubscribe();
+    try {
+      db.removeChannel(channel);
+    } catch {
+      // ignore
+    }
   };
 }
 
@@ -332,7 +339,7 @@ export function subscribeToVitalizationRequest(
  */
 export async function approveVitalizationRequest(requestId: string, primaryDeviceId: string): Promise<void> {
   // Update vitalization request status
-  const { error: updateError } = await supabase
+  const { error: updateError } = await db
     .from('vitalization_requests')
     .update({
       status: 'APPROVED',
@@ -346,7 +353,7 @@ export async function approveVitalizationRequest(requestId: string, primaryDevic
   }
 
   // Get request details
-  const { data: request, error: fetchError } = await supabase
+  const { data: request, error: fetchError } = await db
     .from('vitalization_requests')
     .select('*')
     .eq('id', requestId)
@@ -357,7 +364,7 @@ export async function approveVitalizationRequest(requestId: string, primaryDevic
   }
 
   // Add device to authorized_devices
-  const { error: insertError } = await supabase
+  const { error: insertError } = await db
     .from('authorized_devices')
     .insert({
       phone_number: request.phone_number,
@@ -394,7 +401,7 @@ export async function approveVitalizationRequest(requestId: string, primaryDevic
  * Deny Vitalization Request
  */
 export async function denyVitalizationRequest(requestId: string, primaryDeviceId: string): Promise<void> {
-  const { error } = await supabase
+  const { error } = await db
     .from('vitalization_requests')
     .update({
       status: 'DENIED',
@@ -412,7 +419,7 @@ export async function denyVitalizationRequest(requestId: string, primaryDeviceId
  * Get All Authorized Devices for User
  */
 export async function getAuthorizedDevices(phoneNumber: string): Promise<any[]> {
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('authorized_devices')
     .select('*')
     .eq('phone_number', phoneNumber)
@@ -430,7 +437,7 @@ export async function getAuthorizedDevices(phoneNumber: string): Promise<any[]> 
  * Revoke Device Authorization
  */
 export async function revokeDeviceAuthorization(deviceId: string): Promise<void> {
-  const { error } = await supabase
+  const { error } = await db
     .from('authorized_devices')
     .update({
       status: 'REVOKED',
@@ -449,7 +456,7 @@ export async function revokeDeviceAuthorization(deviceId: string): Promise<void>
  * Update Device Nickname
  */
 export async function updateDeviceNickname(deviceId: string, nickname: string): Promise<void> {
-  const { error } = await supabase
+  const { error } = await db
     .from('authorized_devices')
     .update({
       device_nickname: nickname,
@@ -468,7 +475,7 @@ export async function updateDeviceNickname(deviceId: string, nickname: string): 
  * Update Last Used Timestamp
  */
 export async function updateDeviceLastUsed(deviceId: string): Promise<void> {
-  const { error } = await supabase
+  const { error } = await db
     .from('authorized_devices')
     .update({
       last_used_at: new Date().toISOString(),
@@ -488,7 +495,7 @@ export async function createGuardianRecoveryRequest(
   oldPrimaryDeviceId: string | null,
   newDeviceInfo: DeviceInfo
 ): Promise<string> {
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('guardian_recovery_requests')
     .insert({
       phone_number: phoneNumber,
@@ -525,7 +532,7 @@ export async function submitGuardianApproval(
   ipAddress: string,
   geolocation: VitalizationRequest['geolocation']
 ): Promise<void> {
-  const { error } = await supabase.from('guardian_approvals').insert({
+  const { error } = await db.from('guardian_approvals').insert({
     recovery_request_id: recoveryRequestId,
     guardian_phone_number: guardianPhoneNumber,
     guardian_full_name: guardianFullName,
@@ -547,7 +554,7 @@ export async function submitGuardianApproval(
  * Get Guardian Recovery Request Status
  */
 export async function getGuardianRecoveryStatus(requestId: string): Promise<any> {
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('guardian_recovery_requests')
     .select('*')
     .eq('id', requestId)
@@ -567,7 +574,7 @@ export function subscribeToGuardianRecoveryRequest(
   requestId: string,
   onStatusChange: (status: 'APPROVED' | 'DENIED' | 'EXPIRED', currentApprovals: number) => void
 ): () => void {
-  const subscription = supabase
+  const channel = db
     .channel(`guardian_recovery_${requestId}`)
     .on(
       'postgres_changes',
@@ -576,19 +583,24 @@ export function subscribeToGuardianRecoveryRequest(
         schema: 'public',
         table: 'guardian_recovery_requests',
         filter: `id=eq.${requestId}`,
-      },
-      (payload) => {
-        const newStatus = (payload.new as any).status;
-        const currentApprovals = (payload.new as any).current_approvals;
+      } as any,
+      (payload: { new?: Record<string, unknown> } | undefined) => {
+        const newRow = (payload?.new ?? undefined) as { status?: string; current_approvals?: number } | undefined;
+        const newStatus = newRow?.status;
+        const currentApprovals = newRow?.current_approvals ?? 0;
         if (newStatus === 'APPROVED' || newStatus === 'DENIED' || newStatus === 'EXPIRED') {
           onStatusChange(newStatus, currentApprovals);
         }
       }
-    )
-    .subscribe();
+    );
+  channel.subscribe();
 
   return () => {
-    subscription.unsubscribe();
+    try {
+      db.removeChannel(channel);
+    } catch {
+      // ignore
+    }
   };
 }
 

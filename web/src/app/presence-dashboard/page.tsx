@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PresenceOverrideWrapper } from '@/components/dashboard/PresenceOverrideWrapper';
 import { DependentDashboard } from '@/components/dashboard/DependentDashboard';
 import { UserProfileBalance } from '@/components/dashboard/UserProfileBalance';
@@ -45,10 +45,8 @@ export default function PresenceDashboardPage() {
     );
   }
 
-  return (
-    <PresenceOverrideWrapper deviceOwnerIdentity={deviceOwner}>
-      {({ identity, isPresenceOverride }: { identity: GlobalIdentity; isPresenceOverride: boolean }) => (
-        <div className="min-h-screen bg-[#050505]">
+  const renderContent = ({ identity, isPresenceOverride }: { identity: GlobalIdentity; isPresenceOverride: boolean }): React.ReactNode => (
+    <div className="min-h-screen bg-[#050505]">
           {/* Header */}
           <header className="bg-[#16161a] border-b border-[#2a2a2e] px-6 py-4">
             <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -141,8 +139,13 @@ export default function PresenceDashboardPage() {
             )}
           </main>
         </div>
-      )}
-    </PresenceOverrideWrapper>
+  );
+
+  return (
+    <PresenceOverrideWrapper
+      deviceOwnerIdentity={deviceOwner}
+      children={renderContent}
+    />
   );
 }
 

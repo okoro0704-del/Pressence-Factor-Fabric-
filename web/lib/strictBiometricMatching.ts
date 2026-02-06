@@ -1,4 +1,19 @@
-import { createClient } from '@supabase/supabase-js';
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL || '', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '');
-export async function verifySovereignIdentity(userId, scanData) { return { success: true, match: true }; }
-export async function executeGenesisReset() { await supabase.auth.signOut(); return { success: true, message: 'Reset Complete' }; }
+import { getSupabase } from './supabase';
+
+/** Breach attempt record (variance, layer) — used by BreachMonitoringDashboard. */
+export interface BreachAttempt {
+  id?: string;
+  variance_percentage?: number;
+  layer?: string;
+  [key: string]: unknown;
+}
+
+export async function verifySovereignIdentity(userId: string, scanData: unknown) {
+  return { success: true, match: true };
+}
+
+export async function executeGenesisReset() {
+  const supabase = getSupabase();
+  if (supabase) await (supabase as any).auth.signOut();
+  return { success: true, message: 'Reset Complete' };
+}

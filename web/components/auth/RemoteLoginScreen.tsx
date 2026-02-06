@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { JetBrains_Mono } from 'next/font/google';
 import { verifyBiometricSignature } from '@/lib/biometricAuth';

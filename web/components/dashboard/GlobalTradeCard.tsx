@@ -11,6 +11,7 @@ import {
 } from '@/lib/sovryn';
 import { sendDLLR, isValidAddress } from '@/lib/sovryn/sendDLLR';
 import { getIdentityAnchorPhone } from '@/lib/sentinelActivation';
+import { checkPresenceVerified } from '@/lib/withPresenceCheck';
 
 const jetbrains = JetBrains_Mono({ weight: ['400', '600', '700'], subsets: ['latin'] });
 
@@ -33,6 +34,11 @@ export function GlobalTradeCard() {
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [sendSuccess, setSendSuccess] = useState<string | null>(null);
+  const [isPresenceVerified, setIsPresenceVerified] = useState(true);
+
+  useEffect(() => {
+    checkPresenceVerified().then((r) => setIsPresenceVerified(r.verified));
+  }, []);
 
   // Auto-refresh balance every 30 seconds
   useEffect(() => {

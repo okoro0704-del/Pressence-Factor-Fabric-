@@ -21,8 +21,8 @@ const VLT_API_URL = process.env.NEXT_PUBLIC_VLT_API_URL || BACKEND_URL;
  * Connects to real backend API
  */
 async function performPFFScan(): Promise<PresenceProof> {
-  if (!BACKEND_URL) {
-    throw new Error('NEXT_PUBLIC_PFF_BACKEND_URL not configured');
+  if (!BACKEND_URL?.trim()) {
+    return Promise.reject(new Error('NEXT_PUBLIC_PFF_BACKEND_URL not configured. Set it in .env.local or Netlify.'));
   }
 
   // TODO: Implement real WebAuthn flow
@@ -56,8 +56,8 @@ async function performPFFScan(): Promise<PresenceProof> {
  * Connects to real economic layer API
  */
 async function mintVidaCap(pffId: string): Promise<VidaCapResult> {
-  if (!BACKEND_URL) {
-    throw new Error('NEXT_PUBLIC_PFF_BACKEND_URL not configured');
+  if (!BACKEND_URL?.trim()) {
+    return Promise.reject(new Error('NEXT_PUBLIC_PFF_BACKEND_URL not configured. Set it in .env.local or Netlify.'));
   }
 
   // The minting happens automatically on registration, but we can fetch the result
@@ -93,8 +93,8 @@ async function mintVidaCap(pffId: string): Promise<VidaCapResult> {
  * Connects to real economic layer API
  */
 async function getVidaBalance(pffId: string): Promise<VidaBalance> {
-  if (!BACKEND_URL) {
-    throw new Error('NEXT_PUBLIC_PFF_BACKEND_URL not configured');
+  if (!BACKEND_URL?.trim()) {
+    return Promise.reject(new Error('NEXT_PUBLIC_PFF_BACKEND_URL not configured. Set it in .env.local or Netlify.'));
   }
 
   const response = await fetch(`${BACKEND_URL}/economic/vida-cap/balance`, {

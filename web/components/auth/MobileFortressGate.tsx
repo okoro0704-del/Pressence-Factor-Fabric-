@@ -6,6 +6,7 @@ import { resolveSovereignByPresence, AuthStatus, AuthLayer } from '@/lib/biometr
 import { verifyRemoteAuthSession } from '@/lib/remoteAuth';
 import { generateIdentityHash } from '@/lib/phoneIdentity';
 import { executeHardIdentityReset } from '@/lib/identityReset';
+import { getIdentityAnchorPhone } from '@/lib/sentinelActivation';
 
 interface MobileFortressGateProps {
   sessionId: string;
@@ -34,9 +35,15 @@ export function MobileFortressGate({ sessionId }: MobileFortressGateProps) {
     setError('');
 
     try {
+      const phone = getIdentityAnchorPhone();
+      if (!phone?.trim()) {
+        setError('Identity anchor required. Complete 4-layer gate first.');
+        setAuthStatus(AuthStatus.FAILED);
+        return;
+      }
       // Perform 4-layer biometric scan
-      const authResult = await resolveSovereignByPresence((layer, status) => {
-        setCurrentLayer(layer);
+      const authResult = await resolveSovereignByPresence(phone, (layer: AuthLayer | null, status: AuthStatus) => {
+        setCurrentLayer(layer != null ? 1 : 0);
         setAuthStatus(status);
       });
 

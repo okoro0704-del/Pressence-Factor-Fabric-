@@ -37,6 +37,7 @@ function inCircle(cx: number, cy: number, x: number, y: number, r: number): bool
 }
 
 export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPulseCaptureProps) {
+  const { setScanCue } = useSovereignCompanion();
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);

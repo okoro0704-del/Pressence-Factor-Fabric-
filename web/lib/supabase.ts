@@ -56,8 +56,8 @@ function initSupabase() {
   if (_initialized) return;
   _initialized = true;
 
-  const url = (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_SUPABASE_URL)?.trim() ?? '';
-  const anon = (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)?.trim() ?? '';
+  const url = (typeof process !== 'undefined' ? (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '') : '').trim();
+  const anon = (typeof process !== 'undefined' ? (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '') : '').trim();
 
   if (!url || !anon) {
     const msg =
@@ -87,7 +87,7 @@ function initSupabase() {
       global: {
         fetch: noCacheFetch,
       },
-    });
+    } as any);
     _isMock = false;
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);

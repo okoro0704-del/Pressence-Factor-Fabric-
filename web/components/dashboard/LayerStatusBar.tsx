@@ -48,10 +48,11 @@ export function LayerStatusBar() {
   const statusText = allGold ? 'TRIPLE ANCHOR VERIFIED' : `ANCHOR ${count}/3`;
   const subText = allGold ? '1 VIDA Unlocked' : 'Face → Fingerprint → Device';
 
-  const icons: { key: 'face' | 'fingerprint' | 'device'; verified: boolean; Icon: React.ComponentType<{ size?: number; className?: string }>; label: string }[] = [
-    { key: 'face', verified: tripleAnchor.face, Icon: ScanLine, label: 'Face' },
-    { key: 'fingerprint', verified: tripleAnchor.fingerprint, Icon: Fingerprint, label: 'Fingerprint' },
-    { key: 'device', verified: tripleAnchor.device, Icon: Smartphone, label: 'Device' },
+  type IconProps = { size?: number; className?: string; 'aria-hidden'?: boolean };
+  const icons: { key: 'face' | 'fingerprint' | 'device'; verified: boolean; Icon: React.ComponentType<IconProps>; label: string }[] = [
+    { key: 'face', verified: tripleAnchor.face, Icon: ScanLine as React.ComponentType<IconProps>, label: 'Face' },
+    { key: 'fingerprint', verified: tripleAnchor.fingerprint, Icon: Fingerprint as React.ComponentType<IconProps>, label: 'Fingerprint' },
+    { key: 'device', verified: tripleAnchor.device, Icon: Smartphone as React.ComponentType<IconProps>, label: 'Device' },
   ];
 
   return (
@@ -91,7 +92,7 @@ export function LayerStatusBar() {
                 }}
                 title={`${label}: ${verified ? 'Verified' : 'Pending'}`}
               >
-                <Icon size={22} style={{ color: verified ? GOLD : GRAY }} aria-hidden />
+                <Icon size={22} className={verified ? 'text-[#D4AF37]' : 'text-[#6b6b70]'} aria-hidden />
                 <span className="text-[10px] mt-0.5" style={{ color: verified ? GOLD : GRAY }}>
                   {label}
                 </span>

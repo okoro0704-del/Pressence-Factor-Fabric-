@@ -17,6 +17,8 @@ export default function AdminSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [refreshStatus, setRefreshStatus] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
   const [refreshMessage, setRefreshMessage] = useState('');
+  const [resetStatus, setResetStatus] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
+  const [resetMessage, setResetMessage] = useState('');
 
   useEffect(() => {
     setPhone(getIdentityAnchorPhone());

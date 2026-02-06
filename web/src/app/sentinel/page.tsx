@@ -27,11 +27,16 @@ export default function SentinelPage() {
   const [activated, setActivated] = useState(false);
   const [sentinelId, setSentinelId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [vitalizedCount, setVitalizedCount] = useState(0);
 
   useEffect(() => {
     const p = getIdentityAnchorPhone();
     setPhone(p);
     if (p) isSentinelActive(p).then(setActive);
+  }, []);
+
+  useEffect(() => {
+    getVitalizedCitizensCount().then((n) => setVitalizedCount(n ?? 0));
   }, []);
 
   const handleActivateLocalKey = async () => {

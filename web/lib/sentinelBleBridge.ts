@@ -8,10 +8,22 @@ const NORDIC_UART_SERVICE = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
 const NORDIC_UART_TX = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
 const NORDIC_UART_RX = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
 
+/** Web Bluetooth types (BluetoothDevice, BluetoothRemoteGATTCharacteristic) — use any for broad compatibility. */
 export interface SentinelBleBridgeHandle {
-  device: BluetoothDevice;
-  txChar: BluetoothRemoteGATTCharacteristic;
-  rxChar: BluetoothRemoteGATTCharacteristic;
+  device: any;
+  txChar: any;
+  rxChar: any;
+}
+
+/** Minimal Web Bluetooth API shape for requestDevice. */
+type BleGattCharacteristic = { getCharacteristic(u: string): Promise<unknown> };
+type BleGattService = { getPrimaryService(u: string): Promise<BleGattCharacteristic> };
+type BleGattServer = { connect(): Promise<BleGattService> };
+type BleRequestDeviceResult = { gatt?: BleGattServer };
+interface WebBluetoothNavigator {
+  bluetooth?: {
+    requestDevice(opts: { filters: { name: string }[]; optionalServices: string[] }): Promise<BleRequestDeviceResult>;
+  };
 }
 
 let bridgeHandle: SentinelBleBridgeHandle | null = null;
@@ -24,12 +36,14 @@ export async function connectSentinelBleBridge(): Promise<{
   ok: true;
   handle: SentinelBleBridgeHandle;
 } | { ok: false; error: string }> {
-  if (typeof navigator === 'undefined' || !navigator.bluetooth) {
+  const nav = navigator as WebBluetoothNavigator;
+  const bluetooth = typeof navigator !== 'undefined' && nav.bluetooth;
+  if (!bluetooth) {
     return { ok: false, error: 'Web Bluetooth is not supported. Use Chrome/Edge and HTTPS.' };
   }
 
   try {
-    const device = await navigator.bluetooth.requestDevice({
+    const device = await bluetooth.requestDevice({
       filters: [{ name: SENTINEL_BRIDGE_NAME }],
       optionalServices: [NORDIC_UART_SERVICE],
     });
@@ -105,7 +119,7 @@ export function startHashListener(
       await handle.rxChar.startNotifications();
       handle.rxChar.addEventListener('characteristicvaluechanged', (ev: Event) => {
         if (cancelled) return;
-        const char = (ev as { target?: BluetoothRemoteGATTCharacteristic }).target as BluetoothRemoteGATTCharacteristic | undefined;
+        const char = (ev as { target?: { value?: { buffer: ArrayBuffer } } }).target;
         const value = char?.value;
         if (!value) return;
         const bytes = new Uint8Array(value.buffer);
@@ -150,7 +164,7 @@ async function base64ToHashHexAsync(base64: string): Promise<string> {
 }
 
 function sha256ToHex(bytes: Uint8Array): Promise<string> {
-  return crypto.subtle.digest('SHA-256', bytes).then((buf) => {
+  return crypto.subtle.digest('SHA-256', new Uint8Array(bytes) as unknown as BufferSource).then((buf) => {
     const arr = new Uint8Array(buf);
     return Array.from(arr)
       .map((b) => b.toString(16).padStart(2, '0'))
