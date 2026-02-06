@@ -163,7 +163,7 @@ export default function SentinelPurchasePage() {
                   </p>
                 </div>
                 <ul className="text-sm text-neutral-400 space-y-1 flex-1 mb-6">
-                  <li>• Device fingerprinting</li>
+                  <li>• Device identification</li>
                   <li>• License linked to Identity Anchor</li>
                   {isBusiness && <li>• PFF_API_KEY for Partner API</li>}
                 </ul>

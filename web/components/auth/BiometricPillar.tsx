@@ -118,7 +118,7 @@ async function tryTransferIn(device: USBDevice, endpointNumber: number, maxWaitM
 async function waitForTransferIn(device: USBDevice, endpointNumber: number, maxWaitMs: number): Promise<Uint8Array> {
   const arr = await tryTransferIn(device, endpointNumber, maxWaitMs);
   if (arr) return arr;
-  throw new Error('No fingerprint data received. Place your finger on the scanner and tap Capture Fingerprint again.');
+  throw new Error('No palm data received. Hold your palm to the camera and try again.');
 }
 
 export const BiometricPillar = forwardRef<BiometricPillarHandle, BiometricPillarProps>(function BiometricPillar(
@@ -444,7 +444,7 @@ export const BiometricPillar = forwardRef<BiometricPillarHandle, BiometricPillar
           </div>
           <p className="text-sm font-medium text-[#e8c547] mt-2">{getStatusText()}</p>
           {bridgeMode === 'ble' && state === 'auto_on' ? (
-            <p className="text-[10px] text-[#6b6b70] mt-1">Place finger on Bridge scanner. Hash will auto-submit.</p>
+            <p className="text-[10px] text-[#6b6b70] mt-1">Hold your palm to the scanner. Hash will auto-submit.</p>
           ) : bridgeMode !== 'ble' ? (
             <p className="text-[10px] text-[#6b6b70] mt-1">Scanner polling every {AUTO_POLL_INTERVAL_MS}ms</p>
           ) : null}
@@ -486,24 +486,24 @@ export const BiometricPillar = forwardRef<BiometricPillarHandle, BiometricPillar
         <>
           {bridgeMode === 'ble' ? (
             <>
-              <p className="text-xs text-[#6b6b70] mb-4">Place your finger on the Bridge scanner. Request capture to power ZKTeco and receive hash (no cable).</p>
+              <p className="text-xs text-[#6b6b70] mb-4">Use the Hub Bridge scanner for Sovereign Palm. Request capture to power ZKTeco and receive hash (no cable).</p>
               <button
                 type="button"
                 onClick={() => triggerExternalCapture()}
                 className="w-full py-4 rounded-lg bg-[#D4AF37] text-[#0d0d0f] font-bold text-sm uppercase tracking-wider hover:opacity-90 transition-opacity"
               >
-                Request fingerprint
+                Request Palm Scan
               </button>
             </>
           ) : (
             <>
-              <p className="text-xs text-[#6b6b70] mb-4">Place your finger on the scanner, or wait for Auto-On after Face Pulse.</p>
+              <p className="text-xs text-[#6b6b70] mb-4">Hold your palm to the camera, or use the Hub scanner when available.</p>
               <button
                 type="button"
                 onClick={captureFingerprint}
                 className="w-full py-4 rounded-lg bg-[#D4AF37] text-[#0d0d0f] font-bold text-sm uppercase tracking-wider hover:opacity-90 transition-opacity"
               >
-                Capture Fingerprint
+                Sovereign Palm Scan
               </button>
             </>
           )}
@@ -512,7 +512,7 @@ export const BiometricPillar = forwardRef<BiometricPillarHandle, BiometricPillar
 
       {state === 'auto_on' && (
         <p className="text-xs text-[#6b6b70]">
-          {bridgeMode === 'ble' ? 'Place your finger on the Bridge scanner. Hash will be sent via BLE and saved to recovery_seed_hash.' : 'Place your finger on the scanner. Capturing automatically.'}
+          {bridgeMode === 'ble' ? 'Hold your palm to the camera or use Bridge scanner. Hash will be sent via BLE and saved.' : 'Hold your palm to the camera. Capturing automatically.'}
         </p>
       )}
 

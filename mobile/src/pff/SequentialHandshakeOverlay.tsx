@@ -29,7 +29,7 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 
-import type { HandshakePhase, PhaseStatus } from '../../../core/sequentialHandshake';
+import type { HandshakePhase, PhaseStatus } from './coreSequentialHandshake';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 

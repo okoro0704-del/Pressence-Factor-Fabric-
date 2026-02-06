@@ -57,7 +57,7 @@ export function PresenceVerificationOverlay({
   visible,
   onClose,
   onSuccess,
-}: PresenceVerificationOverlayProps): React.JSX.Element {
+}: PresenceVerificationOverlayProps): React.JSX.Element | null {
   const insets = useSafeAreaInsets();
   const [phase, setPhase] = useState<Phase>('camera');
   const [errorKind, setErrorKind] = useState<ErrorKind | null>(null);

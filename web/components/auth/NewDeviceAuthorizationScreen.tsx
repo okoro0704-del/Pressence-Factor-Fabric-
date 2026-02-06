@@ -10,7 +10,7 @@ interface NewDeviceAuthorizationScreenProps {
 
 /**
  * New Device Authorization — shown when a verified user logs in on a device
- * whose fingerprint does not match stored primary_sentinel_device_id.
+ * whose device ID does not match stored primary_sentinel_device_id.
  * Options: (1) Add this device by approving from phone — keeps both devices. (2) Authorize this device only — 5s Face Pulse, replaces primary.
  */
 export function NewDeviceAuthorizationScreen({

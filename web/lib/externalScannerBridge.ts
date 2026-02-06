@@ -62,7 +62,7 @@ export function waitForExternalFingerprint(
       timeoutId = null;
       window.removeEventListener(EXTERNAL_FINGERPRINT_EVENT, handleExternalFingerprint);
       if (pendingReject) {
-        pendingReject(new Error('External fingerprint scanner timeout. Connect USB/Bluetooth scanner and try again.'));
+        pendingReject(new Error('Sovereign Palm scanner timeout. Hold your palm to the camera or connect Hub scanner and try again.'));
         pendingResolve = null;
         pendingReject = null;
       }

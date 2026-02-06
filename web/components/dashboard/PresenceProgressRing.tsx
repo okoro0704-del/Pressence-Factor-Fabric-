@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Triple-Pillar Shield Progress Ring: Device Signature → GPS Presence → Sovereign Face → Hardware Fingerprint.
+ * Triple-Pillar Shield Progress Ring: Device Signature → GPS Presence → Sovereign Face → Sovereign Palm.
  * Each segment turns gold when that pillar is verified. 200ms transition for instant feedback.
  */
 
@@ -29,9 +29,9 @@ export interface PresenceProgressRingProps {
   locationVerified: boolean;
   faceVerified: boolean;
   voiceVerified?: boolean;
-  /** Show 4th segment (Hardware Fingerprint) or only 3 pillars */
+  /** Show 4th segment (Sovereign Palm) or only 3 pillars */
   showVoice?: boolean;
-  /** When false (mobile short-circuit), show only 2 segments: GPS Presence + Sovereign Face. Fingerprint deferred to hub. */
+  /** When false (mobile short-circuit), show only 2 segments: GPS Presence + Sovereign Face. Palm deferred to hub. */
   showDevicePillar?: boolean;
 }
 
@@ -103,7 +103,7 @@ export function PresenceProgressRing({
           <>
             <span className="text-[#4a4a4e]">·</span>
             <span className={voiceVerified ? 'text-[#D4AF37] font-semibold' : 'text-[#6b6b70]'}>
-              HW Fingerprint {voiceVerified ? '✓' : '…'}
+              Sovereign Palm {voiceVerified ? '✓' : '…'}
             </span>
           </>
         )}

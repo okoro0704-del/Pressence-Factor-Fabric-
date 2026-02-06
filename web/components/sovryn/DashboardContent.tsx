@@ -81,7 +81,7 @@ export function DashboardContent({
 
   return (
     <div className="flex flex-col min-h-screen">
-      <header className="shrink-0 border-b border-[#2a2a2e] bg-[#16161a]/90 backdrop-blur px-4 py-3">
+      <header className="shrink-0 border-b border-[#2a2a2e] bg-[#16161a]/90 backdrop-blur px-4 py-3 safe-area-top">
         <div className="flex items-center justify-between">
           <div>
             <button
@@ -131,6 +131,20 @@ export function DashboardContent({
       </header>
 
       <div className="flex-1 p-4 md:p-6 max-w-6xl mx-auto w-full">
+        {/* Sync to Mobile — show prominently on laptop so user can pair phone */}
+        <section className="hidden lg:block mb-6 rounded-2xl border-2 p-6 max-w-lg mx-auto" style={{ borderColor: 'rgba(212, 175, 55, 0.5)', background: 'linear-gradient(180deg, rgba(30, 28, 22, 0.6) 0%, rgba(15, 14, 10, 0.8) 100%)' }}>
+          <h2 className="text-lg font-bold text-[#D4AF37] uppercase tracking-wider mb-2">Sync to Mobile</h2>
+          <p className="text-sm text-[#a0a0a5] mb-4">
+            Open Sovereign on your phone and scan the QR from the laptop login screen, or open the link below to pair this device.
+          </p>
+          <Link
+            href="/link-device"
+            className="inline-flex items-center gap-2 px-4 py-3 rounded-xl font-semibold text-sm uppercase tracking-wider transition-all border-2 hover:opacity-95"
+            style={{ borderColor: 'rgba(212, 175, 55, 0.6)', color: '#D4AF37', background: 'rgba(212, 175, 55, 0.1)' }}
+          >
+            Open Link Device / QR Pairing
+          </Link>
+        </section>
         {/* Tabs: Overview | Sales (for merchants) */}
         {merchantModeOn && (
           <div className="flex gap-2 mb-4 border-b border-[#2a2a2e] pb-2">

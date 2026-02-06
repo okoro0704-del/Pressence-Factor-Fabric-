@@ -1,5 +1,5 @@
 /**
- * Triple-Anchor Security — Face, Fingerprint (WebAuthn), Device ID.
+ * Triple-Anchor Security — Face, Sovereign Palm, Device ID.
  * All three must be verified (and turn Gold in UI) before 1 VIDA balance is unlocked.
  * State is stored in sessionStorage for the current session only.
  */
@@ -63,7 +63,7 @@ export function clearTripleAnchor(anchor?: TripleAnchorType): void {
   }
 }
 
-/** True only when Face, Fingerprint, and Device are all verified. Unlocks 1 VIDA. */
+/** True only when Face, Palm, and Device are all verified. Unlocks 1 VIDA. */
 export function areAllAnchorsVerified(): boolean {
   const s = getTripleAnchorState();
   return s.face && s.fingerprint && s.device;

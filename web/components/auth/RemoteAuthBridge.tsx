@@ -99,7 +99,7 @@ export function RemoteAuthBridge({ deviceId, onVerified, onError }: RemoteAuthBr
             Remote Biometric Authentication
           </h1>
           <p className="text-sm" style={{ color: '#6b6b70' }}>
-            No compatible biometric sensor detected on this device
+            No camera detected. Hold your palm to the camera for Sovereign Palm scan.
           </p>
         </div>
 

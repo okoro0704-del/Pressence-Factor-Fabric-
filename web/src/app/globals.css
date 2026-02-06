@@ -22,6 +22,39 @@
 
 body {
   background-color: var(--obsidian-bg);
+  /* Safe area: respect iPhone notch and home bar so buttons don't hide */
+  padding-top: env(safe-area-inset-top, 0);
+  padding-right: env(safe-area-inset-right, 0);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  padding-left: env(safe-area-inset-left, 0);
+}
+
+/* Fixed headers/footers: add safe area so they don't sit under notch or home bar */
+.safe-area-top {
+  padding-top: max(env(safe-area-inset-top, 0), 0.5rem);
+}
+.safe-area-pb {
+  padding-bottom: max(env(safe-area-inset-bottom, 0), 0.5rem);
+}
+
+/* Registration / gate step transitions — smooth fades (duration-500), no jerk between screens */
+.step-transition-enter {
+  animation: step-fade-in 0.5s ease-out forwards;
+}
+.step-transition-wrapper {
+  transition: opacity 500ms ease-out;
+}
+@keyframes step-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Mobile-first: center-aligned Sovereign card (same on laptop and mobile) */
+.sovereign-card {
+  @apply w-full max-w-lg mx-auto rounded-2xl border-2 p-6 md:p-8 text-center;
+  background: linear-gradient(180deg, rgba(30, 28, 22, 0.98) 0%, rgba(15, 14, 10, 0.99) 100%);
+  border-color: rgba(212, 175, 55, 0.6);
+  box-shadow: 0 0 60px rgba(212, 175, 55, 0.2);
 }
 
 /* CRITICAL BYPASS: Force hide all lock overlays */

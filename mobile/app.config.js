@@ -9,8 +9,8 @@
 const pkg = require('./package.json');
 
 module.exports = {
-  name: 'PFFMobile',
-  slug: 'pff-mobile',
+  name: 'PFF PROTOCOL',
+  slug: 'pff-protocol',
   version: pkg.version,
   orientation: 'portrait',
   icon: './assets/images/icon.png',
@@ -51,7 +51,7 @@ module.exports = {
   plugins: [],
   extra: {
     eas: {
-      projectId: process.env.EAS_PROJECT_ID || '',
+      projectId: process.env.EAS_PROJECT_ID || '48e550ab-4a24-4ca3-98ae-4165c19aeb77',
     },
   },
 };

@@ -170,7 +170,7 @@ export function GrandmasterAuth({ onAuthSuccess }: GrandmasterAuthProps) {
             <h3 className="text-2xl font-bold text-[#e8c547] mb-4 text-center">SECURITY LAYERS</h3>
             <div className="grid grid-cols-2 gap-4">
               {[
-                { layer: AuthLayer.BIOMETRIC_SIGNATURE, icon: '👤', name: 'Face/Fingerprint' },
+                { layer: AuthLayer.BIOMETRIC_SIGNATURE, icon: '👤', name: 'Face/Palm Scan' },
                 { layer: AuthLayer.VOICE_PRINT, icon: '🎤', name: 'Voice Print' },
                 { layer: AuthLayer.HARDWARE_TPM, icon: '🔒', name: 'Trusted Device' },
                 { layer: AuthLayer.GENESIS_HANDSHAKE, icon: '🤝', name: 'Genesis Vault' },

@@ -88,6 +88,7 @@ import { PalmPulseCapture } from '@/components/auth/PalmPulseCapture';
 import { verifyOrEnrollPalm } from '@/lib/palmHashProfile';
 import { DailyUnlockCelebration } from '@/components/dashboard/DailyUnlockCelebration';
 import { useSovereignCompanion } from '@/contexts/SovereignCompanionContext';
+import { getNativeAppUrl } from '@/lib/appStoreUrls';
 
 const jetbrains = JetBrains_Mono({ weight: ['400', '600', '700'], subsets: ['latin'] });
 
@@ -119,8 +120,11 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
   } | null>(null);
   /** Dependent flow: show "Guardian Authorization Detected. Sentinel Secure." and skip full biometric. */
   const [showGuardianAuthorizationBypass, setShowGuardianAuthorizationBypass] = useState(false);
-  /** PRE-VITALIZATION: Confirm Language → Identity Anchor (Voice step removed — Triple-Pillar only). Restored from storage so remount doesn't bounce back. */
+  /** PRE-VITALIZATION: Confirm Language → App Download (Step 2) → Identity Anchor. Restored from storage so remount doesn't bounce back. */
   const [languageConfirmed, setLanguageConfirmed] = useState<LanguageCode | null>(null);
+  /** Step 2: Compulsory App Download — Next disabled until "Download Sovereign Mobile" is clicked; then Next goes to Step 3. */
+  const [appDownloadClicked, setAppDownloadClicked] = useState(false);
+  const [appDownloadStepComplete, setAppDownloadStepComplete] = useState(false);
   /** Recover My Account: enter phone + 12 words to unbind from lost device */
   const [showRecoverFlow, setShowRecoverFlow] = useState(false);
 
@@ -210,7 +214,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
   /** Dual-Pillar: after Face Pulse, show Palm Pulse (Palm Wave) to authorize $100 daily unlock; replaces fingerprint. */
   const [showPalmPulse, setShowPalmPulse] = useState(false);
   const [palmPulseError, setPalmPulseError] = useState<string | null>(null);
-  /** Face Pulse fail count: after 2 failures show "Use Backup Anchor" (Fingerprint + Device ID only). */
+  /** Face Pulse fail count: after 2 failures show "Use Backup Anchor" (Sovereign Palm + Device ID only). */
   const [faceFailCount, setFaceFailCount] = useState(0);
   /** Biometric sensitivity for Architect Vision: from profile slider; overridden by soft-start (streak < 10 or first run) to 0.3 / no brightness. */
   const [visionConfidenceThreshold, setVisionConfidenceThreshold] = useState(0.3);
@@ -411,15 +415,15 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     }
   };
 
-  /** Triple-Pillar Shield labels: no Voice/Touch ID — use Hardware Fingerprint Verified */
+  /** Triple-Pillar Shield labels: Sovereign Face + Sovereign Palm + Device */
   const getLayerName = (layer: AuthLayer) => {
     switch (layer) {
       case AuthLayer.BIOMETRIC_SIGNATURE:
         return 'Sovereign Face';
       case AuthLayer.VOICE_PRINT:
-        return 'Hardware Fingerprint Verified';
+        return 'Sovereign Palm Verified';
       case AuthLayer.HARDWARE_TPM:
-        return 'External Fingerprint Scanner';
+        return 'Sovereign Palm (Hub Scanner)';
       case AuthLayer.GENESIS_HANDSHAKE:
         return 'Genesis Handshake';
       case AuthLayer.GPS_LOCATION:
@@ -436,13 +440,13 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     }
     switch (layer) {
       case AuthLayer.HARDWARE_TPM:
-        return 'Waiting for USB/Bluetooth Scanner...';
+        return 'Hold your palm to the camera or connect Hub scanner...';
       case AuthLayer.GPS_LOCATION:
         return 'Acquiring GPS Presence...';
       case AuthLayer.BIOMETRIC_SIGNATURE:
         return 'Resolving Sovereign Face...';
       case AuthLayer.VOICE_PRINT:
-        return 'Verifying Hardware Fingerprint...';
+        return 'Hold your palm to the camera...';
       case AuthLayer.GENESIS_HANDSHAKE:
         return 'Genesis Handshake...';
       default:
@@ -894,13 +898,13 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     setShowGuardianRecovery(true);
   };
 
-  /** Backup Anchor: Fingerprint + Device ID only (no face). After 2 face failures, show button; on click verify FP + device then run success flow. */
+  /** Backup Anchor: Sovereign Palm + Device ID only (no face). After 2 face failures, show button; on click verify palm + device then run success flow. */
   const handleBackupAnchor = useCallback(async () => {
     if (!identityAnchor) return;
     try {
       const fpResult = await getAssertion();
       if (!fpResult) {
-        setResult((r) => (r ? { ...r, errorMessage: 'Fingerprint verification failed or was cancelled.' } : r));
+        setResult((r) => (r ? { ...r, errorMessage: 'Palm scan failed or was cancelled.' } : r));
         return;
       }
       const compId = await getCompositeDeviceFingerprint();
@@ -1317,7 +1321,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
             Guardian Authorization Detected. Sentinel Secure.
           </h2>
           <p className="text-sm text-[#a0a0a5] mb-6">
-            Your guardian&apos;s Sentinel is active. Hardware Fingerprint check bypassed. Proceeding with secure access.
+            Your guardian&apos;s Sentinel is active. Sovereign Palm check bypassed. Proceeding with secure access.
           </p>
           <button
             type="button"
@@ -1523,22 +1527,92 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     />
   );
 
-  // PRE-VITALIZATION: Confirm Language → then Identity Anchor (Voice step removed)
+  // Step 1 of 5: Language Selection — smooth fade (duration-500)
   if (!languageConfirmed) {
     return (
-      <div className="min-h-screen bg-[#050505] flex items-center justify-center p-4">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.5 }}
+        className="min-h-screen bg-[#050505] flex items-center justify-center p-4 step-transition-wrapper"
+      >
         {screenBg}
-        <ConfirmLanguageScreen
-          onConfirm={(code) => setLanguageConfirmed(code)}
-        />
-      </div>
+        <div className="relative z-10 w-full max-w-lg mx-auto">
+          <p className="text-center text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: '#D4AF37' }}>Step 1 of 5</p>
+          <ConfirmLanguageScreen
+            onConfirm={(code) => setLanguageConfirmed(code)}
+          />
+        </div>
+      </motion.div>
     );
   }
 
-  // Recover My Account — enter phone + 12 words to unbind from lost device (navigate to RecoverMyAccountScreen)
+  // Step 2 of 5: Compulsory App Download — skip on mobile/PWA (friction removal: they're already on app)
+  useEffect(() => {
+    if (!mounted) return;
+    const standalone =
+      window.matchMedia('(display-mode: standalone)').matches || (window as Window & { standalone?: boolean }).standalone === true;
+    if (isMobile || standalone) setAppDownloadStepComplete(true);
+  }, [mounted, isMobile]);
+
+  // Step 2 of 5: Compulsory App Download — Next disabled until Download button is clicked (mobile-first Sovereign card)
+  if (!appDownloadStepComplete) {
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.5 }}
+        className="min-h-screen bg-[#050505] flex flex-col items-center justify-center p-4 step-transition-wrapper"
+      >
+        {screenBg}
+        <div className="relative z-10 sovereign-card max-w-md">
+          <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: '#D4AF37' }}>
+            Step 2 of 5
+          </p>
+          <h2 className="text-xl font-bold uppercase tracking-wider mb-3" style={{ color: '#f5f5f5' }}>
+            The Protocol requires a mobile anchor.
+          </h2>
+          <p className="text-sm text-[#a0a0a5] mb-6">
+            Install the app to secure your 1 VIDA. Tap the button below to open the download page and get PFF PROTOCOL, then tap Next.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setAppDownloadClicked(true);
+              window.open(getNativeAppUrl(), '_blank', 'noopener,noreferrer');
+            }}
+            className="inline-flex items-center justify-center gap-2 w-full py-4 rounded-xl font-bold text-lg uppercase tracking-wider transition-all hover:opacity-95 active:scale-[0.98] duration-300"
+            style={{
+              background: 'linear-gradient(135deg, #D4AF37 0%, #c9a227 100%)',
+              color: '#0d0d0f',
+              boxShadow: '0 0 24px rgba(212, 175, 55, 0.4)',
+            }}
+          >
+            Get PFF PROTOCOL
+          </button>
+          <button
+            type="button"
+            disabled={!appDownloadClicked}
+            onClick={() => setAppDownloadStepComplete(true)}
+            className="mt-6 w-full py-3 rounded-xl font-semibold uppercase tracking-wider border-2 transition-all duration-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{
+              borderColor: 'rgba(212, 175, 55, 0.5)',
+              color: appDownloadClicked ? '#D4AF37' : '#6b6b70',
+            }}
+          >
+            Next
+          </button>
+        </div>
+      </motion.div>
+    );
+  }
+
+  // Recover My Account — enter phone + 12 words to unbind from lost device (smooth fade)
   if (showRecoverFlow) {
     return (
-      <div className="min-h-screen bg-[#050505] flex items-center justify-center p-4">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.5 }} className="min-h-screen bg-[#050505] flex items-center justify-center p-4 step-transition-wrapper">
         <div
           className="absolute inset-0 opacity-20 pointer-events-none"
           style={{ background: 'radial-gradient(circle at center, rgba(212, 175, 55, 0.2) 0%, rgba(5, 5, 5, 0) 70%)' }}
@@ -1548,16 +1622,23 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
           onComplete={() => setShowRecoverFlow(false)}
           onCancel={() => setShowRecoverFlow(false)}
         />
-      </div>
+      </motion.div>
     );
   }
 
-  // Identity Anchor Input (after language + vocal instruction)
+  // Step 3 of 5: Phone Number & Device Anchor — mobile-first center Sovereign card
   if (!identityAnchor) {
     return (
-      <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center p-4">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.5 }}
+        className="min-h-screen bg-[#050505] flex flex-col items-center justify-center p-4 step-transition-wrapper"
+      >
         {screenBg}
-        <div className="relative max-w-2xl w-full flex-1 flex flex-col justify-center">
+        <div className="relative z-10 w-full max-w-lg mx-auto flex flex-col justify-center">
+          <p className="text-center text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: '#D4AF37' }}>Step 3 of 5</p>
           <IdentityAnchorInput
             onAnchorVerified={handleAnchorVerified}
             title="Identity Anchor Required"
@@ -1598,13 +1679,19 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
             </div>
           </div>
         )}
-      </div>
+      </motion.div>
     );
   }
 
+  // Step 4 & 5 of 5: Architect Vision (Face + Palm) → Vitalization Complete / Dashboard — mobile-first: same center card on laptop
   return (
-    <div className="min-h-screen bg-[#050505] flex items-center justify-center p-4 relative transition-all duration-200">
-      {/* 4/4 Layers Verified Status Bar — 200ms for instant feedback */}
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.5 }}
+      className="min-h-screen bg-[#050505] flex flex-col items-center justify-center p-4 relative step-transition-wrapper"
+    >
+      {/* 4/4 Layers Verified Status Bar */}
       <LayerStatusBar />
 
       {/* Background Glow — pointer-events-none so it does not block clicks */}
@@ -1616,8 +1703,8 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
         aria-hidden="true"
       />
 
-      {/* Main Gate Container — z-10 so buttons receive clicks above background */}
-      <div className="relative z-10 max-w-2xl w-full">
+      {/* Main Gate Container — mobile-first: center-aligned Sovereign card; laptop matches mobile (same width, vertical card) */}
+      <div className="relative z-10 w-full max-w-lg mx-auto step-transition-wrapper">
         {/* Identity Anchor Display */}
         <div
           className="rounded-lg border p-4 mb-6"
@@ -1649,8 +1736,9 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
           </div>
         </div>
 
-        {/* Header */}
+        {/* Header — Step 4 of 5: Architect Vision (Face + Palm Scan) */}
         <div className="text-center mb-8">
+          <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: '#D4AF37' }}>Step 4 of 5 — Architect Vision (Face + Palm Scan)</p>
           <div className="text-6xl mb-4 animate-pulse">🔐</div>
           <h1
             className={`text-4xl font-bold text-[#D4AF37] uppercase tracking-wider mb-4 ${jetbrains.className}`}
@@ -1665,7 +1753,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
                 : 'Device Signature → GPS Presence → Sovereign Face (5s)'
               : effectiveMobile
               ? 'GPS Presence · Sovereign Face · Complete Initial Registration'
-              : 'Device Signature · GPS Presence · Sovereign Face · Hardware Fingerprint Verified'}
+              : 'Device Signature · GPS Presence · Sovereign Face · Sovereign Palm Verified'}
           </p>
         </div>
 
@@ -1679,7 +1767,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
               showVoice={false}
               showDevicePillar={!effectiveMobile}
             />
-            {/* Hardware Handshake: Connect Scanner → USB session → finger data → hash & store. Mobile: Fingerprint deferred to Sentinel Hub. */}
+            {/* Sovereign Palm: Hold palm to camera (webcam) or connect Hub scanner. Mobile: Palm Pulse via camera. */}
             {identityAnchor && !effectiveMobile && (
               <div className="mt-6">
                 <BiometricPillar ref={biometricPillarRef} phoneNumber={identityAnchor.phone} />
@@ -1949,7 +2037,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
           playSound
         />
       )}
-    </div>
+    </motion.div>
   );
 }
 

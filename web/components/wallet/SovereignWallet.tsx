@@ -128,7 +128,7 @@ export function SovereignWallet({ phoneNumber, layerResults }: SovereignWalletPr
       return;
     }
     if (!quorumSatisfied || !layerResults) {
-      setBiometricError('Complete 3-of-4 biometric scan (Handshake, Face, Voice, Fingerprint) before converting.');
+      setBiometricError('Complete biometric scan (Sovereign Face + Sovereign Palm + Device) before converting.');
       setConvertStatus('error');
       return;
     }
@@ -307,7 +307,7 @@ export function SovereignWallet({ phoneNumber, layerResults }: SovereignWalletPr
         <p className="text-xs mb-4" style={{ color: '#6b6b70' }}>
           {quorumSatisfied
             ? '3-of-4 biometric quorum satisfied. 1 VIDA = 1,000 DLLR.'
-            : 'Complete 3-of-4 biometric scan (Handshake, Face, Voice, Fingerprint) before converting.'}
+            : 'Complete biometric scan (Sovereign Face + Sovereign Palm + Device) before converting.'}
         </p>
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex-1 min-w-[120px]">

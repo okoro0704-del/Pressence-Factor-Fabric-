@@ -14,7 +14,7 @@ export default function RegisterPage() {
           Register your device
         </h1>
         <p className="mt-2 text-[#6b6b70] text-sm">
-          Create a hardware-bound credential. Face ID, Touch ID, or fingerprint required.
+          Create a hardware-bound credential. Face and Sovereign Palm scan required.
         </p>
       </header>
       <RegisterForm />

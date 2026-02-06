@@ -68,7 +68,7 @@ export async function connectSentinelBleBridge(): Promise<{
 
 /**
  * Send capture command '1' to the Bridge Box. Bridge powers ZKTeco and waits for finger.
- * Call this when the user reaches the fingerprint stage.
+ * Call this when the user reaches the palm scan stage (Hub scanner path).
  */
 export async function sendCaptureCommand(): Promise<{ ok: true } | { ok: false; error: string }> {
   const handle = bridgeHandle;

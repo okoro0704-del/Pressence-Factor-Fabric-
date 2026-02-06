@@ -12,7 +12,7 @@ import {
   type VisualLivenessData,
   type TactileIdentityData,
   type VitalPulseData,
-} from '../../../core/sequentialHandshakeEngine';
+} from './sequentialHandshakeEngine';
 
 // Platform-specific imports (to be implemented)
 // import { FaceDetector } from 'react-native-vision-camera';
@@ -105,7 +105,7 @@ async function executePhase2TactileIdentity(): Promise<TactileIdentityData> {
     fingerprintMatched: success,
     matchConfidence: success ? 1 : 0,
     templateId: success ? 'PFF_SIGNING_KEY' : '',
-    sensorType: caps.biometryType === 'TouchID' ? 'capacitive' : caps.biometryType === 'FaceID' ? 'face' : 'Biometrics',
+    sensorType: caps.biometryType === 'TouchID' ? 'capacitive' : caps.biometryType === 'FaceID' ? 'capacitive' : 'capacitive',
   };
 }
 

@@ -17,7 +17,7 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_PFF_BACKEND_URL || '';
 const VLT_API_URL = process.env.NEXT_PUBLIC_VLT_API_URL || BACKEND_URL;
 
 /**
- * Perform PFF Scan (Triple-Lock: Phone UUID + Face + Fingerprint)
+ * Perform PFF Scan (Triple-Lock: Phone UUID + Face + Sovereign Palm)
  * Connects to real backend API
  */
 async function performPFFScan(): Promise<PresenceProof> {

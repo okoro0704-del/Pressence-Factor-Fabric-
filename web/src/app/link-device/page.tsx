@@ -3,7 +3,7 @@
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useState } from 'react';
 import Link from 'next/link';
-import { Fingerprint, Smartphone, Loader2 } from 'lucide-react';
+import { Hand, Smartphone, Loader2 } from 'lucide-react';
 import { approveLoginRequestWithDeviceToken } from '@/lib/loginRequest';
 import { getAssertion, isWebAuthnSupported } from '@/lib/webauthn';
 import { getCompositeDeviceFingerprint } from '@/lib/biometricAuth';
@@ -12,7 +12,7 @@ const GOLD = '#D4AF37';
 
 /**
  * Link Device — Mobile side of Laptop-Mobile Pairing Bridge.
- * - With requestId (from scanning laptop's QR): confirm login and send Device ID + Fingerprint-Signed Token to login_requests.
+ * - With requestId (from scanning laptop's QR): confirm login and send Device ID + device-signed token to login_requests.
  * - Without requestId: show instructions to scan the QR on the laptop.
  */
 export default function LinkDevicePage() {
@@ -21,10 +21,10 @@ export default function LinkDevicePage() {
   const [status, setStatus] = useState<'idle' | 'prompting' | 'sending' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const handleApproveWithFingerprint = useCallback(async () => {
+  const handleApproveWithPalm = useCallback(async () => {
     if (!requestId?.trim()) return;
     if (!isWebAuthnSupported()) {
-      setErrorMessage('Fingerprint not supported in this browser.');
+      setErrorMessage('Palm scan not supported in this browser.');
       setStatus('error');
       return;
     }
@@ -33,7 +33,7 @@ export default function LinkDevicePage() {
     try {
       const assertion = await getAssertion();
       if (!assertion) {
-        setErrorMessage('Fingerprint cancelled or failed.');
+        setErrorMessage('Palm scan cancelled or failed.');
         setStatus('error');
         return;
       }
@@ -117,27 +117,27 @@ export default function LinkDevicePage() {
       <div className="max-w-md w-full">
         <div className="rounded-2xl border-2 p-8 text-center" style={{ borderColor: GOLD, background: 'rgba(212,175,55,0.05)' }}>
           <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 border-2" style={{ borderColor: GOLD, background: 'rgba(212,175,55,0.1)' }}>
-            <Fingerprint className="w-10 h-10" style={{ color: GOLD }} />
+            <Hand className="w-10 h-10" style={{ color: GOLD }} />
           </div>
           <h1 className="text-xl font-bold uppercase tracking-wider mb-2" style={{ color: GOLD }}>
             Confirm login on this device
           </h1>
           <p className="text-[#a0a0a5] text-sm mb-6">
-            A laptop is requesting to log in as you. Approve with your fingerprint to unlock the laptop and add it as a trusted device.
+            A laptop is requesting to log in as you. Hold your palm to the camera to approve and add this device as trusted.
           </p>
           {errorMessage && (
             <p className="text-red-400 text-sm mb-4" role="alert">{errorMessage}</p>
           )}
           <button
             type="button"
-            onClick={handleApproveWithFingerprint}
+            onClick={handleApproveWithPalm}
             disabled={status === 'prompting' || status === 'sending'}
             className="w-full py-4 rounded-xl font-bold uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-70"
             style={{ background: GOLD, color: '#0d0d0f' }}
           >
             {status === 'prompting' && <Loader2 className="w-5 h-5 animate-spin" />}
             {status === 'sending' && <Loader2 className="w-5 h-5 animate-spin" />}
-            {status === 'prompting' ? 'Touch fingerprint…' : status === 'sending' ? 'Sending…' : 'Approve with Fingerprint'}
+            {status === 'prompting' ? 'Hold your palm to the camera…' : status === 'sending' ? 'Sending…' : 'Approve with Sovereign Palm'}
           </button>
           <Link href="/dashboard" className="block mt-4 text-sm text-[#6b6b70] hover:text-[#a0a0a5]">
             Cancel

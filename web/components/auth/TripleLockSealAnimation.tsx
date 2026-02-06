@@ -1,12 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ScanLine, Fingerprint, Smartphone } from 'lucide-react';
+import { ScanLine, Hand, Smartphone } from 'lucide-react';
 
 const GOLD = '#D4AF37';
 
 /**
- * Triple Lock Confirmation: 1-second animation of Face, Fingerprint, and Phone ID icons
+ * Triple Lock Confirmation: 1-second animation of Face, Sovereign Palm, and Phone ID icons
  * merging into a single Gold Seal. Shown when laptop unlocks after phone approves via QR.
  */
 export function TripleLockSealAnimation({ onComplete }: { onComplete: () => void }) {
@@ -35,7 +35,7 @@ export function TripleLockSealAnimation({ onComplete }: { onComplete: () => void
           }}
         >
           <ScanLine size={44} style={{ color: GOLD }} aria-hidden />
-          <Fingerprint size={44} style={{ color: GOLD }} aria-hidden />
+          <Hand size={44} style={{ color: GOLD }} aria-hidden />
           <Smartphone size={44} style={{ color: GOLD }} aria-hidden />
         </div>
         {/* Gold Seal: scales in as icons merge */}

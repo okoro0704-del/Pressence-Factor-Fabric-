@@ -139,7 +139,7 @@ export default function EvgAuthorizePage() {
           <strong className="text-[#D4AF37]">Verified Human</strong>.
         </p>
         <p className="text-xs text-[#6b6b70] mb-6">
-          Only a <strong>YES</strong> or <strong>NO</strong> is shared. No fingerprint, no face data, no identity.
+          Only a <strong>YES</strong> or <strong>NO</strong> is shared. No palm data, no face data, no identity.
         </p>
         {error && (
           <p className="text-red-400 text-sm mb-4" role="alert">

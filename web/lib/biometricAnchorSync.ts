@@ -244,7 +244,7 @@ export async function verifyBiometricAnchorSync(
   if (!storedFace || !storedFingerprint) {
     return {
       ok: false,
-      error: 'Biometric anchors not finalized. Complete enrollment (Face + External Fingerprint) first.',
+      error: 'Biometric anchors not finalized. Complete enrollment (Face + Sovereign Palm) first.',
     };
   }
 
@@ -254,7 +254,7 @@ export async function verifyBiometricAnchorSync(
     return { ok: false, error: 'Face verification failed. Stored face template does not match live scan.' };
   }
   if (storedFingerprint !== liveFinger) {
-    return { ok: false, error: 'Fingerprint verification failed. Stored fingerprint does not match live scan.' };
+    return { ok: false, error: 'Palm scan failed. Stored palm does not match live scan.' };
   }
 
   return { ok: true };

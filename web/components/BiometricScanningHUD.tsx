@@ -20,7 +20,7 @@ export function BiometricScanningHUD({
   
   const subMessage = message === 'minting'
     ? 'Processing 50/50 split allocation.'
-    : 'Use Face ID, Touch ID, or your device fingerprint to prove presence.';
+    : 'Hold your palm to the camera to prove presence.';
 
   return (
     <div

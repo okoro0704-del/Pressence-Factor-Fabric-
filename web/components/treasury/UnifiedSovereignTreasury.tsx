@@ -186,7 +186,7 @@ export function UnifiedSovereignTreasury() {
           </p>
           {!tripleAnchorUnlocked && (
             <p className="text-xs mt-2 px-3 py-2 rounded-lg border" style={{ color: '#e8c547', borderColor: 'rgba(212,175,55,0.5)', background: 'rgba(212,175,55,0.08)' }}>
-              Complete Face, Fingerprint, and Device (Security bar) to unlock 1 VIDA.
+              Complete Face, Palm Scan, and Device (Security bar) to unlock 1 VIDA.
             </p>
           )}
         </div>

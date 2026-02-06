@@ -88,7 +88,7 @@ export async function signConstitutionWithBiometrics(
     return { ok: false, error: bioResult.error ?? 'Biometric verification failed.' };
   }
   if (bioResult.credential == null) {
-    return { ok: false, error: 'Biometric credential required. Complete face or fingerprint scan.' };
+    return { ok: false, error: 'Biometric credential required. Complete face or palm scan.' };
   }
 
   const timestamp = new Date().toISOString();

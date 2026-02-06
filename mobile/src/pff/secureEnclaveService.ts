@@ -52,7 +52,7 @@ export async function getDeviceCapabilities(): Promise<DeviceCapabilities> {
   const { available, biometryType } = await rnBiometrics.isSensorAvailable();
   return {
     hasBiometrics: available,
-    biometryType: available ? toBiometryType(biometryType) : null,
+    biometryType: available && biometryType != null ? toBiometryType(biometryType) : null,
     hasSecureEnclave: available, // Keychain/KeyStore implies hardware-backed when biometry exists
     attestationSupported: false, // Set true when react-native-app-attest / Keymaster attestation integrated
   };

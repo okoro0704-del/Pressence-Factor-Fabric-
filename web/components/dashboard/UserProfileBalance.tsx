@@ -208,7 +208,7 @@ export function UserProfileBalance({
     setIsPresenceVerified(true);
   };
 
-  /** Protocol Release: unlock when is_fully_verified or face_hash present. Bypass fingerprint lock modal when active. */
+  /** Protocol Release: unlock when is_fully_verified or face_hash present. Bypass palm lock modal when active. */
   const canSpend = spendingUnlocked || biometricSpendingActive;
 
   const handleSwapClick = () => {

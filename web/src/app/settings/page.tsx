@@ -51,7 +51,7 @@ export default function SettingsPage() {
 
   return (
     <AppShell>
-      <main className="p-4 md:p-6 max-w-xl mx-auto">
+      <main className="p-4 md:p-6 sovereign-card w-full">
         <h1 className="text-xl font-bold uppercase tracking-wider mb-2" style={{ color: GOLD }}>
           Settings
         </h1>

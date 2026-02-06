@@ -245,7 +245,15 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[300] flex flex-col items-center justify-center bg-black">
+    <div
+      className="fixed inset-0 z-[300] flex flex-col items-center justify-center bg-black"
+      style={{
+        paddingTop: 'env(safe-area-inset-top, 0)',
+        paddingBottom: 'env(safe-area-inset-bottom, 0)',
+        paddingLeft: 'env(safe-area-inset-left, 0)',
+        paddingRight: 'env(safe-area-inset-right, 0)',
+      }}
+    >
       <div className="relative w-full max-w-2xl aspect-[4/3] max-h-[80vh] overflow-hidden rounded-xl border-2 border-[#22c55e]/50 shadow-[0_0_40px_rgba(34,197,94,0.2)]">
         <video
           ref={videoRef}
@@ -276,7 +284,7 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
             Scan Area
           </span>
           <span className="text-xs font-mono" style={{ color: '#6b6b70' }}>
-            Hold your palm in the circle — Palm Wave
+            Hold your palm to the camera in the circle — Sovereign Palm
           </span>
         </div>
       </div>

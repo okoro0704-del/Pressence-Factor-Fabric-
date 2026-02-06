@@ -15,7 +15,7 @@ import { isFirstRegistration } from '@/lib/masterArchitectInit';
  * Vitalization Screen — Optimized for Redmi 15 View
  * 
  * Features:
- * - PFF Triple-Lock Scan (Phone UUID + Face + Fingerprint)
+ * - PFF Triple-Lock Scan (Phone UUID + Face + Sovereign Palm)
  * - 50/50 VIDA CAP Minting Split Display
  * - $VIDA Balance Updates
  * - Hard reset flow (?reset=1): camera diagnostic (mirror + blue mesh), then re-register

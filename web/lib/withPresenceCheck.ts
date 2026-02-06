@@ -133,7 +133,7 @@ export function markPresenceVerified(): void {
 
 /**
  * Clear presence verification (for logout or manual reset).
- * Also clears Triple-Anchor state (Face, Fingerprint, Device) so 1 VIDA stays locked until re-verification.
+ * Also clears Triple-Anchor state (Face, Palm, Device) so 1 VIDA stays locked until re-verification.
  */
 export function clearPresenceVerification(): void {
   localStorage.removeItem(STORAGE_KEY);

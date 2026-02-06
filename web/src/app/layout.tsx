@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { HowToInstallTooltip } from '@/components/HowToInstallTooltip';
 import { GlobalPresenceGatewayProvider } from '@/contexts/GlobalPresenceGateway';
@@ -9,6 +9,14 @@ import { BiometricSessionProvider } from '@/contexts/BiometricSessionContext';
 import { SovereignCompanionProvider } from '@/contexts/SovereignCompanionContext';
 import { CompanionEyes } from '@/components/dashboard/CompanionEyes';
 import Script from 'next/script';
+
+/** Prevent accidental zoom during Palm Scan; same layout on mobile and desktop. */
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
 
 export const metadata: Metadata = {
   title: 'PFF — Vitalization Manifesto | Born in Lagos. Built for the World.',
@@ -37,7 +45,7 @@ export default function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="PFF" />
+        <meta name="apple-mobile-web-app-title" content="Sovereign" />
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
         <link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192.png" />
         <link rel="apple-touch-icon" sizes="512x512" href="/icons/icon-512.png" />

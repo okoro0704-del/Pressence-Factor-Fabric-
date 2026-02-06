@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Download } from 'lucide-react';
+import Link from 'next/link';
+import { X, Download, Smartphone } from 'lucide-react';
 import { useBeforeInstallPrompt } from '@/lib/useBeforeInstallPrompt';
 
 const BANNER_DISMISS_KEY = 'pff_install_banner_dismissed';
 
 /**
- * Smart Banner: appears on mobile (and when install prompt is available), prompts "Install PFF PROTOCOL to your Home Screen".
+ * Smart Banner: appears on desktop, prompts "Install PFF PROTOCOL" (native app or add to Home Screen).
  * When the browser fires beforeinstallprompt (Chrome/Edge), shows an "Install now" button that triggers the native install dialog.
  * Otherwise shows manual instructions. Dismissible; state stored in localStorage.
  */
@@ -30,7 +31,8 @@ export function InstallSmartBanner() {
     const isMobile =
       /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
       (typeof navigator.maxTouchPoints === 'number' && navigator.maxTouchPoints > 0);
-    if (!standalone && !dismissed && (isMobile || canPromptInstall)) setVisible(true);
+    /* Friction removal: hide on mobile (they're already there) and when already PWA; show only on desktop */
+    if (!standalone && !dismissed && !isMobile) setVisible(true);
   }, [mounted, canPromptInstall]);
 
   const handleInstall = async () => {
@@ -54,7 +56,7 @@ export function InstallSmartBanner() {
 
   return (
     <div
-      className="md:hidden fixed bottom-0 left-0 right-0 z-50 p-4 border-t border-[#D4AF37]/30 bg-[#0A0A0A]/98 backdrop-blur"
+      className="max-md:hidden fixed bottom-0 left-0 right-0 z-50 p-4 border-t border-[#D4AF37]/30 bg-[#0A0A0A]/98 backdrop-blur safe-area-pb"
       style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 1rem)' }}
       role="banner"
       aria-label="Install PFF PROTOCOL"
@@ -65,22 +67,30 @@ export function InstallSmartBanner() {
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-[#f5f5f5]">
-            Install PFF PROTOCOL to your Home Screen for Secure Access
+            The Protocol requires a mobile anchor. Install the app to secure your 1 VIDA.
           </p>
           <p className="text-xs text-[#6b6b70] mt-0.5">
-            Add to Home Screen for faster, app-like access and biometric security.
+            Add to Home Screen for full Sovereign Palm and Face Pulse experience.
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            {canPromptInstall ? (
+            <Link
+              href="/get-app"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[#D4AF37] px-3 py-1.5 text-xs font-semibold text-[#0A0A0A] hover:bg-[#c9a227] touch-manipulation"
+            >
+              <Smartphone className="w-3.5 h-3.5" />
+              Download PFF PROTOCOL
+            </Link>
+            {canPromptInstall && (
               <button
                 type="button"
                 onClick={handleInstall}
                 disabled={isInstalling}
-                className="rounded-lg bg-[#D4AF37] px-3 py-1.5 text-xs font-semibold text-[#0A0A0A] hover:bg-[#c9a227] disabled:opacity-60 touch-manipulation"
+                className="rounded-lg border border-[#D4AF37]/60 px-3 py-1.5 text-xs font-semibold text-[#D4AF37] hover:bg-[#D4AF37]/10 disabled:opacity-60 touch-manipulation"
               >
-                {isInstalling ? 'Installing…' : 'Install now'}
+                {isInstalling ? 'Installing…' : 'Or add to Home Screen'}
               </button>
-            ) : (
+            )}
+            {!canPromptInstall && (
               <span className="text-xs text-[#D4AF37]">
                 Safari: Share → Add to Home Screen · Chrome: Menu → Install app
               </span>

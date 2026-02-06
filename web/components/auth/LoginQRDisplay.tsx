@@ -17,7 +17,7 @@ export interface LoginQRDisplayProps {
 }
 
 /**
- * Laptop: shows Session QR code for Link Device. Phone scans → sends Device ID + Fingerprint token →
+ * Laptop: shows Session QR code for Link Device. Phone scans → sends Device ID + device-signed token →
  * Supabase Realtime → this component runs Triple Lock animation then unlocks Dashboard.
  * Stores laptop as Trusted Device in completeLoginBridge.
  */

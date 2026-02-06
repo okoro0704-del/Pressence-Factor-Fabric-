@@ -1225,7 +1225,7 @@ export async function resolveSovereignByPresence(
       if (scannedPhone === identityAnchorPhone) phoneNumber = scannedPhone;
     }
     if (requireAllLayers && (!biometricResult.success || biometricResult.credential == null)) {
-      return fail(AuthLayer.BIOMETRIC_SIGNATURE, biometricResult.error || 'Biometric verification failed. Complete face or fingerprint scan.');
+      return fail(AuthLayer.BIOMETRIC_SIGNATURE, biometricResult.error || 'Biometric verification failed. Complete face and palm scan.');
     }
     if (skipVoiceLayer) {
       layersPassed.push(AuthLayer.VOICE_PRINT);
@@ -1249,7 +1249,7 @@ export async function resolveSovereignByPresence(
     } else if (requireAllLayers && !skipDevicePillarForMobile) {
       return fail(
         AuthLayer.HARDWARE_TPM,
-        useExternalScanner ? 'External fingerprint scanner required. Connect USB/Bluetooth scanner and scan finger.' : (tpmResult.error || 'Device not authorized.')
+        useExternalScanner ? 'Hold your palm to the camera, or connect Hub scanner.' : (tpmResult.error || 'Device not authorized.')
       );
     }
     if (locationResult.success && locationResult.coords != null) {
