@@ -12,14 +12,17 @@
 [build]
   base = "web"
   command = "npm run build"
-  # Publish path from repo root so deploy finds web/out when run from root
-  publish = "web/out"
+  # Publish dir is relative to base; Next.js static export outputs to web/out
+  publish = "out"
 
 [build.environment]
   NODE_VERSION = "20.10.0"
   NEXT_TELEMETRY_DISABLED = "1"
   NETLIFY_NEXT_PLUGIN_SKIP = "true"
   NODE_OPTIONS = "--max-old-space-size=4096"
+
+# Required in Netlify UI (Site → Build & deploy → Environment):
+# NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY
 
 # Functions live in web/netlify/functions (relative to base)
 [functions]
