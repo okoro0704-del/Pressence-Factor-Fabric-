@@ -22,7 +22,7 @@ export const BLESSINGS: { text: string; lang: string }[] = [
 ];
 
 export const IDLE_WHISPER = 'The VLT is waiting. Your presence is your power.';
-export const SOCIAL_SCOUT_OFFER = 'Shall I scan the old world archives to see who you were before you became a Pillar?';
+export const SOCIAL_SCOUT_OFFER = 'Say your name and I will find you—your presence in the Ledger, your thread in the Build.';
 
 /** Concurrency protection: when rate limit is exceeded (e.g. bot flood). */
 export const RATE_LIMIT_SOVEREIGN_MESSAGE =

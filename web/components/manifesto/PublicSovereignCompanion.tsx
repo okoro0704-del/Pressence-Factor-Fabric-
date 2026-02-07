@@ -22,7 +22,7 @@ import {
 } from '@/lib/vltLedgerCompanion';
 import { useSovereignAwakening } from '@/contexts/SovereignAwakeningContext';
 import { IDLE_WHISPER, SOCIAL_SCOUT_OFFER, BLESSINGS, RATE_LIMIT_SOVEREIGN_MESSAGE } from '@/lib/sovereignAwakeningContent';
-import { RECOGNITION_FALLBACK_SOULFUL, VLT_ERROR_SOULFUL } from '@/lib/manifestoCompanionKnowledge';
+import { getRecognitionPivotPersonal, VLT_ERROR_SOULFUL } from '@/lib/manifestoCompanionKnowledge';
 
 const GOLD = '#D4AF37';
 const GOLD_DIM = 'rgba(212, 175, 55, 0.6)';
@@ -335,13 +335,14 @@ export function PublicSovereignCompanion() {
         });
         if (!res.ok) throw new Error(res.statusText);
         const data = await res.json();
-        const { name: resName, role, location, keyInterest } = data;
+        const { name: resName, role, location, keyInterest, detail } = data;
         const fullText = buildRecognitionMessage(
           lang,
           resName || name,
           role || 'Citizen',
           location || 'the Vanguard',
-          keyInterest || 'the Protocol'
+          keyInterest || 'the Protocol',
+          detail
         );
         setMessages((prev) => [
           ...prev,
@@ -362,9 +363,10 @@ export function PublicSovereignCompanion() {
           // ignore
         }
       } catch {
+        const pivot = getRecognitionPivotPersonal(preferredLang ?? undefined);
         setMessages((prev) => [
           ...prev,
-          { id: `rec-err-${Date.now()}`, role: 'assistant', text: RECOGNITION_FALLBACK_SOULFUL },
+          { id: `rec-err-${Date.now()}`, role: 'assistant', text: pivot },
         ]);
       } finally {
         setIsScanningRecognition(false);
@@ -380,7 +382,8 @@ export function PublicSovereignCompanion() {
       t,
       architect,
       preferredLang ?? undefined,
-      conversationContext
+      conversationContext,
+      typeof window !== 'undefined' ? new Date().getHours() : undefined
     );
     setTimeout(() => {
       setMessages((prev) => [
