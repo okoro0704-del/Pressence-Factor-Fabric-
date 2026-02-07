@@ -84,9 +84,9 @@ export function LoginQRDisplay({ requestId, onDenied, onError }: LoginQRDisplayP
           style={{ background: 'rgba(212,175,55,0.05)', borderColor: GOLD, boxShadow: `0 0 50px ${GOLD}25` }}
         >
           {qrDataUrl ? (
-            <img src={qrDataUrl} alt="Session QR code - scan with Link Device" className="w-[260px] h-[260px] rounded-lg bg-white p-2" />
+            <img src={qrDataUrl} alt="Session QR code - scan with Link Device" className="w-full max-w-[260px] h-auto aspect-square rounded-lg bg-white p-2" />
           ) : (
-            <div className="w-[260px] h-[260px] rounded-lg bg-[#1a1a1a] flex items-center justify-center text-[#6b6b70]">Generating QR…</div>
+            <div className="w-full max-w-[260px] aspect-square rounded-lg bg-[#1a1a1a] flex items-center justify-center text-[#6b6b70]">Generating QR…</div>
           )}
           <p className="mt-6 text-xs text-[#6b6b70]">
             Session QR · Laptop will unlock when your phone approves

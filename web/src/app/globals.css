@@ -122,8 +122,8 @@ body {
   animation: vida-shimmer 1.2s ease-out;
 }
 
-/* Mobile-first touch targets — min 48px for thumb navigation */
-@media (max-width: 768px) {
+/* Mobile-first touch targets — aligns with Tailwind md: (768px). Use sm:/md:/lg: in components instead of hard-coded pixel widths. */
+@media (max-width: 767px) {
   button:not([class*="min-h-"]):not([class*="p-"]),
   a[role="button"]:not([class*="min-h-"]) {
     min-height: 48px;

@@ -2,6 +2,10 @@
  * Singleton Supabase client for National Pulse (presence_handshakes) and app-wide use.
  * If globalThis.__PFF_SUPABASE__ exists, use it; otherwise create once and assign to global scope.
  * Stops Multiple GoTrueClient warnings. When NEXT_PUBLIC_SUPABASE_URL is missing, returns a mock.
+ *
+ * Auth redirect: Update Supabase Dashboard → Authentication → URL Configuration:
+ * - Site URL: your canonical origin (e.g. https://pffprotocol.com).
+ * - Redirect Allow List: add both https://pffprotocol.com/** and https://pffwork.netlify.app/** so logins work on custom domain and Netlify.
  */
 
 import { createClient } from '@supabase/supabase-js';

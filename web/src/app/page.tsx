@@ -15,10 +15,10 @@ import { getCompositeDeviceFingerprint } from '@/lib/biometricAuth';
 
 /**
  * ROOT PAGE — Public Gatekeeper (Architect's Hidden Access)
+ * Sovereign-only: Manifesto (SovereignManifestoLanding) or Full Protocol (FourLayerGate). No legacy component branching.
  * - Production domain + not authorized → Manifesto & Countdown only.
  * - Preview URL (deploy-preview-*--*) → Full Protocol for testing.
- * - Authorized device_id (Architect / Sentinel list) → Full Protocol (Vitalization, Treasury, Gate).
- * All logic is client-side so Netlify static build does not crash.
+ * - Authorized device_id → Full Protocol (Vitalization, Treasury, Gate).
  */
 export default function Home() {
   const [mounted, setMounted] = useState(false);

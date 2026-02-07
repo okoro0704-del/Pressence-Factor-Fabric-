@@ -88,11 +88,29 @@ git push origin main
 
 ---
 
-## 5. Netlify Bypass (Sandbox)
+## 5. Supabase Site URL and Redirect Allow List (reminder)
+
+**Update in Supabase Dashboard → Authentication → URL Configuration:**
+
+1. **Site URL**  
+   Set to your canonical origin, e.g. `https://pffprotocol.com` (so auth defaults to the custom domain).
+
+2. **Redirect Allow List**  
+   Add both origins so logins work on Netlify and custom domain:
+   - `https://pffprotocol.com/**`
+   - `https://pffwork.netlify.app/**`
+
+The app passes `redirectTo: window.location.origin` in auth calls so the correct domain is used per visit. Both URLs must be in the allow list or redirects will be rejected.
+
+---
+
+## 6. Netlify Bypass (Sandbox)
 
 - **netlify.toml** and docs state: do **not** set `NEXT_PUBLIC_PRODUCTION_DOMAIN` on the default Netlify .app site so it stays the **Sandbox** (Architect Mode, full search, dev panels).
 - Same build can serve both: custom domain (with production env) and Netlify URL (without production domain env).
 
 ---
+
+**Service Worker (mobile cache-bust):** On each deploy, bump `CACHE_VERSION` in `web/public/sw.js` (e.g. `v2` → `v3`) so phones drop old caches and load new code. HTML is fetched with `cache: 'no-store'` so navigations get fresh content when online.
 
 **Summary:** Commit Unveiling changes to `main`, push, then set the env vars above on the Custom Domain site. Canonical and Ledger Lock are wired in code; Architect Recognition (singleton + getVibration) is active on both URLs once deployed.

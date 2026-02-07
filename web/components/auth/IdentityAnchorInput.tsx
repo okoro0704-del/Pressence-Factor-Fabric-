@@ -310,8 +310,7 @@ export function IdentityAnchorInput({
               </button>
               {guardianPickerOpen && (
                 <div
-                  className="absolute left-0 top-full z-50 mt-1 rounded-lg border shadow-xl flex flex-col"
-                  style={{ background: '#0d0d0f', borderColor: 'rgba(212, 175, 55, 0.3)', minWidth: 260, maxHeight: 320 }}
+                  className="absolute left-0 top-full z-50 mt-1 rounded-lg border shadow-xl flex flex-col w-full min-w-[260px] max-w-[min(320px,100vw)] max-h-[320px] bg-[#0d0d0f] border-[#D4AF37]/30"
                 >
                   <div className="p-2 border-b border-[#D4AF37]/20 sticky top-0 bg-[#0d0d0f]">
                     <input
@@ -450,13 +449,7 @@ export function IdentityAnchorInput({
             </button>
             {pickerOpen && (
               <div
-                className="absolute left-0 top-full z-50 mt-1 rounded-lg border shadow-xl flex flex-col"
-                style={{
-                  background: '#0d0d0f',
-                  borderColor: 'rgba(212, 175, 55, 0.3)',
-                  minWidth: 260,
-                  maxHeight: 320,
-                }}
+                className="absolute left-0 top-full z-50 mt-1 rounded-lg border shadow-xl flex flex-col w-full min-w-[260px] max-w-[min(320px,100vw)] max-h-[320px] bg-[#0d0d0f] border-[#D4AF37]/30"
               >
                 <div className="p-2 border-b border-[#D4AF37]/20 sticky top-0 bg-[#0d0d0f]">
                   <input

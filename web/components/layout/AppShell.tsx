@@ -63,10 +63,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-[#0d0d0f]">
-      {/* Desktop / iPad: persistent or collapsible sidebar */}
+      {/* Desktop / iPad: sidebar (md: = 768px Tailwind breakpoint); mobile uses Sovereign Drawer below */}
       <aside
         className={`
-          hidden md:flex flex-col border-r border-[#2a2a2e] bg-[#0a0a0c] shrink-0
+          hidden md:flex flex-col border-r-2 border-[#2a2a2e] md:border-[#D4AF37]/20 bg-[#0a0a0c] shrink-0
           ${sidebarOpen ? 'w-56' : 'w-16'}
           transition-[width] duration-200 ease-out
         `}
@@ -123,10 +123,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {children}
       </main>
 
-      {/* Mobile: bottom-docked navigation bar */}
+      {/* Mobile: Sovereign Drawer — bottom bar, Era of Light aesthetic (gold border, slate bg); same nav as desktop sidebar */}
       <nav
-        className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-[#2a2a2e] bg-[#0a0a0c]/95 backdrop-blur safe-area-pb"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0)' }}
+        className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t-2 border-[#D4AF37]/40 bg-[#0a0a0c]/98 backdrop-blur-md safe-area-pb shadow-[0_-4px_24px_rgba(212,175,55,0.08)]"
+        style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 8px)' }}
+        aria-label="Sovereign navigation"
       >
         <div className="flex items-center justify-around min-h-[56px] px-2">
           {NAV.map(({ href, label, icon: Icon }) => {
@@ -137,7 +138,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 href={href}
                 className={`
                   min-h-[48px] min-w-[48px] flex flex-col items-center justify-center gap-0.5 rounded-lg touch-manipulation px-2 py-2
-                  ${active ? 'text-[#D4AF37]' : 'text-[#6b6b70]'}
+                  transition-colors duration-200
+                  ${active ? 'text-[#D4AF37] bg-[#D4AF37]/10' : 'text-[#6b6b70] hover:text-[#a0a0a5] active:bg-[#16161a]'}
                 `}
                 aria-current={active ? 'page' : undefined}
               >

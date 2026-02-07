@@ -1,10 +1,10 @@
 /**
  * PFF PROTOCOL — Service Worker
- * Caches 3-out-of-4 Biometric logic and Sovereign Constitution for instant open on slow 3G/4G.
- * Precache: manifest, icons. Runtime cache: app shell, _next/static (JS/CSS).
+ * Caches Biometric + Sovereign Constitution for instant open. Bump CACHE_VERSION on each deploy so mobile drops old code.
  */
 
-const CACHE_NAME = 'pff-protocol-v1';
+const CACHE_VERSION = 'v2';
+const CACHE_NAME = 'pff-protocol-' + CACHE_VERSION;
 const PRECACHE_URLS = [
   '/manifest.json',
   '/icons/icon-192.png',
@@ -13,18 +13,18 @@ const PRECACHE_URLS = [
   '/dashboard/',
 ];
 
-// Install: precache critical assets so app opens instantly
+// Install: precache and take control immediately so new deploy wins
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS)).then(() => self.skipWaiting())
   );
 });
 
-// Activate: take control and prune old caches
+// Activate: purge all caches from previous versions so phone never loads stuck old code
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+      Promise.all(keys.filter((k) => k.startsWith('pff-protocol-') && k !== CACHE_NAME).map((k) => caches.delete(k)))
     ).then(() => self.clients.claim())
   );
 });
@@ -66,10 +66,10 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Documents (HTML): network-first, fallback to cache (so app works offline after first load)
+  // Documents (HTML): always network when online (cache: no-store) so deploy delivers new code; fallback to cache only when offline
   if (request.mode === 'navigate' || request.headers.get('accept')?.includes('text/html')) {
     event.respondWith(
-      fetch(request)
+      fetch(request, { cache: 'no-store' })
         .then((res) => {
           const clone = res.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));

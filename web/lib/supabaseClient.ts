@@ -34,15 +34,26 @@ export function getCountryCallingCode(country: CountryCode): string {
   }
 }
 
+/** Auth redirect: use current origin so logins work on both Netlify URL and custom domain. */
+function getAuthRedirectUrl(): string | undefined {
+  if (typeof window === 'undefined' || !window.location?.origin) return undefined;
+  return window.location.origin;
+}
+
 /**
  * Sign in with OTP (SMS). Phone must be in E.164 format.
  * Use formatPhoneE164() before calling if input may be national format.
+ * redirectTo uses current origin so auth works on both pffwork.netlify.app and pffprotocol.com.
  */
 export async function signInWithOtp(phoneE164: string, options?: { channel?: 'sms' | 'whatsapp' }) {
   const supabase = getSupabase();
+  const redirectTo = getAuthRedirectUrl();
   const { data, error } = await supabase.auth.signInWithOtp({
     phone: phoneE164,
-    options: options ?? { channel: 'sms' },
+    options: {
+      ...(options ?? { channel: 'sms' }),
+      ...(redirectTo ? { redirectTo } : {}),
+    },
   });
   return { data, error };
 }
