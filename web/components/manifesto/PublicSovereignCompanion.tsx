@@ -139,6 +139,7 @@ export function PublicSovereignCompanion() {
   const greetingInjectedRef = useRef(false);
   const langDropdownRef = useRef<HTMLDivElement>(null);
   const presenceDbErrorInjectedRef = useRef(false);
+  const handshakeCompleteInjectedRef = useRef(false);
 
   const { presenceGreeting } = useGlobalPresenceGateway();
 
@@ -172,6 +173,9 @@ export function PublicSovereignCompanion() {
     return () => clearTimeout(t);
   }, [greetingSpoken]);
 
+  // Soul Awakening: when handshake row is found (verified presence), use that greeting instead of default.
+  const isHandshakeCompleteGreeting = presenceGreeting?.startsWith('The Ledger is synchronized');
+
   useEffect(() => {
     if (!open || greetingInjectedRef.current) return;
     greetingInjectedRef.current = true;
@@ -183,8 +187,9 @@ export function PublicSovereignCompanion() {
         const valid = session && session.name && session.timestamp && Date.now() - session.timestamp < SOVEREIGN_SESSION_TTL_MS;
         if (valid && !sessionRestoredRef.current) {
           sessionRestoredRef.current = true;
+          const firstLine = isHandshakeCompleteGreeting && presenceGreeting ? presenceGreeting : AUTO_GREETING;
           initial = [
-            { id: 'greeting', role: 'assistant', text: AUTO_GREETING },
+            { id: 'greeting', role: 'assistant', text: firstLine },
             { id: 'welcome-back', role: 'assistant', text: `Welcome back, ${session.name}. I remember you from the archives.` },
           ];
         }
@@ -192,15 +197,18 @@ export function PublicSovereignCompanion() {
         // ignore
       }
     }
-    if (initial.length === 0) initial = [{ id: 'greeting', role: 'assistant', text: AUTO_GREETING }];
+    if (initial.length === 0) {
+      const firstLine = isHandshakeCompleteGreeting && presenceGreeting ? presenceGreeting : AUTO_GREETING;
+      initial = [{ id: 'greeting', role: 'assistant', text: firstLine }];
+    }
     setMessages((prev) => (prev.length === 0 ? initial : prev));
     if (!greetingSpoken) {
       speak(initial[0].text);
       setGreetingSpoken(true);
     }
-  }, [open, greetingSpoken]);
+  }, [open, greetingSpoken, isHandshakeCompleteGreeting, presenceGreeting]);
 
-  // When presence check fails due to DB error, SOVRYN says the disturbance message instead of a dry error log.
+  // When presence check fails due to DB error, SOVRYN says the Ledger/secret key message.
   useEffect(() => {
     if (!open || !presenceGreeting || presenceGreeting !== PRESENCE_DB_ERROR_GREETING || presenceDbErrorInjectedRef.current) return;
     presenceDbErrorInjectedRef.current = true;
@@ -209,6 +217,19 @@ export function PublicSovereignCompanion() {
       { id: `presence-db-err-${Date.now()}`, role: 'assistant', text: PRESENCE_DB_ERROR_GREETING },
     ]);
     speak(PRESENCE_DB_ERROR_GREETING);
+  }, [open, presenceGreeting]);
+
+  // Soul Awakening: when Gateway found the handshake record, inject Ledger synchronized greeting.
+  useEffect(() => {
+    if (!open || !presenceGreeting || !presenceGreeting.startsWith('The Ledger is synchronized') || handshakeCompleteInjectedRef.current) return;
+    handshakeCompleteInjectedRef.current = true;
+    setMessages((prev) => {
+      const hasIt = prev.some((m) => m.role === 'assistant' && m.text.startsWith('The Ledger is synchronized'));
+      if (hasIt) return prev;
+      return [...prev, { id: `handshake-complete-${Date.now()}`, role: 'assistant', text: presenceGreeting }];
+    });
+    speak(presenceGreeting);
+    setGreetingSpoken(true);
   }, [open, presenceGreeting]);
 
   useEffect(() => {

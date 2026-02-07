@@ -1,11 +1,12 @@
 /**
  * Supabase client for National Pulse realtime (presence_handshakes).
+ * Singleton: only one createClient() call for the app. Use the same instance everywhere to avoid auth/presence conflicts.
  * When NEXT_PUBLIC_SUPABASE_URL is missing, returns a mock client so the app does not crash.
- * Client uses non-cached fetch to avoid Schema Cache errors (e.g. recovery_seed_encrypted).
  */
 
 import { createClient } from '@supabase/supabase-js';
 
+/** Singleton instance. Do not call createClient elsewhere. */
 let _supabase: any = null;
 let _initialized = false;
 let _isMock = false;
@@ -54,6 +55,7 @@ function getMockClient(): any {
 
 function initSupabase() {
   if (_initialized) return;
+  if (_supabase && !_isMock) return;
   _initialized = true;
 
   const url = (typeof process !== 'undefined' ? (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '') : '').trim();

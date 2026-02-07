@@ -26,7 +26,9 @@ export async function enqueuePresenceProof(handshakeId: string, proof: unknown):
   await enqueueProof(handshakeId, proofJson);
 }
 
-/** Enqueue, POST once. Mark synced on 2xx. If fetch fails, workbox-background-sync will retry. */
+const HANDSHAKE_REJECTED_KEY = 'pff_handshake_rejected';
+
+/** Enqueue, POST once. Mark synced on 2xx. If fetch fails, workbox-background-sync will retry. When DB rejects (e.g. NOT NULL), set flag so Gateway shows Architect bypass message. */
 export async function submitSingleProof(handshakeId: string, proof: unknown): Promise<boolean> {
   await enqueuePresenceProof(handshakeId, proof);
   try {
@@ -39,6 +41,9 @@ export async function submitSingleProof(handshakeId: string, proof: unknown): Pr
     if (res.ok) {
       await markSynced(handshakeId);
       return true;
+    }
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.setItem(HANDSHAKE_REJECTED_KEY, '1');
     }
   } catch {
     /* offline or network error; queue remains pending, SW may retry */

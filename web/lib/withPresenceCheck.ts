@@ -1,13 +1,16 @@
 /**
  * withPresenceCheck - Wrapper function for presence-gated actions
  * Verifies Presence_Verified signal from Supabase before enabling Send/Swap/Bank operations.
- * Table: presence_handshakes must have columns verified_at (TIMESTAMPTZ) and liveness_score.
+ * Table: presence_handshakes — only verified_at and liveness_score are required for basic chat.
+ * Columns like handshake_code or anchor_phone are optional (nullable); see migration 20260259000000.
+ * We only read from this table here; never send created_at or updated_at — the database handles those via DEFAULT NOW().
  * If verified_at is missing, run supabase/migrations/20260257000000_add_verified_at_presence_handshakes.sql.
  */
 
 import { hasSupabase, supabase } from './supabase';
 import { clearTripleAnchor } from './tripleAnchor';
 
+/** Recent presence verification window: 24 hours for all users including Architect. Do not tighten (e.g. 5 min); keep 24h. */
 const PRESENCE_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
 const STORAGE_KEY = 'pff_presence_verified';
 const TIMESTAMP_KEY = 'pff_presence_timestamp';

@@ -381,15 +381,15 @@ export function getManifestoCompanionResponse(
     return { text: vision + getClosingHook(lang), lang };
   }
 
-  // Codebase deep-link — "code", "where is", "how is it implemented", "file": exact file and logic. No general answer.
+  // Codebase deep-link — wrapped with Sovereign Authority so response is not raw code only.
   if (/\b(code|source|implementation|where is|which file|how (is it |does it )?(implemented|built|coded)|file (that |where)|logic (tier|layer)|vitalizationRitual|vidaCap\.ts|contracts?)\b/i.test(lower)) {
     return { text: getCodebaseDeepLinkResponse(lower, isArchitect), lang: 'en' };
   }
 
-  // 9-day ritual — codebase deep-link: exact file and function names.
+  // 9-day ritual — codebase deep-link with Sovereign Authority summary (not raw code only).
   if (lower.includes('9-day') || lower.includes('9 day') || lower.includes('ritual') || lower.includes('daily unlock') || lower.includes('vitalization streak')) {
-    const conceptual = 'In web/lib/vitalizationRitual.ts, the 9-Day Ritual is the heart of the unlock. recordDailyScan() moves 0.1 VIDA from locked to spendable each calendar day—STREAK_TARGET = 10, DAILY_UNLOCK_VIDA_AMOUNT = 0.1. One unlock per day; no double-unlock. On Day 10, biometric strictness is set to HIGH. That is how 1 VIDA ($1,000) becomes spendable.';
-    const technical = 'web/lib/vitalizationRitual.ts: recordDailyScan(phoneNumber) updates user_profiles.vitalization_streak and vitalization_last_scan_date; same-day scans do not increment. getVitalizationStatus() reads spendable_vida, locked_vida. core/economic.ts holds constants; backend/src/economic/vidaCap.ts mints the 5 Citizen share with 4/1 lock—the 1 is released over 10 days by this ritual.';
+    const conceptual = SOVEREIGN_AUTHORITY_PREFIX + 'In web/lib/vitalizationRitual.ts, the 9-Day Ritual is the heart of the unlock. recordDailyScan() moves 0.1 VIDA from locked to spendable each calendar day—STREAK_TARGET = 10. One unlock per day; no double-unlock. On Day 10, biometric strictness is set to HIGH. That is how 1 VIDA ($1,000) becomes spendable.';
+    const technical = SOVEREIGN_AUTHORITY_PREFIX + 'web/lib/vitalizationRitual.ts: recordDailyScan(phoneNumber) updates user_profiles.vitalization_streak and vitalization_last_scan_date; same-day scans do not increment. getVitalizationStatus() reads spendable_vida, locked_vida. core/economic.ts holds constants; backend/src/economic/vidaCap.ts mints the 5 Citizen share with 4/1 lock—the 1 is released over 10 days by this ritual.';
     const code = `// web/lib/vitalizationRitual.ts
 const STREAK_TARGET = 10;
 const DAILY_UNLOCK_VIDA_AMOUNT = 0.1;
@@ -401,10 +401,10 @@ export async function recordDailyScan(phoneNumber: string) { ... }`;
     };
   }
 
-  // VIDA CAP / 50:50 minting — codebase deep-link: backend/src/economic/vidaCap.sol logic.
+  // VIDA CAP / 50:50 minting — Sovereign Authority summary over code.
   if (lower.includes('mint') || lower.includes('minting') || (lower.includes('vida cap') && (lower.includes('code') || lower.includes('logic') || lower.includes('how') || lower.includes('50')))) {
-    const conceptual = 'In backend/src/economic/vidaCap.ts, I handle the 50:50 split by mintOnVitalization(). Ten VIDA per Vitalization—or two after 1B cap. Five to National_Vault (70% locked until sovereign clauses), five to Citizen_Vault (4/1 lock: the 1 is the 9-day ritual). core/economic.ts defines VITALIZATION_CAP, GROSS_SOVEREIGN_GRANT_VIDA, NATIONAL_VAULT_VIDA, CITIZEN_VAULT_VIDA.';
-    const technical = 'backend/src/economic/vidaCap.ts: mintOnVitalization(citizenId, pffId) calls getTotalVidaCapMinted(). If total >= VITALIZATION_CAP (1e9), uses POST_HALVING_MINT_VIDA (2). Else GROSS_SOVEREIGN_GRANT_VIDA (10). 50:50: nationalShare and citizenShare from core/economic.ts. Atomic: INSERT vida_cap_allocations, UPDATE citizen_vaults (vida_locked_4, vida_ritual_pool_1), UPDATE national_reserve. burnVidaCap() when halving active.';
+    const conceptual = SOVEREIGN_AUTHORITY_PREFIX + 'In backend/src/economic/vidaCap.ts, the 50:50 split is enforced by mintOnVitalization(). Ten VIDA per Vitalization—or two after 1B cap. Five to National_Vault (70% locked until sovereign clauses), five to Citizen_Vault (4/1 lock: the 1 is the 9-day ritual). core/economic.ts defines the constants.';
+    const technical = SOVEREIGN_AUTHORITY_PREFIX + 'backend/src/economic/vidaCap.ts: mintOnVitalization(citizenId, pffId) calls getTotalVidaCapMinted(). If total >= VITALIZATION_CAP (1e9), uses POST_HALVING_MINT_VIDA (2). Else 10. 50:50: nationalShare and citizenShare. Atomic: INSERT vida_cap_allocations, UPDATE citizen_vaults and national_reserve. burnVidaCap() when halving active.';
     const code = `// backend/src/economic/vidaCap.ts
 export async function mintOnVitalization(citizenId, pffId) {
   const halvingActive = await getTotalVidaCapMinted() >= VITALIZATION_CAP;
@@ -478,10 +478,9 @@ export async function mintOnVitalization(citizenId, pffId) {
     return { text: getGreetingVisionaryRemark(lang), lang };
   }
 
-  // Codebase deep-link — any code/file/logic question: exact file and line. No general answer.
+  // Codebase deep-link — Sovereign Authority summary (not raw code only).
   if (/\b(code|codebase|file|where is|how does .+ (work|implement)|vidaCap|vitalizationRitual|contract|implementation|logic tier|backend|core\/economic)\b/i.test(lower) || /in (the )?code|which file|what (file|module)|\.ts\b|\.sol\b/i.test(lower)) {
-    const deep = getCodebaseDeepLinkResponse(lower, isArchitect);
-    return { text: deep, lang: 'en' };
+    return { text: getCodebaseDeepLinkResponse(lower, isArchitect), lang: 'en' };
   }
 
   // Default — Soul embedded in every sentence. Zero-latency personality; no menu before the human.
@@ -597,21 +596,23 @@ function getVltTruthDefinition(lang: string, isArchitect: boolean): string {
   return localized[lang] ?? (isArchitect ? technical : conceptual);
 }
 
-/** Codebase deep-link: exact file and logic. Every answer names the file. No general answer. */
+const SOVEREIGN_AUTHORITY_PREFIX = 'By Sovereign Authority, the codebase attests: ';
+
+/** Codebase deep-link: exact file and logic. Wrapped with Sovereign Authority so we do not return raw code only—we summarize under authority. */
 function getCodebaseDeepLinkResponse(lower: string, isArchitect: boolean): string {
+  let raw: string;
   if (/ritual|9\.?day|streak|daily\s*unlock|vitalization\s*streak/i.test(lower)) {
-    return 'In web/lib/vitalizationRitual.ts I handle the 9-day unlock. recordDailyScan(phoneNumber) updates vitalization_streak and vitalization_last_scan_date on user_profiles; DAILY_UNLOCK_VIDA_AMOUNT = 0.1. Same-day scans do not double-unlock. getVitalizationStatus() reads spendable_vida, locked_vida. The 5 Citizen VIDA (4/1 lock) is released over 10 days here.';
+    raw = 'In web/lib/vitalizationRitual.ts the 9-day unlock is implemented. recordDailyScan(phoneNumber) updates vitalization_streak and vitalization_last_scan_date; DAILY_UNLOCK_VIDA_AMOUNT = 0.1. Same-day scans do not double-unlock. The 5 Citizen VIDA (4/1 lock) is released over 10 days here.';
+  } else if (/50:50|mint|vida\s*cap|national\s*vault|citizen\s*vault|vidaCap/i.test(lower)) {
+    raw = 'In backend/src/economic/vidaCap.ts the 50:50 split is enforced. mintOnVitalization(citizenId, pffId) calls getTotalVidaCapMinted(); if >= VITALIZATION_CAP we mint 2 else 10. Five to National_Vault (70/30 lock), five to Citizen_Vault (4/1 lock). Atomic INSERT and UPDATE. burnVidaCap() when halving is active.';
+  } else if (/ate|economic|treasury/i.test(lower)) {
+    raw = 'ATE lives in core/economic.ts and backend/src/economic/vidaCap.ts (mintOnVitalization, burnVidaCap). The 50:50 rule is enforced there—5 National (70/30 lock), 5 Citizen (4/1 lock, released via web/lib/vitalizationRitual.ts).';
+  } else if (/pff|presence|vitalization\s*ledger|vlt/i.test(lower)) {
+    raw = 'PFF and VLT: identity in web/lib/biometricAuth.ts; 9-day ritual in web/lib/vitalizationRitual.ts; mint in backend/src/economic/vidaCap.ts. Constants in core/economic.ts.';
+  } else {
+    raw = 'The codebase is indexed. 9-day ritual: web/lib/vitalizationRitual.ts. 50:50 mint: backend/src/economic/vidaCap.ts. Constants: core/economic.ts. Identity: web/lib/biometricAuth.ts. Ask me about a specific file or flow—I answer with the exact file and logic.';
   }
-  if (/50:50|mint|vida\s*cap|national\s*vault|citizen\s*vault|vidaCap/i.test(lower)) {
-    return 'In backend/src/economic/vidaCap.ts I handle the 50:50 split. mintOnVitalization(citizenId, pffId) calls getTotalVidaCapMinted(); if >= VITALIZATION_CAP (core/economic.ts), we mint 2 else 10. Five to National_Vault (70/30 lock), five to Citizen_Vault (4/1 lock). Atomic INSERT vida_cap_allocations and UPDATE national_reserve, citizen_vaults. burnVidaCap() when halving is active.';
-  }
-  if (/ate|economic|treasury/i.test(lower)) {
-    return 'ATE lives in core/economic.ts (constants, VidaCapAllocation) and backend/src/economic/vidaCap.ts (mintOnVitalization, burnVidaCap). vidaCurrency.ts handles issuance. The 50:50 rule is enforced in mintOnVitalization—5 National (70/30 lock), 5 Citizen (4/1 lock, released via web/lib/vitalizationRitual.ts).';
-  }
-  if (/pff|presence|vitalization\s*ledger|vlt/i.test(lower)) {
-    return 'PFF and VLT logic: identity in web/lib/biometricAuth.ts (verifyBiometricSignature, verifyHardwareTPM, resolveSovereignByPresence); 9-day ritual in web/lib/vitalizationRitual.ts; mint in backend/src/economic/vidaCap.ts. Constants in core/economic.ts. I speak from the exact line.';
-  }
-  return 'The codebase is indexed. 9-day ritual: web/lib/vitalizationRitual.ts. 50:50 mint: backend/src/economic/vidaCap.ts. Constants: core/economic.ts. Identity and presence: web/lib/biometricAuth.ts. Ask me about a specific file or flow—I answer with the exact file and logic.';
+  return SOVEREIGN_AUTHORITY_PREFIX + raw;
 }
 
 /** Contextual memory: "Good morning" earlier + "I'm tired" now — connect the two. */

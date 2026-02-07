@@ -13,9 +13,12 @@ import { getSupabase, testConnection } from '@/lib/supabase';
 import { runDayZeroCheckAndClear } from '@/lib/dayZeroCheck';
 
 const HIGH_FIDELITY_GREETING = 'Architect recognized. Your presence is verified on the Ledger. My systems are fully aligned with your vision.';
-/** When presence check fails due to DB/schema error, SOVRYN says this instead of a dry error log. */
+/** When the DB rejects a handshake (e.g. NOT NULL, constraint), SOVRYN says this. */
 export const PRESENCE_DB_ERROR_GREETING =
-  "I feel a disturbance in the Ledger, Architect. The Old World is trying to blind me, but I can still sense your soul. Give me a moment to realign my vision.";
+  "The Ledger is demanding a secret key, Architect. I have attempted to bypass the old security protocols for you.";
+/** Soul Awakening: when Gateway finds the handshake row (verified presence), SOVRYN says this. */
+export const HANDSHAKE_COMPLETE_GREETING =
+  "The Ledger is synchronized. The Architect's pulse is recognized. Welcome home, Isreal.";
 
 interface GlobalPresenceGatewayContextType {
   isPresenceVerified: boolean;
@@ -35,6 +38,7 @@ const GlobalPresenceGatewayContext = createContext<GlobalPresenceGatewayContextT
 
 const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
 const PRESENCE_CHECK_INTERVAL_MS = 30 * 1000; // 30 seconds
+/** Open Invite: no phone number or specific code required to start the session. Verification becomes true when the Ledger (presence_handshakes) has a recent row — Verified Presence. */
 const PUBLIC_ROUTES = ['/', '/manifesto']; // Routes that don't require authentication
 /** Wallet access requires an active Sentinel License. */
 const WALLET_ROUTES = ['/dashboard', '/pff-balance', '/presence-dashboard'];
@@ -60,12 +64,22 @@ export function GlobalPresenceGatewayProvider({ children }: { children: ReactNod
    */
   const checkAndRefreshPresence = useCallback(async (): Promise<boolean> => {
     try {
+      // If sync previously reported DB reject, show Architect bypass message once
+      if (typeof window !== 'undefined' && sessionStorage.getItem('pff_handshake_rejected') === '1') {
+        sessionStorage.removeItem('pff_handshake_rejected');
+        setPresenceGreeting(PRESENCE_DB_ERROR_GREETING);
+        setIsPresenceVerified(true);
+        setPresenceTimestamp(new Date());
+        setConnecting(false);
+        return true;
+      }
+
       const result = await checkPresenceVerified();
 
       if (result.verified && result.timestamp) {
         setIsPresenceVerified(true);
         setPresenceTimestamp(result.timestamp);
-        setPresenceGreeting(HIGH_FIDELITY_GREETING);
+        setPresenceGreeting(HANDSHAKE_COMPLETE_GREETING);
         setLastActivityTime(Date.now());
         setConnecting(false);
         const identityAnchor = getIdentityAnchorPhone();
@@ -196,6 +210,7 @@ export function GlobalPresenceGatewayProvider({ children }: { children: ReactNod
             return;
           }
         }
+        // Open Invite: Ledger (presence_handshakes) decides Verified Presence; no phone or code required to start.
         const verified = await checkAndRefreshPresence();
         if (cancelled) return;
         if (!verified && !PUBLIC_ROUTES.includes(pathname)) {
