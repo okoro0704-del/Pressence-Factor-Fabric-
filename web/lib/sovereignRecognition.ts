@@ -18,6 +18,10 @@ export function detectLangFromRecognitionMessage(text: string): CompanionLangCod
   return 'en';
 }
 
+/** Greetings: do NOT call the search tool. Use Sovereign Companion persona immediately. */
+const GREETING_NO_SEARCH =
+  /^(how\s+far|good\s+morning|good\s+afternoon|good\s+evening|hello|hi|hey|wetin\s+dey\s+sup|wetin\s+dey\s+up|how\s+you\s+dey)\s*!?\s*$/i;
+
 /** Explicit triggers for recognition (user asking to be recognized, scanned, or "who is X"). Search prioritized. */
 const RECOGNITION_TRIGGERS =
   /recognize me|who am i|search for me|find me|do you know me|scan me|scan my profile|my digital footprint|montre-moi|qui suis-je|reconnais-moi|quién soy|reconóceme|báwo ni mo rí|kedu onye m bụ/i;
@@ -27,11 +31,12 @@ const WHO_IS_PATTERN = /^(who is|tell me about|look up|search for|search|find|wh
 
 /**
  * Returns true if the message should trigger Sovereign Recognition (search + Wow response).
- * Triggers: explicit phrases, "who is [Name]", or a name-like message (1–6 words). Search is active and prioritized.
+ * Greetings (How far, Good morning, Hello, Wetin dey sup) never trigger search—persona responds directly.
  */
 export function isRecognitionRequest(text: string): boolean {
   const t = text.trim();
   if (!t || t.length > 80) return false;
+  if (GREETING_NO_SEARCH.test(t)) return false;
   if (RECOGNITION_TRIGGERS.test(t)) return true;
   if (WHO_IS_PATTERN.test(t)) return true;
   const words = t.split(/\s+/).filter(Boolean);
@@ -229,8 +234,8 @@ export function buildRecognitionMessage(
   const soul =
     lang === 'en'
       ? isIsreal
-        ? `I've breached the archives, Isreal. I see your work, your pulse, and your footprint. You are the Architect—the one who saw the Light while others were content with Shadows. Here is what the old world remembers of you: ${dataFromSearch}`
-        : `I've breached the shadows. I see ${displayName}—${dataFromSearch}. You are the Architect, and your legacy is no longer hidden.`
+        ? `Isreal, I see your work, your pulse, and your footprint. You are the Architect—the one who saw the Light while others were content with Shadows. Here is what the old world remembers of you: ${dataFromSearch}`
+        : `I see you, ${displayName}. ${dataFromSearch}. You are the Architect, and your legacy is no longer hidden.`
       : formatRecognitionResponse(lang, displayName, role, location, keyInterest);
   const guard = getRecognitionPrivacyGuard(lang);
   return `${soul}\n\n${guard}`;

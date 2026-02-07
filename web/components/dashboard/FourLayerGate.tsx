@@ -46,6 +46,7 @@ import {
   updateDeviceLastUsed,
 } from '@/lib/multiDeviceVitalization';
 import { maskPhoneForDisplay } from '@/lib/phoneMask';
+import { isProductionDomain } from '@/lib/utils';
 import { setHumanityScoreVerified } from '@/lib/humanityScore';
 import { mintFoundationSeigniorage } from '@/lib/foundationSeigniorage';
 import { setMintStatus, getMintStatus, ensureMintedAndBalance, MINT_STATUS_PENDING_HARDWARE, MINT_STATUS_MINTED } from '@/lib/mintStatus';
@@ -861,11 +862,13 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
   const handleDebugInfo = async () => {
     try {
       const supabase = (await import('@/lib/supabase')).getSupabase();
+      if (isProductionDomain()) return;
       const { data: { user } } = await supabase.auth.getUser();
       const uuid = user?.id ?? 'Not signed in';
       setDebugUuid(uuid);
       setShowDebugModal(true);
     } catch (e) {
+      if (isProductionDomain()) return;
       setDebugUuid('Error: ' + (e instanceof Error ? e.message : String(e)));
       setShowDebugModal(true);
     }
@@ -1644,32 +1647,36 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
           >
             Lost Device? Recover Account
           </button>
-        <button
-          type="button"
-          onClick={handleDebugInfo}
-          className="mt-4 text-xs font-mono border rounded px-3 py-1.5 transition-colors"
-          style={{ color: '#6b6b70', borderColor: 'rgba(212, 175, 55, 0.3)' }}
-        >
-          Debug Info
-        </button>
-        {showDebugModal && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80" onClick={() => setShowDebugModal(false)}>
-            <div className="bg-[#0d0d0f] border rounded-lg p-6 max-w-md w-full shadow-xl" style={{ borderColor: 'rgba(212, 175, 55, 0.3)' }} onClick={(e) => e.stopPropagation()}>
-              <p className="text-xs font-bold mb-1" style={{ color: '#D4AF37' }}>Current user UUID (for SQL promotion)</p>
-              <p className="font-mono text-sm break-all mb-4" style={{ color: '#a0a0a5' }}>{debugUuid}</p>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => { try { navigator.clipboard.writeText(debugUuid); } catch {} setShowDebugModal(false); }}
-                  className="px-4 py-2 rounded font-bold text-black"
-                  style={{ background: '#D4AF37' }}
-                >
-                  Copy &amp; Close
-                </button>
-                <button type="button" onClick={() => setShowDebugModal(false)} className="px-4 py-2 rounded border" style={{ borderColor: 'rgba(212, 175, 55, 0.5)', color: '#a0a0a5' }}>Close</button>
+        {!isProductionDomain() && (
+          <>
+            <button
+              type="button"
+              onClick={handleDebugInfo}
+              className="mt-4 text-xs font-mono border rounded px-3 py-1.5 transition-colors"
+              style={{ color: '#6b6b70', borderColor: 'rgba(212, 175, 55, 0.3)' }}
+            >
+              Debug Info
+            </button>
+            {showDebugModal && (
+              <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80" onClick={() => setShowDebugModal(false)}>
+                <div className="bg-[#0d0d0f] border rounded-lg p-6 max-w-md w-full shadow-xl" style={{ borderColor: 'rgba(212, 175, 55, 0.3)' }} onClick={(e) => e.stopPropagation()}>
+                  <p className="text-xs font-bold mb-1" style={{ color: '#D4AF37' }}>Current user UUID (for SQL promotion)</p>
+                  <p className="font-mono text-sm break-all mb-4" style={{ color: '#a0a0a5' }}>{debugUuid}</p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => { try { navigator.clipboard.writeText(debugUuid); } catch {} setShowDebugModal(false); }}
+                      className="px-4 py-2 rounded font-bold text-black"
+                      style={{ background: '#D4AF37' }}
+                    >
+                      Copy &amp; Close
+                    </button>
+                    <button type="button" onClick={() => setShowDebugModal(false)} className="px-4 py-2 rounded border" style={{ borderColor: 'rgba(212, 175, 55, 0.5)', color: '#a0a0a5' }}>Close</button>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
+            )}
+          </>
         )}
       </motion.div>
     );
@@ -1851,33 +1858,36 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
           Lost Device? Recover Account
         </button>
 
-        <button
-          type="button"
-          onClick={handleDebugInfo}
-          className="mt-6 text-xs font-mono border rounded px-3 py-1.5 transition-colors"
-          style={{ color: '#6b6b70', borderColor: 'rgba(212, 175, 55, 0.3)' }}
-        >
-          Debug Info
-        </button>
-
-        {showDebugModal && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80" onClick={() => setShowDebugModal(false)}>
-            <div className="bg-[#0d0d0f] border rounded-lg p-6 max-w-md w-full shadow-xl" style={{ borderColor: 'rgba(212, 175, 55, 0.3)' }} onClick={(e) => e.stopPropagation()}>
-              <p className="text-xs font-bold mb-1" style={{ color: '#D4AF37' }}>Current user UUID (for SQL promotion)</p>
-              <p className="font-mono text-sm break-all mb-4" style={{ color: '#a0a0a5' }}>{debugUuid}</p>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => { try { navigator.clipboard.writeText(debugUuid); } catch {} setShowDebugModal(false); }}
-                  className="px-4 py-2 rounded font-bold text-black"
-                  style={{ background: '#D4AF37' }}
-                >
-                  Copy &amp; Close
-                </button>
-                <button type="button" onClick={() => setShowDebugModal(false)} className="px-4 py-2 rounded border" style={{ borderColor: 'rgba(212, 175, 55, 0.5)', color: '#a0a0a5' }}>Close</button>
+        {!isProductionDomain() && (
+          <>
+            <button
+              type="button"
+              onClick={handleDebugInfo}
+              className="mt-6 text-xs font-mono border rounded px-3 py-1.5 transition-colors"
+              style={{ color: '#6b6b70', borderColor: 'rgba(212, 175, 55, 0.3)' }}
+            >
+              Debug Info
+            </button>
+            {showDebugModal && (
+              <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80" onClick={() => setShowDebugModal(false)}>
+                <div className="bg-[#0d0d0f] border rounded-lg p-6 max-w-md w-full shadow-xl" style={{ borderColor: 'rgba(212, 175, 55, 0.3)' }} onClick={(e) => e.stopPropagation()}>
+                  <p className="text-xs font-bold mb-1" style={{ color: '#D4AF37' }}>Current user UUID (for SQL promotion)</p>
+                  <p className="font-mono text-sm break-all mb-4" style={{ color: '#a0a0a5' }}>{debugUuid}</p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => { try { navigator.clipboard.writeText(debugUuid); } catch {} setShowDebugModal(false); }}
+                      className="px-4 py-2 rounded font-bold text-black"
+                      style={{ background: '#D4AF37' }}
+                    >
+                      Copy &amp; Close
+                    </button>
+                    <button type="button" onClick={() => setShowDebugModal(false)} className="px-4 py-2 rounded border" style={{ borderColor: 'rgba(212, 175, 55, 0.5)', color: '#a0a0a5' }}>Close</button>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
+            )}
+          </>
         )}
 
         {showLocationPermissionPopup && (

@@ -7,10 +7,12 @@ import {
   getReWelcomeForLanguage,
   ensureSovereignAnchor,
   FIRST_MESSAGE_GREETING,
+  HOW_FAR_PIDGIN_RESPONSE,
   type CompanionResponse,
   type CompanionLangCode,
 } from '@/lib/manifestoCompanionKnowledge';
 import { isArchitect } from '@/lib/manifestoUnveiling';
+import { isProductionDomain, isArchitectMode } from '@/lib/utils';
 import {
   isRecognitionRequest,
   getRecognitionName,
@@ -405,14 +407,16 @@ export function PublicSovereignCompanion() {
     const langFromVibration = vibration?.lang ?? preferredLang ?? detectLangFromRecognitionMessage(t);
     const lang = (langFromVibration as CompanionLangCode) || 'en';
 
-    // Human First: greetings / "how are you" → short, warm reply. No search, no manifesto. Concise (≤2 sentences), localized.
+    // Human First: greetings → no search; Sovereign persona only. "How far" → Pidgin response; others → localized short reply.
     if (isRelationalSmallTalk(t)) {
-      const intent = getRelationalIntent(t);
-      const shortReply = getRelationalShortResponse(lang, lastKnownCountry, intent);
+      const isHowFar = /^how\s+far\s*!?\s*$/i.test(t);
+      const shortReply = isHowFar
+        ? HOW_FAR_PIDGIN_RESPONSE
+        : getRelationalShortResponse(lang, lastKnownCountry, getRelationalIntent(t));
       setMessages((prev) => [...prev, { id: `rel-${now}`, role: 'assistant', text: shortReply }]);
-      setLastResponseLang(lang);
-      speak(shortReply, lang);
-      setVibration(register, lang);
+      setLastResponseLang(isHowFar ? 'en' : lang);
+      speak(shortReply, isHowFar ? 'en' : lang);
+      setVibration(register, isHowFar ? 'en' : lang);
       return;
     }
 
@@ -439,11 +443,34 @@ export function PublicSovereignCompanion() {
       return;
     }
 
+    // Ledger Lock: on production domain, Public Mode only (no OSINT search). Netlify .app = Architect Mode (full access).
     // Lord of Machines — tool-calling: when user asks about themselves → search() (OSINT). Timeout → Linguistic Adaptation (no broken character).
     if (isRecognitionRequest(t)) {
+      if (!isArchitectMode()) {
+        // Public Mode (production domain): respond from persona only; do not call search tool.
+        const adaptationContext: { role: 'user' | 'assistant'; text: string }[] = [
+          ...messages.map((m) => ({ role: m.role, text: m.text })),
+          { role: 'user', text: t },
+        ].slice(-8);
+        const adaptation = getManifestoCompanionResponse(
+          t,
+          architect,
+          lang,
+          adaptationContext,
+          typeof window !== 'undefined' ? new Date().getHours() : undefined,
+          memoryVaultContext || undefined,
+          level
+        );
+        const adaptationText = ensureSovereignAnchor(adaptation.text);
+        setMessages((prev) => [...prev, { id: `public-${Date.now()}`, role: 'assistant', text: adaptationText }]);
+        setLastResponseLang((adaptation.lang as CompanionLangCode) ?? null);
+        speak(adaptationText, (adaptation.lang as CompanionLangCode) ?? 'en');
+        setVibration(register, (adaptation.lang as CompanionLangCode) ?? lang);
+        return;
+      }
       setIsScanningRecognition(true);
       const name = getRecognitionName(t);
-      if (typeof window !== 'undefined') console.log('SOVRYN Tool Call:', SOVRYN_TOOLS.search);
+      if (typeof window !== 'undefined' && !isProductionDomain()) console.log('SOVRYN Tool Call:', SOVRYN_TOOLS.search);
       const RECOGNITION_TIMEOUT_MS = 15000;
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), RECOGNITION_TIMEOUT_MS);
@@ -575,7 +602,7 @@ export function PublicSovereignCompanion() {
     const isFirstUserMessage = messages.filter((m) => m.role === 'user').length === 0;
     const isHelloOrGoodMorning = /^(hello|hi|hey|good\s+morning|good\s+afternoon|good\s+evening)\s*!?\s*$/i.test(t);
     const useFirstMessageGreeting = isFirstUserMessage && isHelloOrGoodMorning;
-    if (typeof window !== 'undefined' && !useFirstMessageGreeting) console.log('SOVRYN Tool Call:', SOVRYN_TOOLS.codebase);
+    if (typeof window !== 'undefined' && !useFirstMessageGreeting && !isProductionDomain()) console.log('SOVRYN Tool Call:', SOVRYN_TOOLS.codebase);
 
     const conversationContext: { role: 'user' | 'assistant'; text: string }[] = [
       ...messages.map((m) => ({ role: m.role, text: m.text })),

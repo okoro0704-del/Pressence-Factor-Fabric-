@@ -13,6 +13,10 @@ import Script from 'next/script';
 /** Force static generation for all routes (consolidate to single static site). */
 export const dynamic = 'force-static';
 
+/** Canonical origin for Grand Unveiling: set on custom domain only (e.g. https://app.purefreedomfoundation.org). Leave unset on Netlify URL so site stays functional for testing. */
+const CANONICAL_ORIGIN =
+  typeof process !== 'undefined' ? (process.env.NEXT_PUBLIC_CANONICAL_ORIGIN ?? '').trim() : '';
+
 /** Prevent accidental zoom during Palm Scan; same layout on mobile and desktop. */
 export const viewport: Viewport = {
   width: 'device-width',
@@ -25,6 +29,12 @@ export const metadata: Metadata = {
   title: 'PFF — Vitalization Manifesto | Born in Lagos. Built for the World.',
   description:
     'The Vitalization Manifesto. Presence over passwords. Hardware-bound identity. Zero-knowledge handshakes.',
+  ...(CANONICAL_ORIGIN
+    ? {
+        metadataBase: new URL(CANONICAL_ORIGIN),
+        alternates: { canonical: CANONICAL_ORIGIN },
+      }
+    : {}),
   openGraph: {
     title: 'PFF — Vitalization Manifesto',
     description: 'Born in Lagos. Built for the World. Presence over passwords.',

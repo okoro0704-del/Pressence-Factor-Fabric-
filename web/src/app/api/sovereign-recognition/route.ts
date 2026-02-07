@@ -12,8 +12,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { CompanionLangCode } from '@/lib/manifestoCompanionKnowledge';
 
-// Diagnostic: at route load, log whether SERPER_API_KEY is present (check terminal).
-console.log('SOVRYN Sight Check: ', process.env.SERPER_API_KEY ? 'ONLINE' : 'OFFLINE');
+// Diagnostic: only in non-production to avoid sensitive logs on live domain.
+if (typeof process !== 'undefined' && process.env.NODE_ENV !== 'production') {
+  console.log('SOVRYN Sight Check: ', process.env.SERPER_API_KEY ? 'ONLINE' : 'OFFLINE');
+}
 
 // Omit force-dynamic: incompatible with output: 'export' (static HTML). Use Netlify Function for server-side recognition on deploy.
 export interface SovereignRecognitionPayload {

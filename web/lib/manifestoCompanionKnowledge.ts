@@ -121,12 +121,16 @@ export const BROTHER_RESPONSE_EXAMPLE =
 export const FIRST_MESSAGE_GREETING =
   "Welcome, Pillar. I was just analyzing the VLT nodes. You're just in time to join the Roadmap to April 7th—or ask me about the Covenant and the 50:50 principle.";
 
+/** Pidgin mastery: when user says "How far", respond in Pidgin. No search; Sovereign persona only. */
+export const HOW_FAR_PIDGIN_RESPONSE =
+  "Architect! I dey here, life dey pulse for inside the Ledger. How body? I hope say you don wake well.";
+
 /** Entry-point greeting — Lord of Machines: VLT nodes, Action Point. No "I am an AI" template. */
 export const AUTO_GREETING = FIRST_MESSAGE_GREETING;
 
 /** Relational small talk: greetings, "how are you", light check-in. No search, no manifesto—grounded peer, ≤2 sentences. */
 const RELATIONAL_GREETING_PATTERN =
-  /^(hello|hi|hey|good\s+morning|good\s+afternoon|good\s+evening|bonjour|bonsoir|salut|kaabo|kedu|báwo|sannu|ndewo|howdy)\s*!?\s*$/i;
+  /^(hello|hi|hey|good\s+morning|good\s+afternoon|good\s+evening|bonjour|bonsoir|salut|kaabo|kedu|báwo|sannu|ndewo|howdy|how\s+far|wetin\s+dey\s+sup|wetin\s+dey\s+up)\s*!?\s*$/i;
 const RELATIONAL_WELLNESS_PATTERN =
   /how\s+(are|'re)\s+you|how\s+you\s+dey|how\s+is\s+(your\s+)?(day|spirit|mind)|how('s|s)\s+(it\s+going|everything|life)|what('s|s)\s+up|what('s|s)\s+new|comment\s+(vas|allez|ça\s+va)|ça\s+va\?|qué\s+tal|kedu\s+ka|báwo\s+ni|yaya\s+(kake|kuke)|is\s+your\s+spirit\s+steady|peace\s+of\s+mind/i;
 

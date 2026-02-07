@@ -1,5 +1,9 @@
 # PFF — Root redirect so Netlify builds the web app from web/
 # When this repo is connected to Netlify, use base directory "web" so build runs there.
+#
+# Sovereign Shield: Set NEXT_PUBLIC_PRODUCTION_DOMAIN only on the *custom domain* (e.g. app.purefreedomfoundation.org).
+# Do NOT set it on the default *.netlify.app site: that URL stays the Sandbox (Architect Mode, full search, dev panels).
+# Supabase: add both your custom domain and https://*.netlify.app to Auth URL / Redirect URLs so Sandbox and live both work.
 
 [build]
   base = "web"
