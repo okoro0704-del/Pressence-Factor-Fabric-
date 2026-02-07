@@ -2,14 +2,16 @@
  * PHONE IDENTITY ENGINE
  * Phone Number as Primary Unique Identifier (Primary Key)
  * Maps phone numbers to Global Identity Hash and Virtual Bridge for banking
+ * Uses singleton from @/lib/supabase to avoid Multiple GoTrueClient.
  */
 
-import { createClient } from '@supabase/supabase-js';
+import { getSupabase } from './supabase';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = new Proxy({} as ReturnType<typeof getSupabase>, {
+  get(_, prop: string) {
+    return (getSupabase() as any)[prop];
+  },
+});
 
 // Account Types
 export enum AccountType {

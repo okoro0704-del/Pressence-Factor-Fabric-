@@ -30,9 +30,14 @@
   status = 200
   force = true
 
-# Sovereign Companion search: static export has no API routes; serve via Netlify Function so /api/sovereign-recognition works on deploy
+# Sovereign Companion search: static export has no API routes; serve via Netlify Function (no 404)
 [[redirects]]
   from = "/api/sovereign-recognition"
+  to = "/.netlify/functions/sovereign-recognition"
+  status = 200
+  force = true
+[[redirects]]
+  from = "/api/sovereign-recognition/"
   to = "/.netlify/functions/sovereign-recognition"
   status = 200
   force = true

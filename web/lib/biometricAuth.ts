@@ -3,7 +3,6 @@
  * Bypasses manual phone number entry with presence-based identity resolution
  */
 
-import { createClient } from '@supabase/supabase-js';
 import { generateIdentityHash, type GlobalIdentity } from './phoneIdentity';
 import {
   createSession,
@@ -15,10 +14,14 @@ import {
 } from './sessionManagement';
 import { waitForExternalFingerprint } from './externalScannerBridge';
 import { hashExternalFingerprintRaw } from './biometricAnchorSync';
+import { getSupabase } from './supabase';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+/** Single Supabase instance (same as rest of app). Avoids Multiple GoTrueClient warning. */
+export const supabase = new Proxy({} as ReturnType<typeof getSupabase>, {
+  get(_, prop: string) {
+    return (getSupabase() as any)[prop];
+  },
+});
 
 // Authentication Layers
 export enum AuthLayer {

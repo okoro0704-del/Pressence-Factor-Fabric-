@@ -92,9 +92,9 @@ if (typeof window !== 'undefined') {
   initSupabase();
 }
 
-/** Returns the single Supabase instance. Use this or the exported `supabase` proxy. */
+/** Returns the single Supabase instance. Use this or the exported `supabase` proxy. One GoTrueClient only. */
 export function getSupabase(): any {
-  if (typeof window !== 'undefined' && !_initialized) initSupabase();
+  if (!_initialized) initSupabase();
   return _supabase ?? getMockClient();
 }
 

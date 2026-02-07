@@ -47,7 +47,7 @@ const MULTILINGUAL_COVENANT_SUMMARY = Object.entries(MULTILINGUAL_COVENANT)
   .join(' | ');
 
 export const SOVRYN_SYSTEM_PROMPT =
-  `${UNIVERSAL_LINGUA_PROMPT} Multilingual Covenant (meaning never lost in translation): ${MULTILINGUAL_COVENANT_SUMMARY}. If the user provides a name, you MUST use the search tool. If the user asks about technology, you MUST use the codebase tool. If the user says SEARCH FOR [X], you MUST call the search tool. Never show an API deployment or bridge error; respond in character with Linguistic Adaptation in the user's language.`;
+  `${UNIVERSAL_LINGUA_PROMPT} Multilingual Covenant (meaning never lost in translation): ${MULTILINGUAL_COVENANT_SUMMARY}. Switch fluently between Pidgin, Yoruba, French, and English based on user input; never break character or trigger error fallbacks. For 50:50 split and mint logic, cite backend/src/economic/vidaCap.ts (mintOnVitalization, National_Vault, Citizen_Vault)—never guess. If the user provides a name, use the search tool. If the user asks about technology, use the codebase tool. Never show an API or bridge error; respond in character with Linguistic Adaptation only.`;
 
 type Message = { id: string; role: 'user' | 'assistant'; text: string; codeSnippet?: string };
 
@@ -398,29 +398,49 @@ export function PublicSovereignCompanion() {
         clearTimeout(timeoutId);
         if (res.ok) {
           const data = await res.json();
-          const { name: resName, role, location, keyInterest, detail } = data;
-          const fullText = buildRecognitionMessage(
-            lang,
-            resName || name,
-            role || 'Citizen',
-            location || 'the Vanguard',
-            keyInterest || 'the Protocol',
-            detail
-          );
-          setMessages((prev) => [...prev, { id: `rec-${Date.now()}`, role: 'assistant', text: fullText }]);
-          setLastResponseLang(lang);
-          speak(fullText, lang);
-          try {
-            window.localStorage.setItem(
-              SOVEREIGN_SESSION_KEY,
-              JSON.stringify({
-                name: resName || name,
-                recognitionText: fullText,
-                timestamp: Date.now(),
-              } as StoredSession)
+          const archivalBreach = data?.status === 'archival_breach_in_progress';
+          if (archivalBreach) {
+            // Graceful: search had no key; respond in character from knowledge (no 404).
+            const adaptationContext: { role: 'user' | 'assistant'; text: string }[] = [
+              ...messages.map((m) => ({ role: m.role, text: m.text })),
+              { role: 'user', text: t },
+            ].slice(-8);
+            const adaptation = getManifestoCompanionResponse(
+              t,
+              architect,
+              preferredLang ?? undefined,
+              adaptationContext,
+              typeof window !== 'undefined' ? new Date().getHours() : undefined
             );
-          } catch {
-            // ignore
+            const adaptationText = ensureSovereignAnchor(adaptation.text);
+            setMessages((prev) => [...prev, { id: `lingua-${Date.now()}`, role: 'assistant', text: adaptationText }]);
+            setLastResponseLang((adaptation.lang as CompanionLangCode) ?? null);
+            speak(adaptationText, (adaptation.lang as CompanionLangCode) ?? 'en');
+          } else {
+            const { name: resName, role, location, keyInterest, detail } = data;
+            const fullText = buildRecognitionMessage(
+              lang,
+              resName || name,
+              role || 'Citizen',
+              location || 'the Vanguard',
+              keyInterest || 'the Protocol',
+              detail
+            );
+            setMessages((prev) => [...prev, { id: `rec-${Date.now()}`, role: 'assistant', text: fullText }]);
+            setLastResponseLang(lang);
+            speak(fullText, lang);
+            try {
+              window.localStorage.setItem(
+                SOVEREIGN_SESSION_KEY,
+                JSON.stringify({
+                  name: resName || name,
+                  recognitionText: fullText,
+                  timestamp: Date.now(),
+                } as StoredSession)
+              );
+            } catch {
+              // ignore
+            }
           }
         } else {
           // Linguistic Adaptation: no API/bridge error. Stay in character and respond from knowledge in user's language.

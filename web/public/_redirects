@@ -1,3 +1,9 @@
+# API routes → Netlify Functions (must come before catch-all so /api/* is not sent to SPA)
+/api/sovereign-recognition    /.netlify/functions/sovereign-recognition    200
+/api/sovereign-recognition/   /.netlify/functions/sovereign-recognition    200
+/api/identity-reset           /.netlify/functions/identity-reset          200
+/api/identity-reset/          /.netlify/functions/identity-reset           200
+
 # Unveiling Phase: lock vitalization and treasury to Sovereign Countdown
 /vitalization    /countdown/   302
 /vitalization/   /countdown/   302

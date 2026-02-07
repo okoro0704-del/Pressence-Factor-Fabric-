@@ -122,12 +122,18 @@ exports.handler = async (event) => {
     };
   }
 
+  // Graceful: never return 404. Client uses Linguistic Adaptation when status is not 200-with-data.
   return {
-    statusCode: 503,
+    statusCode: 200,
     headers: corsHeaders(),
     body: JSON.stringify({
-      error: 'SIGHT_OFFLINE',
-      message: 'Search services unavailable. Check SERPER_API_KEY / TAVILY_API_KEY in Netlify env.',
+      status: 'archival_breach_in_progress',
+      name: (name || 'Citizen').trim() || 'Citizen',
+      role: 'Citizen',
+      location: 'the Vanguard',
+      keyInterest: 'the Protocol',
+      detail: undefined,
+      message: 'Archival breach in progress. SOVRYN responds from the Covenant.',
     }),
   };
 };
