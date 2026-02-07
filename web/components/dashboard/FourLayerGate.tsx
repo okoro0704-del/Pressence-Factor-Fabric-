@@ -12,9 +12,11 @@ import {
   type BiometricAuthResult,
   type PresencePillar,
   startLocationRequestFromUserGesture,
+  startGpsWatch,
   getCompositeDeviceFingerprint,
   SCAN_TIMEOUT_MS,
   MOBILE_SCAN_TIMEOUT_MS,
+  GPS_EARTH_ANCHOR_SEARCHING_MESSAGE,
 } from '@/lib/biometricAuth';
 import { PresenceProgressRing } from './PresenceProgressRing';
 import type { GlobalIdentity } from '@/lib/phoneIdentity';
@@ -77,7 +79,7 @@ import { BiometricPillar, type BiometricPillarHandle } from '@/components/auth/B
 import { AwaitingLoginApproval } from '@/components/auth/AwaitingLoginApproval';
 import { LoginQRDisplay } from '@/components/auth/LoginQRDisplay';
 import { ArchitectVisionCapture } from '@/components/auth/ArchitectVisionCapture';
-import { speakSovereignAlignmentFailed } from '@/lib/sovereignVoice';
+import { speakSovereignAlignmentFailed, speakDualVitalizationSuccess } from '@/lib/sovereignVoice';
 import { useBiometricSession } from '@/contexts/BiometricSessionContext';
 import { createLoginRequest, completeLoginBridge } from '@/lib/loginRequest';
 import { setTripleAnchorVerified } from '@/lib/tripleAnchor';
@@ -98,11 +100,15 @@ const SovereignPalmScan = dynamic(
   () => import('@/components/auth/SovereignPalmScan').then((m) => ({ default: m.SovereignPalmScan })),
   { ssr: false }
 );
+const DualVitalizationCapture = dynamic(
+  () => import('@/components/auth/DualVitalizationCapture').then((m) => ({ default: m.DualVitalizationCapture })),
+  { ssr: false }
+);
 import { DailyUnlockCelebration } from '@/components/dashboard/DailyUnlockCelebration';
 import { useSovereignCompanion } from '@/contexts/SovereignCompanionContext';
 import { getNativeAppUrl } from '@/lib/appStoreUrls';
 import { IS_PUBLIC_REVEAL, isVettedUser } from '@/lib/publicRevealAccess';
-import { ENABLE_GPS_AS_FOURTH_PILLAR } from '@/lib/constants';
+import { ENABLE_GPS_AS_FOURTH_PILLAR, ENABLE_DUAL_VITALIZATION_CAPTURE } from '@/lib/constants';
 import { recordClockIn, getLastClockInCoords } from '@/lib/workPresence';
 import { QuadPillarGrid } from '@/components/dashboard/QuadPillarShield';
 
@@ -255,6 +261,8 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
   const [lastExternalScannerSerial, setLastExternalScannerSerial] = useState<string | null>(null);
   /** Architect Vision: camera + face mesh overlay during Face Pulse; closes when face verified (gold freeze) or on cancel/fail */
   const [showArchitectVision, setShowArchitectVision] = useState(false);
+  /** Dual-Vitalization: Face Frame + Palm Frame simultaneously; replaces ArchitectVision + SovereignPalmScan when ENABLE_DUAL_VITALIZATION_CAPTURE */
+  const [showDualVitalization, setShowDualVitalization] = useState(false);
   /** When true, Architect Vision shows gold freeze then onComplete; when false/null, scanning or closed */
   const [architectVerificationSuccess, setArchitectVerificationSuccess] = useState<boolean | null>(null);
   const architectSuccessRef = useRef<{
@@ -464,13 +472,21 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     };
   }, [resetVerification]);
 
-  // When GPS pillar is active and scanning, after 3s (desktop) / 5s (mobile) show "Initializing Protocol..." (indoor mode)
+  // When GPS pillar is active and scanning, after 5s show "Initializing Protocol..." and Grant Location button
   useEffect(() => {
     if (currentLayer !== AuthLayer.GPS_LOCATION || authStatus !== AuthStatus.SCANNING) return;
-    const delay = isMobile ? 5000 : 3000;
-    const t = setTimeout(() => setGpsTakingLong(true), delay);
+    const t = setTimeout(() => setGpsTakingLong(true), 5000);
     return () => clearTimeout(t);
-  }, [currentLayer, authStatus, isMobile]);
+  }, [currentLayer, authStatus]);
+
+  // GPS backgrounding: start watchPosition while camera (Face/Palm scan) is active so Pillar 4 locks coords in background
+  useEffect(() => {
+    if (!identityAnchor?.phone || !ENABLE_GPS_AS_FOURTH_PILLAR) return;
+    const cameraActive = showArchitectVision || showSovereignPalmScan || showDualVitalization;
+    if (!cameraActive) return;
+    const unwatch = startGpsWatch(identityAnchor.phone);
+    return unwatch;
+  }, [showArchitectVision, showSovereignPalmScan, showDualVitalization, identityAnchor?.phone]);
 
   // Step 2 of 5: Compulsory App Download — skip on mobile/PWA (friction removal: they're already on app)
   useEffect(() => {
@@ -705,12 +721,18 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
       }
     }
 
-    if (!resumePillars) setShowArchitectVision(true);
+    if (!resumePillars) {
+      if (ENABLE_DUAL_VITALIZATION_CAPTURE) setShowDualVitalization(true);
+      else setShowArchitectVision(true);
+    }
 
     const palmPromise = identityAnchor.isMinor
       ? undefined
       : new Promise<void>((resolve) => {
-          palmResolveRef.current = () => resolve();
+          palmResolveRef.current = () => {
+            resolve();
+            if (ENABLE_DUAL_VITALIZATION_CAPTURE) setShowDualVitalization(false);
+          };
         });
     if (effectiveMobile && identityAnchor?.phone && ENABLE_GPS_AS_FOURTH_PILLAR) startLocationRequestFromUserGesture(identityAnchor.phone);
     const authResult = await resolveSovereignByPresence(
@@ -736,12 +758,13 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
           if (pillar === 'face') {
             setPillarFace(true);
             saveVerifiedPillar(identityAnchor.phone, 'face');
-            if (!identityAnchor.isMinor) setShowSovereignPalmScan(true);
+            if (!identityAnchor.isMinor && !ENABLE_DUAL_VITALIZATION_CAPTURE) setShowSovereignPalmScan(true);
             biometricPillarRef.current?.triggerExternalCapture();
           }
           if (pillar === 'palm') {
             setPillarPalm(true);
             saveVerifiedPillar(identityAnchor.phone, 'palm');
+            if (pillarFace) speakDualVitalizationSuccess();
           }
           if (pillar === 'device') {
             setPillarDevice(true);
@@ -761,6 +784,13 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
 
     if (authResult.timedOut) {
       setShowArchitectVision(false);
+      const faceAndPalmPassed =
+        authResult.layersPassed?.includes(AuthLayer.BIOMETRIC_SIGNATURE) &&
+        authResult.layersPassed?.includes(AuthLayer.SOVEREIGN_PALM);
+      const gpsFailed = ENABLE_GPS_AS_FOURTH_PILLAR && !authResult.layersPassed?.includes(AuthLayer.GPS_LOCATION);
+      if (faceAndPalmPassed && gpsFailed) {
+        setResult({ ...authResult, errorMessage: GPS_EARTH_ANCHOR_SEARCHING_MESSAGE });
+      }
       speakSovereignAlignmentFailed();
       setFaceFailCount((c) => c + 1);
       setAuthStatus(AuthStatus.FAILED);
@@ -780,6 +810,12 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
         compositeDeviceId,
         effectiveMobile,
       };
+      if (ENABLE_DUAL_VITALIZATION_CAPTURE) {
+        // Dual-Vitalization: skip ArchitectVision gold freeze; proceed directly to Palm Pulse or dashboard
+        setShowDualVitalization(false);
+        await handleArchitectVisionComplete();
+        return;
+      }
       if (ENABLE_GPS_AS_FOURTH_PILLAR) {
         const coords = authResult.lastLocationCoords ?? getLastClockInCoords();
         if (coords) recordClockIn(identityAnchor.phone, coords).catch(() => {});
@@ -800,9 +836,13 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
       const unrecognized = identityAnchor ? !(await isDeviceAuthorized(identityAnchor.phone, compositeForCheck)) : false;
       setShowVerifyFromAuthorizedDevice(unrecognized);
 
-      // Check if this is a biological mismatch (high similarity but not exact match)
-      // Parse error message to determine mismatch type
-      const errorMsg = authResult.errorMessage || '';
+      // Biometrics captured but GPS failed — show Earth-Anchor message
+      const faceAndPalmPassed =
+        authResult.layersPassed?.includes(AuthLayer.BIOMETRIC_SIGNATURE) &&
+        authResult.layersPassed?.includes(AuthLayer.SOVEREIGN_PALM);
+      const gpsFailed = ENABLE_GPS_AS_FOURTH_PILLAR && !authResult.layersPassed?.includes(AuthLayer.GPS_LOCATION);
+      const useEarthAnchorMsg = faceAndPalmPassed && gpsFailed && (authResult.manualVerificationRequired || authResult.timedOut);
+      const errorMsg = useEarthAnchorMsg ? GPS_EARTH_ANCHOR_SEARCHING_MESSAGE : (authResult.errorMessage || '');
       let mismatchType = MismatchEventType.BIOLOGICAL_HASH_MISMATCH;
 
       if (errorMsg.includes('twin') || errorMsg.includes('Twin')) {
@@ -1817,8 +1857,13 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
       transition={{ duration: 0.5 }}
       className="min-h-screen bg-[#050505] flex flex-col items-center justify-center p-4 relative step-transition-wrapper"
     >
-      {/* 4/4 Layers Verified Status Bar */}
-      <LayerStatusBar />
+      {/* 4/4 Layers Verified Status Bar — real-time sync with QuadPillarShield */}
+      <LayerStatusBar
+        faceVerified={pillarFace}
+        palmVerified={pillarPalm}
+        deviceVerified={pillarDevice}
+        locationVerified={pillarLocation}
+      />
 
       {/* Background Glow — pointer-events-none so it does not block clicks */}
       <div
@@ -1893,6 +1938,8 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
                 phoneAnchorVerified={pillarDevice}
                 locationVerified={pillarLocation}
                 gpsPillarMessage={result?.manualVerificationRequired ? 'Manual Verification Required' : undefined}
+                gpsTakingLong={gpsTakingLong}
+                onGrantLocation={identityAnchor?.phone ? () => startLocationRequestFromUserGesture(identityAnchor.phone) : undefined}
               />
             ) : (
               <PresenceProgressRing
@@ -1963,14 +2010,18 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
           </button>
         )}
 
-        {/* Authentication Button — z-50 above overlay; 200ms transition. Quad-Pillar: auto-transition to Dashboard when all 4 verified. */}
+        {/* Authentication Button — z-50 above overlay; Sovereign Glow when 4/4 verified */}
         {(
           <motion.button
             type="button"
             onClick={handleStartAuthentication}
             disabled={authStatus === AuthStatus.SCANNING}
-            className="relative z-50 w-full min-h-[48px] py-4 px-6 rounded-lg bg-gradient-to-r from-[#D4AF37] to-[#C9A227] hover:from-[#e8c547] hover:to-[#D4AF37] text-black font-bold text-xl uppercase tracking-wider transition-all duration-200 disabled:opacity-90 disabled:pointer-events-none flex items-center justify-center gap-3 touch-manipulation cursor-pointer"
-            style={{ boxShadow: '0 0 40px rgba(212, 175, 55, 0.6)' }}
+            className="relative z-50 w-full min-h-[48px] py-4 px-6 rounded-lg bg-gradient-to-r from-[#D4AF37] to-[#C9A227] hover:from-[#e8c547] hover:to-[#D4AF37] text-black font-bold text-xl uppercase tracking-wider transition-all duration-500 disabled:opacity-90 disabled:pointer-events-none flex items-center justify-center gap-3 touch-manipulation cursor-pointer"
+            style={{
+              boxShadow: ENABLE_GPS_AS_FOURTH_PILLAR && pillarFace && pillarPalm && pillarDevice && pillarLocation
+                ? '0 0 15px rgba(255,215,0,0.5), 0 0 40px rgba(212,175,55,0.6)'
+                : '0 0 40px rgba(212, 175, 55, 0.6)',
+            }}
             whileTap={{ scale: 0.98 }}
             transition={{ type: 'spring', stiffness: 400, damping: 17 }}
           >
@@ -2134,9 +2185,26 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
         />
       )}
 
+      {/* Dual-Vitalization: Face Frame + Palm Frame simultaneously; replaces ArchitectVision + SovereignPalmScan */}
+      {showDualVitalization && identityAnchor && (
+        <DualVitalizationCapture
+          isOpen={showDualVitalization}
+          identityAnchorPhone={identityAnchor.phone}
+          onClose={() => {
+            setShowDualVitalization(false);
+            setAuthStatus(AuthStatus.IDLE);
+          }}
+          onSuccess={() => {
+            palmResolveRef.current?.();
+            palmResolveRef.current = null;
+            setShowDualVitalization(false);
+          }}
+        />
+      )}
+
       {/* Architect Vision: Face Pulse camera + face mesh overlay, HUD, blue laser, gold freeze on success */}
       <ArchitectVisionCapture
-        isOpen={showArchitectVision}
+        isOpen={showArchitectVision && !ENABLE_DUAL_VITALIZATION_CAPTURE}
         onClose={() => {
           setShowArchitectVision(false);
           setArchitectVerificationSuccess(null);
@@ -2150,8 +2218,8 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
         enforceBrightnessCheck={visionEnforceBrightness}
       />
 
-      {/* Triple-Pillar Pillar 2: Sovereign Palm Scan — back camera + palm overlay; resolves palmVerificationPromise on success */}
-      {showSovereignPalmScan && (
+      {/* Triple-Pillar Pillar 2: Sovereign Palm Scan — front camera + palm overlay; resolves palmVerificationPromise on success (skipped when Dual-Vitalization) */}
+      {showSovereignPalmScan && !ENABLE_DUAL_VITALIZATION_CAPTURE && (
         <SovereignPalmScan
           isOpen={showSovereignPalmScan}
           onClose={() => setShowSovereignPalmScan(false)}

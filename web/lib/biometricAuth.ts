@@ -411,6 +411,10 @@ function isMobileUserAgent(): boolean {
 /** Face-First Security: balance hidden until face match score >= 95% (variance <= 5). */
 export const FACE_MATCH_THRESHOLD_PERCENT = 95;
 
+/** When biometrics (face+palm) captured but GPS fails during scan. */
+export const GPS_EARTH_ANCHOR_SEARCHING_MESSAGE =
+  'Biometrics captured, but Earth-Anchor (GPS) is still searching. Please ensure you are near a window or outdoors.';
+
 /** Multi-Profile: short hash of identity for scoped cache keys (different user = separate HW/location cache). */
 function hashIdentityForStorage(identity: string): string {
   let h = 5381;
@@ -492,7 +496,9 @@ export function startLocationRequestFromUserGesture(identityAnchor?: string): vo
       maximumAge: MAXIMUM_AGE_MS,
     };
 
+    let watchIdRef: number | null = null;
     const timeoutId = setTimeout(() => {
+      if (watchIdRef != null) navigator.geolocation.clearWatch(watchIdRef);
       ipPromise.then((ipLoc) => {
         if (resolved) return;
         if (ipLoc) {
@@ -531,28 +537,59 @@ export function startLocationRequestFromUserGesture(identityAnchor?: string): vo
       return;
     }
 
-    navigator.geolocation.getCurrentPosition(
+    // Use watchPosition instead of getCurrentPosition to keep Earth-Anchor warm and prevent "Initializing Protocol" freeze on mobile
+    watchIdRef = navigator.geolocation.watchPosition(
       (pos) => {
         if (resolved) return;
         clearTimeout(timeoutId);
+        if (watchIdRef != null) {
+          navigator.geolocation.clearWatch(watchIdRef);
+          watchIdRef = null;
+        }
         const coords = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
         saveAndResolve(coords);
       },
       (err: GeolocationPositionError) => {
         if (resolved) return;
-        clearTimeout(timeoutId);
         if (err?.code === 1) {
+          clearTimeout(timeoutId);
+          if (watchIdRef != null) {
+            navigator.geolocation.clearWatch(watchIdRef);
+            watchIdRef = null;
+          }
           useIPFallback(false);
-        } else {
-          ipPromise.then((ipLoc) => {
-            if (ipLoc) saveAndResolve({ latitude: ipLoc.latitude, longitude: ipLoc.longitude }, true, ipLoc.country_code, false);
-            else useIPFallback(false);
-          });
         }
+        // Keep watching for other errors; timeout will handle fallback
       },
       gpsOptions
     );
   });
+}
+
+/** Start GPS watchPosition in background while camera/scan is active. Returns unwatch function. Coords stored in localStorage when received. */
+export function startGpsWatch(identityAnchor?: string): () => void {
+  if (typeof navigator === 'undefined' || !navigator.geolocation) return () => {};
+  if (typeof window !== 'undefined' && window.location?.protocol !== 'https:' && !window.location?.hostname?.startsWith('localhost')) return () => {};
+  const locKey = locationKey(identityAnchor);
+  const locTsKey = locationTsKey(identityAnchor);
+  const mobile = isMobileUserAgent();
+  const opts: PositionOptions = {
+    enableHighAccuracy: ENABLE_GPS_AS_FOURTH_PILLAR,
+    timeout: mobile ? GPS_TIMEOUT_MOBILE_MS : GPS_TIMEOUT_MS,
+    maximumAge: 5000,
+  };
+  const watchId = navigator.geolocation.watchPosition(
+    (pos) => {
+      const coords = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(locKey, JSON.stringify(coords));
+        localStorage.setItem(locTsKey, String(Date.now()));
+      }
+    },
+    () => { /* ignore errors; getCurrentPosition/verifyLocation will handle */ },
+    opts
+  );
+  return () => navigator.geolocation.clearWatch(watchId);
 }
 
 /** IP-based location fallback when GPS is denied or unavailable. Returns coords + country for pillar gold if IP matches registered country. */

@@ -1,10 +1,13 @@
 /**
  * PFF PROTOCOL — Service Worker
- * Caches Biometric + Sovereign Constitution for instant open. Bump CACHE_VERSION on each deploy so mobile drops old code.
+ * Caches Biometric, Camera, GPS logic + Sovereign Constitution for instant open.
+ * Ensures Shield loads and runs locally on weak signal.
+ * Bump CACHE_VERSION on each deploy so mobile drops old code.
  */
 
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const CACHE_NAME = 'pff-protocol-' + CACHE_VERSION;
+const MEDIAPIPE_CACHE = 'pff-mediapipe-' + CACHE_VERSION;
 const PRECACHE_URLS = [
   '/manifest.json',
   '/icons/icon-192.png',
@@ -24,7 +27,11 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('pff-protocol-') && k !== CACHE_NAME).map((k) => caches.delete(k)))
+      Promise.all(
+        keys
+          .filter((k) => (k.startsWith('pff-protocol-') && k !== CACHE_NAME) || (k.startsWith('pff-mediapipe-') && k !== MEDIAPIPE_CACHE))
+          .map((k) => caches.delete(k))
+      )
     ).then(() => self.clients.claim())
   );
 });
@@ -35,10 +42,27 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   if (request.method !== 'GET') return;
 
-  // Same-origin only
-  if (url.origin !== self.location.origin) return;
-
   const path = url.pathname;
+
+  // MediaPipe CDN: cache camera/GPS logic assets for offline/weak signal
+  if (url.hostname === 'cdn.jsdelivr.net' && (path.includes('@mediapipe/hands') || path.includes('@mediapipe/tasks-vision'))) {
+    event.respondWith(
+      caches.open(MEDIAPIPE_CACHE).then((cache) =>
+        cache.match(request).then((cached) =>
+          cached ||
+          fetch(request, { mode: 'cors' })
+            .then((res) => {
+              if (res.ok) cache.put(request, res.clone());
+              return res;
+            })
+        )
+      )
+    );
+    return;
+  }
+
+  // Same-origin only (for remaining rules)
+  if (url.origin !== self.location.origin) return;
 
   // API and economic/reserve requests: always network, never cache (avoid stale national reserve / citizen impact)
   if (path.startsWith('/api/') || path.includes('national-reserve') || path.includes('citizen-impact') || path.includes('economic/')) {
@@ -46,7 +70,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Static assets: cache-first (instant load for biometric/constitution JS, CSS, icons)
+  // Static assets: cache-first (instant load for biometric, camera, GPS, constitution JS, CSS, icons)
   if (
     path.startsWith('/_next/static/') ||
     path.startsWith('/icons/') ||

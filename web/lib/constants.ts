@@ -26,3 +26,6 @@ export const QUAD_PILLAR_DEFINITIONS = [
 
 /** One-sentence confirmation when each pillar clears (for brevity) */
 export const PILLAR_CONFIRMATIONS = QUAD_PILLAR_DEFINITIONS.map((p) => p.confirm);
+
+/** When true, use DualVitalizationCapture (Face Frame + Palm Frame simultaneously) instead of ArchitectVision + SovereignPalmScan sequentially. */
+export const ENABLE_DUAL_VITALIZATION_CAPTURE = true;

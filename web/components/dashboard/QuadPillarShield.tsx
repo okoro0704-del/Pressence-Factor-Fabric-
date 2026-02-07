@@ -27,6 +27,10 @@ export interface QuadPillarGridProps {
   locationVerified: boolean;
   /** When location not verified, show this message for GPS pillar (e.g. "Manual Verification Required"). */
   gpsPillarMessage?: string;
+  /** GPS stuck >5s — show "Grant Location" button in Pillar 4 box */
+  gpsTakingLong?: boolean;
+  /** Callback when user taps Grant Location (triggers browser location permission) */
+  onGrantLocation?: () => void;
 }
 
 /** Four pillars in a compact 2x2 grid — no scrolling on mobile */
@@ -36,6 +40,8 @@ export function QuadPillarGrid({
   phoneAnchorVerified,
   locationVerified,
   gpsPillarMessage,
+  gpsTakingLong = false,
+  onGrantLocation,
 }: QuadPillarGridProps) {
   const verified = [faceVerified, palmVerified, phoneAnchorVerified, locationVerified];
   const allVerified = verified.every(Boolean);
@@ -46,7 +52,8 @@ export function QuadPillarGrid({
         {QUAD_PILLAR_DEFINITIONS.map((pillar, i) => {
           const v = verified[i];
           const isGpsPillar = pillar.id === 4;
-          const pendingMsg = !v && isGpsPillar && gpsPillarMessage ? gpsPillarMessage : '…';
+          const showGrantButton = isGpsPillar && !v && gpsTakingLong && onGrantLocation;
+          const pendingMsg = !v && isGpsPillar && gpsPillarMessage ? gpsPillarMessage : gpsTakingLong ? 'Initializing Protocol…' : '…';
           return (
             <div
               key={pillar.id}
@@ -65,18 +72,52 @@ export function QuadPillarGrid({
                 {pillar.label}
               </p>
               <p className="text-[10px] text-[#6b6b70]">{pillar.sensor}</p>
-              <p className={`text-[10px] mt-0.5 font-mono ${v ? 'text-[#22c55e]' : 'text-[#4a4a4e]'}`}>
+              <p className={`text-[10px] mt-0.5 font-mono text-center ${v ? 'text-[#22c55e]' : 'text-[#4a4a4e]'}`}>
                 {v ? pillar.confirm : pendingMsg}
               </p>
+              {showGrantButton && (
+                <button
+                  type="button"
+                  onClick={onGrantLocation}
+                  className="mt-2 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all border-2 border-[#D4AF37] bg-[#D4AF37]/20 text-[#D4AF37] hover:bg-[#D4AF37]/30"
+                >
+                  Grant Location
+                </button>
+              )}
             </div>
           );
         })}
       </div>
-      {allVerified && (
-        <p className="text-center text-[#22c55e] text-xs font-semibold mt-3">
-          I see you. Your hand is true. The device is recognized. You are at your post.
-        </p>
-      )}
+      {allVerified ? (
+        <div
+          className="mt-4 relative overflow-hidden rounded-xl border-2 border-[#22c55e] bg-[#22c55e]/10 p-4 transition-all duration-500"
+          style={{ boxShadow: '0 0 15px rgba(255,215,0,0.5)' }}
+        >
+          <p className="relative z-10 text-center text-[#22c55e] text-sm font-bold uppercase tracking-wider">
+            Vitalization Complete
+          </p>
+          <p className="relative z-10 text-center text-[#22c55e]/90 text-xs font-semibold mt-1">
+            I see you. Your hand is true. The device is recognized. You are at your post.
+          </p>
+          {/* Golden pixel burst — subtle confetti */}
+          <div className="absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden" aria-hidden>
+            {[...Array(8)].map((_, i) => (
+              <div
+                key={i}
+                className="absolute w-1.5 h-1.5 rounded-full bg-[#D4AF37] opacity-70 animate-pulse"
+                style={{
+                  left: '50%',
+                  top: '50%',
+                  marginLeft: -3,
+                  marginTop: -3,
+                  animationDelay: `${i * 80}ms`,
+                  transform: `translate(${Math.cos((i / 8) * Math.PI * 2) * 50}px, ${Math.sin((i / 8) * Math.PI * 2) * 50}px)`,
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -10,6 +10,9 @@ const SOVEREIGN_PITCH = 1.0;
 const SUCCESS_SCRIPT =
   'Sovereign Identity Confirmed. One VIDA anchored. Welcome to the Protocol, Architect.';
 
+const DUAL_VITALIZATION_SCRIPT =
+  'Dual Vitalization Complete. Face and Palm confirmed. I see you. Your hand is true.';
+
 const ALIGNMENT_FAILED_SCRIPT =
   'Position face clearly in frame. Scan can proceed.';
 
@@ -63,6 +66,13 @@ function speak(text: string): void {
  */
 export function speakSovereignSuccess(): void {
   speak(SUCCESS_SCRIPT);
+}
+
+/**
+ * Call when both Face and Palm are verified (Dual-Vitalization).
+ */
+export function speakDualVitalizationSuccess(): void {
+  speak(DUAL_VITALIZATION_SCRIPT);
 }
 
 /**

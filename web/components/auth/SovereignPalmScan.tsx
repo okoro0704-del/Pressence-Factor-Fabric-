@@ -81,7 +81,7 @@ export function SovereignPalmScan({ isOpen, onClose, onSuccess, onError }: Sover
           video: {
             width: { ideal: 1280 },
             height: { ideal: 720 },
-            facingMode: 'environment',
+            facingMode: 'user',
           },
           audio: false,
         });
@@ -168,7 +168,7 @@ export function SovereignPalmScan({ isOpen, onClose, onSuccess, onError }: Sover
             Sovereign Palm
           </span>
           <span className="text-xs font-mono text-[#6b6b70]">
-            Align your palm in the outline — back camera
+            Align your palm in the outline — front camera
           </span>
         </div>
         {status === 'ready' && (
@@ -188,7 +188,7 @@ export function SovereignPalmScan({ isOpen, onClose, onSuccess, onError }: Sover
       {status === 'initializing' && (
         <div className="absolute inset-0 z-[200] flex flex-col items-center justify-center bg-black/90">
           <div className="h-8 w-8 rounded-full border-2 border-[#D4AF37] border-t-transparent animate-spin mb-4" />
-          <p className="text-[#D4AF37] font-mono text-sm tracking-wider">Initializing back camera…</p>
+          <p className="text-[#D4AF37] font-mono text-sm tracking-wider">Initializing front camera…</p>
         </div>
       )}
 
