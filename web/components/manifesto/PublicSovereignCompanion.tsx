@@ -21,7 +21,8 @@ import {
   type VltPffMetricsPayload,
 } from '@/lib/vltLedgerCompanion';
 import { useSovereignAwakening } from '@/contexts/SovereignAwakeningContext';
-import { IDLE_WHISPER, SOCIAL_SCOUT_OFFER, BLESSINGS } from '@/lib/sovereignAwakeningContent';
+import { IDLE_WHISPER, SOCIAL_SCOUT_OFFER, BLESSINGS, RATE_LIMIT_SOVEREIGN_MESSAGE } from '@/lib/sovereignAwakeningContent';
+import { RECOGNITION_FALLBACK_SOULFUL, VLT_ERROR_SOULFUL } from '@/lib/manifestoCompanionKnowledge';
 
 const GOLD = '#D4AF37';
 const GOLD_DIM = 'rgba(212, 175, 55, 0.6)';
@@ -98,6 +99,13 @@ const BLESSING_VISIBLE_MS = 4_000;
 const EYE_SMOOTH = 0.12;
 const EYE_MAX_OFFSET = 6;
 
+const SOVEREIGN_SESSION_KEY = 'sovereign_companion_session';
+const SOVEREIGN_SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_MAX_MESSAGES = 10;
+
+type StoredSession = { name: string; recognitionText: string; timestamp: number };
+
 export function PublicSovereignCompanion() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -126,6 +134,8 @@ export function PublicSovereignCompanion() {
   const eyeTargetRef = useRef({ x: 0, y: 0 });
   const orbRef = useRef<HTMLButtonElement>(null);
   const rafRef = useRef<number>(0);
+  const messageTimestampsRef = useRef<number[]>([]);
+  const sessionRestoredRef = useRef(false);
 
   const displayLang: CompanionLangCode = preferredLang ?? lastResponseLang ?? 'en';
 
@@ -145,9 +155,27 @@ export function PublicSovereignCompanion() {
   useEffect(() => {
     if (!open || greetingInjectedRef.current) return;
     greetingInjectedRef.current = true;
-    setMessages((prev) => (prev.length === 0 ? [{ id: 'greeting', role: 'assistant', text: AUTO_GREETING }] : prev));
+    let initial: Message[] = [];
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = window.localStorage.getItem(SOVEREIGN_SESSION_KEY);
+        const session = raw ? (JSON.parse(raw) as StoredSession) : null;
+        const valid = session && session.name && session.timestamp && Date.now() - session.timestamp < SOVEREIGN_SESSION_TTL_MS;
+        if (valid && !sessionRestoredRef.current) {
+          sessionRestoredRef.current = true;
+          initial = [
+            { id: 'greeting', role: 'assistant', text: AUTO_GREETING },
+            { id: 'welcome-back', role: 'assistant', text: `Welcome back, ${session.name}. I remember you from the archives.` },
+          ];
+        }
+      } catch {
+        // ignore
+      }
+    }
+    if (initial.length === 0) initial = [{ id: 'greeting', role: 'assistant', text: AUTO_GREETING }];
+    setMessages((prev) => (prev.length === 0 ? initial : prev));
     if (!greetingSpoken) {
-      speak(AUTO_GREETING);
+      speak(initial[0].text);
       setGreetingSpoken(true);
     }
   }, [open, greetingSpoken]);
@@ -256,7 +284,19 @@ export function PublicSovereignCompanion() {
   const sendMessage = async (text: string) => {
     const t = text.trim();
     if (!t) return;
-    const userMsg: Message = { id: `u-${Date.now()}`, role: 'user', text: t };
+    const now = Date.now();
+    const timestamps = messageTimestampsRef.current;
+    const windowStart = now - RATE_LIMIT_WINDOW_MS;
+    messageTimestampsRef.current = timestamps.filter((ts) => ts > windowStart);
+    if (messageTimestampsRef.current.length >= RATE_LIMIT_MAX_MESSAGES) {
+      setMessages((prev) => [
+        ...prev,
+        { id: `shadow-${now}`, role: 'assistant', text: RATE_LIMIT_SOVEREIGN_MESSAGE },
+      ]);
+      return;
+    }
+    messageTimestampsRef.current.push(now);
+    const userMsg: Message = { id: `u-${now}`, role: 'user', text: t };
     setMessages((prev) => [...prev, userMsg]);
     setInput('');
 
@@ -275,7 +315,7 @@ export function PublicSovereignCompanion() {
       } catch {
         setMessages((prev) => [
           ...prev,
-          { id: `vlt-err-${Date.now()}`, role: 'assistant', text: 'The VLT Ledger could not be reached. This response is not a verified fact from the chain. Try again later.' },
+          { id: `vlt-err-${Date.now()}`, role: 'assistant', text: VLT_ERROR_SOULFUL },
         ]);
       } finally {
         setIsFetchingMetrics(false);
@@ -309,11 +349,22 @@ export function PublicSovereignCompanion() {
         ]);
         setLastResponseLang(lang);
         speak(fullText, lang);
+        try {
+          window.localStorage.setItem(
+            SOVEREIGN_SESSION_KEY,
+            JSON.stringify({
+              name: resName || name,
+              recognitionText: fullText,
+              timestamp: Date.now(),
+            } as StoredSession)
+          );
+        } catch {
+          // ignore
+        }
       } catch {
-        const fallback = 'I could not reach the digital archives this time. Try again, or ask me about the Covenant, the 9-day ritual, or the Roadmap.';
         setMessages((prev) => [
           ...prev,
-          { id: `rec-err-${Date.now()}`, role: 'assistant', text: fallback },
+          { id: `rec-err-${Date.now()}`, role: 'assistant', text: RECOGNITION_FALLBACK_SOULFUL },
         ]);
       } finally {
         setIsScanningRecognition(false);
@@ -321,7 +372,16 @@ export function PublicSovereignCompanion() {
       return;
     }
 
-    const res: CompanionResponse = getManifestoCompanionResponse(t, architect, preferredLang ?? undefined);
+    const conversationContext: { role: 'user' | 'assistant'; text: string }[] = [
+      ...messages.map((m) => ({ role: m.role, text: m.text })),
+      { role: 'user', text: t },
+    ].slice(-8);
+    const res: CompanionResponse = getManifestoCompanionResponse(
+      t,
+      architect,
+      preferredLang ?? undefined,
+      conversationContext
+    );
     setTimeout(() => {
       setMessages((prev) => [
         ...prev,

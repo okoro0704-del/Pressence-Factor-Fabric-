@@ -40,9 +40,6 @@ export async function generateMobileBindingToken(
       return { success: false, message: 'Supabase not configured' };
     }
 
-    console.log('[MOBILE BINDING] Generating binding token...');
-    console.log('[MOBILE BINDING] Device UUID:', deviceUUID);
-
     // Generate unique 6-digit PIN
     let pin = generateSixDigitPIN();
     let attempts = 0;
@@ -83,13 +80,8 @@ export async function generateMobileBindingToken(
       .single();
 
     if (error) {
-      console.error('[MOBILE BINDING] Token generation error:', error);
       return { success: false, message: `Token generation failed: ${error.message}` };
     }
-
-    console.log('[MOBILE BINDING] ✅ Token generated successfully');
-    console.log('[MOBILE BINDING] PIN:', pin);
-    console.log('[MOBILE BINDING] Expires at:', expiresAt);
 
     return {
       success: true,
@@ -98,7 +90,6 @@ export async function generateMobileBindingToken(
       message: 'Mobile binding token generated',
     };
   } catch (err) {
-    console.error('[MOBILE BINDING] Token generation failed:', err);
     return { success: false, message: `Token generation failed: ${err}` };
   }
 }
@@ -122,8 +113,6 @@ export async function validateMobileBindingToken(
       return { valid: false, message: 'Supabase not configured' };
     }
 
-    console.log('[MOBILE BINDING] Validating PIN:', pin);
-
     // Query token
     const { data: token, error } = await supabase!
       .from('sentinel_auth_tokens')
@@ -133,7 +122,6 @@ export async function validateMobileBindingToken(
       .single();
 
     if (error || !token) {
-      console.error('[MOBILE BINDING] Invalid PIN');
       return { valid: false, message: 'Invalid or expired PIN' };
     }
 
@@ -142,18 +130,15 @@ export async function validateMobileBindingToken(
     const expiresAt = new Date(token.expires_at);
 
     if (now > expiresAt) {
-      console.error('[MOBILE BINDING] PIN expired');
       return { valid: false, message: 'PIN has expired' };
     }
 
-    console.log('[MOBILE BINDING] ✅ PIN valid');
     return {
       valid: true,
       deviceUUID: token.device_uuid,
       message: 'PIN validated successfully',
     };
   } catch (err) {
-    console.error('[MOBILE BINDING] Validation failed:', err);
     return { valid: false, message: `Validation failed: ${err}` };
   }
 }
@@ -178,10 +163,6 @@ export async function executeMobileBinding(
       return { success: false, message: 'Supabase not configured' };
     }
 
-    console.log('[MOBILE BINDING] 🔥 EXECUTING MOBILE DEVICE BINDING');
-    console.log('[MOBILE BINDING] PIN:', pin);
-    console.log('[MOBILE BINDING] Mobile Device UUID:', mobileDeviceUUID);
-
     // Step 1: Validate PIN
     const validation = await validateMobileBindingToken(pin);
     if (!validation.valid) {
@@ -198,7 +179,6 @@ export async function executeMobileBinding(
       .eq('token_pin', pin);
 
     if (tokenError) {
-      console.error('[MOBILE BINDING] Token update error:', tokenError);
       return { success: false, message: 'Failed to consume token' };
     }
 
@@ -225,21 +205,14 @@ export async function executeMobileBinding(
       .select();
 
     if (error) {
-      console.error('[MOBILE BINDING] Device binding error:', error);
       return { success: false, message: `Binding failed: ${error.message}` };
     }
-
-    console.log('[MOBILE BINDING] ✅ MOBILE DEVICE BOUND SUCCESSFULLY');
-    console.log('[MOBILE BINDING] Device UUID:', mobileDeviceUUID);
-    console.log('[MOBILE BINDING] Status: BINDED');
-    console.log('[MOBILE BINDING] Alias: mrfundzman');
 
     return {
       success: true,
       message: 'Mobile device bound successfully',
     };
   } catch (err) {
-    console.error('[MOBILE BINDING] Binding failed:', err);
     return { success: false, message: `Binding failed: ${err}` };
   }
 }
@@ -260,8 +233,6 @@ export async function forceGlobalPresence(): Promise<{
       return { success: false, message: 'Supabase not configured' };
     }
 
-    console.log('[MOBILE BINDING] 🔥 FORCING GLOBAL PRESENCE ACTIVATION');
-
     // Update all root_sovereign_devices to is_live = true
     const { data, error } = await supabase!
       .from('root_sovereign_devices')
@@ -273,14 +244,10 @@ export async function forceGlobalPresence(): Promise<{
       .select();
 
     if (error) {
-      console.error('[MOBILE BINDING] Global presence activation error:', error);
       return { success: false, message: `Activation failed: ${error.message}` };
     }
 
     const devicesActivated = data?.length || 0;
-
-    console.log('[MOBILE BINDING] ✅ GLOBAL PRESENCE ACTIVATED');
-    console.log('[MOBILE BINDING] Devices activated:', devicesActivated);
 
     return {
       success: true,
@@ -288,7 +255,6 @@ export async function forceGlobalPresence(): Promise<{
       message: `Global presence activated for ${devicesActivated} device(s)`,
     };
   } catch (err) {
-    console.error('[MOBILE BINDING] Global presence activation failed:', err);
     return { success: false, message: `Activation failed: ${err}` };
   }
 }
@@ -323,7 +289,6 @@ export async function checkDualNodeStatus(): Promise<{
 
     return { isDualNode, laptopLive, mobileLive };
   } catch (err) {
-    console.error('[MOBILE BINDING] Dual-node status check failed:', err);
     return { isDualNode: false, laptopLive: false, mobileLive: false };
   }
 }

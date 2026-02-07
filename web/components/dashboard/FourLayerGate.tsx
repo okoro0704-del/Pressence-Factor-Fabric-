@@ -328,7 +328,6 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
   // Hydration sync + restore language/identity so redirect from architect (or any protected route) doesn't bounce back to language
   useEffect(() => {
     setMounted(true);
-    console.log('Interaction Layer Active', '(FourLayerGate)');
     if (typeof window === 'undefined') return;
     const storedLang = getStoredLanguage();
     if (storedLang) setLanguageConfirmed(storedLang);
@@ -368,18 +367,9 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
   // Reset to Layer 1 on every entry (app initialization or foreground)
   useEffect(() => {
     if (!mounted) return;
-    console.log('🔐 Initializing Zero-Persistence Session Management');
-
-    // Initialize zero-persistence session management
     initializeZeroPersistenceSession();
-
-    // Reset to Layer 1 on every entry
     resetSessionToLayer1();
-
-    // Update session status
     setSessionStatus(getSessionStatus());
-
-    console.log('✅ Session reset to Layer 1 - All 4 layers required');
   }, [mounted]);
 
   // Update session status periodically
@@ -738,8 +728,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
           const geolocation = { city: 'Lagos', country: 'Nigeria', latitude: 6.5244, longitude: 3.3792 };
           await assignPrimarySentinel(anchor.phone, anchor.name, deviceInfo, ipAddress, geolocation, compId, authResult.externalScannerSerialNumber ?? null, authResult.externalFingerprintHash ?? null, isFirstRun);
           if (isFirstRun) {
-            const grant = await creditArchitectVidaGrant(anchor.phone);
-            if (!grant.ok) console.warn('[PFF] Architect 5 VIDA grant failed:', grant.error);
+            await creditArchitectVidaGrant(anchor.phone);
           }
           if (mobile) await setMintStatus(anchor.phone, MINT_STATUS_PENDING_HARDWARE);
           const ritual = await recordDailyScan(anchor.phone);
@@ -883,7 +872,6 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
   };
 
   const handleVitalizationApproved = async () => {
-    console.log('✅ Vitalization approved - check constitution then proceed');
     setShowAwaitingAuth(false);
     if (!identityAnchor) return;
     const signed = await hasSignedConstitution(identityAnchor.phone);
@@ -901,7 +889,6 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
   };
 
   const handleVitalizationDenied = () => {
-    console.log('❌ Vitalization denied - resetting authentication');
     setShowAwaitingAuth(false);
     setVitalizationRequestId(null);
     setPrimaryDeviceInfo(null);
@@ -913,7 +900,6 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
   };
 
   const handleShowGuardianRecovery = () => {
-    console.log('🛡️ Showing Guardian Recovery UI');
     setShowAwaitingAuth(false);
     setShowGuardianRecovery(true);
   };
@@ -984,14 +970,12 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
   };
 
   const handleGuardianRecoveryRequestCreated = (requestId: string) => {
-    console.log('✅ Guardian recovery request created:', requestId);
     setGuardianRecoveryRequestId(requestId);
     setShowGuardianRecovery(false);
     setShowGuardianRecoveryStatus(true);
   };
 
   const handleGuardianRecoveryCancel = () => {
-    console.log('❌ Guardian recovery cancelled');
     setShowGuardianRecovery(false);
     setAuthStatus(AuthStatus.IDLE);
     setCurrentLayer(null);
@@ -999,7 +983,6 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
   };
 
   const handleGuardianRecoveryApproved = async () => {
-    console.log('✅ Guardian recovery approved - check constitution then proceed');
     setShowGuardianRecoveryStatus(false);
     setGuardianRecoveryRequestId(null);
     if (!identityAnchor) return;
@@ -1017,7 +1000,6 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
   };
 
   const handleGuardianRecoveryExpired = () => {
-    console.log('⏰ Guardian recovery request expired');
     setShowGuardianRecoveryStatus(false);
     setGuardianRecoveryRequestId(null);
     alert('Guardian recovery request expired. Please try again.');
@@ -1027,7 +1009,6 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
   };
 
   const handleGuardianRecoveryDenied = () => {
-    console.log('❌ Guardian recovery denied');
     setShowGuardianRecoveryStatus(false);
     setGuardianRecoveryRequestId(null);
     alert('Guardian recovery request was denied.');
@@ -1116,7 +1097,6 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
 
     const result = await completeLoginBridge(requestId);
     if (!result.ok) {
-      console.warn('[Login via phone] Bridge failed:', result.error);
       setTransitioningToDashboard(false);
       setLoginRequestId(requestId);
       setShowAwaitingLoginApproval(true);

@@ -18,6 +18,11 @@
   directory = "netlify/functions"
   node_bundler = "esbuild"
 
+# Edge: Sovereign Companion responds from the data center closest to the user
+[[edge_functions]]
+  function = "sovereign-heartbeat"
+  path = "/api/sovereign-edge"
+
 # Rewrite /api/identity-reset to Netlify Function so Reset Identity clears Supabase on live site
 [[redirects]]
   from = "/api/identity-reset"

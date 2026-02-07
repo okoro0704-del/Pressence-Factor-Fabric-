@@ -91,7 +91,6 @@ export async function verifyBiometricSignature(
 
     // Check if WebAuthn is supported
     if (!window.PublicKeyCredential) {
-      console.warn('WebAuthn not supported on this device');
       return { success: false, error: 'WebAuthn not supported on this device' };
     }
 
@@ -99,7 +98,6 @@ export async function verifyBiometricSignature(
     const biometricAvailable = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
 
     if (!biometricAvailable) {
-      console.warn('No biometric authenticator available');
       return { success: false, error: 'No biometric authenticator available' };
     }
 
@@ -175,7 +173,6 @@ export async function verifyBiometricSignature(
     if (faceTemplateHash?.trim()) {
       const persistResult = await persistFaceHash(identityAnchorPhone, faceTemplateHash);
       if (!persistResult.ok) {
-        console.warn('[FacePulse] persist face_hash failed:', persistResult.error);
       }
     }
 
@@ -186,7 +183,6 @@ export async function verifyBiometricSignature(
       variance: matchResult.variance,
       phone: identityAnchorPhone,
     };
-    console.log('FACE CAPTURED:', faceData);
     try {
       const { setBiometricSessionVerified } = await import('./biometricSession');
       setBiometricSessionVerified();
@@ -200,7 +196,6 @@ export async function verifyBiometricSignature(
       variance: matchResult.variance
     };
   } catch (error) {
-    console.error('Biometric verification failed:', error);
     return { success: false, error: 'Biometric verification system error' };
   }
 }
@@ -376,12 +371,10 @@ export async function verifyVoicePrint(
         recognition.start();
       } catch (error) {
         cleanup();
-        console.error('Voice capture failed:', error);
         resolve({ success: false, error: 'Failed to capture audio for voice analysis' });
       }
     });
   } catch (error) {
-    console.error('Voice print verification failed:', error);
     return { success: false, error: 'Voice verification system error' };
   }
 }
@@ -749,11 +742,6 @@ export async function verifyHardwareTPM(phoneNumber?: string): Promise<{ success
     }
 
     const canvasStr = canvasFingerprint();
-    if (!canvasStr || canvasStr.length === 0) {
-      console.warn('[HW Fingerprint] Canvas fingerprint returned empty string. Browser may be blocking or unavailable.');
-    } else {
-      console.warn('[HW Fingerprint] Generated string (length=', canvasStr.length, '):', JSON.stringify(canvasStr.substring(0, 200)) + (canvasStr.length > 200 ? '…' : ''));
-    }
     let deviceHash: string;
     try {
       const encoder = new TextEncoder();
@@ -765,7 +753,6 @@ export async function verifyHardwareTPM(phoneNumber?: string): Promise<{ success
     } catch {
       deviceHash = 'cf-' + simpleHash(canvasStr);
     }
-    console.warn('[HW Fingerprint] deviceHash (Device ID):', deviceHash ? `${deviceHash.substring(0, 16)}…` : '(empty)');
 
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(hwKey, deviceHash);
@@ -774,7 +761,6 @@ export async function verifyHardwareTPM(phoneNumber?: string): Promise<{ success
 
     return { success: true, deviceHash };
   } catch (error) {
-    console.error('Canvas fingerprint failed:', error);
     return { success: false, error: 'Hardware fingerprint unavailable' };
   }
 }
@@ -836,7 +822,6 @@ export async function verifyGenesisHandshake(
 
     return { success: true, phoneNumber };
   } catch (error) {
-    console.error('Genesis handshake failed:', error);
     return { success: false };
   }
 }
@@ -944,7 +929,6 @@ export async function resolveIdentityByPresence(
       layersPassed,
     };
   } catch (error) {
-    console.error('Identity resolution failed:', error);
     return {
       success: false,
       status: AuthStatus.FAILED,
@@ -979,7 +963,6 @@ export async function requestGuardianOverride(
       message: `Guardian override request sent to ${guardianPhone}. They will be notified immediately.`,
     };
   } catch (error) {
-    console.error('Guardian override request failed:', error);
     return {
       success: false,
       message: 'Failed to contact Guardian. Please try again.',
@@ -1063,7 +1046,6 @@ export async function resolveSovereignByPresence(
 
     const language = getSessionLanguage();
     createSession(identityAnchorPhone, language ? { language } : undefined);
-    console.log('🔐 Zero-persistence session created for:', identityAnchorPhone, language ? `(lang: ${language})` : '');
 
     const lockedUntil = localStorage.getItem('pff_portal_locked_until');
     if (lockedUntil && new Date(lockedUntil) > new Date()) {
@@ -1204,7 +1186,6 @@ export async function resolveSovereignByPresence(
     const locationResult = state.location!;
     const gpsData = locationResult.success ? locationResult.coords : null;
     const hwHash = tpmResult.deviceHash ?? null;
-    console.log('Sensor Status', { GPS: gpsData, HW: hwHash });
 
     const silentModeUsed = !skipVoiceLayer && !!(voiceResult as VerifyVoicePrintResult).silentModeSuggested;
     if (silentModeUsed) onSilentMode?.();
@@ -1271,7 +1252,6 @@ export async function resolveSovereignByPresence(
     if (genesisIdentity) {
       await markLayerPassed(4, identityAnchorPhone);
       layersPassed.push(AuthLayer.GENESIS_HANDSHAKE);
-      console.log('✅ Layer 4/4 passed: Genesis Handshake');
     } else if (requireAllLayers) {
       return fail(AuthLayer.GENESIS_HANDSHAKE, 'Sovereign identity not found in Genesis Vault.');
     }
@@ -1307,7 +1287,6 @@ export async function resolveSovereignByPresence(
     }
 
     onProgress?.(null, AuthStatus.BANKING_UNLOCKED);
-    console.log('🎉 Sovereign Threshold met —', layersPassed.length, '/4 layers passed', silentModeUsed ? '(Silent Presence Mode)' : '');
 
     return {
       success: true,
@@ -1324,7 +1303,6 @@ export async function resolveSovereignByPresence(
       }),
     };
   } catch (error) {
-    console.error('Sovereign presence resolution failed:', error);
     return {
       success: false,
       status: AuthStatus.FAILED,

@@ -47,7 +47,6 @@ export const GENESIS_TELEMETRY = {
 export async function checkArchitectDevice(): Promise<boolean> {
   try {
     if (!hasSupabase() || !supabase) {
-      console.error('[GENESIS SEEDING] Supabase not configured');
       return false;
     }
 
@@ -57,14 +56,12 @@ export async function checkArchitectDevice(): Promise<boolean> {
       .eq('device_uuid', ARCHITECT_IDENTITY.deviceId)
       .single();
 
-    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
-      console.error('[GENESIS SEEDING] Error checking device:', error);
+    if (error && error.code !== 'PGRST116') {
       return false;
     }
 
     return !!data;
   } catch (err) {
-    console.error('[GENESIS SEEDING] Failed to check device:', err);
     return false;
   }
 }
@@ -75,7 +72,6 @@ export async function checkArchitectDevice(): Promise<boolean> {
 export async function checkTelemetryData(): Promise<boolean> {
   try {
     if (!hasSupabase() || !supabase) {
-      console.error('[GENESIS SEEDING] Supabase not configured');
       return false;
     }
 
@@ -86,13 +82,11 @@ export async function checkTelemetryData(): Promise<boolean> {
       .single();
 
     if (error && error.code !== 'PGRST116') {
-      console.error('[GENESIS SEEDING] Error checking telemetry:', error);
       return false;
     }
 
     return !!data;
   } catch (err) {
-    console.error('[GENESIS SEEDING] Failed to check telemetry:', err);
     return false;
   }
 }
@@ -108,21 +102,14 @@ export async function seedArchitectDevice(): Promise<{ success: boolean; message
       return { success: false, message: 'Supabase not configured' };
     }
 
-    console.log('[GENESIS SEEDING] Seeding Architect device...');
-
-    // Note: Hardware binding is handled by hardwareBinding.ts
-    // This is just a verification step
     const exists = await checkArchitectDevice();
-    
+
     if (exists) {
-      console.log('[GENESIS SEEDING] ✅ Architect device already exists');
       return { success: true, message: 'Device already seeded' };
     }
 
-    console.log('[GENESIS SEEDING] ℹ️ Device will be seeded by hardware binding module');
     return { success: true, message: 'Device seeding delegated to hardware binding' };
   } catch (err) {
-    console.error('[GENESIS SEEDING] Failed to seed device:', err);
     return { success: false, message: `Seeding failed: ${err}` };
   }
 }
@@ -137,16 +124,11 @@ export async function seedGenesisTelemetry(): Promise<{ success: boolean; messag
       return { success: false, message: 'Supabase not configured' };
     }
 
-    console.log('[GENESIS SEEDING] Checking telemetry data...');
-
     const exists = await checkTelemetryData();
 
     if (exists) {
-      console.log('[GENESIS SEEDING] ✅ Telemetry data already exists');
       return { success: true, message: 'Telemetry already seeded' };
     }
-
-    console.log('[GENESIS SEEDING] 🌱 Seeding Genesis telemetry data...');
 
     // Upsert telemetry data (trigger will auto-calculate 50:50 split)
     const { data, error } = await supabase!
@@ -157,16 +139,11 @@ export async function seedGenesisTelemetry(): Promise<{ success: boolean; messag
       .select();
 
     if (error) {
-      console.error('[GENESIS SEEDING] Telemetry upsert error:', error);
       return { success: false, message: `Upsert failed: ${error.message}` };
     }
 
-    console.log('[GENESIS SEEDING] ✅ Genesis telemetry seeded successfully');
-    console.log('[GENESIS SEEDING] Data:', data);
-
     return { success: true, message: 'Genesis telemetry seeded', data };
   } catch (err) {
-    console.error('[GENESIS SEEDING] Failed to seed telemetry:', err);
     return { success: false, message: `Seeding failed: ${err}` };
   }
 }
@@ -184,7 +161,6 @@ export async function executeGenesisSeeding(): Promise<{
 }> {
   try {
     if (!hasSupabase() || !supabase) {
-      console.error('[GENESIS SEEDING] ❌ Supabase not configured');
       return {
         success: false,
         presenceDeclared: false,
@@ -192,35 +168,20 @@ export async function executeGenesisSeeding(): Promise<{
       };
     }
 
-    console.log('[GENESIS SEEDING] 🔥 EXECUTING GENESIS DATABASE SEEDING PROTOCOL');
-    console.log('[GENESIS SEEDING] Architect:', ARCHITECT_IDENTITY.fullName);
-    console.log('[GENESIS SEEDING] Alias:', ARCHITECT_IDENTITY.alias);
-    console.log('[GENESIS SEEDING] Device:', ARCHITECT_IDENTITY.deviceId);
-
-    // Step 1: Seed Architect's Device (verification only, actual seeding in hardwareBinding.ts)
-    const deviceResult = await seedArchitectDevice();
-    console.log('[GENESIS SEEDING] Device seeding:', deviceResult.message);
-
-    // Step 2: Seed Genesis Telemetry Data
-    const telemetryResult = await seedGenesisTelemetry();
-    console.log('[GENESIS SEEDING] Telemetry seeding:', telemetryResult.message);
+    await seedArchitectDevice();
+    await seedGenesisTelemetry();
 
     // Step 3: Verify seeding success
     const deviceExists = await checkArchitectDevice();
     const telemetryExists = await checkTelemetryData();
 
     if (telemetryExists) {
-      console.log('[GENESIS SEEDING] ✅ ARCHITECT IDENTITY ANCHORED IN VAULT');
-      console.log('[GENESIS SEEDING] ✅ PRESENCE DECLARED');
-      console.log('[GENESIS SEEDING] ✅ 50:50 ECONOMIC SPLIT ACTIVE');
-
       return {
         success: true,
         presenceDeclared: true,
         message: 'Genesis seeding complete - Architect identity anchored',
       };
     } else {
-      console.error('[GENESIS SEEDING] ⚠️ Seeding incomplete - verification failed');
       return {
         success: false,
         presenceDeclared: false,
@@ -228,7 +189,6 @@ export async function executeGenesisSeeding(): Promise<{
       };
     }
   } catch (err) {
-    console.error('[GENESIS SEEDING] ❌ Genesis seeding failed:', err);
     return {
       success: false,
       presenceDeclared: false,

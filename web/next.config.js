@@ -22,6 +22,10 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  // 0% Unbanked: smaller payload for 3G; JS is minified in production
+  productionBrowserSourceMaps: false,
+  poweredByHeader: false,
+  compress: true,
   // Note: Next.js 16+ does not support eslint in next.config; do not run `next lint` in CI if you want to skip lint.
 };
 

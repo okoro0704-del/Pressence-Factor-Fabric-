@@ -32,7 +32,6 @@ export default function DashboardPage() {
 
   useEffect(() => {
     setMounted(true);
-    console.log('Interaction Layer Active', '(dashboard)');
   }, []);
 
   // Unveiling Phase: sensitive wallet/biometric only for architects
@@ -80,13 +79,7 @@ export default function DashboardPage() {
     const phone = getIdentityAnchorPhone();
     if (!phone) return;
     const cleanup = startVerifiedMintListener(phone, (result) => {
-      if (result.txHash) {
-        console.log('[VidaMint] Receipt:', result.txHash);
-        setMintTxHash(result.txHash);
-      }
-      if (result.error) {
-        console.warn('[VidaMint]', result.error);
-      }
+      if (result.txHash) setMintTxHash(result.txHash);
     }, { pollIntervalMs: 20000 });
     return cleanup;
   }, [mounted, vaultStable]);

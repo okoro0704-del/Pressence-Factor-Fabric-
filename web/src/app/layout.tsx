@@ -60,8 +60,6 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
-                console.log('[CRITICAL BYPASS PRE-REACT] 🔥 EXECUTING BEFORE REACT LOADS');
-
                 // ROOT DEVICE IDENTIFIERS - DUAL-HASH RECOGNITION
                 const AUTHORIZED_DEVICE_IDS = [
                   'HP-LAPTOP-ROOT-SOVEREIGN-001', // Legacy laptop identifier
@@ -86,7 +84,6 @@ export default function RootLayout({
                     var now = Date.now();
 
                     if (cookie.granted && cookie.expiry > now) {
-                      console.log('[CRITICAL BYPASS PRE-REACT] ✅ VALID SOVEREIGN COOKIE FOUND');
                       return true;
                     }
 
@@ -110,9 +107,7 @@ export default function RootLayout({
                     };
 
                     localStorage.setItem(SOVEREIGN_COOKIE_KEY, JSON.stringify(cookieValue));
-                    console.log('[CRITICAL BYPASS PRE-REACT] ✅ SOVEREIGN COOKIE SET (365-day expiry)');
                   } catch (err) {
-                    console.error('[CRITICAL BYPASS PRE-REACT] Error setting cookie:', err);
                   }
                 }
 
@@ -136,8 +131,6 @@ export default function RootLayout({
                   }
 
                   if (isRootDevice) {
-                    console.log('[CRITICAL BYPASS PRE-REACT] ✅ ROOT DEVICE DETECTED');
-
                     // Set Sovereign Cookie for 365-day bypass
                     setSovereignCookie();
 
@@ -147,8 +140,6 @@ export default function RootLayout({
                     localStorage.setItem('device_authorized', 'true');
                     localStorage.setItem('isLocked', 'false');
                     localStorage.setItem('isAuthorized', 'true');
-
-                    console.log('[CRITICAL BYPASS PRE-REACT] ✅ ROOT ACCESS GRANTED + SOVEREIGN COOKIE SET');
 
                     // Inject CSS to hide ALL lock overlays IMMEDIATELY
                     const style = document.createElement('style');
@@ -178,8 +169,6 @@ export default function RootLayout({
                       }
                     \`;
                     document.head.appendChild(style);
-
-                    console.log('[CRITICAL BYPASS PRE-REACT] ✅ LOCK OVERLAY STYLES INJECTED');
 
                     // Continuously purge overlays every 100ms for first 5 seconds
                     let purgeCount = 0;
@@ -219,21 +208,13 @@ export default function RootLayout({
                         });
                       });
 
-                      if (removed > 0) {
-                        console.log('[CRITICAL BYPASS PRE-REACT] ✅ PURGED ' + removed + ' OVERLAYS');
-                      }
-
                       purgeCount++;
-                      if (purgeCount >= 50) { // Stop after 5 seconds (50 * 100ms)
+                      if (purgeCount >= 50) {
                         clearInterval(purgeInterval);
-                        console.log('[CRITICAL BYPASS PRE-REACT] ✅ PURGE PROTOCOL COMPLETE');
                       }
                     }, 100);
-                  } else {
-                    console.log('[CRITICAL BYPASS PRE-REACT] ⚠️ NON-ROOT DEVICE');
                   }
                 } catch (err) {
-                  console.error('[CRITICAL BYPASS PRE-REACT] ❌ Error:', err);
                 }
               })();
             `,
@@ -255,10 +236,8 @@ export default function RootLayout({
                       localStorage.setItem('PFF_APP_SCHEMA_VERSION', PFF_APP_SCHEMA_VERSION);
                     }
                     if (typeof sessionStorage !== 'undefined') sessionStorage.clear();
-                    console.log('[PFF] Local app cache cleared for schema', PFF_APP_SCHEMA_VERSION);
                   }
                 } catch (e) {
-                  console.warn('[PFF] Schema version check failed:', e);
                 }
               })();
             `,

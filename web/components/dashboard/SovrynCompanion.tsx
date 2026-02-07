@@ -51,7 +51,6 @@ export function SovrynCompanion({
         interimResults: true,
       });
     } catch (e) {
-      console.warn('[SovrynCompanion] Voice recognition unavailable:', e);
       setGreeting('Sovereign Intelligence — voice offline.');
       voiceEngineRef.current = null;
       return;
@@ -63,7 +62,6 @@ export function SovrynCompanion({
         command: 'show my pff balance',
         aliases: ['show balance', 'pff balance', 'my balance', 'check balance'],
         action: () => {
-          console.log('📊 Voice command: Show PFF Balance');
           setLastCommand('Scrolling to Grand Total...');
           onScrollToBalance?.();
         },
@@ -72,7 +70,6 @@ export function SovrynCompanion({
         command: 'swap vida to dllr',
         aliases: ['swap vida', 'open swap', 'swap modal', 'convert vida'],
         action: () => {
-          console.log('💱 Voice command: Swap VIDA to DLLR');
           setLastCommand('Opening Swap Modal...');
           onOpenSwapModal?.();
         },
@@ -81,7 +78,6 @@ export function SovrynCompanion({
         command: 'vitalization status',
         aliases: ['check vitalization', 'health check', 'status check', 'my status'],
         action: () => {
-          console.log('🔐 Voice command: Vitalization Status');
           setLastCommand('Displaying 4-Layer Health Check...');
           onShowVitalizationStatus?.();
         },
@@ -90,7 +86,6 @@ export function SovrynCompanion({
         command: 'lockdown',
         aliases: ['panic', 'emergency lockdown', 'trigger panic', 'emergency'],
         action: () => {
-          console.log('🚨 Voice command: Lockdown');
           setLastCommand('Triggering Sovereign Panic Switch...');
           // Require confirmation for critical command
           if (confirm('⚠️ CONFIRM SOVEREIGN LOCKDOWN?\n\nThis will revoke all global sessions and force re-authentication.')) {
@@ -108,9 +103,7 @@ export function SovrynCompanion({
         setTranscript(text);
         setIsInterim(!isFinal);
       });
-      engine.onCommand((command) => {
-        console.log(`✓ Command executed: ${command}`);
-      });
+      engine.onCommand(() => {});
       engine.onStateChange((listening) => {
         setIsListening(listening);
         if (!listening) {
@@ -119,7 +112,6 @@ export function SovrynCompanion({
         }
       });
     } catch (e) {
-      console.warn('[SovrynCompanion] Voice setup failed:', e);
       setGreeting('Sovereign Intelligence — voice offline.');
       voiceEngineRef.current = null;
       return;
