@@ -643,7 +643,8 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
       navigator.vibrate([100, 50, 100, 50, 200]);
     }
 
-    if (ENABLE_GPS_AS_FOURTH_PILLAR && effectiveMobile) startLocationRequestFromUserGesture(identityAnchor.phone);
+    // Request GPS immediately on user click (required for geolocation permission)
+    if (ENABLE_GPS_AS_FOURTH_PILLAR && identityAnchor.phone) startLocationRequestFromUserGesture(identityAnchor.phone);
 
     const resumePillars = getVerifiedPillarsForResume(identityAnchor.phone);
 

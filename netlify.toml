@@ -24,6 +24,12 @@
 # Required in Netlify UI (Site → Build & deploy → Environment):
 # NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY
 
+# Allow GPS, camera, mic for Quad-Pillar Shield (browsers block without this)
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Permissions-Policy = "camera=(self), microphone=(self), geolocation=(self)"
+
 # Functions live in web/netlify/functions (relative to base)
 [functions]
   directory = "netlify/functions"
