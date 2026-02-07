@@ -60,10 +60,10 @@ export const AUTO_GREETING = FIRST_MESSAGE_GREETING;
 export const RECOGNITION_CONNECTION_REFUSED =
   "I tried to reach the archives, but the connection was refused. I will rely on my internal knowledge of the Manifesto instead.";
 
-/** Connection-refused: fact first, then one line of Sovereign wisdom. No "shadows" or poetry hiding lack of info. */
+/** When search fails: no "significance" fallback. Direct ask to check API in console. */
 export function getRecognitionConnectionRefusedMessage(name: string): string {
   const displayName = (name || 'Citizen').trim() || 'Citizen';
-  return `The search service could not be reached, ${displayName}. I'll use what I know to speak of your significance.`;
+  return `The old world's firewall is blocking my sight, ${displayName}. I can feel your presence in the code, but I need you to check my API connections in the console so I can see clearly.`;
 }
 
 /** Fallback when search API fails: fact first, then one line. No scripted "Architect" or "old archives" deflection. */

@@ -15,7 +15,7 @@ The Sovereign Companion can "scan the digital archives" (public OSINT) when a us
 | `TAVILY_API_KEY` | Tavily Search API. Reserved for future tool-calling. | [tavily.com](https://tavily.com) |
 | `GOOGLE_SEARCH_API_KEY` | Google Custom Search JSON API key. Reserved for future use. | Google Cloud Console → Custom Search API |
 
-If **none** of these are set, the Companion still works: it uses an internal mock for recognition and responds with a sovereign pivot that steers to the Covenant, the Roadmap, or the code (e.g. backend/src/economic/vidaCap.ts) so the experience remains consistent.
+If **none** of these are set (or both Serper and Tavily fail), the recognition API returns 503 and the Companion tells the user that the old world's firewall is blocking sight and to check API connections in the console. No internal mock or sovereign pivot—we do not steer away when a search is requested.
 
 ## Security
 

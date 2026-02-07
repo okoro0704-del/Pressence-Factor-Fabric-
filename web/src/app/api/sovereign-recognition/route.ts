@@ -2,19 +2,15 @@
  * Sovereign Recognition (Social Sync) API.
  * Accepts a name and returns a profile from "digital archives" (public OSINT).
  *
- * Search tools use env: SERPER_API_KEY (primary), TAVILY_API_KEY (fallback). Both read from process.env
- * (e.g. .env.local or Netlify env). Serper first, then Tavily if Serper fails, then mock.
- * Lord personality lock: we never say "I cannot reach archives." Search for the user, then tell them
- * why they are a Pillar of this new world based on what we find (or pivot with a dynamic, personal observation).
- *
- * Response is used by the Companion to deliver the "I see you, [Name]..." Wow moment.
+ * Env: SERPER_API_KEY from process.env. If present, we must attempt a real fetch to serper.dev.
+ * No internal mock or sovereign pivot when search is requested—if both Serper and Tavily fail, we return 503.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import type { CompanionLangCode } from '@/lib/manifestoCompanionKnowledge';
 
-// Diagnostic: confirm SERPER_API_KEY is loaded (check terminal on first request or server start).
-console.log('Search Key Active:', !!process.env.SERPER_API_KEY);
+// Diagnostic: at route load, log whether SERPER_API_KEY is present (check terminal).
+console.log('SOVRYN Sight Check: ', process.env.SERPER_API_KEY ? 'ONLINE' : 'OFFLINE');
 
 // Omit force-dynamic: incompatible with output: 'export' (static HTML). Use Netlify Function for server-side recognition on deploy.
 export interface SovereignRecognitionPayload {
@@ -31,8 +27,6 @@ export interface SovereignRecognitionResult {
   detail?: string;
 }
 
-/** Delay only when using mock (so "scanning" feels real). With Sight (Serper), we run fast—World of Vitalie has no time for lag. */
-const MOCK_SCAN_DELAY_MS = 600;
 const SERPER_URL = 'https://google.serper.dev/search';
 const TAVILY_URL = 'https://api.tavily.com/search';
 
@@ -71,7 +65,10 @@ function hasTavilySight(): boolean {
   return Boolean(typeof process !== 'undefined' && process.env.TAVILY_API_KEY?.trim());
 }
 
-/** Call Serper to scan digital archives. Key from process.env.SERPER_API_KEY only. Returns null on failure or missing key. */
+/**
+ * Serper search: raw fetch only (no library wrapper). URL and header must match .env key SERPER_API_KEY.
+ * https://google.serper.dev/search — X-API-KEY: process.env.SERPER_API_KEY
+ */
 async function searchDigitalArchivesSerper(name: string): Promise<SovereignRecognitionResult | null> {
   const apiKey = typeof process !== 'undefined' ? (process.env.SERPER_API_KEY ?? '').trim() : '';
   if (!apiKey) return null;
@@ -79,7 +76,10 @@ async function searchDigitalArchivesSerper(name: string): Promise<SovereignRecog
   try {
     const res = await fetch(SERPER_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-API-KEY': apiKey },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-KEY': apiKey,
+      },
       body: JSON.stringify({ q: query, num: 8 }),
     });
     if (!res.ok) {
@@ -154,65 +154,8 @@ async function searchDigitalArchivesTavily(name: string): Promise<SovereignRecog
 }
 
 /**
- * Mock: used only when Serper and Tavily both fail. No static "Architect" or "Old World" scripted responses—
- * every name gets a hash-based profile so we never deflect with keyword-triggered text.
- */
-function mockSearchDigitalArchives(name: string): SovereignRecognitionResult {
-  const trimmed = name.trim() || 'Citizen';
-  const parts = trimmed.split(/\s+/);
-  const firstName = parts[0] ?? trimmed;
-  const hash = firstName.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
-  const roles = [
-    'Builder',
-    'Creator',
-    'Innovator',
-    'Strategist',
-    'Designer',
-    'Engineer',
-    'Leader',
-    'Thinker',
-    'Advocate',
-    'Pioneer',
-  ];
-  const locations = [
-    'Lagos',
-    'Abuja',
-    'Paris',
-    'London',
-    'New York',
-    'Dubai',
-    'Accra',
-    'Nairobi',
-    'Berlin',
-    'the Vanguard',
-  ];
-  const interests = [
-    'the future of identity',
-    'sovereign technology',
-    'proof of personhood',
-    'the Protocol',
-    'human-centred systems',
-    'the World of Vitalie',
-    'truth and presence',
-    'the Covenant',
-  ];
-  const details = [
-    'Your presence in the Vanguard is noted—the Ledger remembers.',
-    'The Protocol has your pulse; one Palm Scan away from the full unlock.',
-    'Your footprint aligns with the Covenant—Builder, not bystander.',
-  ];
-  return {
-    name: trimmed,
-    role: roles[hash % roles.length],
-    location: locations[(hash + 1) % locations.length],
-    keyInterest: interests[(hash + 2) % interests.length],
-    detail: details[hash % details.length],
-  };
-}
-
-/**
- * Force search logic: every request with a name must run Serper then Tavily first.
- * No scripted shortcuts—mock only when both APIs fail or keys are missing.
+ * Force search: if SERPER_API_KEY is present, we always attempt real fetch to serper.dev.
+ * No internal mock, no sovereign pivot—when both Serper and Tavily fail, return 503 so the client shows "sight offline".
  */
 export async function POST(request: NextRequest) {
   try {
@@ -225,19 +168,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Always execute search tools first when we have a name (client sends name for "search" or name queries).
-    let result: SovereignRecognitionResult | null = await searchDigitalArchivesSerper(name);
-    if (result) return NextResponse.json(result);
-    result = await searchDigitalArchivesTavily(name);
-    if (result) return NextResponse.json(result);
-    if (!hasSerperSight() && !hasTavilySight()) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.warn('[sovereign-recognition] SERPER_API_KEY and TAVILY_API_KEY not set or empty. Using mock. Restart the server after adding .env.local.');
-      }
-      await new Promise((r) => setTimeout(r, MOCK_SCAN_DELAY_MS));
+    if (hasSerperSight()) {
+      const result = await searchDigitalArchivesSerper(name);
+      if (result) return NextResponse.json(result);
     }
-    result = mockSearchDigitalArchives(name);
-    return NextResponse.json(result);
+    if (hasTavilySight()) {
+      const result = await searchDigitalArchivesTavily(name);
+      if (result) return NextResponse.json(result);
+    }
+    return NextResponse.json(
+      { error: 'SIGHT_OFFLINE', message: 'Search services unavailable. Check SERPER_API_KEY / TAVILY_API_KEY and console.' },
+      { status: 503 }
+    );
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return NextResponse.json({ error: msg }, { status: 500 });
