@@ -42,7 +42,7 @@ export const initializeZeroPersistenceSession = () => {
   sessionMetadata = {};
   currentSessionLanguage = null;
   sessionSecurityWarning = null;
-  console.log("Vault Session Initialized: Memory Wiped.");
+  // Vault session initialized
 };
 
 /** Get current security warning (e.g. Sentinel not activated — fund access limited). */
@@ -110,14 +110,14 @@ export const markLayerPassed = async (
     currentStatus = SessionStatus.LAYER_2_VERIFIED;
   }
 
-  console.log(`Layer ${layerNumber} Secured. Total Layers: ${passedLayers.length}/4`);
+  // Layer secured
   return { ok: true };
 };
 
 export const resetSessionToLayer1 = () => {
   passedLayers = [];
   currentStatus = SessionStatus.LAYER_1;
-  console.log("Protocol Reset: Returning to Anchor Handshake.");
+  // Protocol reset
 };
 
 /** Create session; optional metadata (e.g. language) is stored for Supabase record. */

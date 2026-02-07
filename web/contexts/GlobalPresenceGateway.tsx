@@ -82,6 +82,7 @@ export function GlobalPresenceGatewayProvider({ children }: { children: ReactNod
         setPresenceGreeting(HANDSHAKE_COMPLETE_GREETING);
         setLastActivityTime(Date.now());
         setConnecting(false);
+        markPresenceVerified();
         const identityAnchor = getIdentityAnchorPhone();
         if (identityAnchor) {
           getCurrentUserRole(identityAnchor).then((role) => setRoleCookie(role));
@@ -90,16 +91,16 @@ export function GlobalPresenceGatewayProvider({ children }: { children: ReactNod
       }
 
       if (result.fallbackToGreeting) {
-        console.warn('[GlobalPresenceGateway] Presence check schema/DB error (bypass with SOVRYN greeting):', result.error);
         setPresenceGreeting(PRESENCE_DB_ERROR_GREETING);
         setIsPresenceVerified(true);
         setPresenceTimestamp(new Date());
         setConnecting(false);
+        markPresenceVerified();
         return true;
       }
 
       if (result.error) {
-        console.warn('[GlobalPresenceGateway] Presence check failed (non-blocking):', result.error);
+        // non-blocking; no log to reduce noise
       }
       setIsPresenceVerified(false);
       setPresenceTimestamp(null);
@@ -107,11 +108,11 @@ export function GlobalPresenceGatewayProvider({ children }: { children: ReactNod
       setConnecting(false);
       return false;
     } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.warn('[GlobalPresenceGateway] Presence check threw (non-blocking):', msg);
       setPresenceGreeting(PRESENCE_DB_ERROR_GREETING);
       setIsPresenceVerified(true);
+      setPresenceTimestamp(new Date());
       setConnecting(false);
+      markPresenceVerified();
       return true;
     }
   }, []);
@@ -174,7 +175,6 @@ export function GlobalPresenceGatewayProvider({ children }: { children: ReactNod
         const conn = await testConnection();
         if (!cancelled && !conn.ok) {
           setProtocolReconnecting(true);
-          console.warn('[GlobalPresenceGateway] Supabase handshake failed:', conn.error);
         } else if (!cancelled) {
           setProtocolReconnecting(false);
         }
@@ -279,7 +279,7 @@ export function GlobalPresenceGatewayProvider({ children }: { children: ReactNod
       const elapsed = now - lastActivityTime;
 
       if (elapsed >= INACTIVITY_TIMEOUT_MS && isPresenceVerified) {
-        console.warn('[GlobalPresenceGateway] Inactivity timeout - clearing presence');
+        // Inactivity timeout - clearing presence
         setPresenceVerifiedHandler(false);
         router.push('/');
       }

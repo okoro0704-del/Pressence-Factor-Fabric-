@@ -1,14 +1,16 @@
 /**
  * Singleton Supabase client for National Pulse (presence_handshakes) and app-wide use.
- * createClient is called only once; the same instance is exported and reused everywhere.
- * When NEXT_PUBLIC_SUPABASE_URL is missing, returns a mock client so the app does not crash.
+ * If globalThis.__PFF_SUPABASE__ exists, use it; otherwise create once and assign to global scope.
+ * Stops Multiple GoTrueClient warnings. When NEXT_PUBLIC_SUPABASE_URL is missing, returns a mock.
  */
 
 import { createClient } from '@supabase/supabase-js';
 
+const GLOBAL_KEY = '__PFF_SUPABASE__';
+
 declare global {
   interface Window {
-    __PFF_SUPABASE__?: any;
+    [key: string]: any;
   }
 }
 
@@ -52,11 +54,12 @@ function getMockClient(): any {
   return _cachedMock;
 }
 
-/** Create the client exactly once. Reuse window.__PFF_SUPABASE__ if already set. */
+/** Create the client exactly once. Reuse globalThis[GLOBAL_KEY] if it exists to avoid multiple GoTrueClient. */
 function initSupabase(): void {
   if (_initialized) return;
-  if (typeof window !== 'undefined' && window.__PFF_SUPABASE__) {
-    _supabase = window.__PFF_SUPABASE__;
+  const g = typeof globalThis !== 'undefined' ? (globalThis as any) : null;
+  if (g && g[GLOBAL_KEY]) {
+    _supabase = g[GLOBAL_KEY];
     _initialized = true;
     _isMock = false;
     return;
@@ -78,7 +81,7 @@ function initSupabase(): void {
       global: { fetch: noCacheFetch },
     } as any);
     _isMock = false;
-    if (typeof window !== 'undefined') window.__PFF_SUPABASE__ = _supabase;
+    if (g) g[GLOBAL_KEY] = _supabase;
   } catch (error) {
     _supabase = getMockClient();
     _isMock = true;

@@ -1,12 +1,15 @@
 /**
  * Master Architect Initialization — Day Zero detection and nuclear local clear.
- * When the database has been cleared (no profiles), force the app into a "Day Zero" state.
- * Uses Supabase RPC get_user_profiles_count (client-side) so static export build does not require API routes.
+ * Nuclear clear runs only when Reset Mode is set (PFF_DAY_ZERO_RESET_MODE=1), so session memory
+ * is not wiped on every page load. Uses Supabase RPC get_user_profiles_count (client-side).
  */
 
 import { getSupabase } from './supabase';
 
 export type DayZeroResult = { empty: true } | { empty: false };
+
+/** Set to '1' in localStorage to allow nuclear clear when DB is empty (Reset Mode). Without this, we do not clear on load. */
+export const DAY_ZERO_RESET_MODE_KEY = 'PFF_DAY_ZERO_RESET_MODE';
 
 /** Default count when RPC fails (e.g. 404) so the UI does not break. */
 const RPC_COUNT_FALLBACK = 777;
@@ -37,24 +40,26 @@ export async function checkDatabaseEmpty(): Promise<DayZeroResult> {
 }
 
 /**
- * Nuclear local clear: localStorage and sessionStorage. Run when database is empty (Day Zero).
+ * Nuclear local clear: localStorage and sessionStorage. Only call when explicitly in Reset Mode.
  */
 export function runNuclearLocalClear(): void {
   if (typeof window === 'undefined') return;
   try {
     localStorage.clear();
     if (typeof sessionStorage !== 'undefined') sessionStorage.clear();
-    console.log('[PFF] Day Zero: local storage cleared.');
-  } catch (e) {
-    console.warn('[PFF] Day Zero clear failed:', e);
+  } catch {
+    // ignore
   }
 }
 
 /**
- * On app launch: if database has no profiles, clear local/session storage (Day Zero state).
- * Call once from a client component on mount (e.g. GlobalPresenceGateway or DayZeroGuard).
+ * On app launch: if database has no profiles and Reset Mode is set, clear local/session storage.
+ * Does not run nuclear clear on every page load — only when PFF_DAY_ZERO_RESET_MODE is '1'.
  */
 export async function runDayZeroCheckAndClear(): Promise<void> {
   const result = await checkDatabaseEmpty();
-  if (result.empty) runNuclearLocalClear();
+  if (!result.empty) return;
+  if (typeof window === 'undefined') return;
+  const resetMode = localStorage.getItem(DAY_ZERO_RESET_MODE_KEY) === '1';
+  if (resetMode) runNuclearLocalClear();
 }

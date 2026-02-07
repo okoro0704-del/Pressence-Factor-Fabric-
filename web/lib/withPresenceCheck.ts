@@ -1,10 +1,10 @@
 /**
  * withPresenceCheck - Wrapper function for presence-gated actions
  * Verifies Presence_Verified signal from Supabase before enabling Send/Swap/Bank operations.
+ * Once verified, state is stored in localStorage (pff_presence_verified, pff_presence_timestamp) so the AI
+ * recognizes the user immediately without a new DB query every interval (24h window).
  * Table: presence_handshakes — only verified_at and liveness_score are required for basic chat.
- * Columns like handshake_code or anchor_phone are optional (nullable); see migration 20260259000000.
  * We only read from this table here; never send created_at or updated_at — the database handles those via DEFAULT NOW().
- * If verified_at is missing, run supabase/migrations/20260257000000_add_verified_at_presence_handshakes.sql.
  */
 
 import { hasSupabase, supabase } from './supabase';
@@ -72,7 +72,7 @@ export async function checkPresenceVerified(): Promise<PresenceCheckResult> {
       error = result.error ?? null;
     } catch (queryErr) {
       const msg = queryErr instanceof Error ? queryErr.message : String(queryErr);
-      console.warn('[withPresenceCheck] Database query threw (non-blocking):', msg);
+      // Database query threw (non-blocking)
       const isSchemaError = /column.*verified_at|verified_at.*missing|does not exist|relation.*presence_handshakes/i.test(msg);
       return { verified: false, error: msg, fallbackToGreeting: isSchemaError };
     }
@@ -81,7 +81,7 @@ export async function checkPresenceVerified(): Promise<PresenceCheckResult> {
       const msg =
         (error && typeof error === 'object' && 'message' in error && String((error as { message?: unknown }).message).trim()) ||
         'Database call failed';
-      console.warn('[withPresenceCheck] Error querying presence (non-blocking):', msg);
+      // Error querying presence (non-blocking)
       const isSchemaError = /column.*verified_at|verified_at.*missing|does not exist|relation.*presence_handshakes/i.test(msg);
       return { verified: false, error: msg, fallbackToGreeting: isSchemaError };
     }
@@ -103,7 +103,7 @@ export async function checkPresenceVerified(): Promise<PresenceCheckResult> {
     return { verified: false, error: 'No recent presence verification found' };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error('[withPresenceCheck] Error checking presence:', msg);
+    // Error checking presence
     const isSchemaError = /column.*verified_at|verified_at.*missing|does not exist|relation.*presence_handshakes/i.test(msg);
     return { verified: false, error: msg, fallbackToGreeting: isSchemaError };
   }
@@ -124,7 +124,7 @@ export async function withPresenceCheck<T>(
   const result = await checkPresenceVerified();
   
   if (!result.verified) {
-    console.warn('[withPresenceCheck] Presence not verified:', result.error);
+    // Presence not verified
     onVerificationNeeded?.();
     return null;
   }
