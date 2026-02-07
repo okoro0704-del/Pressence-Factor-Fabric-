@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { DashboardContent } from '@/components/sovryn/DashboardContent';
 import { ProtectedRoute } from '@/components/dashboard/ProtectedRoute';
-import { InstallSmartBanner } from '@/components/InstallSmartBanner';
 import { VitalizationRequestListener } from '@/components/dashboard/VitalizationRequestListener';
 import { LoginRequestListener } from '@/components/dashboard/LoginRequestListener';
 import { getMintStatus, MINT_STATUS_PENDING_HARDWARE } from '@/lib/mintStatus';
@@ -143,7 +142,6 @@ export default function DashboardPage() {
           mintTxHash={mintTxHash}
           openSwapFromUrl={searchParams.get('openSwap') === '1'}
         />
-        <InstallSmartBanner />
         {identityPhone && <VitalizationRequestListener phoneNumber={identityPhone} />}
         {identityPhone && <LoginRequestListener phoneNumber={identityPhone} />}
       </main>

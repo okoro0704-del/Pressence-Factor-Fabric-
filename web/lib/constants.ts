@@ -15,3 +15,14 @@ export const PILLAR_LABEL_FACE = 'Sovereign Face';
 export const PILLAR_LABEL_PALM = 'Sovereign Palm';
 export const PILLAR_LABEL_IDENTITY_ANCHOR = 'Identity Anchor';
 export const PILLAR_LABEL_GPS = 'GPS Presence';
+
+/** Quad-Pillar Shield: four active sensors. Simple, human confirmations only. */
+export const QUAD_PILLAR_DEFINITIONS = [
+  { id: 1, label: 'Face', sensor: 'Biometric', confirm: 'I see you.' },
+  { id: 2, label: 'Palm', sensor: 'Physical Pattern', confirm: 'Your hand is true.' },
+  { id: 3, label: 'Phone', sensor: 'Hardware Anchor', confirm: 'The device is recognized.' },
+  { id: 4, label: 'GPS', sensor: 'Geofenced Work-Site', confirm: 'You are at your post.' },
+] as const;
+
+/** One-sentence confirmation when each pillar clears (for brevity) */
+export const PILLAR_CONFIRMATIONS = QUAD_PILLAR_DEFINITIONS.map((p) => p.confirm);

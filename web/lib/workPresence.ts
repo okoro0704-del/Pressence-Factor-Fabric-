@@ -1,8 +1,8 @@
 /**
  * Ghost Economy Protocol — Work-site presence verification.
- * verifyWorkPresence(): GPS pillar turns green only when user is within
- * WORK_SITE_RADIUS_METERS of their registered work location.
- * If the check fails, session is flagged 'Non-Work Active' (50:50 split not fully unlocked).
+ * Pulls work_site_lat/work_site_lng from Supabase (user_profiles).
+ * GPS pillar turns green only when distance between current location and work site
+ * is within WORK_SITE_RADIUS_METERS. If the check fails, session is flagged 'Non-Work Active'.
  */
 
 import { getSupabase } from './supabase';
@@ -18,6 +18,8 @@ export interface VerifyWorkPresenceResult {
   /** Distance in meters when not at work (for UI) */
   distanceMeters?: number;
   error?: string;
+  /** When true, user has no work_site_coords set — show "Manual Verification Required" instead of crashing. */
+  manualVerificationRequired?: boolean;
 }
 
 /** Haversine distance in meters between two lat/lng points. */
@@ -41,9 +43,43 @@ function haversineMeters(
 }
 
 /**
- * Verify that current coordinates are within WORK_SITE_RADIUS_METERS of the
- * identity anchor's registered work location. If no work site is set, returns
- * atWork: false and sessionFlag: 'Non-Work Active'.
+ * Parse work site lat/lng from work_site_coords JSONB or work_site_lat/lng columns.
+ * Returns null if no valid coordinates.
+ */
+function parseWorkSiteCoords(
+  data: {
+    work_site_coords?: { lat?: number; lng?: number; radius_meters?: number } | null;
+    work_site_lat?: number | null;
+    work_site_lng?: number | null;
+  } | null
+): { lat: number; lng: number; radiusMeters: number } | null {
+  if (!data) return null;
+
+  // Prefer work_site_coords JSONB when present and valid
+  const coords = data.work_site_coords;
+  if (coords && typeof coords === 'object' && coords.lat != null && coords.lng != null) {
+    const lat = Number(coords.lat);
+    const lng = Number(coords.lng);
+    if (!isNaN(lat) && !isNaN(lng)) {
+      const radiusMeters = coords.radius_meters != null ? Number(coords.radius_meters) : WORK_SITE_RADIUS_METERS;
+      return { lat, lng, radiusMeters: isNaN(radiusMeters) ? WORK_SITE_RADIUS_METERS : radiusMeters };
+    }
+  }
+
+  // Fallback to work_site_lat / work_site_lng
+  const lat = data.work_site_lat != null ? Number(data.work_site_lat) : null;
+  const lng = data.work_site_lng != null ? Number(data.work_site_lng) : null;
+  if (lat != null && lng != null && !isNaN(lat) && !isNaN(lng)) {
+    return { lat, lng, radiusMeters: WORK_SITE_RADIUS_METERS };
+  }
+
+  return null;
+}
+
+/**
+ * Verify that current coordinates are within radius_meters of the identity anchor's
+ * work site (from work_site_coords JSONB or work_site_lat/lng). If distance > radius,
+ * pillar stays red. If no work site is set, returns manualVerificationRequired: true.
  */
 export async function verifyWorkPresence(
   identityAnchorPhone: string,
@@ -55,38 +91,51 @@ export async function verifyWorkPresence(
       return { atWork: false, sessionFlag: 'Non-Work Active', error: 'Supabase not available' };
     }
 
-    const { data, error } = await supabase
+    // 1. Try user_profiles (work_site_coords JSONB, work_site_lat, work_site_lng)
+    const { data: profileData, error: profileError } = await supabase
       .from('user_profiles')
-      .select('work_site_lat, work_site_lng')
+      .select('work_site_coords, work_site_lat, work_site_lng')
       .eq('phone_number', identityAnchorPhone)
       .single();
 
-    if (error || !data) {
-      return {
-        atWork: false,
-        sessionFlag: 'Non-Work Active',
-        error: 'Profile or work site not found. Register work site to enable Clock-In.',
-      };
+    let site = parseWorkSiteCoords(profileData as Record<string, unknown> | null);
+
+    // 2. Fallback: latest presence_handshakes.work_site_coords for this anchor
+    if (!site && !profileError) {
+      const { data: handshakeData } = await supabase
+        .from('presence_handshakes')
+        .select('work_site_coords')
+        .eq('anchor_phone', identityAnchorPhone)
+        .order('verified_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const hc = (handshakeData as { work_site_coords?: { lat?: number; lng?: number } | null } | null)?.work_site_coords;
+      if (hc && typeof hc === 'object' && hc.lat != null && hc.lng != null) {
+        const lat = Number(hc.lat);
+        const lng = Number(hc.lng);
+        if (!isNaN(lat) && !isNaN(lng)) {
+          site = { lat, lng, radiusMeters: WORK_SITE_RADIUS_METERS };
+        }
+      }
     }
 
-    const workLat = data.work_site_lat != null ? Number(data.work_site_lat) : null;
-    const workLng = data.work_site_lng != null ? Number(data.work_site_lng) : null;
-
-    if (workLat == null || workLng == null) {
+    if (!site) {
       return {
         atWork: false,
         sessionFlag: 'Non-Work Active',
-        error: 'Work site not registered. Set your work location to enable Clock-In.',
+        manualVerificationRequired: true,
+        error: 'Manual Verification Required',
       };
     }
 
     const distance = haversineMeters(
       currentCoords.latitude,
       currentCoords.longitude,
-      workLat,
-      workLng
+      site.lat,
+      site.lng
     );
-    const atWork = distance <= WORK_SITE_RADIUS_METERS;
+    const atWork = distance <= site.radiusMeters;
 
     const sessionFlag: WorkPresenceStatus = atWork ? 'Work Active' : 'Non-Work Active';
     setWorkPresenceStatus(sessionFlag);

@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
-import { HowToInstallTooltip } from '@/components/HowToInstallTooltip';
 import { GlobalPresenceGatewayProvider } from '@/contexts/GlobalPresenceGateway';
 import { SovereignSeedProvider } from '@/contexts/SovereignSeedContext';
 import { GhostSessionGuard } from '@/components/GhostSessionGuard';
@@ -270,7 +269,6 @@ export default function RootLayout({
             </SovereignCompanionProvider>
           </SovereignSeedProvider>
           </BiometricSessionProvider>
-          <HowToInstallTooltip />
           <RegisterServiceWorker />
         </GlobalPresenceGatewayProvider>
       </body>

@@ -50,6 +50,12 @@ export interface Database {
           identity_bound: boolean | null;
           spending_unlocked: boolean | null;
           updated_at: string | null;
+          /** Registered work site latitude for Quad-Pillar geofence. */
+          work_site_lat: number | null;
+          /** Registered work site longitude for Quad-Pillar geofence. */
+          work_site_lng: number | null;
+          /** Work site { lat, lng, radius_meters? } JSONB for GPS pillar. */
+          work_site_coords: { lat?: number; lng?: number; radius_meters?: number } | null;
           [key: string]: unknown;
         };
         Insert: Partial<Database['public']['Tables']['user_profile']['Row']>;
@@ -59,6 +65,19 @@ export interface Database {
         Row: Database['public']['Tables']['user_profile']['Row'];
         Insert: Database['public']['Tables']['user_profile']['Insert'];
         Update: Database['public']['Tables']['user_profile']['Update'];
+      };
+      presence_handshakes: {
+        Row: {
+          id: string;
+          anchor_phone: string | null;
+          verified_at: string | null;
+          liveness_score: number | null;
+          /** Work site { lat, lng } at clock-in (Quad-Pillar audit). */
+          work_site_coords: { lat?: number; lng?: number } | null;
+          [key: string]: unknown;
+        };
+        Insert: Partial<Database['public']['Tables']['presence_handshakes']['Row']>;
+        Update: Partial<Database['public']['Tables']['presence_handshakes']['Row']>;
       };
     };
   };

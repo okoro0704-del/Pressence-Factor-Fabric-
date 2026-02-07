@@ -69,6 +69,8 @@ export interface BiometricAuthResult {
   externalScannerSerialNumber?: string;
   /** Quad-Pillar: coords when GPS pillar passed (for Clock-In work_site_coords). */
   lastLocationCoords?: { latitude: number; longitude: number };
+  /** When true, user has no work_site_coords set — show "Manual Verification Required" for GPS pillar. */
+  manualVerificationRequired?: boolean;
 }
 
 /** Scan timeout: all three pillars must resolve in under 5 seconds total (desktop). */
@@ -424,6 +426,8 @@ export type LocationResult = {
   /** Set when location came from IP fallback (city/sector); pillar gold if country matches registered. */
   fromIP?: boolean;
   country_code?: string;
+  /** When true, user has no work_site_coords set — show "Manual Verification Required" instead of crashing. */
+  manualVerificationRequired?: boolean;
 };
 
 let pendingLocationFromUserGesture: Promise<LocationResult> | null = null;
@@ -592,6 +596,9 @@ export async function verifyLocation(registeredCountryCode?: string, identityAnc
           if (coords?.latitude != null && coords?.longitude != null) {
             if (ENABLE_GPS_AS_FOURTH_PILLAR && identityAnchor) {
               const workResult = await verifyWorkPresence(identityAnchor, coords);
+              if (workResult.manualVerificationRequired) {
+                return { success: false, error: 'Manual Verification Required', manualVerificationRequired: true };
+              }
               if (!workResult.atWork) {
                 return { success: false, error: workResult.error ?? `Not within ${WORK_SITE_RADIUS_METERS}m of work site.`, permissionRequired: false };
               }
@@ -693,6 +700,9 @@ export async function verifyLocation(registeredCountryCode?: string, identityAnc
       identityAnchor
     ) {
       const workResult = await verifyWorkPresence(identityAnchor, rawResult.coords);
+      if (workResult.manualVerificationRequired) {
+        return { success: false, error: 'Manual Verification Required', manualVerificationRequired: true };
+      }
       if (!workResult.atWork) {
         return {
           success: false,
@@ -1228,6 +1238,7 @@ export async function resolveSovereignByPresence(
         const corePillars = 3 + (useGpsPillar ? 1 : 0);
         const twoPillarsOnly = passed === 2;
         const locPerm = state.location && (state.location as LocationResult).permissionRequired === true;
+        const manualVerif = useGpsPillar && (state.location as LocationResult)?.manualVerificationRequired === true;
         const timeoutLabel = scanTimeoutMs >= 15000 ? '15s' : migrationMode ? '5s Face Pulse' : '5s';
         return {
           ...fail(
@@ -1237,6 +1248,7 @@ export async function resolveSovereignByPresence(
             twoPillarsOnly
           ),
           ...(locPerm && { locationPermissionRequired: true }),
+          ...(manualVerif && { manualVerificationRequired: true }),
         };
       }
       throw err;
@@ -1312,9 +1324,11 @@ export async function resolveSovereignByPresence(
       layersPassed.push(AuthLayer.GPS_LOCATION);
     }
     if (useGpsPillar && silentModeUsed && !locationResult.success) {
+      const manualVerif = (locationResult as LocationResult).manualVerificationRequired === true;
       return {
-        ...fail(AuthLayer.GPS_LOCATION, 'Silent Presence Mode requires Location. Enable GPS and try again.'),
+        ...fail(AuthLayer.GPS_LOCATION, manualVerif ? 'Manual Verification Required' : 'Silent Presence Mode requires Location. Enable GPS and try again.'),
         ...(locationPermissionRequired && { locationPermissionRequired: true }),
+        ...(manualVerif && { manualVerificationRequired: true }),
       };
     }
 
@@ -1333,13 +1347,19 @@ export async function resolveSovereignByPresence(
     const minRequired = skipDevicePillarForMobile ? (useGpsPillar ? 3 : 2) : coreMin;
     const quorumMin = skipDevicePillarForMobile ? (useGpsPillar ? 3 : 2) : Math.min(coreMin, SOVEREIGN_QUORUM_MIN);
     const quorumMet = layersPassed.length >= quorumMin;
+    const manualVerif = useGpsPillar && (locationResult as LocationResult).manualVerificationRequired === true;
     if (!quorumMet && !requireAllLayers) {
-      return fail(null, `Sovereign Threshold not met. ${layersPassed.length}/${minRequired} layers passed.`);
+      const msg = manualVerif ? 'Manual Verification Required' : `Sovereign Threshold not met. ${layersPassed.length}/${minRequired} layers passed.`;
+      return { ...fail(null, msg), ...(manualVerif && { manualVerificationRequired: true }) };
     }
     if (requireAllLayers && layersPassed.length < minRequired) {
-      return fail(null, skipDevicePillarForMobile
+      const msg = manualVerif ? 'Manual Verification Required' : (skipDevicePillarForMobile
         ? (useGpsPillar ? 'Complete Face and GPS to finish initial registration.' : 'Complete Face and Palm to finish initial registration.')
         : 'New device: all pillars required. Complete Face, Sovereign Palm, and Identity Anchor.');
+      return {
+        ...fail(null, msg),
+        ...(manualVerif && { manualVerificationRequired: true }),
+      };
     }
 
     const identity = genesisIdentity ?? (phoneNumber ? await resolvePhoneToIdentity(phoneNumber) : null);

@@ -104,7 +104,7 @@ import { getNativeAppUrl } from '@/lib/appStoreUrls';
 import { IS_PUBLIC_REVEAL, isVettedUser } from '@/lib/publicRevealAccess';
 import { ENABLE_GPS_AS_FOURTH_PILLAR } from '@/lib/constants';
 import { recordClockIn, getLastClockInCoords } from '@/lib/workPresence';
-import { QuadPillarClockInBlock } from '@/components/dashboard/QuadPillarShield';
+import { QuadPillarGrid } from '@/components/dashboard/QuadPillarShield';
 
 const jetbrains = JetBrains_Mono({ weight: ['400', '600', '700'], subsets: ['latin'] });
 
@@ -716,9 +716,11 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
         effectiveMobile,
       };
       if (ENABLE_GPS_AS_FOURTH_PILLAR) {
-        setQuadPillarAwaitingClockIn(true);
-        setShowArchitectVision(false);
-        setAuthStatus(AuthStatus.IDLE);
+        const coords = authResult.lastLocationCoords ?? getLastClockInCoords();
+        if (coords) recordClockIn(identityAnchor.phone, coords).catch(() => {});
+        setQuadPillarAwaitingClockIn(false);
+        setShowArchitectVision(true);
+        setArchitectVerificationSuccess(true);
         return;
       }
       setArchitectVerificationSuccess(true);
@@ -1816,15 +1818,25 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
           </p>
         </div>
 
-        {/* Progress Ring: Triple-Pillar Shield — Face → Sovereign Palm → Identity Anchor */}
+        {/* Quad-Pillar Shield: 2x2 grid (mobile: all 4 visible, no scroll). Next locked until all 4 verified. */}
         {authStatus === AuthStatus.SCANNING && (
-          <div className="mb-8 transition-all duration-200">
-            <PresenceProgressRing
-              faceVerified={pillarFace}
-              palmVerified={pillarPalm}
-              phoneAnchorVerified={pillarDevice}
-              locationVerified={pillarLocation}
-            />
+          <div className="mb-6 w-full max-w-sm mx-auto transition-all duration-200">
+            {ENABLE_GPS_AS_FOURTH_PILLAR ? (
+              <QuadPillarGrid
+                faceVerified={pillarFace}
+                palmVerified={pillarPalm}
+                phoneAnchorVerified={pillarDevice}
+                locationVerified={pillarLocation}
+                gpsPillarMessage={result?.manualVerificationRequired ? 'Manual Verification Required' : undefined}
+              />
+            ) : (
+              <PresenceProgressRing
+                faceVerified={pillarFace}
+                palmVerified={pillarPalm}
+                phoneAnchorVerified={pillarDevice}
+                locationVerified={pillarLocation}
+              />
+            )}
             {/* Sovereign Palm: Hold palm to camera (webcam) or connect Hub scanner. Mobile: Palm Pulse via camera. */}
             {identityAnchor && !effectiveMobile && (
               <div className="mt-6">
@@ -1886,30 +1898,8 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
           </button>
         )}
 
-        {/* Quad-Pillar: Clock-In — enabled only when all 4 pillars active; records work_site_coords to presence_handshakes */}
-        {ENABLE_GPS_AS_FOURTH_PILLAR && quadPillarAwaitingClockIn && identityAnchor && (
-          <QuadPillarClockInBlock
-            identityAnchorPhone={identityAnchor.phone}
-            lastLocationCoords={
-              architectSuccessRef.current?.authResult?.lastLocationCoords ??
-              getLastClockInCoords()
-            }
-            onClockIn={async () => {
-              const coords =
-                architectSuccessRef.current?.authResult?.lastLocationCoords ??
-                getLastClockInCoords();
-              if (coords) {
-                await recordClockIn(identityAnchor.phone, coords);
-              }
-              setQuadPillarAwaitingClockIn(false);
-              setShowArchitectVision(true);
-              setArchitectVerificationSuccess(true);
-            }}
-          />
-        )}
-
-        {/* Authentication Button — z-50 above overlay; 200ms transition. Hidden when Quad-Pillar awaiting Clock-In. */}
-        {!quadPillarAwaitingClockIn && (
+        {/* Authentication Button — z-50 above overlay; 200ms transition. Quad-Pillar: auto-transition to Dashboard when all 4 verified. */}
+        {(
           <motion.button
             type="button"
             onClick={handleStartAuthentication}
