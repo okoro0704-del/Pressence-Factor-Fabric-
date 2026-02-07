@@ -24,7 +24,11 @@ import {
 } from '@/lib/vltLedgerCompanion';
 import { useSovereignAwakening } from '@/contexts/SovereignAwakeningContext';
 import { IDLE_WHISPER, SOCIAL_SCOUT_OFFER, BLESSINGS, RATE_LIMIT_SOVEREIGN_MESSAGE } from '@/lib/sovereignAwakeningContent';
-import { VLT_ERROR_SOULFUL, RECOGNITION_CONNECTION_REFUSED } from '@/lib/manifestoCompanionKnowledge';
+import {
+  VLT_ERROR_SOULFUL,
+  getRecognitionConnectionRefusedMessage,
+  getRecognitionFallbackSoulful,
+} from '@/lib/manifestoCompanionKnowledge';
 
 const GOLD = '#D4AF37';
 const GOLD_DIM = 'rgba(212, 175, 55, 0.6)';
@@ -377,9 +381,12 @@ export function PublicSovereignCompanion() {
           // ignore
         }
       } catch {
+        const connectionRefused = getRecognitionConnectionRefusedMessage(name);
+        const internalVision = getRecognitionFallbackSoulful(name);
         setMessages((prev) => [
           ...prev,
-          { id: `rec-err-${Date.now()}`, role: 'assistant', text: RECOGNITION_CONNECTION_REFUSED },
+          { id: `rec-err-${Date.now()}`, role: 'assistant', text: connectionRefused },
+          { id: `rec-fallback-${Date.now()}`, role: 'assistant', text: internalVision },
         ]);
       } finally {
         setIsScanningRecognition(false);
