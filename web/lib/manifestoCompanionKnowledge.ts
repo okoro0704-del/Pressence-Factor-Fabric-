@@ -421,11 +421,7 @@ export async function mintOnVitalization(citizenId, pffId) {
     return { text: localize('pff', lang, en), lang };
   }
 
-  // VLT & SOVRYN AI — Human Benefit + code reference (web/lib, contracts). Hardware-bound proof of life.
-  if (lower.includes('vlt') || lower.includes('vitalization ledger') || lower.includes('sovryn') || lower.includes('tech stack')) {
-    const en = 'VLT (Vitalization Ledger Technology) is the hardware-bound proof of life that replaces traditional IDs. Your Face, Palm, and Device attest you; the Ledger in web/lib and the contracts layer record it. The VLT exists so that your life, identity, and heritage are protected by truth—not by a corporation. SOVRYN AI is the Master Governor. One ledger, one truth, one covenant.';
-    return { text: localize('vlt', lang, en), lang };
-  }
+  // VLT static block REMOVED: only use getVltTruthDefinition for explicit "What is VLT?" / "Explain VLT" (handled above). Never use as response to a search request—search is handled in the component before this layer.
 
   // 50:50 rule — codebase deep-link + stern defense. Exact file and logic.
   if (/(50:50|50\s*\/\s*50)\s*(rule|split|principle)|why (the )?50:50|explain (the )?50:50|half (and )?half|fifty fifty/i.test(lower)) {

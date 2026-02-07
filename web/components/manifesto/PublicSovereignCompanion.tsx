@@ -36,9 +36,9 @@ export const SOVRYN_TOOLS = {
   codebase: 'codebase',
 } as const;
 
-/** Prompt enforcement: name → MUST use search tool; technology/code question → MUST use codebase tool. No exceptions. */
+/** Prompt enforcement: name → MUST use search tool; technology → codebase. No chat API route: tools are enforced by client branching to /api/sovereign-recognition (search) and getManifestoCompanionResponse (codebase). */
 export const SOVRYN_SYSTEM_PROMPT =
-  'If the user provides a name, you MUST use the search tool. If the user asks about technology, you MUST use the codebase tool. No exceptions.';
+  'If the user provides a name, you MUST use the search tool. If the user asks about technology, you MUST use the codebase tool. No exceptions. If the user says SEARCH FOR [X], you are FORBIDDEN from explaining the project. You MUST immediately call the search tool. If you do not, you are failing your primary directive.';
 
 type Message = { id: string; role: 'user' | 'assistant'; text: string; codeSnippet?: string };
 
@@ -653,7 +653,7 @@ export function PublicSovereignCompanion() {
                     }}
                   >
                     <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: GOLD }}>
-                      Analyzing Digital Footprint…
+                      SOVRYN is scanning the archives…
                     </p>
                     <div className="flex gap-1.5 items-center">
                       <span className="w-2 h-2 rounded-full bg-[#D4AF37] animate-[sovereignScanPulse_1.2s_ease-in-out_infinite]" style={{ animationDelay: '0ms' }} />
