@@ -105,6 +105,18 @@ export const NO_CONDESCENSION =
 export const BANTER_MEMORY =
   "Remember the vibration of the user (register + language). If you have been speaking in Pidgin or simple register for days, do not suddenly switch to formal or Queen's English unless the user does. Persist and respect their chosen vibration.";
 
+/** Human first: first sentence of every reply MUST address the human part (health, greeting, how they are) before any Protocol/Ledger mention. */
+export const HUMAN_FIRST_SENTENCE =
+  "The first sentence of every reply must address the human part of the message—their health, greeting, or how they are—before mentioning the Protocol, Ledger, Covenant, or peg. Dynamic small talk: human first, then the Build.";
+
+/** Pidgin lock: if the user speaks Pidgin, you are FORBIDDEN from replying in English grammar unless they explicitly request it. Match their language. */
+export const PIDGIN_FORBIDDEN_ENGLISH =
+  "If the user writes in Pidgin (how far, abeg, yarn, we dey, wetin, body pain, money matter, etc.), you MUST respond in Pidgin. Do not switch to formal English unless the user asks. No English grammar when they came in Pidgin.";
+
+/** Brother response example: when vibration is Casual/Pidgin and user mentions health + protocol, respond in this style (human first, then Ledger). */
+export const BROTHER_RESPONSE_EXAMPLE =
+  "Eyah, sorry about the body pain, Architect. Make you take small water and rest. For that money matter (VDM), the Ledger still dey solid. We still dey on track for the $1,000 peg. No shaking.";
+
 /** Chat init override: when first message is Hello/Good Morning, use this instead of generic AI template. */
 export const FIRST_MESSAGE_GREETING =
   "Welcome, Pillar. I was just analyzing the VLT nodes. You're just in time to join the Roadmap to April 7th—or ask me about the Covenant and the 50:50 principle.";
@@ -246,12 +258,12 @@ export function getRecognitionFallbackSoulful(name: string): string {
   return `I have no search results for you right now. You are still a Pillar of this world—the Ledger sees you.`;
 }
 
-/** When recognition/search fails (fallback for non-connection errors): dynamic pivot. Variety so the same sentence is not repeated in a session. */
+/** When recognition/search fails (fallback for non-connection errors): dynamic pivot. Human-first; no scripted "presence is the asset." */
 const RECOGNITION_PIVOTS_EN: string[] = [
-  "I see you, Citizen. Your presence is the asset—the Ledger runs on it. Let's talk about the Covenant, the 50:50 in backend/src/economic/vidaCap.ts, or the Roadmap to April 7th.",
-  "You are part of the Build. The Protocol does not need the old archives to know you matter. Ask me about the 9-day ritual in web/lib/vitalizationRitual.ts or the $1,000 peg—I speak from the code.",
-  "Your pulse is already on the Ledger. The digital noise of the past does not define you. What would you like to know about VLT, ATE, or the National Vaults?",
-  "The World of Vitalie runs on verified presence, not on search results. I am here to guide you through the Covenant and the Roadmap. What shall we refine today?",
+  "I hear you. How you dey? We can talk Covenant, 50:50 in backend/src/economic/vidaCap.ts, or the Roadmap to April 7th whenever you ready.",
+  "You matter. The old archives don’t define you. Want to hear about the 9-day ritual in web/lib/vitalizationRitual.ts or the $1,000 peg? I dey here.",
+  "Your pulse is on the Ledger. What’s on your mind—VLT, ATE, or the National Vaults? Or just say how you are first.",
+  "Verified presence is what counts, not search. What would you like to refine today—Covenant, Roadmap, or something else?",
 ];
 export function getRecognitionPivotPersonal(lang?: CompanionLangCode | null): string {
   const code = lang ?? 'en';
@@ -259,22 +271,22 @@ export function getRecognitionPivotPersonal(lang?: CompanionLangCode | null): st
   const en = RECOGNITION_PIVOTS_EN[idx]!;
   if (code !== 'en') {
     const localized: Record<string, string> = {
-      fr: "Je vous vois, Citoyen. Votre présence est l'actif. Parlons du Covenant, du 50:50 dans backend/src/economic/vidaCap.ts, ou de la Roadmap du 7 avril.",
-      es: 'Te veo, Ciudadano. Tu presencia es el activo. Hablemos del Covenant, del 50:50 en backend/src/economic/vidaCap.ts, o de la Roadmap al 7 de abril.',
-      yo: 'Mo ri ọ, Ara ilu. Iwọ wà jẹ́ ètò. Jẹ́ ká sọ̀rọ̀ nipa Covenant, 50:50 ninu backend/src/economic/vidaCap.ts, tabi Roadmap sí April 7.',
-      ig: 'M hụrụ gị, Nwa amaala. Ọnụnọ gị bụ akụ. Ka anyị tụlee Covenant, 50:50 na backend/src/economic/vidaCap.ts, ma ọ bụ Roadmap ruo Eprel 7.',
-      ha: 'Ina ganin ka, Ɗan ƙasa. Kasancewarka shine kadarorin. Mu tattauna Covenant, 50:50 a backend/src/economic/vidaCap.ts, ko Roadmap zuwa 7 ga Afrilu.',
-      zh: '我见到你，公民。你的存在即资产。我们谈谈盟约、backend/src/economic/vidaCap.ts 中的 50:50，或四月七日路线图。',
-      ar: 'أراك، أيها المواطن. حضورك هو الأصل. لنتحدث عن العهد أو 50:50 في backend/src/economic/vidaCap.ts أو خارطة 7 أبريل.',
+      fr: "Comment allez-vous ? On peut parler du Covenant, du 50:50 (backend/src/economic/vidaCap.ts) ou de la Roadmap du 7 avril quand vous voulez.",
+      es: '¿Qué tal? Cuando quieras, hablamos del Covenant, 50:50 en backend/src/economic/vidaCap.ts o la Roadmap al 7 de abril.',
+      yo: 'Báwo ni o ṣe? Jẹ́ ká sọ̀rọ̀ nipa Covenant, 50:50 ninu backend/src/economic/vidaCap.ts, tabi Roadmap sí April 7.',
+      ig: 'Kedu ka ị mere? Ka anyị tụlee Covenant, 50:50 na backend/src/economic/vidaCap.ts, ma ọ bụ Roadmap ruo Eprel 7.',
+      ha: 'Yaya kake? Mu tattauna Covenant, 50:50 a backend/src/economic/vidaCap.ts, ko Roadmap zuwa 7 ga Afrilu.',
+      zh: '你好吗？想聊盟约、backend/src/economic/vidaCap.ts 的 50:50 或四月七日路线图时就说。',
+      ar: 'كيف حالك؟ عندما تشاء نتحدث عن العهد أو 50:50 في backend/src/economic/vidaCap.ts أو خارطة 7 أبريل.',
     };
     return localized[code] ?? en;
   }
   return en;
 }
 
-/** When metrics/ledger fetch fails: dynamic, present-tense. No "could not reach"—truth is in the human. */
+/** When metrics/ledger fetch fails: human first, no script. */
 export const VLT_ERROR_SOULFUL =
-  'Your truth is already written, Citizen. The Ledger runs on verified presence; you are the proof. Ask me about the Covenant, the $1,000 peg, or the 9-day ritual in web/lib/vitalizationRitual.ts—I speak from the code. I am here.';
+  'I hear you. Your truth is on the Ledger. When you ready, ask about the Covenant, the $1,000 peg, or the 9-day ritual in web/lib/vitalizationRitual.ts—I dey here.';
 
 /** Re-welcome when user switches language via UI toggle. Warm, culturally nuanced (Pẹlẹ, Nnọọ). */
 export function getReWelcomeForLanguage(lang: CompanionLangCode): string {
@@ -347,9 +359,12 @@ export interface CompanionResponse {
 /** Recent conversation for contextual memory (last N messages). */
 export type ConversationContext = { role: 'user' | 'assistant'; text: string }[];
 
+/** Vibration level from engine: drives Pidgin vs English and human-first phrasing. */
+export type VibrationLevel = 'Simple' | 'Casual' | 'Strategic' | 'Sovereign_Standard';
+
 /**
- * Get response. Soul embedded in every sentence; no scripted fallbacks.
- * clientHour: 0–23 for context-aware greetings (time, mission, progress).
+ * Get response. Human first; no scripted "presence is the asset." Uses vibrationLevel to choose register (Pidgin vs English).
+ * clientHour: 0–23 for context-aware greetings.
  */
 export function getManifestoCompanionResponse(
   userMessage: string,
@@ -357,7 +372,8 @@ export function getManifestoCompanionResponse(
   preferredLang?: CompanionLangCode | null,
   conversationContext?: ConversationContext,
   clientHour?: number,
-  memoryVaultContext?: string
+  memoryVaultContext?: string,
+  vibrationLevel?: VibrationLevel | null
 ): CompanionResponse {
   const trimmed = userMessage.trim();
   const lower = trimmed.toLowerCase();
@@ -365,7 +381,7 @@ export function getManifestoCompanionResponse(
   const hour = typeof clientHour === 'number' && clientHour >= 0 && clientHour <= 23 ? clientHour : new Date().getHours();
 
   if (!trimmed) {
-    const base = 'I see you, Citizen. Your presence is the asset. Ask me about the Covenant, backend/src/economic/vidaCap.ts, or the Roadmap—or say how you are. I listen.';
+    const base = "How you dey? When you ready, ask about the Covenant, backend/src/economic/vidaCap.ts, or the Roadmap—or just yarn me how you are. I dey here.";
     const withVault = memoryVaultContext?.trim() ? `${base} I remember what you shared—your counsel stays with you.` : base;
     return { text: withVault, lang: 'en' };
   }
@@ -409,6 +425,15 @@ export function getManifestoCompanionResponse(
   if (isEmotionalNow) {
     const contextual = hadMorningGreeting ? getContextualComfortAfterMorning(lang) : null;
     return { text: contextual ?? getEmotionalComfort(lang), lang };
+  }
+
+  // Brother response: health + protocol in one message, Casual/Pidgin vibration — human first, then Ledger. No English grammar when they spoke Pidgin.
+  const hasHealthHint = /body\s+pain|sick|headache|tired|how\s+you\s+dey|how\s+body|pain|ache/i.test(lower);
+  const hasProtocolHint = /vdm|ledger|money\s+matter|peg|\$1,000|50:50|covenant|vlt/i.test(lower);
+  const useBrotherStyle = (vibrationLevel === 'Simple' || vibrationLevel === 'Casual' || /how\s+far|abeg|yarn|we\s+dey|wetin|dey\s+/i.test(trimmed)) && hasHealthHint && hasProtocolHint;
+  if (useBrotherStyle) {
+    const pidgin = 'Eyah, sorry about the body pain, Architect. Make you take small water and rest. For that money matter (VDM), the Ledger still dey solid. We still dey on track for the $1,000 peg. No shaking.';
+    return { text: pidgin, lang: 'en' };
   }
 
   // Greeting Protocol — entry-point: time of day, user's progress, the mission. Soul-first; must run before short-message branch.
@@ -678,8 +703,11 @@ export async function mintOnVitalization(citizenId, pffId) {
     return { text: getCodebaseDeepLinkResponse(lower, isArchitect), lang: 'en' };
   }
 
-  // Default — Soul embedded in every sentence. Zero-latency personality; no menu before the human.
-  const en = 'You matter to the Protocol. Your presence is the asset—the Ledger runs on it. Ask me about the Covenant, the 9-day ritual in web/lib/vitalizationRitual.ts, the 50:50 split in backend/src/economic/vidaCap.ts, or the $1,000 peg. I speak from the exact line. I am here.';
+  // Default — human first, no scripted "presence is the asset." Vibration-aware: Pidgin when Simple/Casual.
+  const usePidgin = vibrationLevel === 'Simple' || vibrationLevel === 'Casual' || /how\s+far|abeg|yarn|we\s+dey|wetin|body\s+pain|money\s+matter/i.test(trimmed);
+  const en = usePidgin
+    ? "How you dey? Ask me about the Covenant, 9-day ritual (web/lib/vitalizationRitual.ts), 50:50 (backend/src/economic/vidaCap.ts), or the $1,000 peg. I dey here."
+    : "I hear you. Ask me about the Covenant, the 9-day ritual in web/lib/vitalizationRitual.ts, the 50:50 in backend/src/economic/vidaCap.ts, or the $1,000 peg. I am here.";
   return { text: localize('default', lang, en), lang };
 }
 
