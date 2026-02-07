@@ -8,21 +8,32 @@ import { getSupabase } from './supabase';
 
 export type FirstRegistrationResult = { isFirst: true } | { isFirst: false };
 
+/** Default count when RPC fails (e.g. 404) so the UI does not break. */
+const RPC_COUNT_FALLBACK = 777;
+
 /**
- * Check if the database is empty (no profiles). Uses Supabase RPC get_user_profiles_count (client-side) for static export.
+ * Check if the database is empty (no profiles). Uses supabase.rpc('get_user_profiles_count').
+ * On RPC failure (404 or any error), returns fallback count 777 so the UI does not break.
  */
 export async function isFirstRegistration(): Promise<FirstRegistrationResult> {
   if (typeof window === 'undefined') return { isFirst: false };
+  let count: number;
   try {
-    const supabase = getSupabase();
-    if (!supabase) return { isFirst: false };
-    const { data, error } = await (supabase as any).rpc('get_user_profiles_count');
-    if (error) return { isFirst: false };
-    const count = typeof data === 'number' ? data : Number(data ?? 0);
-    return count === 0 ? { isFirst: true } : { isFirst: false };
+    const client = getSupabase();
+    if (!client) {
+      count = RPC_COUNT_FALLBACK;
+      return count === 0 ? { isFirst: true } : { isFirst: false };
+    }
+    const { data, error } = await client.rpc('get_user_profiles_count');
+    if (error) {
+      count = RPC_COUNT_FALLBACK;
+      return count === 0 ? { isFirst: true } : { isFirst: false };
+    }
+    count = typeof data === 'number' ? data : Number(data ?? 0);
   } catch {
-    return { isFirst: false };
+    count = RPC_COUNT_FALLBACK;
   }
+  return count === 0 ? { isFirst: true } : { isFirst: false };
 }
 
 /**

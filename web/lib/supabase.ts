@@ -1,36 +1,33 @@
 /**
- * Supabase client for National Pulse realtime (presence_handshakes).
- * Singleton: only one createClient() call for the app. Use the same instance everywhere to avoid auth/presence conflicts.
+ * Singleton Supabase client for National Pulse (presence_handshakes) and app-wide use.
+ * createClient is called only once; the same instance is exported and reused everywhere.
  * When NEXT_PUBLIC_SUPABASE_URL is missing, returns a mock client so the app does not crash.
  */
 
 import { createClient } from '@supabase/supabase-js';
 
-/** Singleton instance. Do not call createClient elsewhere. */
+declare global {
+  interface Window {
+    __PFF_SUPABASE__?: any;
+  }
+}
+
 let _supabase: any = null;
 let _initialized = false;
 let _isMock = false;
 
-/** Schema cache-bust: new value each page load so Supabase/PostgREST gets fresh schema. */
 const SCHEMA_REFRESH_TS = typeof window !== 'undefined' ? String(Date.now()) : '0';
 
-/** Custom fetch: no cache + cache-busting header to force fresh schema (avoids recovery_seed_encrypted Schema Cache errors). */
 function noCacheFetch(url: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const headers = new Headers(init?.headers ?? undefined);
   headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
   headers.set('Pragma', 'no-cache');
   headers.set('X-PFF-Schema-Refresh', SCHEMA_REFRESH_TS);
-  return fetch(url, {
-    ...init,
-    cache: 'no-store',
-    headers,
-  });
+  return fetch(url, { ...init, cache: 'no-store', headers });
 }
 
-/** Cached mock client — single instance so we never re-run or create new refs during render/SSR. */
 let _cachedMock: any = null;
 
-/** No-op mock so supabase.from().select().gte().order().limit() never throws when URL is missing. Initialized once. */
 function getMockClient(): any {
   if (_cachedMock) return _cachedMock;
   const resolved = Promise.resolve({ data: null, error: { message: 'Supabase URL not configured' } });
@@ -49,65 +46,61 @@ function getMockClient(): any {
     }),
     channel: () => ({ on: () => ({ subscribe: () => ({ unsubscribe: () => {} }) }) }),
     removeChannel: () => {},
+    rpc: () => resolved,
+    auth: { getUser: () => resolved },
   };
   return _cachedMock;
 }
 
-function initSupabase() {
+/** Create the client exactly once. Reuse window.__PFF_SUPABASE__ if already set. */
+function initSupabase(): void {
   if (_initialized) return;
-  if (_supabase && !_isMock) return;
+  if (typeof window !== 'undefined' && window.__PFF_SUPABASE__) {
+    _supabase = window.__PFF_SUPABASE__;
+    _initialized = true;
+    _isMock = false;
+    return;
+  }
   _initialized = true;
 
   const url = (typeof process !== 'undefined' ? (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '') : '').trim();
   const anon = (typeof process !== 'undefined' ? (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '') : '').trim();
 
   if (!url || !anon) {
-    const msg =
-      '[SUPABASE] Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY. Using mock client. Add env vars to .env.local or Netlify.';
-    console.warn(msg);
-    console.error('[SUPABASE] initSupabase: URL present=', !!url, 'anon present=', !!anon);
     _supabase = getMockClient();
     _isMock = true;
     return;
   }
 
-  // Format check: URL should be https://*.supabase.co; anon key should look like a JWT (three base64 segments)
-  const urlFormatOk = url.startsWith('https://') && url.includes('.supabase.co');
-  const anonFormatOk = anon.split('.').length === 3;
-  if (!urlFormatOk || !anonFormatOk) {
-    console.warn(
-      '[SUPABASE] Env format may be wrong: URL should be https://*.supabase.co; ANON_KEY should be a JWT. Check .env.local.'
-    );
-  }
-
   try {
     _supabase = createClient(url, anon, {
-      auth: {
-        autoRefreshToken: true,
-        persistSession: true,
-      },
-      global: {
-        fetch: noCacheFetch,
-      },
+      auth: { autoRefreshToken: true, persistSession: true },
+      global: { fetch: noCacheFetch },
     } as any);
     _isMock = false;
+    if (typeof window !== 'undefined') window.__PFF_SUPABASE__ = _supabase;
   } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    console.warn('[SUPABASE] Failed to create client (using mock):', msg);
-    console.error('[SUPABASE] createClient error:', error);
     _supabase = getMockClient();
     _isMock = true;
   }
 }
 
-// Initialize only in browser — outside component render cycle so it does not re-run on every click
 if (typeof window !== 'undefined') {
   initSupabase();
 }
 
-// Export the client (stable ref: real client or single cached mock)
-// @ts-ignore - Supabase client type inference
-export const supabase = _supabase ?? getMockClient();
+/** Returns the single Supabase instance. Use this or the exported `supabase` proxy. */
+export function getSupabase(): any {
+  if (typeof window !== 'undefined' && !_initialized) initSupabase();
+  return _supabase ?? getMockClient();
+}
+
+/** Single exported instance: every access delegates to getSupabase() so one client is used everywhere. */
+export const supabase = new Proxy({} as any, {
+  get(_, prop: string) {
+    return (getSupabase() as any)[prop];
+  },
+});
 
 export function hasSupabase(): boolean {
   if (typeof window === 'undefined') return false;
@@ -115,13 +108,18 @@ export function hasSupabase(): boolean {
   return !!_supabase && !_isMock;
 }
 
-/** Safe getter: returns real client or cached mock. Use when module may load before init. */
-export function getSupabase(): any {
-  if (typeof window !== 'undefined' && !_initialized) initSupabase();
-  return _supabase ?? getMockClient();
+/** Resolves when the Supabase client is fully initialized. Use before running presence checks to avoid undefined behavior. */
+export function whenSupabaseReady(): Promise<any> {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined') {
+      resolve(getMockClient());
+      return;
+    }
+    initSupabase();
+    resolve(getSupabase());
+  });
 }
 
-/** Handshake verification: ping Supabase on app startup. Returns ok + latency ms or error. Use to show "Reconnecting to Protocol" instead of crashing. */
 export async function testConnection(): Promise<
   { ok: true; latencyMs: number } | { ok: false; error: string }
 > {
@@ -133,12 +131,9 @@ export async function testConnection(): Promise<
   try {
     const { error } = await client.from('user_profiles').select('id').limit(1);
     const latencyMs = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - start);
-    if (error) {
-      return { ok: false, error: error.message ?? 'Query failed' };
-    }
+    if (error) return { ok: false, error: error.message ?? 'Query failed' };
     return { ok: true, latencyMs };
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return { ok: false, error: msg };
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
 }

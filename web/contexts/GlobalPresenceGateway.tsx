@@ -9,7 +9,7 @@ import { getMintStatusForPresence, MINT_STATUS_PENDING_HARDWARE, MINT_STATUS_MIN
 import { hasActiveSentinelLicense } from '@/lib/sentinelLicensing';
 import { getCurrentUserRole, setRoleCookie } from '@/lib/roleAuth';
 import { checkSessionIsolation, setSessionIdentity } from '@/lib/sessionIsolation';
-import { getSupabase, testConnection } from '@/lib/supabase';
+import { getSupabase, testConnection, whenSupabaseReady } from '@/lib/supabase';
 import { runDayZeroCheckAndClear } from '@/lib/dayZeroCheck';
 
 const HIGH_FIDELITY_GREETING = 'Architect recognized. Your presence is verified on the Ledger. My systems are fully aligned with your vision.';
@@ -152,8 +152,8 @@ export function GlobalPresenceGatewayProvider({ children }: { children: ReactNod
   }, []);
 
   /**
-   * Initial presence check on mount. Safety timeout so UI never stays blocked if check hangs.
-   * Mandatory Blockade: if route requires Sentinel License (Wallet or Partner API) and user has none, redirect to Sentinel Store.
+   * Initial presence check on mount. Deferred until after first paint so CSS loads before JS runs (avoids "Layout was forced").
+   * Safety timeout so UI never stays blocked if check hangs.
    */
   useEffect(() => {
     let cancelled = false;
@@ -240,9 +240,22 @@ export function GlobalPresenceGatewayProvider({ children }: { children: ReactNod
       }
     };
 
-    initializePresence();
+    // Presence lock: run check only after Supabase client is fully initialized to avoid undefined behavior.
+    const rafId = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (cancelled) return;
+        whenSupabaseReady()
+          .then(() => {
+            if (!cancelled) initializePresence();
+          })
+          .catch(() => {
+            if (!cancelled) initializePresence();
+          });
+      });
+    });
     return () => {
       cancelled = true;
+      if (typeof rafId === 'number') cancelAnimationFrame(rafId);
     };
   }, [pathname, router]);
 

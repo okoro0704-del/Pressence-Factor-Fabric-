@@ -41,6 +41,7 @@ export default function RootLayout({
     <html lang="en" className="dark">
       <head>
         <meta charSet="utf-8" />
+        <link rel="icon" href="/favicon.ico" sizes="any" />
         {/* No link rel="preload" for scripts: avoid console noise; add only if pointing to an existing file with as="script". */}
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#0A0A0A" />

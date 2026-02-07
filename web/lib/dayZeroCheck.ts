@@ -8,21 +8,32 @@ import { getSupabase } from './supabase';
 
 export type DayZeroResult = { empty: true } | { empty: false };
 
+/** Default count when RPC fails (e.g. 404) so the UI does not break. */
+const RPC_COUNT_FALLBACK = 777;
+
 /**
- * Check if the database has zero user_profiles (cleared). Calls RPC get_user_profiles_count via Supabase client.
+ * Check if the database has zero user_profiles (cleared). Uses supabase.rpc('get_user_profiles_count').
+ * On RPC failure (404 or any error), returns fallback count 777 so the UI does not break.
  */
 export async function checkDatabaseEmpty(): Promise<DayZeroResult> {
   if (typeof window === 'undefined') return { empty: false };
+  let count: number;
   try {
-    const supabase = getSupabase();
-    if (!supabase) return { empty: false };
-    const { data, error } = await (supabase as any).rpc('get_user_profiles_count');
-    if (error) return { empty: false };
-    const count = typeof data === 'number' ? data : Number(data ?? 0);
-    return count === 0 ? { empty: true } : { empty: false };
+    const client = getSupabase();
+    if (!client) {
+      count = RPC_COUNT_FALLBACK;
+      return count === 0 ? { empty: true } : { empty: false };
+    }
+    const { data, error } = await client.rpc('get_user_profiles_count');
+    if (error) {
+      count = RPC_COUNT_FALLBACK;
+      return count === 0 ? { empty: true } : { empty: false };
+    }
+    count = typeof data === 'number' ? data : Number(data ?? 0);
   } catch {
-    return { empty: false };
+    count = RPC_COUNT_FALLBACK;
   }
+  return count === 0 ? { empty: true } : { empty: false };
 }
 
 /**
