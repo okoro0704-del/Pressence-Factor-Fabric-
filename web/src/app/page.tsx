@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { SovereignManifestoLanding } from '@/components/SovereignManifestoLanding';
+import { SovereignAwakeningProvider } from '@/contexts/SovereignAwakeningContext';
 import { FourLayerGate } from '@/components/dashboard/FourLayerGate';
 import { AppErrorBoundary } from '@/components/AppErrorBoundary';
 import {
@@ -78,5 +79,9 @@ export default function Home() {
     );
   }
 
-  return <SovereignManifestoLanding />;
+  return (
+    <SovereignAwakeningProvider>
+      <SovereignManifestoLanding />
+    </SovereignAwakeningProvider>
+  );
 }

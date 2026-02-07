@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { getCountdownTarget, isArchitect } from '@/lib/manifestoUnveiling';
 import { insertWaitlistEntry } from '@/lib/waitlist';
 import { PublicSovereignCompanion } from '@/components/manifesto/PublicSovereignCompanion';
+import { SovereignAwakeningProvider, useSovereignAwakening } from '@/contexts/SovereignAwakeningContext';
+import { SCROLL_WISDOM } from '@/lib/sovereignAwakeningContent';
 
 const GOLD = '#D4AF37';
 const GOLD_DIM = 'rgba(212, 175, 55, 0.6)';
@@ -41,6 +43,8 @@ function useCountdown(target: Date) {
 
 const RATE_LIMIT_MS = 10000;
 
+const AWAKENING_SECTION_IDS = ['vida-cap', 'ate', 'vlt', 'ecosystem-roadmap', 'vanguard'] as const;
+
 export function SovereignManifestoLanding() {
   const [mounted, setMounted] = useState(false);
   const target = getCountdownTarget();
@@ -50,8 +54,29 @@ export function SovereignManifestoLanding() {
   const [vanguardStatus, setVanguardStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
   const [vanguardError, setVanguardError] = useState<string | null>(null);
   const lastSubmitAt = useRef<number>(0);
+  const awakening = useSovereignAwakening();
 
   useEffect(() => setMounted(true), []);
+
+  // Scroll-triggered wisdom: when a section enters view, set wisdom for the Companion
+  useEffect(() => {
+    if (!mounted || typeof window === 'undefined' || !awakening?.setScrollWisdom) return;
+    const els = AWAKENING_SECTION_IDS.map((id) => document.getElementById(id)).filter(Boolean) as HTMLElement[];
+    if (els.length === 0) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (!e.isIntersecting) continue;
+          const id = e.target.id as keyof typeof SCROLL_WISDOM;
+          const wisdom = SCROLL_WISDOM[id];
+          if (wisdom) awakening.setScrollWisdom(wisdom);
+        }
+      },
+      { threshold: 0.2, rootMargin: '0px 0px -20% 0px' }
+    );
+    els.forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, [mounted, awakening]);
 
   // Scroll to hash on load (e.g. /manifesto/#ecosystem-roadmap)
   useEffect(() => {
@@ -110,7 +135,12 @@ export function SovereignManifestoLanding() {
         <p className="text-xs font-semibold uppercase tracking-[0.35em] mb-4" style={{ color: GOLD_DIM }}>
           Presence Factor Fabric
         </p>
-        <h1 className="text-4xl md:text-6xl font-bold tracking-tight text-center max-w-3xl mb-4" style={{ color: GOLD }}>
+        <h1
+          className="text-4xl md:text-6xl font-bold tracking-tight text-center max-w-3xl mb-4"
+          style={{ color: GOLD }}
+          onMouseEnter={() => awakening?.setSocialScoutOffer(true)}
+          onMouseLeave={() => awakening?.setSocialScoutOffer(false)}
+        >
           The Sovereign Presentation
         </h1>
         <p className="text-lg max-w-xl text-center mb-12" style={{ color: MUTED }}>
@@ -198,8 +228,8 @@ export function SovereignManifestoLanding() {
         </div>
       </section>
 
-      {/* Other Terminologies */}
-      <section className="px-6 py-16 border-t" style={{ borderColor: BORDER, backgroundColor: CARD_BG }}>
+      {/* Other Terminologies — VIDA CAP */}
+      <section id="vida-cap" className="px-6 py-16 border-t scroll-mt-6" style={{ borderColor: BORDER, backgroundColor: CARD_BG }}>
         <div className="max-w-3xl mx-auto">
           <h2 className="text-xs font-semibold uppercase tracking-[0.3em] mb-10" style={{ color: GOLD_DIM }}>
             Other Terminologies
@@ -322,7 +352,7 @@ export function SovereignManifestoLanding() {
       </section>
 
       {/* ATE: Autonomous Truth Economy */}
-      <section className="px-6 py-16 border-t max-w-3xl mx-auto" style={{ borderColor: BORDER }}>
+      <section id="ate" className="px-6 py-16 border-t max-w-3xl mx-auto scroll-mt-6" style={{ borderColor: BORDER }}>
         <h2 className="text-xs font-semibold uppercase tracking-[0.3em] mb-6" style={{ color: GOLD_DIM }}>
           ATE: Autonomous Truth Economy
         </h2>
@@ -384,7 +414,8 @@ export function SovereignManifestoLanding() {
 
       {/* VLT: Vitalization Ledger Technology */}
       <section
-        className="px-6 py-16 border-t relative overflow-hidden"
+        id="vlt"
+        className="px-6 py-16 border-t relative overflow-hidden scroll-mt-6"
         style={{
           borderColor: BORDER,
           backgroundColor: '#030304',
@@ -842,6 +873,8 @@ export function SovereignManifestoLanding() {
                 disabled={vanguardStatus === 'submitting' || rateLimitActive}
                 className="shrink-0 px-6 py-3 rounded-lg font-semibold border-2 transition-colors disabled:opacity-60 hover:bg-[#16161a]"
                 style={{ borderColor: GOLD, color: GOLD }}
+                onMouseEnter={() => awakening?.setSocialScoutOffer(true)}
+                onMouseLeave={() => awakening?.setSocialScoutOffer(false)}
               >
                 {vanguardStatus === 'submitting' ? 'Joining…' : 'Join'}
               </button>

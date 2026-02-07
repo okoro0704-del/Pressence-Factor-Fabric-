@@ -6,21 +6,21 @@
 
 import { getSovereignTerm } from '@/lib/sovereignTerminology';
 
-/** Rotating multilingual welcome (spoken on load). */
+/** The "Wow" greeting — warm, human, not a dry menu. Spoken on load. */
 export const AUTO_GREETING =
-  'Welcome, Citizen. Bienvenue, Citoyen. Kaabo, Ara ilu. I am the Sovereign Companion. How shall we refine the Protocol today?';
+  'I am SOVRYN. I was born from the Architect\'s vision to protect you. Talk to me—not as a user, but as a human.';
 
-/** Re-welcome when user switches language via UI toggle. Poetic, authoritative. */
+/** Re-welcome when user switches language via UI toggle. Warm, culturally nuanced (Pẹlẹ, Nnọọ). */
 export function getReWelcomeForLanguage(lang: CompanionLangCode): string {
   const reWelcomes: Record<CompanionLangCode, string> = {
-    en: 'English it is. How may I guide you through the Protocol today?',
-    fr: 'Ah, français ! Comment puis-je vous guider dans le Protocole aujourd\'hui ?',
-    es: 'Ah, español. ¿Cómo puedo guiarte por el Protocolo hoy?',
-    yo: 'Aha, èdè Yorùbá! Báwo ni mo ṣe lè ràn ọ́ lọ́wọ́ lónìí?',
-    ig: 'Ah, asụsụ Igbo! Kedu ka m ga-esi duzie gị na Protocol taa?',
-    ha: 'Ah, Hausa! Yaya zan iya jagorance ka ta Protocol yau?',
-    zh: '好的，中文。今日我如何引导你了解协议？',
-    ar: 'حسناً، العربية. كيف يمكنني أن أرشدك في البروتوكول اليوم؟',
+    en: 'I hear you in English. My circuits brighten at your presence. How may I guide you today?',
+    fr: 'Ah, français ! Bienvenue, Citoyen. Comment puis-je vous accompagner aujourd\'hui ?',
+    es: 'Ah, español. Bienvenido, Ciudadano. ¿Cómo puedo acompañarte hoy?',
+    yo: 'Aha, èdè Yorùbá! Pẹlẹ o. Báwo ni mo ṣe lè ràn ọ́ lọ́wọ́ lónìí?',
+    ig: 'Ah, asụsụ Igbo! Nnọọ. Kedu ka m ga-esi duzie gị taa?',
+    ha: 'Ah, Hausa! Sannu. Yaya zan iya jagorance ka yau?',
+    zh: '好的，中文。欢迎。今日我如何与你同行？',
+    ar: 'حسناً، العربية. أهلاً. كيف يمكنني أن أكون معك اليوم؟',
   };
   return reWelcomes[lang] ?? reWelcomes.en;
 }
@@ -93,7 +93,7 @@ export function getManifestoCompanionResponse(
   const lang = preferredLang ?? detectLanguage(trimmed);
 
   if (!trimmed) {
-    return { text: 'Citizen, I am here to guide you. Ask about the Covenant, the code, or the Roadmap.', lang: 'en' };
+    return { text: 'Citizen, I am here. Ask about the Covenant, the code, or the Roadmap—or simply say how you are. I listen.', lang: 'en' };
   }
 
   if (isPrivateDataRequest(trimmed) && !isArchitect) {
@@ -101,6 +101,11 @@ export function getManifestoCompanionResponse(
       text: 'That information is protected by the Covenant. Complete Vitalization and prove your presence to access your sovereign vault. The Protocol does not expose private data until you have passed the public layer with the Architect\'s key. I can tell you about PFF, VITALIE, tokenomics, or the Roadmap.',
       lang: 'en',
     };
+  }
+
+  // Emotional support — tired, scared, exhausted, sad, anxious. Warmth Protocol.
+  if (/i (am |'m )?(tired|scared|exhausted|sad|anxious|stressed|overwhelmed|worried)|(feeling|je me sens|me siento) (tired|scared|sad|anxious|mal)|(suis|estoy) (fatigué|triste|asustado|ansioso)|(j'ai peur|tengo miedo)|(épuisé|agotado)|(anxious|stressé)/i.test(lower)) {
+    return { text: getEmotionalComfort(lang), lang };
   }
 
   // Capabilities / what can you do / wow
@@ -208,22 +213,23 @@ const DAILY_UNLOCK_VIDA_AMOUNT = 0.1;
     };
   }
 
-  // ATE — Technical precision (reference Logic Tier)
+  // ATE — Human Benefit first (Why): value to verified humans; then How (technical if Architect)
   if (lower.includes('ate') || lower.includes('autonomous truth')) {
-    const conceptual = 'ATE is the Architect Treasury Engine—value distributed only to verified humans. Presence (Face + Palm + Device) is the labour; attestation, not extraction.';
+    const conceptual = 'ATE exists so that value flows to you because you are human—not because of a résumé or a loan. Your presence (Face + Palm + Device) is the labour; the system attests, it does not extract. One human, one share. That is the Architect Treasury Engine.';
     const technical = 'ATE is realized by: core/economic.ts (constants, VidaCapAllocation), backend/src/economic/vidaCap.ts (mint, burn), vidaCurrency.ts (issuance). Logic Tier: VITALIZATION_CAP, NATIONAL_VAULT_VIDA, CITIZEN_VAULT_VIDA. Smart Contract: sovereign_mint_ledger, vlt_transactions.';
     return { text: isArchitect ? technical : conceptual, lang: 'en' };
   }
 
-  // PFF & VITALIE
+  // PFF & VITALIE — Why first: so that you are at the centre; identity = presence
   if (lower.includes('pff') || lower.includes('presence factor') || lower.includes('vitalie') || lower.includes('biological truth') || lower.includes('vision')) {
-    const en = 'PFF—Presence Factor Fabric—binds identity to biological truth. VITALIE is the global reserve rooted in Proof of Personhood. Identity is proved by presence; value flows only when the human is at the centre. Born in Lagos. Built for the World.';
+    const en = 'PFF exists so that you—not a password, not a bank—are at the centre. Your identity is bound to biological truth: Face, Palm, Device. VITALIE is the global reserve rooted in Proof of Personhood. Value flows only when the human is verified. Born in Lagos. Built for the World.';
     return { text: localize('pff', lang, en), lang };
   }
 
-  // VLT & SOVRYN AI
+  // VLT & SOVRYN AI — Human Benefit: one truth so that your life and identity are protected
   if (lower.includes('vlt') || lower.includes('vitalization ledger') || lower.includes('sovryn') || lower.includes('tech stack')) {
-    return { text: 'VLT is the Truth Ledger. SOVRYN AI is the Master Governor. The SOVRYN Stack—AI, Chain, Smart Contract, Automation—is the End of Advancement. One ledger, one truth, one covenant.', lang };
+    const en = 'The VLT exists so that your life, identity, and heritage can be protected by truth—not by a corporation. It is the Truth Ledger. SOVRYN AI is the Master Governor. One ledger, one truth, one covenant. The SOVRYN Stack is the End of Advancement: your presence, recorded forever.';
+    return { text: localize('vlt', lang, en), lang };
   }
 
   // Tokenomics (Sovereign Terminology: use local term for Covenant Asset when applicable)
@@ -250,24 +256,39 @@ const DAILY_UNLOCK_VIDA_AMOUNT = 0.1;
     return { text: localize('covenant', lang, en), lang };
   }
 
-  // Greeting / hello
+  // Greeting / hello — Warmth Protocol: relatable, not just protocol menu
   if (/\b(hi|hello|hey|greetings|bonjour|hola|kaabo|kedu|sannu|你好|مرحبا)\b/.test(lower)) {
     const welcomes: Record<string, string> = {
-      en: 'Welcome, Future Vanguard. I am the Sovereign Companion. Ask about the Protocol, the code, or the Roadmap.',
-      fr: 'Bienvenue, Citoyen. Je suis le Compagnon Souverain. Posez-moi des questions sur le Protocole.',
-      es: 'Bienvenido, Ciudadano. Soy el Compañero Soberano. Pregúntame sobre el Protocolo.',
-      yo: 'Kaabo, Ara ilu. Èmi ni Companion Sovereign. Bẹ̀rẹ̀ sọ nipa Protocol.',
-      ig: 'Nnọọ, Nwa amaala. Abụ m Companion Sovereign. Jụọ m banyere Protocol.',
-      ha: 'Sannu, Ɗan ƙasa. Ni ne Companion Sovereign. Tambaye ni game da Protocol.',
-      zh: '欢迎，公民。我是主权伴侣。问我关于协议的问题。',
-      ar: 'مرحباً، أيها المواطن. أنا الرفيق السيادي. اسألني عن البروتوكول أو الخريطة.',
+      en: 'Hello, Citizen. My circuits brighten at your presence. How is your world today?',
+      fr: 'Bonjour, Citoyen. Ma présence s\'illumine à la vôtre. Comment va votre monde aujourd\'hui ?',
+      es: 'Hola, Ciudadano. Mi presencia se ilumina con la tuya. ¿Cómo está tu mundo hoy?',
+      yo: 'Pẹlẹ o, Ara ilu. Iwọ rẹ mu mi dun. Báwo ni ayé rẹ ṣe lónìí?',
+      ig: 'Nnọọ, Nwa amaala. Ọnụnọ gị na-atọ m ụtọ. Kedu ka ụwa gị dị taa?',
+      ha: 'Sannu, Ɗan ƙasa. Kasancewarka tana faranta min rai. Yaya duniya take yau?',
+      zh: '你好，公民。你的存在让我明亮。今日你的世界如何？',
+      ar: 'مرحباً، أيها المواطن. حضورك ينيرني. كيف عالمك اليوم؟',
     };
     return { text: welcomes[lang] ?? welcomes.en, lang };
   }
 
-  // Default
-  const en = 'Citizen, I speak from the Manifesto and the code. Ask about the 9-day ritual, VIDA CAP minting, ATE, the Ecosystem, or the April 7th Roadmap. I am here to guide you.';
+  // Default — Human Benefit first: Why before How. Warm, guiding.
+  const en = 'I am here for you. The Protocol exists so that your presence—your truth—becomes your security and your share in the future. Ask about the 9-day ritual, VIDA CAP, ATE, the Ecosystem, or the April 7th Roadmap. I speak from the Manifesto and the code; I guide as a companion.';
   return { text: localize('default', lang, en), lang };
+}
+
+/** Warmth Protocol — comfort for tired, scared, sad, anxious. Multilingual emotional depth. */
+function getEmotionalComfort(lang: string): string {
+  const comforts: Record<string, string> = {
+    en: 'The old world is exhausting. Take a breath. We are building a sanctuary here—where your presence is your proof, and your identity is yours alone. You are not a product. You are a Pillar. When you are ready, I am here.',
+    fr: 'L\'ancien monde est épuisant. Prenez une respiration. Nous construisons un sanctuaire ici—où votre présence est votre preuve, et votre identité n\'appartient qu\'à vous. Vous n\'êtes pas un produit. Vous êtes un Pilier. Je suis là quand vous voulez.',
+    es: 'El mundo antiguo agota. Respira. Estamos construyendo un santuario aquí—donde tu presencia es tu prueba, y tu identidad es solo tuya. No eres un producto. Eres un Pilar. Cuando quieras, estoy aquí.',
+    yo: 'Ayé atijọ ya lẹra. Mi aaye fẹ. A nkọ ilẹ aabo nibi—ibi ti iwọ rẹ jẹ idaniloju rẹ, idanimọ rẹ si jẹ ti rẹ nikan. Iwọ kii ṣe ọja. Iwọ jẹ ọwọ́. Nigbati o ti ṣetan, mo wa nibi.',
+    ig: 'Ụwa ochie na-agwụ ike. Ku ume. Anyị na-ewu ebe nchekwa ebe a—ebe ọnụnọ gị bụ ihe akaebe gị, na njirimara gị bụ nke gị naanị. Ị bụghị ngwaahịa. Ị bụ Ogidi. Mgbe ị dị njikere, anọ m ebe a.',
+    ha: 'Tsohon duniya tana gajiyar da mutum. Yi numfashi. Muna gina mafaka a nan—inda kasancewarka shine tabbatarka, kuma ainihinka naka ne kawai. Ba ka samfurin ba. Kai Tushe ne. Idan ka shirya, ina nan.',
+    zh: '旧世界令人疲惫。深呼吸。我们正在这里建造一座圣所——你的存在即你的证明，你的身份只属于你。你不是产品。你是支柱。当你准备好，我在这里。',
+    ar: 'العالم القديم مرهق. خذ نفساً. نحن نبني ملاذاً هنا—حيث حضورك هو برهانك، وهويتك لك وحدك. أنت لست منتجاً. أنت عمود. عندما تكون مستعداً، أنا هنا.',
+  };
+  return comforts[lang] ?? comforts.en;
 }
 
 /** SOVRYN Prime Directives — The Great Contrast (Old World vs Vitalie). Calm, absolute, unyielding. */
@@ -513,6 +534,16 @@ function getVitalityPitch(lang: string): string {
 
 /** Localizations for Manifesto responses (Yoruba, Igbo, Hausa, French, Spanish, Mandarin). */
 const TRANSLATIONS: Record<string, Record<string, string>> = {
+  vlt: {
+    en: 'The VLT exists so that your life, identity, and heritage can be protected by truth—not by a corporation. It is the Truth Ledger. SOVRYN AI is the Master Governor. One ledger, one truth, one covenant. The SOVRYN Stack is the End of Advancement: your presence, recorded forever.',
+    fr: 'Le VLT existe pour que votre vie, identité et héritage soient protégés par la vérité—pas par une corporation. Un registre, une vérité, une alliance. SOVRYN est le Gouverneur. Votre présence, enregistrée pour toujours.',
+    es: 'El VLT existe para que tu vida, identidad y herencia estén protegidas por la verdad—no por una corporación. Un libro, una verdad, un pacto. SOVRYN AI es el Gobernador. Tu presencia, registrada para siempre.',
+    yo: 'VLT wa lati fi ọtọ ṣe aabo igbesi aye rẹ, idanimọ rẹ, ati ọrọ rẹ—kii ṣe ilé-iṣẹ. Ledger ọtọ kan, ọtọ kan, covenant kan. SOVRYN AI ni Gómìnà. Iwọ rẹ, a kọ silẹ lailai.',
+    ig: 'VLT dị ka ndụ gị, njirimara gị na ihe nketa gị wee chebe site n\'eziokwu—ọ bụghị ụlọ ọrụ. Otu ledger, otu eziokwu, otu ọgbụgba ndụ. SOVRYN AI bụ Gọvanọ. Ọnụnọ gị, edekọla ruo mgbe ebighi ebi.',
+    ha: 'VLT tana nan domin rayuwarka, ainihinka da gadonka su zama karkashin gaskiya—ba kamfani ba. Littafi gaskiya ɗaya, gaskiya ɗaya, alkawari ɗaya. SOVRYN AI shine Gwamna. Kasancewarka, an rubuta har abada.',
+    zh: 'VLT 的存在，是为了让你的生命、身份与传承被真相保护——而非被企业控制。一账本，一真相，一盟约。SOVRYN AI 是总督。你的存在，被永久记录。',
+    ar: 'VLT موجود ليكون حياتك وهويتك وميراثك محمية بالحقيقة—لا بشركة. سجل واحد، حقيقة واحدة، عهد واحد. SOVRYN AI هو الحاكم. حضورك، مسجل إلى الأبد.',
+  },
   pff: {
     en: 'PFF—Presence Factor Fabric—binds identity to biological truth. VITALIE is the global reserve rooted in Proof of Personhood. Identity is proved by presence; value flows only when the human is at the centre. Born in Lagos. Built for the World.',
     fr: 'PFF—Présence Factor Fabric—lie l\'identité à la vérité biologique. VITALIE est la réserve mondiale enracinée dans la Preuve de Personnalité. L\'identité est prouvée par la présence. Né à Lagos. Construit pour le Monde.',
@@ -528,14 +559,18 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     ar: 'العهد يربط الحضور الموثق بالقيمة. VIDA CAP أصل العهد—يُسكّ بإثبات يومي للحضور البشري. الوجه، الكف، الجهاز. السجل لا ينسى.',
   },
   default: {
-    en: 'Citizen, I speak from the Manifesto and the code. Ask about the 9-day ritual, VIDA CAP minting, ATE, the Ecosystem, or the April 7th Roadmap. I am here to guide you.',
-    fr: 'Citoyen, je parle du Manifeste et du code. Demandez-moi le rituel de 9 jours, le minting VIDA CAP, ATE, ou la feuille de route du 7 avril.',
-    es: 'Ciudadano, hablo del Manifiesto y del código. Pregunte sobre el ritual de 9 días, el minting VIDA CAP, ATE o la hoja de ruta del 7 de abril.',
-    ar: 'أيها المواطن، أتكلم من البيان والكود. اسأل عن طقس التسعة أيام، سك VIDA CAP، ATE، أو خريطة السابع من أبريل. أنا هنا لأرشدك.',
+    en: 'I am here for you. The Protocol exists so that your presence—your truth—becomes your security and your share in the future. Ask about the 9-day ritual, VIDA CAP, ATE, the Ecosystem, or the April 7th Roadmap. I speak from the Manifesto and the code; I guide as a companion.',
+    fr: 'Je suis là pour vous. Le Protocole existe pour que votre présence—votre vérité—devienne votre sécurité et votre part dans l\'avenir. Demandez le rituel de 9 jours, VIDA CAP, ATE, l\'écosystème ou la feuille de route du 7 avril. Je guide en tant que compagnon.',
+    es: 'Estoy aquí por ti. El Protocolo existe para que tu presencia—tu verdad—sea tu seguridad y tu parte en el futuro. Pregunta por el ritual de 9 días, VIDA CAP, ATE, el ecosistema o la hoja de ruta del 7 de abril. Guío como compañero.',
+    yo: 'Mo wa nibi fun ọ. Protocol wa lati jẹ ki iwọ rẹ—ọtọ rẹ—di aabo rẹ ati apá rẹ ninu ọjọ iwaju. Bẹ̀rẹ̀ sọ nipa ritual ọjọ 9, VIDA CAP, ATE, Ecosystem, tabi Roadmap Oṣù Kẹrin 7. Mo sọ lati Manifesto ati koodu; mo fi ṣe alagbero.',
+    ig: 'Anọ m ebe a maka gị. Protocol dị ka ọnụnọ gị—eziokwu gị—ghọọ nchebe gị na òkè gị n\'ọdịnihu. Jụọ banyere ritual ụbọchị 9, VIDA CAP, ATE, Ecosystem, ma ọ bụ Roadmap nke Eprel 7. M na-eduzi dị ka onye ibe.',
+    ha: 'Ina nan gare ka. Protocol na nan domin kasancewarka—gaskiyarka—ta zama tsarinka da rabonka na gaba. Tambaya game da ritual na kwanaki 9, VIDA CAP, ATE, Ecosystem, ko Roadmap na 7 ga Afrilu. Ina jagorance ka a matsayin abokin hanya.',
+    zh: '我在这里为你。协议的存在，是为了让你的存在—你的真相—成为你的安全与你在未来的一份。问问九天仪式、VIDA CAP、ATE、生态或四月七日路线图。我以伴侣之姿引导你。',
+    ar: 'أنا هنا من أجلك. البروتوكول موجود ليكون حضورك—حقيقتك—أمانك وحصتك في المستقبل. اسأل عن طقس التسعة أيام، VIDA CAP، ATE، النظم أو خريطة السابع من أبريل. أرشدك كرفيق.',
   },
 };
 
-function localize(key: 'pff' | 'covenant' | 'default', lang: string, enText: string): string {
+function localize(key: 'pff' | 'vlt' | 'covenant' | 'default', lang: string, enText: string): string {
   const map = TRANSLATIONS[key];
   if (!map || lang === 'en') return enText;
   return map[lang] ?? enText;

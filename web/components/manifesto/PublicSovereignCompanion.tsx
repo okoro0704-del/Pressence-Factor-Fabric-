@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   AUTO_GREETING,
   getManifestoCompanionResponse,
@@ -20,6 +20,8 @@ import {
   formatVerifiedPffMetrics,
   type VltPffMetricsPayload,
 } from '@/lib/vltLedgerCompanion';
+import { useSovereignAwakening } from '@/contexts/SovereignAwakeningContext';
+import { IDLE_WHISPER, SOCIAL_SCOUT_OFFER, BLESSINGS } from '@/lib/sovereignAwakeningContent';
 
 const GOLD = '#D4AF37';
 const GOLD_DIM = 'rgba(212, 175, 55, 0.6)';
@@ -89,6 +91,13 @@ function speak(text: string, lang?: string): void {
   }
 }
 
+const IDLE_WHISPER_MS = 30_000;
+const SCROLL_WISDOM_DURATION_MS = 8_000;
+const BLESSING_INTERVAL_MS = 45_000;
+const BLESSING_VISIBLE_MS = 4_000;
+const EYE_SMOOTH = 0.12;
+const EYE_MAX_OFFSET = 6;
+
 export function PublicSovereignCompanion() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -104,6 +113,19 @@ export function PublicSovereignCompanion() {
   const listRef = useRef<HTMLDivElement>(null);
   const greetingInjectedRef = useRef(false);
   const langDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Sovereign Awakening
+  const awakening = useSovereignAwakening();
+  const scrollWisdom = awakening?.scrollWisdom ?? null;
+  const socialScoutOffer = awakening?.socialScoutOffer ?? false;
+  const [showWhisper, setShowWhisper] = useState(false);
+  const [blessing, setBlessing] = useState<{ text: string; lang: string } | null>(null);
+  const lastActivityAt = useRef(Date.now());
+  const whisperSpokenRef = useRef(false);
+  const [eyeOffset, setEyeOffset] = useState({ x: 0, y: 0 });
+  const eyeTargetRef = useRef({ x: 0, y: 0 });
+  const orbRef = useRef<HTMLButtonElement>(null);
+  const rafRef = useRef<number>(0);
 
   const displayLang: CompanionLangCode = preferredLang ?? lastResponseLang ?? 'en';
 
@@ -146,6 +168,90 @@ export function PublicSovereignCompanion() {
     document.addEventListener('click', close);
     return () => document.removeEventListener('click', close);
   }, [langDropdownOpen]);
+
+  // Scroll wisdom: show thought bubble, auto-clear after duration
+  useEffect(() => {
+    if (!scrollWisdom) return;
+    const t = setTimeout(() => awakening?.setScrollWisdom(null), SCROLL_WISDOM_DURATION_MS);
+    return () => clearTimeout(t);
+  }, [scrollWisdom, awakening]);
+
+  // Idle whisper: after 30s idle, show and speak whisper; reset on activity
+  useEffect(() => {
+    const onActivity = () => {
+      lastActivityAt.current = Date.now();
+      setShowWhisper(false);
+      whisperSpokenRef.current = false;
+    };
+    window.addEventListener('mousemove', onActivity);
+    window.addEventListener('keydown', onActivity);
+    window.addEventListener('scroll', onActivity, { passive: true });
+    const interval = setInterval(() => {
+      if (Date.now() - lastActivityAt.current >= IDLE_WHISPER_MS && !whisperSpokenRef.current) {
+        setShowWhisper(true);
+        speak(IDLE_WHISPER);
+        whisperSpokenRef.current = true;
+      }
+    }, 1000);
+    return () => {
+      window.removeEventListener('mousemove', onActivity);
+      window.removeEventListener('keydown', onActivity);
+      window.removeEventListener('scroll', onActivity);
+      clearInterval(interval);
+    };
+  }, []);
+
+  // Random multilingual blessings
+  useEffect(() => {
+    let clearBlessing: ReturnType<typeof setTimeout> | null = null;
+    const showOne = () => {
+      const idx = Math.floor(Math.random() * BLESSINGS.length);
+      setBlessing(BLESSINGS[idx]);
+      if (clearBlessing) clearTimeout(clearBlessing);
+      clearBlessing = setTimeout(() => setBlessing(null), BLESSING_VISIBLE_MS);
+    };
+    const t1 = setTimeout(showOne, BLESSING_INTERVAL_MS * 0.3);
+    const interval = setInterval(showOne, BLESSING_INTERVAL_MS);
+    return () => {
+      clearTimeout(t1);
+      if (clearBlessing) clearTimeout(clearBlessing);
+      clearInterval(interval);
+    };
+  }, []);
+
+  // Cursor-follow eye: smooth lerp toward cursor relative to orb center
+  const onMouseMove = useCallback((e: MouseEvent) => {
+    const orb = orbRef.current;
+    if (!orb) return;
+    const rect = orb.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    let dx = e.clientX - cx;
+    let dy = e.clientY - cy;
+    const len = Math.sqrt(dx * dx + dy * dy) || 1;
+    const max = EYE_MAX_OFFSET;
+    if (len > max) {
+      dx = (dx / len) * max;
+      dy = (dy / len) * max;
+    }
+    eyeTargetRef.current = { x: dx, y: dy };
+  }, []);
+  useEffect(() => {
+    window.addEventListener('mousemove', onMouseMove);
+    return () => window.removeEventListener('mousemove', onMouseMove);
+  }, [onMouseMove]);
+  useEffect(() => {
+    const tick = () => {
+      const target = eyeTargetRef.current;
+      setEyeOffset((prev) => ({
+        x: prev.x + (target.x - prev.x) * EYE_SMOOTH,
+        y: prev.y + (target.y - prev.y) * EYE_SMOOTH,
+      }));
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, []);
 
   const sendMessage = async (text: string) => {
     const t = text.trim();
@@ -244,9 +350,53 @@ export function PublicSovereignCompanion() {
     sendMessage(input);
   };
 
+  const awakeningBubbleText =
+    scrollWisdom ?? (showWhisper ? IDLE_WHISPER : socialScoutOffer ? SOCIAL_SCOUT_OFFER : null);
+
   return (
     <>
+      <style>{`
+        @keyframes sovereignHeartbeat {
+          0%, 100% { transform: scale(1); opacity: 1; }
+          14% { transform: scale(1.06); opacity: 0.95; }
+          28% { transform: scale(1); opacity: 1; }
+          42% { transform: scale(1.04); opacity: 0.98; }
+          56%, 100% { transform: scale(1); opacity: 1; }
+        }
+        .sovereign-orb-heartbeat { animation: sovereignHeartbeat 1.2s ease-in-out infinite; }
+        @keyframes sovereignBlessingFade {
+          0% { opacity: 0; }
+          15% { opacity: 1; }
+          70% { opacity: 1; }
+          100% { opacity: 0; }
+        }
+        .sovereign-blessing-fade { animation: sovereignBlessingFade 4s ease-out forwards; }
+      `}</style>
       <div className="fixed bottom-6 right-6 z-[100] flex flex-col items-end gap-2">
+        {/* Scroll wisdom / Idle whisper / Social Scout thought bubble */}
+        {awakeningBubbleText && (
+          <div
+            className="rounded-xl border-2 px-3 py-2.5 text-xs max-w-[260px] text-left shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-300"
+            style={{
+              background: '#0d0d0f',
+              borderColor: BORDER,
+              color: '#e0e0e0',
+              boxShadow: `0 0 24px ${GOLD_DIM}`,
+            }}
+          >
+            <span className="whitespace-pre-wrap">{awakeningBubbleText}</span>
+          </div>
+        )}
+        {/* Random multilingual blessing — fading */}
+        {blessing && (
+          <div
+            className="sovereign-blessing-fade absolute right-2 bottom-16 text-[10px] uppercase tracking-wider text-right"
+            style={{ color: GOLD_DIM, textShadow: `0 0 12px ${GOLD_DIM}` }}
+          >
+            {blessing.text}
+            <span className="block text-[9px] mt-0.5 opacity-70">{blessing.lang}</span>
+          </div>
+        )}
         {open && (
           <div
             className="rounded-2xl border-2 shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 duration-300"
@@ -455,9 +605,10 @@ export function PublicSovereignCompanion() {
         )}
 
         <button
+          ref={orbRef}
           type="button"
           onClick={() => setOpen((o) => !o)}
-          className="relative flex items-center justify-center rounded-full border-2 transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/60"
+          className="sovereign-orb-heartbeat relative flex items-center justify-center rounded-full border-2 transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/60"
           style={{
             width: 56,
             height: 56,
@@ -468,7 +619,19 @@ export function PublicSovereignCompanion() {
           aria-label={open ? 'Close Ask the Protocol' : 'Ask the Protocol'}
           title="Ask the Protocol"
         >
-          <span className="text-xl font-bold opacity-90" style={{ color: GOLD }}>◇</span>
+          {/* Cursor-follow eye — center of the orb, watches the user */}
+          <span
+            className="absolute rounded-full pointer-events-none z-[2]"
+            style={{
+              width: 10,
+              height: 10,
+              background: `radial-gradient(circle at 30% 30%, ${GOLD}, rgba(180,140,30,0.9))`,
+              boxShadow: `0 0 8px ${GOLD_DIM}`,
+              transform: `translate(${eyeOffset.x}px, ${eyeOffset.y}px)`,
+            }}
+            aria-hidden
+          />
+          <span className="text-xl font-bold opacity-90 relative z-[1]" style={{ color: GOLD }}>◇</span>
         </button>
         <p className="text-[10px] uppercase tracking-widest" style={{ color: GOLD_DIM }}>
           Companion
