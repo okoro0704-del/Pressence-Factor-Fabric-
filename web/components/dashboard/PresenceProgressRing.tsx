@@ -1,9 +1,11 @@
 'use client';
 
 /**
- * Triple-Pillar Shield Progress Ring: Device Signature → GPS Presence → Sovereign Face → Sovereign Palm.
- * Each segment turns gold when that pillar is verified. 200ms transition for instant feedback.
+ * Triple-Pillar Shield Progress Ring: Sovereign Face → Sovereign Palm → Identity Anchor.
+ * Optional 4th segment when ENABLE_GPS_AS_FOURTH_PILLAR. Each segment turns gold when verified. 200ms transition.
  */
+
+import { ENABLE_GPS_AS_FOURTH_PILLAR, PILLAR_LABEL_FACE, PILLAR_LABEL_PALM, PILLAR_LABEL_IDENTITY_ANCHOR, PILLAR_LABEL_GPS } from '@/lib/constants';
 
 const GOLD = '#D4AF37';
 const PENDING = 'rgba(107, 107, 112, 0.4)';
@@ -25,41 +27,31 @@ function segmentPath(startAngle: number, endAngle: number): string {
 }
 
 export interface PresenceProgressRingProps {
-  deviceVerified: boolean;
-  locationVerified: boolean;
   faceVerified: boolean;
-  voiceVerified?: boolean;
-  /** Show 4th segment (Sovereign Palm) or only 3 pillars */
-  showVoice?: boolean;
-  /** When false (mobile short-circuit), show only 2 segments: GPS Presence + Sovereign Face. Palm deferred to hub. */
-  showDevicePillar?: boolean;
+  palmVerified: boolean;
+  phoneAnchorVerified: boolean;
+  /** Only used when ENABLE_GPS_AS_FOURTH_PILLAR is true */
+  locationVerified?: boolean;
 }
 
 export function PresenceProgressRing({
-  deviceVerified,
-  locationVerified,
   faceVerified,
-  voiceVerified = false,
-  showVoice = true,
-  showDevicePillar = true,
+  palmVerified,
+  phoneAnchorVerified,
+  locationVerified = false,
 }: PresenceProgressRingProps) {
-  const twoPillarMobile = !showDevicePillar;
-  const segments = twoPillarMobile ? 2 : showVoice ? 4 : 3;
+  const showGpsPillar = ENABLE_GPS_AS_FOURTH_PILLAR;
+  const segments = showGpsPillar ? 4 : 3;
   const step = 360 / segments;
-  const segmentAngles = twoPillarMobile
-    ? [
-        { start: 0, end: 180, verified: locationVerified },
-        { start: 180, end: 360, verified: faceVerified },
-      ]
-    : Array.from({ length: segments }, (_, i) => ({
-        start: i * step,
-        end: (i + 1) * step,
-        verified:
-          (i === 0 && deviceVerified) ||
-          (i === 1 && locationVerified) ||
-          (i === 2 && faceVerified) ||
-          (i === 3 && voiceVerified),
-      }));
+  const segmentAngles = Array.from({ length: segments }, (_, i) => ({
+    start: i * step,
+    end: (i + 1) * step,
+    verified:
+      (i === 0 && faceVerified) ||
+      (i === 1 && palmVerified) ||
+      (i === 2 && phoneAnchorVerified) ||
+      (i === 3 && locationVerified),
+  }));
 
   return (
     <div className="flex flex-col items-center gap-3">
@@ -84,26 +76,22 @@ export function PresenceProgressRing({
         ))}
       </svg>
       <div className="flex flex-wrap justify-center gap-2 text-xs">
-        {!twoPillarMobile && (
-          <>
-            <span className={deviceVerified ? 'text-[#D4AF37] font-semibold' : 'text-[#6b6b70]'}>
-              Device Sig. {deviceVerified ? '✓' : '…'}
-            </span>
-            <span className="text-[#4a4a4e]">·</span>
-          </>
-        )}
-        <span className={locationVerified ? 'text-[#D4AF37] font-semibold' : 'text-[#6b6b70]'}>
-          GPS Presence {locationVerified ? '✓' : '…'}
+        <span className={faceVerified ? 'text-[#D4AF37] font-semibold' : 'text-[#6b6b70]'}>
+          {PILLAR_LABEL_FACE} {faceVerified ? '✓' : '…'}
         </span>
         <span className="text-[#4a4a4e]">·</span>
-        <span className={faceVerified ? 'text-[#D4AF37] font-semibold' : 'text-[#6b6b70]'}>
-          Sovereign Face {faceVerified ? '✓' : '…'}
+        <span className={palmVerified ? 'text-[#D4AF37] font-semibold' : 'text-[#6b6b70]'}>
+          {PILLAR_LABEL_PALM} {palmVerified ? '✓' : '…'}
         </span>
-        {showVoice && showDevicePillar && (
+        <span className="text-[#4a4a4e]">·</span>
+        <span className={phoneAnchorVerified ? 'text-[#D4AF37] font-semibold' : 'text-[#6b6b70]'}>
+          {PILLAR_LABEL_IDENTITY_ANCHOR} {phoneAnchorVerified ? '✓' : '…'}
+        </span>
+        {showGpsPillar && (
           <>
             <span className="text-[#4a4a4e]">·</span>
-            <span className={voiceVerified ? 'text-[#D4AF37] font-semibold' : 'text-[#6b6b70]'}>
-              Sovereign Palm {voiceVerified ? '✓' : '…'}
+            <span className={locationVerified ? 'text-[#D4AF37] font-semibold' : 'text-[#6b6b70]'}>
+              {PILLAR_LABEL_GPS} {locationVerified ? '✓' : '…'}
             </span>
           </>
         )}

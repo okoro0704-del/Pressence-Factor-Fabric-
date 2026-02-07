@@ -7,7 +7,14 @@
  * is built solely from this payload. On 4xx/5xx or timeout, client uses Linguistic Adaptation (no error UI).
  *
  * Netlify: redirect to web/netlify/functions/sovereign-recognition.js; set env vars in Netlify dashboard.
+ *
+ * Brevity Constraint (injected into Companion system prompt):
+ * Your responses must be ultra-concise. For greetings or simple check-ins, do not exceed 15 words.
+ * Avoid manifestos unless explicitly asked for a deep dive. Focus on being a partner, not a lecturer.
+ * Simple test/greeting reply: "I see you, Architect. The pulse is steady. How are you?"
  */
+export const SOVEREIGN_RECOGNITION_BREVITY_INSTRUCTION =
+  'Your responses must be ultra-concise. For greetings or simple check-ins, do not exceed 15 words. Avoid manifestos unless explicitly asked for a deep dive. Focus on being a partner, not a lecturer.';
 
 import { NextRequest, NextResponse } from 'next/server';
 import type { CompanionLangCode } from '@/lib/manifestoCompanionKnowledge';

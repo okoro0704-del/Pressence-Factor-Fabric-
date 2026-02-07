@@ -14,6 +14,7 @@ import {
   startLocationRequestFromUserGesture,
   getCompositeDeviceFingerprint,
   SCAN_TIMEOUT_MS,
+  MOBILE_SCAN_TIMEOUT_MS,
 } from '@/lib/biometricAuth';
 import { PresenceProgressRing } from './PresenceProgressRing';
 import type { GlobalIdentity } from '@/lib/phoneIdentity';
@@ -93,10 +94,17 @@ const PalmPulseCapture = dynamic(
   () => import('@/components/auth/PalmPulseCapture').then((m) => ({ default: m.PalmPulseCapture })),
   { ssr: false }
 );
+const SovereignPalmScan = dynamic(
+  () => import('@/components/auth/SovereignPalmScan').then((m) => ({ default: m.SovereignPalmScan })),
+  { ssr: false }
+);
 import { DailyUnlockCelebration } from '@/components/dashboard/DailyUnlockCelebration';
 import { useSovereignCompanion } from '@/contexts/SovereignCompanionContext';
 import { getNativeAppUrl } from '@/lib/appStoreUrls';
 import { IS_PUBLIC_REVEAL, isVettedUser } from '@/lib/publicRevealAccess';
+import { ENABLE_GPS_AS_FOURTH_PILLAR } from '@/lib/constants';
+import { recordClockIn, getLastClockInCoords } from '@/lib/workPresence';
+import { QuadPillarClockInBlock } from '@/components/dashboard/QuadPillarShield';
 
 const jetbrains = JetBrains_Mono({ weight: ['400', '600', '700'], subsets: ['latin'] });
 
@@ -163,10 +171,16 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
   /** Debug Info: show current user UUID for manual SQL promotion */
   const [showDebugModal, setShowDebugModal] = useState(false);
   const [debugUuid, setDebugUuid] = useState<string>('');
-  /** Progress Ring: Device Signature → GPS Presence → Sovereign Face (Triple-Pillar; no Voice). */
+  /** Progress Ring: Sovereign Face → Sovereign Palm → Identity Anchor (Triple-Pillar). Optional 4th: GPS. */
+  const [pillarFace, setPillarFace] = useState(false);
+  const [pillarPalm, setPillarPalm] = useState(false);
   const [pillarDevice, setPillarDevice] = useState(false);
   const [pillarLocation, setPillarLocation] = useState(false);
-  const [pillarFace, setPillarFace] = useState(false);
+  /** Sovereign Palm Scan (Pillar 2): back-camera + palm overlay; shown after Face completes. */
+  const [showSovereignPalmScan, setShowSovereignPalmScan] = useState(false);
+  const palmResolveRef = useRef<(() => void) | null>(null);
+  /** Quad-Pillar: all 4 pillars passed; show Clock-In button before proceeding. */
+  const [quadPillarAwaitingClockIn, setQuadPillarAwaitingClockIn] = useState(false);
   /** Location permission required — show gold popup to allow access */
   const [showLocationPermissionPopup, setShowLocationPermissionPopup] = useState(false);
   /** GPS taking >3s — show "Initializing Protocol..." (indoor mode) */
@@ -222,6 +236,8 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
   /** Dual-Pillar: after Face Pulse, show Palm Pulse (Palm Wave) to authorize $100 daily unlock; replaces fingerprint. */
   const [showPalmPulse, setShowPalmPulse] = useState(false);
   const [palmPulseError, setPalmPulseError] = useState<string | null>(null);
+  /** Architect Mode: when active in session, show Debug Info on mobile too. */
+  const [architectMode, setArchitectMode] = useState(false);
   /** Face Pulse fail count: after 2 failures show "Use Backup Anchor" (Sovereign Palm + Device ID only). */
   const [faceFailCount, setFaceFailCount] = useState(0);
   /** Biometric sensitivity for Architect Vision: from profile slider; overridden by soft-start (streak < 10 or first run) to 0.3 / no brightness. */
@@ -237,6 +253,14 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
       setIsMobile(/Android|iPhone|iPad|iPod|webOS|Mobile/i.test(navigator.userAgent));
     }
   }, []);
+
+  useEffect(() => {
+    if (typeof sessionStorage === 'undefined') return;
+    setArchitectMode(sessionStorage.getItem('pff_architect_mode') === '1');
+  }, []);
+
+  /** Debug Info: only on non-production; on mobile, only when Architect Mode is active in session. */
+  const showDebugInfo = !isProductionDomain() && (!isMobile || architectMode);
 
   // Phone ID Bridge: on PC, fetch linked mobile device ID from profiles for display
   useEffect(() => {
@@ -303,9 +327,11 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
 
   /** Reset all Approved statuses so user must do a fresh scan every time (e.g. on exit). */
   const resetVerification = useCallback(() => {
+    setPillarFace(false);
+    setPillarPalm(false);
     setPillarDevice(false);
     setPillarLocation(false);
-    setPillarFace(false);
+    setQuadPillarAwaitingClockIn(false);
     setResult(null);
     setAuthStatus(AuthStatus.IDLE);
     setCurrentLayer(null);
@@ -408,10 +434,12 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     switch (layer) {
       case AuthLayer.BIOMETRIC_SIGNATURE:
         return '👤';
+      case AuthLayer.SOVEREIGN_PALM:
+        return '🖐️';
       case AuthLayer.VOICE_PRINT:
         return '🔐';
       case AuthLayer.HARDWARE_TPM:
-        return '🔐';
+        return '📱';
       case AuthLayer.GENESIS_HANDSHAKE:
         return '🤝';
       case AuthLayer.GPS_LOCATION:
@@ -421,17 +449,19 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     }
   };
 
-  /** Triple-Pillar Shield labels: Sovereign Face + Sovereign Palm + Device */
+  /** Triple-Pillar Shield labels: Sovereign Face → Sovereign Palm → Identity Anchor. Optional 4th: GPS. */
   const getLayerName = (layer: AuthLayer) => {
     switch (layer) {
       case AuthLayer.BIOMETRIC_SIGNATURE:
         return 'Sovereign Face';
+      case AuthLayer.SOVEREIGN_PALM:
+        return 'Sovereign Palm';
       case AuthLayer.VOICE_PRINT:
-        return 'Sovereign Palm Verified';
+        return 'Sovereign Palm';
       case AuthLayer.HARDWARE_TPM:
-        return 'Sovereign Palm (Hub Scanner)';
+        return 'Identity Anchor';
       case AuthLayer.GENESIS_HANDSHAKE:
-        return 'Genesis Handshake';
+        return 'Identity Anchor';
       case AuthLayer.GPS_LOCATION:
         return 'GPS Presence';
       default:
@@ -445,28 +475,33 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
       return 'Initializing Protocol...';
     }
     switch (layer) {
+      case AuthLayer.SOVEREIGN_PALM:
+        return 'Align your palm in the frame...';
       case AuthLayer.HARDWARE_TPM:
-        return 'Hold your palm to the camera or connect Hub scanner...';
+        return 'Verifying Identity Anchor (device on record)...';
       case AuthLayer.GPS_LOCATION:
         return 'Acquiring GPS Presence...';
       case AuthLayer.BIOMETRIC_SIGNATURE:
         return 'Resolving Sovereign Face...';
       case AuthLayer.VOICE_PRINT:
-        return 'Hold your palm to the camera...';
+        return 'Align your palm...';
       case AuthLayer.GENESIS_HANDSHAKE:
-        return 'Genesis Handshake...';
+        return 'Identity Anchor...';
       default:
         return 'Verifying...';
     }
   };
 
-  /** Triple-Pillar only: Device → GPS → Face. Voice layer removed (obsolete). MINOR: 2 layers (Face + Device). Mobile (non-hub): hide Fingerprint (Face + GPS + Genesis). */
+  /** Triple-Pillar: Face → Sovereign Palm → Identity Anchor (Phone). Optional 4th: GPS. Minors: Face + Identity Anchor. */
   const effectiveMobile = isMobile && !hubVerification;
   const requiredLayers = identityAnchor?.isMinor
     ? [AuthLayer.BIOMETRIC_SIGNATURE, AuthLayer.HARDWARE_TPM]
-    : effectiveMobile
-    ? [AuthLayer.BIOMETRIC_SIGNATURE, AuthLayer.GPS_LOCATION, AuthLayer.GENESIS_HANDSHAKE]
-    : [AuthLayer.BIOMETRIC_SIGNATURE, AuthLayer.HARDWARE_TPM, AuthLayer.GENESIS_HANDSHAKE];
+    : [
+        AuthLayer.BIOMETRIC_SIGNATURE,
+        AuthLayer.SOVEREIGN_PALM,
+        AuthLayer.HARDWARE_TPM,
+        ...(ENABLE_GPS_AS_FOURTH_PILLAR ? [AuthLayer.GPS_LOCATION] : []),
+      ];
 
   const getLayerStatus = (layer: AuthLayer) => {
     if (!currentLayer) return 'pending';
@@ -558,16 +593,20 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
       navigator.vibrate([100, 50, 100, 50, 200]);
     }
 
-    startLocationRequestFromUserGesture(identityAnchor.phone);
+    if (ENABLE_GPS_AS_FOURTH_PILLAR && effectiveMobile) startLocationRequestFromUserGesture(identityAnchor.phone);
 
     setAuthStatus(AuthStatus.SCANNING);
     setResult(null);
     setShowVerifyFromAuthorizedDevice(false);
     setShowTimeoutBypass(false);
     setGpsTakingLong(false);
+    setPillarFace(false);
+    setPillarPalm(false);
     setPillarDevice(false);
     setPillarLocation(false);
-    setPillarFace(false);
+    setShowSovereignPalmScan(false);
+    setQuadPillarAwaitingClockIn(false);
+    palmResolveRef.current = null;
 
     try {
       // DEPENDENT BYPASS: Guardian Authorization — skip Voice/Face resonance; inherit Sentinel from Guardian.
@@ -615,10 +654,16 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
 
     setShowArchitectVision(true);
 
+    const palmPromise = identityAnchor.isMinor
+      ? undefined
+      : new Promise<void>((resolve) => {
+          palmResolveRef.current = () => resolve();
+        });
+    if (effectiveMobile && identityAnchor?.phone && ENABLE_GPS_AS_FOURTH_PILLAR) startLocationRequestFromUserGesture(identityAnchor.phone);
     const authResult = await resolveSovereignByPresence(
       identityAnchor.phone,
       (layer, status) => {
-        if (layer !== AuthLayer.GPS_LOCATION) setCurrentLayer(layer);
+        if (layer !== AuthLayer.GPS_LOCATION || ENABLE_GPS_AS_FOURTH_PILLAR) setCurrentLayer(layer);
         setAuthStatus(status);
       },
       {
@@ -626,14 +671,19 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
         requireAllLayers: isNewDevice,
         registeredCountryCode: 'NG',
         useExternalScanner: hubVerification ? true : !isMobile,
-        skipDevicePillarForMobile: hubVerification ? false : isMobile,
+        skipDevicePillarForMobile: hubVerification ? false : false,
+        scanTimeoutMs: isMobile ? MOBILE_SCAN_TIMEOUT_MS : undefined,
+        requestLocationFirstForMobile: ENABLE_GPS_AS_FOURTH_PILLAR && effectiveMobile,
+        palmVerificationPromise: palmPromise,
         onPillarComplete: (pillar: PresencePillar) => {
-          if (pillar === 'device') setPillarDevice(true);
-          if (pillar === 'location') setPillarLocation(true);
           if (pillar === 'face') {
             setPillarFace(true);
+            if (!identityAnchor.isMinor) setShowSovereignPalmScan(true);
             biometricPillarRef.current?.triggerExternalCapture();
           }
+          if (pillar === 'palm') setPillarPalm(true);
+          if (pillar === 'device') setPillarDevice(true);
+          if (pillar === 'location') setPillarLocation(true);
         },
       }
     );
@@ -655,7 +705,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
       return;
     }
 
-    // Triple-Pillar success: show Architect Vision gold freeze (0.5s) then run success flow in onComplete
+    // Quad-Pillar or Triple-Pillar success
     if (authResult.success && authResult.identity) {
       architectSuccessRef.current = {
         authResult,
@@ -665,6 +715,12 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
         compositeDeviceId,
         effectiveMobile,
       };
+      if (ENABLE_GPS_AS_FOURTH_PILLAR) {
+        setQuadPillarAwaitingClockIn(true);
+        setShowArchitectVision(false);
+        setAuthStatus(AuthStatus.IDLE);
+        return;
+      }
       setArchitectVerificationSuccess(true);
       return;
     } else {
@@ -1640,23 +1696,27 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
             subtitle="Enter your phone number to proceed to hardware biometric scan. Verification occurs only after the scan."
           />
         </div>
-        <button
+        <div className="flex flex-col gap-4 py-4 mt-2">
+          <button
             type="button"
             onClick={() => setShowRecoverFlow(true)}
-            className="mt-3 text-sm font-medium text-[#e8c547] hover:text-[#c9a227] transition-colors underline"
+            className="min-h-[48px] py-3 text-sm font-medium text-[#e8c547] hover:text-[#c9a227] transition-colors underline rounded-lg touch-manipulation"
           >
             Lost Device? Recover Account
           </button>
-        {!isProductionDomain() && (
-          <>
+          {showDebugInfo && (
             <button
               type="button"
               onClick={handleDebugInfo}
-              className="mt-4 text-xs font-mono border rounded px-3 py-1.5 transition-colors"
+              className="min-h-[48px] text-xs font-mono border rounded-lg px-3 py-3 transition-colors touch-manipulation"
               style={{ color: '#6b6b70', borderColor: 'rgba(212, 175, 55, 0.3)' }}
             >
               Debug Info
             </button>
+          )}
+        </div>
+        {showDebugInfo && (
+          <>
             {showDebugModal && (
               <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80" onClick={() => setShowDebugModal(false)}>
                 <div className="bg-[#0d0d0f] border rounded-lg p-6 max-w-md w-full shadow-xl" style={{ borderColor: 'rgba(212, 175, 55, 0.3)' }} onClick={(e) => e.stopPropagation()}>
@@ -1743,28 +1803,27 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
             className={`text-4xl font-bold text-[#D4AF37] uppercase tracking-wider mb-4 ${jetbrains.className}`}
             style={{ textShadow: '0 0 30px rgba(212, 175, 55, 0.6)' }}
           >
-            Triple-Pillar Shield
+            {ENABLE_GPS_AS_FOURTH_PILLAR ? 'Quad-Pillar Shield' : 'Triple-Pillar Shield'}
           </h1>
           <p className="text-lg text-[#6b6b70]">
             {authStatus === AuthStatus.SCANNING
-              ? effectiveMobile
-                ? 'GPS Presence → Sovereign Face (5s)'
-                : 'Device Signature → GPS Presence → Sovereign Face (5s)'
-              : effectiveMobile
-              ? 'GPS Presence · Sovereign Face · Complete Initial Registration'
-              : 'Device Signature · GPS Presence · Sovereign Face · Sovereign Palm Verified'}
+              ? ENABLE_GPS_AS_FOURTH_PILLAR
+                ? 'Face → Palm → Identity Anchor → GPS (work-site). Then Clock-In.'
+                : 'Sovereign Face → Sovereign Palm → Identity Anchor (15s on mobile)'
+              : ENABLE_GPS_AS_FOURTH_PILLAR
+              ? 'Sovereign Face · Sovereign Palm · Identity Anchor · GPS Presence'
+              : 'Sovereign Face · Sovereign Palm · Identity Anchor'}
           </p>
         </div>
 
-        {/* Progress Ring: Triple-Pillar Shield — Device Sig. → GPS Presence → Sovereign Face (no Voice) */}
+        {/* Progress Ring: Triple-Pillar Shield — Face → Sovereign Palm → Identity Anchor */}
         {authStatus === AuthStatus.SCANNING && (
           <div className="mb-8 transition-all duration-200">
             <PresenceProgressRing
-              deviceVerified={pillarDevice}
-              locationVerified={pillarLocation}
               faceVerified={pillarFace}
-              showVoice={false}
-              showDevicePillar={!effectiveMobile}
+              palmVerified={pillarPalm}
+              phoneAnchorVerified={pillarDevice}
+              locationVerified={pillarLocation}
             />
             {/* Sovereign Palm: Hold palm to camera (webcam) or connect Hub scanner. Mobile: Palm Pulse via camera. */}
             {identityAnchor && !effectiveMobile && (
@@ -1827,47 +1886,75 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
           </button>
         )}
 
-        {/* Authentication Button — z-50 above overlay; 200ms transition */}
-        <motion.button
-          type="button"
-          onClick={handleStartAuthentication}
-          disabled={authStatus === AuthStatus.SCANNING}
-          className="relative z-50 w-full min-h-[48px] py-4 px-6 rounded-lg bg-gradient-to-r from-[#D4AF37] to-[#C9A227] hover:from-[#e8c547] hover:to-[#D4AF37] text-black font-bold text-xl uppercase tracking-wider transition-all duration-200 disabled:opacity-90 disabled:pointer-events-none flex items-center justify-center gap-3 touch-manipulation cursor-pointer"
-          style={{ boxShadow: '0 0 40px rgba(212, 175, 55, 0.6)' }}
-          whileTap={{ scale: 0.98 }}
-          transition={{ type: 'spring', stiffness: 400, damping: 17 }}
-        >
-          {authStatus === AuthStatus.SCANNING ? (
-            <>
-              <svg className="w-6 h-6 animate-spin shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-              </svg>
-              <span>Scanning…</span>
-            </>
-          ) : (
-            <>{effectiveMobile ? 'Complete Initial Registration' : '⚒ Finalize Minting'}</>
-          )}
-        </motion.button>
+        {/* Quad-Pillar: Clock-In — enabled only when all 4 pillars active; records work_site_coords to presence_handshakes */}
+        {ENABLE_GPS_AS_FOURTH_PILLAR && quadPillarAwaitingClockIn && identityAnchor && (
+          <QuadPillarClockInBlock
+            identityAnchorPhone={identityAnchor.phone}
+            lastLocationCoords={
+              architectSuccessRef.current?.authResult?.lastLocationCoords ??
+              getLastClockInCoords()
+            }
+            onClockIn={async () => {
+              const coords =
+                architectSuccessRef.current?.authResult?.lastLocationCoords ??
+                getLastClockInCoords();
+              if (coords) {
+                await recordClockIn(identityAnchor.phone, coords);
+              }
+              setQuadPillarAwaitingClockIn(false);
+              setShowArchitectVision(true);
+              setArchitectVerificationSuccess(true);
+            }}
+          />
+        )}
 
-        <button
-          type="button"
-          onClick={() => setShowRecoverFlow(true)}
-          className="relative z-50 mt-3 w-full text-sm font-medium text-[#e8c547] hover:text-[#c9a227] transition-colors underline"
-        >
-          Lost Device? Recover Account
-        </button>
+        {/* Authentication Button — z-50 above overlay; 200ms transition. Hidden when Quad-Pillar awaiting Clock-In. */}
+        {!quadPillarAwaitingClockIn && (
+          <motion.button
+            type="button"
+            onClick={handleStartAuthentication}
+            disabled={authStatus === AuthStatus.SCANNING}
+            className="relative z-50 w-full min-h-[48px] py-4 px-6 rounded-lg bg-gradient-to-r from-[#D4AF37] to-[#C9A227] hover:from-[#e8c547] hover:to-[#D4AF37] text-black font-bold text-xl uppercase tracking-wider transition-all duration-200 disabled:opacity-90 disabled:pointer-events-none flex items-center justify-center gap-3 touch-manipulation cursor-pointer"
+            style={{ boxShadow: '0 0 40px rgba(212, 175, 55, 0.6)' }}
+            whileTap={{ scale: 0.98 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+          >
+            {authStatus === AuthStatus.SCANNING ? (
+              <>
+                <svg className="w-6 h-6 animate-spin shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                <span>Scanning…</span>
+              </>
+            ) : (
+              <>{effectiveMobile ? 'Complete Initial Registration' : '⚒ Finalize Minting'}</>
+            )}
+          </motion.button>
+        )}
 
-        {!isProductionDomain() && (
-          <>
+        <div className="flex flex-col gap-4 py-4 mt-2">
+          <button
+            type="button"
+            onClick={() => setShowRecoverFlow(true)}
+            className="relative z-50 w-full min-h-[48px] py-3 text-sm font-medium text-[#e8c547] hover:text-[#c9a227] transition-colors underline rounded-lg touch-manipulation"
+          >
+            Lost Device? Recover Account
+          </button>
+          {showDebugInfo && (
             <button
               type="button"
               onClick={handleDebugInfo}
-              className="mt-6 text-xs font-mono border rounded px-3 py-1.5 transition-colors"
+              className="min-h-[48px] text-xs font-mono border rounded-lg px-3 py-3 transition-colors touch-manipulation"
               style={{ color: '#6b6b70', borderColor: 'rgba(212, 175, 55, 0.3)' }}
             >
               Debug Info
             </button>
+          )}
+        </div>
+
+        {showDebugInfo && (
+          <>
             {showDebugModal && (
               <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80" onClick={() => setShowDebugModal(false)}>
                 <div className="bg-[#0d0d0f] border rounded-lg p-6 max-w-md w-full shadow-xl" style={{ borderColor: 'rgba(212, 175, 55, 0.3)' }} onClick={(e) => e.stopPropagation()}>
@@ -1893,9 +1980,9 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
         {showLocationPermissionPopup && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80" onClick={() => setShowLocationPermissionPopup(false)}>
             <div className="bg-[#0d0d0f] border-2 rounded-xl p-6 max-w-md w-full shadow-xl text-center" style={{ borderColor: '#D4AF37', boxShadow: '0 0 40px rgba(212, 175, 55, 0.3)' }} onClick={(e) => e.stopPropagation()}>
-              <p className="text-lg font-bold mb-4" style={{ color: '#D4AF37' }}>Location Blocked by Browser</p>
+              <p className="text-lg font-bold mb-4" style={{ color: '#D4AF37' }}>Sovereign Hint: Location</p>
               <p className="text-sm text-[#a0a0a5] mb-6">
-                Please click the Lock icon in your address bar and select &quot;Allow Location&quot; to authorize the minting protocol and finalize your 5 VIDA cap.
+                The Ledger needs your location once to anchor your presence—not to track you. Tap the Lock icon in your address bar and choose &quot;Allow&quot; for this site. You can revoke it later in browser settings.
               </p>
               <button
                 type="button"
@@ -1925,12 +2012,12 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
                 Use Verification with Master Device or Elderly-First Manual Bypass.
               </p>
             )}
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-4 py-4">
               {faceFailCount >= 2 && (
                 <button
                   type="button"
                   onClick={handleBackupAnchor}
-                  className="relative z-50 w-full py-3 rounded-lg font-bold uppercase tracking-wider transition-all duration-200 cursor-pointer border-2 text-black"
+                  className="relative z-50 w-full min-h-[48px] py-3 rounded-lg font-bold uppercase tracking-wider transition-all duration-200 cursor-pointer border-2 text-black touch-manipulation"
                   style={{ background: '#D4AF37', borderColor: '#D4AF37', boxShadow: '0 0 20px rgba(212, 175, 55, 0.5)' }}
                 >
                   Use Backup Anchor
@@ -1943,7 +2030,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
                   resetVerification();
                   handleStartAuthentication();
                 }}
-                className="relative z-50 w-full py-3 rounded-lg bg-red-500 hover:bg-red-600 text-white font-bold uppercase tracking-wider transition-all duration-200 cursor-pointer"
+                className="relative z-50 w-full min-h-[48px] py-3 rounded-lg bg-red-500 hover:bg-red-600 text-white font-bold uppercase tracking-wider transition-all duration-200 cursor-pointer touch-manipulation"
               >
                 Retry
               </button>
@@ -1951,7 +2038,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
                 <button
                   type="button"
                   onClick={handleVerifyFromAuthorizedDevice}
-                  className="relative z-50 w-full py-3 rounded-lg border-2 border-[#D4AF37] text-[#D4AF37] font-bold uppercase tracking-wider transition-all duration-200 hover:bg-[#D4AF37]/10 cursor-pointer"
+                  className="relative z-50 w-full min-h-[48px] py-3 rounded-lg border-2 border-[#D4AF37] text-[#D4AF37] font-bold uppercase tracking-wider transition-all duration-200 hover:bg-[#D4AF37]/10 cursor-pointer touch-manipulation"
                 >
                   Verify from an authorized device
                 </button>
@@ -2007,6 +2094,20 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
         confidenceThreshold={visionConfidenceThreshold}
         enforceBrightnessCheck={visionEnforceBrightness}
       />
+
+      {/* Triple-Pillar Pillar 2: Sovereign Palm Scan — back camera + palm overlay; resolves palmVerificationPromise on success */}
+      {showSovereignPalmScan && (
+        <SovereignPalmScan
+          isOpen={showSovereignPalmScan}
+          onClose={() => setShowSovereignPalmScan(false)}
+          onSuccess={() => {
+            palmResolveRef.current?.();
+            palmResolveRef.current = null;
+            setShowSovereignPalmScan(false);
+            setPillarPalm(true);
+          }}
+        />
+      )}
 
       {/* Dual-Pillar Scan 2: Palm Pulse (Palm Wave) — contactless palm verification, replaces fingerprint for daily unlock */}
       {showPalmPulse && (

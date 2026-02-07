@@ -23,16 +23,19 @@ export function InstallSmartBanner() {
 
   useEffect(() => {
     if (!mounted || typeof window === 'undefined') return;
+    const isMobile =
+      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+      (typeof navigator.maxTouchPoints === 'number' && navigator.maxTouchPoints > 0);
+    if (isMobile) {
+      setVisible(false);
+      return;
+    }
     const standalone =
       (window as Window & { standalone?: boolean }).standalone === true ||
       window.matchMedia('(display-mode: standalone)').matches ||
       (document as Document & { referrer?: string }).referrer?.includes('android-app');
     const dismissed = localStorage.getItem(BANNER_DISMISS_KEY) === '1';
-    const isMobile =
-      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-      (typeof navigator.maxTouchPoints === 'number' && navigator.maxTouchPoints > 0);
-    /* Friction removal: hide on mobile (they're already there) and when already PWA; show only on desktop */
-    if (!standalone && !dismissed && !isMobile) setVisible(true);
+    if (!standalone && !dismissed) setVisible(true);
   }, [mounted, canPromptInstall]);
 
   const handleInstall = async () => {
@@ -52,7 +55,11 @@ export function InstallSmartBanner() {
     } catch {}
   };
 
-  if (!visible) return null;
+  const isMobile =
+    typeof navigator !== 'undefined' &&
+    (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+      (typeof navigator.maxTouchPoints === 'number' && navigator.maxTouchPoints > 0));
+  if (isMobile || !visible) return null;
 
   return (
     <div

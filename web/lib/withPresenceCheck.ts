@@ -8,6 +8,7 @@
 
 import { hasSupabase, supabase } from './supabase';
 import { clearTripleAnchor } from './tripleAnchor';
+import { clearWorkPresenceStatus } from './workPresence';
 
 /** Recent presence verification window: 24 hours for all users including Architect. Do not tighten (e.g. 5 min); keep 24h. */
 const PRESENCE_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -148,5 +149,6 @@ export function clearPresenceVerification(): void {
   localStorage.removeItem(STORAGE_KEY);
   localStorage.removeItem(TIMESTAMP_KEY);
   clearTripleAnchor();
+  clearWorkPresenceStatus();
 }
 

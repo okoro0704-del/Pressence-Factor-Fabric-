@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { checkPresenceVerified, markPresenceVerified, clearPresenceVerification } from '@/lib/withPresenceCheck';
+import { getWorkPresenceStatus, clearWorkPresenceStatus, type WorkPresenceStatus } from '@/lib/workPresence';
 import { getIdentityAnchorPhone } from '@/lib/sentinelActivation';
 import { hasFaceAndSeed } from '@/lib/recoverySeedStorage';
 import { getMintStatusForPresence, MINT_STATUS_PENDING_HARDWARE, MINT_STATUS_MINTED } from '@/lib/mintStatus';
@@ -32,6 +33,8 @@ interface GlobalPresenceGatewayContextType {
   protocolReconnecting: boolean;
   /** Set when presence is verified (High-Fidelity) or when DB error triggers fallback (Relatable). SOVRYN or UI can display it. */
   presenceGreeting: string | null;
+  /** Quad-Pillar (Ghost Economy): 'Work Active' when at work site, 'Non-Work Active' when GPS check failed. Null when not applicable. */
+  workPresenceStatus: WorkPresenceStatus | null;
 }
 
 const GlobalPresenceGatewayContext = createContext<GlobalPresenceGatewayContextType | undefined>(undefined);
@@ -51,6 +54,9 @@ export function GlobalPresenceGatewayProvider({ children }: { children: ReactNod
   const [isPresenceVerified, setIsPresenceVerified] = useState(false);
   const [presenceTimestamp, setPresenceTimestamp] = useState<Date | null>(null);
   const [presenceGreeting, setPresenceGreeting] = useState<string | null>(null);
+  const [workPresenceStatus, setWorkPresenceStatus] = useState<WorkPresenceStatus | null>(() =>
+    typeof window !== 'undefined' ? getWorkPresenceStatus() : null
+  );
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(true);
   const [protocolReconnecting, setProtocolReconnecting] = useState(false);
@@ -83,6 +89,7 @@ export function GlobalPresenceGatewayProvider({ children }: { children: ReactNod
         setLastActivityTime(Date.now());
         setConnecting(false);
         markPresenceVerified();
+        setWorkPresenceStatus(getWorkPresenceStatus());
         const identityAnchor = getIdentityAnchorPhone();
         if (identityAnchor) {
           getCurrentUserRole(identityAnchor).then((role) => setRoleCookie(role));
@@ -105,6 +112,7 @@ export function GlobalPresenceGatewayProvider({ children }: { children: ReactNod
       setIsPresenceVerified(false);
       setPresenceTimestamp(null);
       setPresenceGreeting(null);
+      setWorkPresenceStatus(null);
       setConnecting(false);
       return false;
     } catch (error) {
@@ -128,6 +136,7 @@ export function GlobalPresenceGatewayProvider({ children }: { children: ReactNod
       setPresenceGreeting(HIGH_FIDELITY_GREETING);
       setLastActivityTime(Date.now());
       markPresenceVerified();
+      setWorkPresenceStatus(getWorkPresenceStatus());
       const identityAnchor = getIdentityAnchorPhone();
       if (identityAnchor) {
         setSessionIdentity(identityAnchor);
@@ -141,7 +150,9 @@ export function GlobalPresenceGatewayProvider({ children }: { children: ReactNod
       setIsPresenceVerified(false);
       setPresenceTimestamp(null);
       setPresenceGreeting(null);
+      setWorkPresenceStatus(null);
       clearPresenceVerification();
+      clearWorkPresenceStatus();
     }
   }, []);
 
@@ -345,6 +356,7 @@ export function GlobalPresenceGatewayProvider({ children }: { children: ReactNod
         connecting,
         protocolReconnecting,
         presenceGreeting,
+        workPresenceStatus,
       }}
     >
       {showConnectingMessage ? (

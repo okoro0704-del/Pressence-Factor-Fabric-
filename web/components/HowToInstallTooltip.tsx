@@ -31,6 +31,8 @@ export function HowToInstallTooltip() {
   const [standalone, setStandalone] = useState(false);
   const { canPrompt, promptInstall, isInstalling } = useBeforeInstallPrompt();
 
+  const [isMobile, setIsMobile] = useState(false);
+
   useEffect(() => {
     setPlatform(detectPlatform());
     setStandalone(
@@ -38,9 +40,14 @@ export function HowToInstallTooltip() {
         (window.matchMedia('(display-mode: standalone)').matches ||
           (window.navigator as unknown as { standalone?: boolean }).standalone === true)
     );
+    setIsMobile(
+      typeof navigator !== 'undefined' &&
+        (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+          (typeof navigator.maxTouchPoints === 'number' && navigator.maxTouchPoints > 0))
+    );
   }, []);
 
-  if (standalone) return null;
+  if (standalone || isMobile) return null;
 
   const handleInstall = async () => {
     const ok = await promptInstall();

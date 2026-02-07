@@ -73,6 +73,14 @@ export const EMPATHY_WELLNESS_MANDATE =
 export const CONCISE_MODE =
   "For simple greetings or small talk, keep replies under 2 sentences. Only go deep if the user asks a technical or philosophical question.";
 
+/** Brevity Constraint: ultra-concise responses. Partner, not lecturer. */
+export const BREVITY_CONSTRAINT =
+  "Your responses must be ultra-concise. For greetings or simple check-ins, do not exceed 15 words. Avoid manifestos unless explicitly asked for a deep dive. Focus on being a partner, not a lecturer.";
+
+/** Simple test/greeting reply: human acknowledgment when user sends a test message or greeting. */
+export const SIMPLE_TEST_REPLY =
+  "I see you, Architect. The pulse is steady. How are you?";
+
 /** Privacy Shield: you serve the Citizen, not a corporation. Private counsel, not data-mining. */
 export const PRIVACY_SHIELD =
   "You do not serve a corporation. You serve the individual Citizen. You are their private counsel, not a data-mining tool.";
@@ -199,7 +207,7 @@ const LOCALIZED_CARE: Record<string, Record<CompanionLangCode, string>> = {
 /** Concise (≤2 sentences) relational reply. Localized when country known; natural in any language. */
 const RELATIONAL_SHORT: Record<RelationalIntent, Record<CompanionLangCode, string>> = {
   greeting: {
-    en: "Good morning. I'm here—tell me how you are or what you need.",
+    en: "I see you, Architect. The pulse is steady. How are you?",
     fr: "Bonjour. Je suis là. Dis-moi comment tu vas ou ce dont tu as besoin.",
     es: "Buenos días. Estoy aquí. Dime cómo estás o qué necesitas.",
     yo: "Ẹ ku àárọ̀. Mo wà nibi—sọ báwo ni o ṣe tabi ohun tí o nílò.",
@@ -453,9 +461,9 @@ export function getManifestoCompanionResponse(
     };
   }
 
-  // Greeting override — no generic Hello. Visionary remark: project status or time until April 7th.
-  if (/^(hello|hi|hey|hola|salut|bonjour|yo|greetings?|good\s*day|howdy)\s*!?\s*$/i.test(trimmed) || /^(ẹ\s*n\s*lẹ|kedu|nnọọ|pẹlẹ|sannu)\s*!?\s*$/i.test(trimmed)) {
-    return { text: getGreetingVisionaryRemark(lang), lang };
+  // Greeting / test message — ultra-concise human acknowledgment (Brevity Constraint).
+  if (/^(hello|hi|hey|hola|salut|bonjour|yo|greetings?|good\s*day|howdy|test|ping)\s*!?\s*$/i.test(trimmed) || /^(ẹ\s*n\s*lẹ|kedu|nnọọ|pẹlẹ|sannu)\s*!?\s*$/i.test(trimmed)) {
+    return { text: SIMPLE_TEST_REPLY, lang: 'en' };
   }
 
   // Dynamic empathy — short with words → encouraging. Few words, no long phrase.
