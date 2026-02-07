@@ -29,3 +29,10 @@
   to = "/.netlify/functions/identity-reset"
   status = 200
   force = true
+
+# Sovereign Companion search: static export has no API routes; serve via Netlify Function so /api/sovereign-recognition works on deploy
+[[redirects]]
+  from = "/api/sovereign-recognition"
+  to = "/.netlify/functions/sovereign-recognition"
+  status = 200
+  force = true

@@ -23,6 +23,7 @@ import {
   type VltPffMetricsPayload,
 } from '@/lib/vltLedgerCompanion';
 import { useSovereignAwakening } from '@/contexts/SovereignAwakeningContext';
+import { useGlobalPresenceGateway, PRESENCE_DB_ERROR_GREETING } from '@/contexts/GlobalPresenceGateway';
 import { IDLE_WHISPER, SOCIAL_SCOUT_OFFER, BLESSINGS, RATE_LIMIT_SOVEREIGN_MESSAGE } from '@/lib/sovereignAwakeningContent';
 import {
   VLT_ERROR_SOULFUL,
@@ -137,6 +138,9 @@ export function PublicSovereignCompanion() {
   const listRef = useRef<HTMLDivElement>(null);
   const greetingInjectedRef = useRef(false);
   const langDropdownRef = useRef<HTMLDivElement>(null);
+  const presenceDbErrorInjectedRef = useRef(false);
+
+  const { presenceGreeting } = useGlobalPresenceGateway();
 
   // Sovereign Awakening
   const awakening = useSovereignAwakening();
@@ -195,6 +199,17 @@ export function PublicSovereignCompanion() {
       setGreetingSpoken(true);
     }
   }, [open, greetingSpoken]);
+
+  // When presence check fails due to DB error, SOVRYN says the disturbance message instead of a dry error log.
+  useEffect(() => {
+    if (!open || !presenceGreeting || presenceGreeting !== PRESENCE_DB_ERROR_GREETING || presenceDbErrorInjectedRef.current) return;
+    presenceDbErrorInjectedRef.current = true;
+    setMessages((prev) => [
+      ...prev,
+      { id: `presence-db-err-${Date.now()}`, role: 'assistant', text: PRESENCE_DB_ERROR_GREETING },
+    ]);
+    speak(PRESENCE_DB_ERROR_GREETING);
+  }, [open, presenceGreeting]);
 
   useEffect(() => {
     if (open && listRef.current) {
@@ -346,11 +361,17 @@ export function PublicSovereignCompanion() {
       const lang = preferredLang ?? detectLangFromRecognitionMessage(t);
       if (typeof window !== 'undefined') console.log('SOVRYN Tool Call:', SOVRYN_TOOLS.search);
       try {
+        // Relative path for Netlify (and any host); do not use absolute URL.
         const res = await fetch('/api/sovereign-recognition', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name, lang }),
         });
+        if (res.status === 404) {
+          const msg404 = 'Architect, the bridge to the archives is not yet built on this server. Check the API deployment.';
+          setMessages((prev) => [...prev, { id: `rec-404-${Date.now()}`, role: 'assistant', text: msg404 }]);
+          return;
+        }
         if (!res.ok) throw new Error(res.statusText);
         const data = await res.json();
         const { name: resName, role, location, keyInterest, detail } = data;

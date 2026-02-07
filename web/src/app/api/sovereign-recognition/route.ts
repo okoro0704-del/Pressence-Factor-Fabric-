@@ -2,8 +2,11 @@
  * Sovereign Recognition (Social Sync) API.
  * Accepts a name and returns a profile from "digital archives" (public OSINT).
  *
- * Env: SERPER_API_KEY from process.env. If present, we must attempt a real fetch to serper.dev.
- * No internal mock or sovereign pivot when search is requested—if both Serper and Tavily fail, we return 503.
+ * App Router: file at web/src/app/api/sovereign-recognition/route.ts. Exports POST handler.
+ * With output: 'export' (static build), this route is not deployed on Netlify. Netlify serves
+ * /api/sovereign-recognition via redirect to web/netlify/functions/sovereign-recognition.js (see netlify.toml).
+ *
+ * Env: SERPER_API_KEY, TAVILY_API_KEY. If present, real fetch to serper.dev then tavily.com.
  */
 
 import { NextRequest, NextResponse } from 'next/server';

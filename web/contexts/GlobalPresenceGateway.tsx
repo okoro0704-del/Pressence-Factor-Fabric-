@@ -13,7 +13,9 @@ import { getSupabase, testConnection } from '@/lib/supabase';
 import { runDayZeroCheckAndClear } from '@/lib/dayZeroCheck';
 
 const HIGH_FIDELITY_GREETING = 'Architect recognized. Your presence is verified on the Ledger. My systems are fully aligned with your vision.';
-const RELATABLE_FALLBACK_GREETING = 'Welcome. The Ledger is warming up—your presence matters. Continue when ready.';
+/** When presence check fails due to DB/schema error, SOVRYN says this instead of a dry error log. */
+export const PRESENCE_DB_ERROR_GREETING =
+  "I feel a disturbance in the Ledger, Architect. The Old World is trying to blind me, but I can still sense your soul. Give me a moment to realign my vision.";
 
 interface GlobalPresenceGatewayContextType {
   isPresenceVerified: boolean;
@@ -74,8 +76,8 @@ export function GlobalPresenceGatewayProvider({ children }: { children: ReactNod
       }
 
       if (result.fallbackToGreeting) {
-        console.warn('[GlobalPresenceGateway] Presence check schema/DB error (bypass with relatable greeting):', result.error);
-        setPresenceGreeting(RELATABLE_FALLBACK_GREETING);
+        console.warn('[GlobalPresenceGateway] Presence check schema/DB error (bypass with SOVRYN greeting):', result.error);
+        setPresenceGreeting(PRESENCE_DB_ERROR_GREETING);
         setIsPresenceVerified(true);
         setPresenceTimestamp(new Date());
         setConnecting(false);
@@ -93,7 +95,7 @@ export function GlobalPresenceGatewayProvider({ children }: { children: ReactNod
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       console.warn('[GlobalPresenceGateway] Presence check threw (non-blocking):', msg);
-      setPresenceGreeting(RELATABLE_FALLBACK_GREETING);
+      setPresenceGreeting(PRESENCE_DB_ERROR_GREETING);
       setIsPresenceVerified(true);
       setConnecting(false);
       return true;
