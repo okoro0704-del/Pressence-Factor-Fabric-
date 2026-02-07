@@ -25,6 +25,7 @@ import {
   type VltPffMetricsPayload,
 } from '@/lib/vltLedgerCompanion';
 import { getMemoryVault, formatVaultForContext } from '@/lib/memoryVault';
+import { getVibration, setVibration, getVibrationFromInput, levelToRegister } from '@/lib/vibrationEngine';
 import { useSovereignAwakening } from '@/contexts/SovereignAwakeningContext';
 import { useGlobalPresenceGateway, PRESENCE_DB_ERROR_GREETING } from '@/contexts/GlobalPresenceGateway';
 import {
@@ -53,7 +54,6 @@ import {
   isRelationalSmallTalk,
   getRelationalShortResponse,
   getRelationalIntent,
-  detectVocabularyRegister,
 } from '@/lib/manifestoCompanionKnowledge';
 
 const GOLD = '#D4AF37';
@@ -397,7 +397,8 @@ export function PublicSovereignCompanion() {
     const vaultEntries = await getMemoryVault();
     const vibration = await getVibration();
     const memoryVaultContext = formatVaultForContext(vaultEntries, vibration);
-    const register = detectVocabularyRegister(t);
+    const level = getVibrationFromInput(t);
+    const register = levelToRegister(level);
     const langFromVibration = vibration?.lang ?? preferredLang ?? detectLangFromRecognitionMessage(t);
     const lang = (langFromVibration as CompanionLangCode) || 'en';
 
