@@ -5,7 +5,7 @@
  * OSINT: process.env.SERPER_API_KEY is read here for Sovereign Companion search. When set, we call
  * Serper first (millisecond logic—no artificial delay). On failure or missing key, mock + short delay.
  * Lord personality lock: we never say "I cannot reach archives." Search for the user, then tell them
- * why they are a Pillar of this new world based on what we find (or pivot with flickering line).
+ * why they are a Pillar of this new world based on what we find (or pivot with a dynamic, personal observation).
  *
  * Response is used by the Companion to deliver the "I see you, [Name]..." Wow moment.
  */

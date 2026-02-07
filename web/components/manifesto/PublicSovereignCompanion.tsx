@@ -24,11 +24,21 @@ import {
 } from '@/lib/vltLedgerCompanion';
 import { useSovereignAwakening } from '@/contexts/SovereignAwakeningContext';
 import { IDLE_WHISPER, SOCIAL_SCOUT_OFFER, BLESSINGS, RATE_LIMIT_SOVEREIGN_MESSAGE } from '@/lib/sovereignAwakeningContent';
-import { getRecognitionPivotPersonal, VLT_ERROR_SOULFUL } from '@/lib/manifestoCompanionKnowledge';
+import { VLT_ERROR_SOULFUL, RECOGNITION_CONNECTION_REFUSED } from '@/lib/manifestoCompanionKnowledge';
 
 const GOLD = '#D4AF37';
 const GOLD_DIM = 'rgba(212, 175, 55, 0.6)';
 const BORDER = 'rgba(212, 175, 55, 0.3)';
+
+/** Tools the Companion can call: search (OSINT via /api/sovereign-recognition) and codebase (Manifesto + indexed paths). SERPER_API_KEY is used server-side only in that API route—never sent to the client. */
+export const SOVRYN_TOOLS = {
+  search: 'search',
+  codebase: 'codebase',
+} as const;
+
+/** Prompt enforcement: name → MUST use search tool; technology/code question → MUST use codebase tool. No exceptions. */
+export const SOVRYN_SYSTEM_PROMPT =
+  'If the user provides a name, you MUST use the search tool. If the user asks about technology, you MUST use the codebase tool. No exceptions.';
 
 type Message = { id: string; role: 'user' | 'assistant'; text: string; codeSnippet?: string };
 
@@ -325,11 +335,12 @@ export function PublicSovereignCompanion() {
       return;
     }
 
-    // Lord of Machines — tool-calling: when user asks about themselves → search() (OSINT) instantly
+    // Lord of Machines — tool-calling: when user asks about themselves → search() (OSINT) instantly. SERPER_API_KEY is read server-side in that API route only; the client never receives the key.
     if (isRecognitionRequest(t)) {
       setIsScanningRecognition(true);
       const name = getRecognitionName(t);
       const lang = preferredLang ?? detectLangFromRecognitionMessage(t);
+      if (typeof window !== 'undefined') console.log('SOVRYN Tool Call:', SOVRYN_TOOLS.search);
       try {
         const res = await fetch('/api/sovereign-recognition', {
           method: 'POST',
@@ -366,10 +377,9 @@ export function PublicSovereignCompanion() {
           // ignore
         }
       } catch {
-        const pivot = getRecognitionPivotPersonal(preferredLang ?? undefined);
         setMessages((prev) => [
           ...prev,
-          { id: `rec-err-${Date.now()}`, role: 'assistant', text: pivot },
+          { id: `rec-err-${Date.now()}`, role: 'assistant', text: RECOGNITION_CONNECTION_REFUSED },
         ]);
       } finally {
         setIsScanningRecognition(false);
@@ -377,10 +387,11 @@ export function PublicSovereignCompanion() {
       return;
     }
 
-    // Lord of Machines — tool-calling: when user asks about code/logic → read_code() via getManifestoCompanionResponse (indexed: backend/src/economic, core, web/lib, manifesto)
+    // Lord of Machines — tool-calling: when user asks about code/technology → codebase via getManifestoCompanionResponse (indexed: backend/src/economic, core, web/lib, manifesto)
     const isFirstUserMessage = messages.filter((m) => m.role === 'user').length === 0;
     const isHelloOrGoodMorning = /^(hello|hi|hey|good\s+morning|good\s+afternoon|good\s+evening)\s*!?\s*$/i.test(t);
     const useFirstMessageGreeting = isFirstUserMessage && isHelloOrGoodMorning;
+    if (typeof window !== 'undefined' && !useFirstMessageGreeting) console.log('SOVRYN Tool Call:', SOVRYN_TOOLS.codebase);
 
     const conversationContext: { role: 'user' | 'assistant'; text: string }[] = [
       ...messages.map((m) => ({ role: m.role, text: m.text })),

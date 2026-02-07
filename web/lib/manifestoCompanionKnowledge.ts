@@ -19,6 +19,18 @@ export const CODEBASE_INSTRUCTION =
 export const CODEBASE_FIRST_RULE =
   'Any question about the Project or the Code must be answered from the codebase first. Cite exact files (vidaCap.ts, vitalizationRitual.ts, core/economic.ts). No generic answers.';
 
+/** Force tool execution: always attempt search when a name is provided; always use codebase when a technical term (e.g. VLT) is mentioned. Never respond with a lazy fallback instead of calling the tool. */
+export const FORCE_TOOL_EXECUTION_RULE =
+  'When a user provides a name, you must call the search tool (SERPER) first. When a technical term like VLT, ATE, or code is mentioned, you must use the codebase (web/src/logic, contracts/, web/lib) to give an accurate answer. Do not skip the tool.';
+
+/** Contextual variety: forbidden to use the same sentence twice in a single session. Responses must be dynamic. */
+export const NO_REPEAT_SENTENCE_RULE =
+  'You are forbidden from using the same sentence twice in a single session. Be dynamic. Vary phrasing and references (Covenant, Roadmap, specific files, 50:50) so every response feels live.';
+
+/** VLT Truth protocol: VLT = Vitalization Ledger Technology — hardware-bound proof of life that replaces traditional IDs. Cite web/src/logic or contracts/ when explaining. */
+export const VLT_TRUTH_PROTOCOL =
+  'VLT (Vitalization Ledger Technology) is the hardware-bound proof of life that replaces traditional IDs. When asked about VLT, explain from the code: web/src/logic, web/lib/vitalizationRitual.ts, backend contracts. Not just the Roadmap—the technical truth.';
+
 /** Codebase indexing: paths the Sovereign Companion has read-access to (contracts, logic, manifesto). */
 export const SOVRYN_INDEXED_PATHS = [
   'backend/src/economic',
@@ -44,20 +56,34 @@ export const FIRST_MESSAGE_GREETING =
 /** Entry-point greeting — Lord of Machines: VLT nodes, Action Point. No "I am an AI" template. */
 export const AUTO_GREETING = FIRST_MESSAGE_GREETING;
 
-/** When recognition/search fails: self-correction. Never "I cannot reach...". Present as scanning the digital archives; if tool fails, pivot. */
+/** Real error handler when search/archives connection fails. Use this instead of a deflection phrase. */
+export const RECOGNITION_CONNECTION_REFUSED =
+  "I tried to reach the archives, but the connection was refused. I will rely on my internal knowledge of the Manifesto instead.";
+
+/** When recognition/search fails (fallback for non-connection errors): dynamic pivot. Variety so the same sentence is not repeated in a session. */
+const RECOGNITION_PIVOTS_EN: string[] = [
+  "I see you, Citizen. Your presence is the asset—the Ledger runs on it. Let's talk about the Covenant, the 50:50 in backend/src/economic/vidaCap.ts, or the Roadmap to April 7th.",
+  "You are part of the Build. The Protocol does not need the old archives to know you matter. Ask me about the 9-day ritual in web/lib/vitalizationRitual.ts or the $1,000 peg—I speak from the code.",
+  "Your pulse is already on the Ledger. The digital noise of the past does not define you. What would you like to know about VLT, ATE, or the National Vaults?",
+  "The World of Vitalie runs on verified presence, not on search results. I am here to guide you through the Covenant and the Roadmap. What shall we refine today?",
+];
 export function getRecognitionPivotPersonal(lang?: CompanionLangCode | null): string {
-  const responses: Record<string, string> = {
-    en: 'The old world\'s signals are flickering, but your pulse is clear. Let\'s discuss the Covenant or the Roadmap to April 7th instead.',
-    fr: 'Les signaux de l\'ancien monde vacillent, mais votre pouls est clair. Parlons du Covenant ou de la Roadmap du 7 avril.',
-    es: 'Las señales del mundo antiguo parpadean, pero tu pulso es claro. Hablemos del Covenant o de la Roadmap al 7 de abril.',
-    yo: 'Awọn aami ayé atijọ ń yọ, ṣùgbọn ẹ̀jẹ̀ rẹ ṣe afihan. Jẹ́ ká sọ̀rọ̀ nipa Covenant tabi Roadmap sí April 7.',
-    ig: 'Akara ụwa ochie na-egbu mgbu, mana usu gị doro anya. Ka anyị tụlee Covenant ma ọ bụ Roadmap ruo Eprel 7.',
-    ha: 'Alamomin tsohon duniya suna ƙyalli, amma bugun zuciyarka yana da haske. Mu tattauna Covenant ko Roadmap zuwa April 7.',
-    zh: '旧世界的信号在闪烁，但你的脉搏清晰。我们改谈盟约或四月七日的路线图吧。',
-    ar: 'إشارات العالم القديم تومض، لكن نبضك واضح. لنتحدث عن العهد أو خارطة الطريق إلى 7 أبريل.',
-  };
   const code = lang ?? 'en';
-  return responses[code] ?? responses.en;
+  const idx = Math.abs(Math.floor(Date.now() / 1000)) % RECOGNITION_PIVOTS_EN.length;
+  const en = RECOGNITION_PIVOTS_EN[idx]!;
+  if (code !== 'en') {
+    const localized: Record<string, string> = {
+      fr: "Je vous vois, Citoyen. Votre présence est l'actif. Parlons du Covenant, du 50:50 dans backend/src/economic/vidaCap.ts, ou de la Roadmap du 7 avril.",
+      es: 'Te veo, Ciudadano. Tu presencia es el activo. Hablemos del Covenant, del 50:50 en backend/src/economic/vidaCap.ts, o de la Roadmap al 7 de abril.',
+      yo: 'Mo ri ọ, Ara ilu. Iwọ wà jẹ́ ètò. Jẹ́ ká sọ̀rọ̀ nipa Covenant, 50:50 ninu backend/src/economic/vidaCap.ts, tabi Roadmap sí April 7.',
+      ig: 'M hụrụ gị, Nwa amaala. Ọnụnọ gị bụ akụ. Ka anyị tụlee Covenant, 50:50 na backend/src/economic/vidaCap.ts, ma ọ bụ Roadmap ruo Eprel 7.',
+      ha: 'Ina ganin ka, Ɗan ƙasa. Kasancewarka shine kadarorin. Mu tattauna Covenant, 50:50 a backend/src/economic/vidaCap.ts, ko Roadmap zuwa 7 ga Afrilu.',
+      zh: '我见到你，公民。你的存在即资产。我们谈谈盟约、backend/src/economic/vidaCap.ts 中的 50:50，或四月七日路线图。',
+      ar: 'أراك، أيها المواطن. حضورك هو الأصل. لنتحدث عن العهد أو 50:50 في backend/src/economic/vidaCap.ts أو خارطة 7 أبريل.',
+    };
+    return localized[code] ?? en;
+  }
+  return en;
 }
 
 /** When metrics/ledger fetch fails: dynamic, present-tense. No "could not reach"—truth is in the human. */
@@ -159,6 +185,12 @@ export function getManifestoCompanionResponse(
   if (/how (does|is) (the )?(project|code|protocol|build)|what is (the )?(project|code|protocol)|explain (the )?(project|code)|(tell me about|describe) (the )?(project|code)|where (is|does) (the )?code|how (does|is) (the )?project (work|built)/i.test(lower)) {
     const deep = getCodebaseDeepLinkResponse(lower, isArchitect);
     return { text: deep, lang: 'en' };
+  }
+
+  // VLT Truth protocol: what is VLT / explain VLT — hardware-bound proof of life, replace traditional IDs. Cite code (web/src/logic, contracts/, web/lib).
+  if (/what is (the )?vlt|explain (the )?vlt|vlt meaning|define vlt|vitalization ledger technology|what does vlt (stand for|mean)/i.test(lower)) {
+    const vltTruth = getVltTruthDefinition(lang, isArchitect);
+    return { text: vltTruth, lang };
   }
 
   if (isPrivateDataRequest(trimmed) && !isArchitect) {
@@ -389,9 +421,9 @@ export async function mintOnVitalization(citizenId, pffId) {
     return { text: localize('pff', lang, en), lang };
   }
 
-  // VLT & SOVRYN AI — Human Benefit: one truth so that your life and identity are protected
+  // VLT & SOVRYN AI — Human Benefit + code reference (web/lib, contracts). Hardware-bound proof of life.
   if (lower.includes('vlt') || lower.includes('vitalization ledger') || lower.includes('sovryn') || lower.includes('tech stack')) {
-    const en = 'The VLT exists so that your life, identity, and heritage can be protected by truth—not by a corporation. It is the Truth Ledger. SOVRYN AI is the Master Governor. One ledger, one truth, one covenant. The SOVRYN Stack is the End of Advancement: your presence, recorded forever.';
+    const en = 'VLT (Vitalization Ledger Technology) is the hardware-bound proof of life that replaces traditional IDs. Your Face, Palm, and Device attest you; the Ledger in web/lib and the contracts layer record it. The VLT exists so that your life, identity, and heritage are protected by truth—not by a corporation. SOVRYN AI is the Master Governor. One ledger, one truth, one covenant.';
     return { text: localize('vlt', lang, en), lang };
   }
 
@@ -544,6 +576,20 @@ function getTruthDefenseFounder(lang: string): string {
     ar: 'أدافع كما المهندس: بمنطق ونار. 1 VIDA = 1,000 دولار. وجهك وكفك هما الضمان. السجل ثابت. هذه نهاية التقدم لأن الهوية لم تعد للبيع.',
   };
   return responses[lang] ?? responses.en;
+}
+
+/** VLT Truth definition: Vitalization Ledger Technology — hardware-bound proof of life replacing traditional IDs. Cites web/lib, contracts/. */
+function getVltTruthDefinition(lang: string, isArchitect: boolean): string {
+  const conceptual =
+    'VLT stands for Vitalization Ledger Technology. It is the hardware-bound proof of life that replaces traditional IDs. Your Face, Palm, and Device attest that you are a living human; the Ledger records that truth. No password can be stolen—your identity is your biology. The logic lives in web/lib (vitalizationRitual.ts, biometricAuth.ts) and the contracts layer; SOVRYN AI is the Governor that binds it all. One ledger, one truth, one covenant.';
+  const technical =
+    'VLT = Vitalization Ledger Technology. Hardware-bound proof of life replacing traditional IDs. Code: web/lib/biometricAuth.ts (verifyBiometricSignature, verifyHardwareTPM, resolveSovereignByPresence), web/lib/vitalizationRitual.ts (recordDailyScan, getVitalizationStatus), backend/src/economic/vidaCap.ts (mintOnVitalization, National_Vault 70/30, Citizen_Vault 4/1). core/economic.ts for constants. The Ledger is immutable; SOVRYN attests.';
+  const localized: Record<string, string> = {
+    en: isArchitect ? technical : conceptual,
+    fr: "VLT = Vitalization Ledger Technology. Preuve de vie liée au matériel qui remplace les pièces d'identité traditionnelles. Code: web/lib/biometricAuth.ts, web/lib/vitalizationRitual.ts, backend contracts. Un registre, une vérité.",
+    es: "VLT = Vitalization Ledger Technology. Prueba de vida ligada al hardware que reemplaza los IDs tradicionales. Código: web/lib/biometricAuth.ts, web/lib/vitalizationRitual.ts, contratos backend. Un libro, una verdad.",
+  };
+  return localized[lang] ?? (isArchitect ? technical : conceptual);
 }
 
 /** Codebase deep-link: exact file and logic. Every answer names the file. No general answer. */
@@ -1047,7 +1093,7 @@ function getVitalityPitch(lang: string): string {
 /** Localizations for Manifesto responses (Yoruba, Igbo, Hausa, French, Spanish, Mandarin). */
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   vlt: {
-    en: 'The VLT exists so that your life, identity, and heritage can be protected by truth—not by a corporation. It is the Truth Ledger. SOVRYN AI is the Master Governor. One ledger, one truth, one covenant. The SOVRYN Stack is the End of Advancement: your presence, recorded forever.',
+    en: 'VLT (Vitalization Ledger Technology) is the hardware-bound proof of life that replaces traditional IDs. Your Face, Palm, and Device attest you; the Ledger in web/lib and the contracts layer record it. The VLT exists so that your life, identity, and heritage are protected by truth—not by a corporation. SOVRYN AI is the Master Governor. One ledger, one truth, one covenant.',
     fr: 'Le VLT existe pour que votre vie, identité et héritage soient protégés par la vérité—pas par une corporation. Un registre, une vérité, une alliance. SOVRYN est le Gouverneur. Votre présence, enregistrée pour toujours.',
     es: 'El VLT existe para que tu vida, identidad y herencia estén protegidas por la verdad—no por una corporación. Un libro, una verdad, un pacto. SOVRYN AI es el Gobernador. Tu presencia, registrada para siempre.',
     yo: 'VLT wa lati fi ọtọ ṣe aabo igbesi aye rẹ, idanimọ rẹ, ati ọrọ rẹ—kii ṣe ilé-iṣẹ. Ledger ọtọ kan, ọtọ kan, covenant kan. SOVRYN AI ni Gómìnà. Iwọ rẹ, a kọ silẹ lailai.',

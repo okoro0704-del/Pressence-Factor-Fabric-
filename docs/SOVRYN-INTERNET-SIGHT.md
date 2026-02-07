@@ -15,7 +15,7 @@ The Sovereign Companion can "scan the digital archives" (public OSINT) when a us
 | `TAVILY_API_KEY` | Tavily Search API. Reserved for future tool-calling. | [tavily.com](https://tavily.com) |
 | `GOOGLE_SEARCH_API_KEY` | Google Custom Search JSON API key. Reserved for future use. | Google Cloud Console → Custom Search API |
 
-If **none** of these are set, the Companion still works: it uses an internal mock for recognition and responds with a sovereign pivot message (e.g. "The old world's signals are flickering, but your pulse is clear…") so the experience remains consistent.
+If **none** of these are set, the Companion still works: it uses an internal mock for recognition and responds with a sovereign pivot that steers to the Covenant, the Roadmap, or the code (e.g. backend/src/economic/vidaCap.ts) so the experience remains consistent.
 
 ## Security
 
