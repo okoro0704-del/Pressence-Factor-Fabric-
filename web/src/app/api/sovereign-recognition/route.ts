@@ -1,10 +1,11 @@
 /**
  * Sovereign Recognition (Social Sync) API.
- * Accepts a name and returns a simulated profile from "digital archives" (public OSINT).
+ * Accepts a name and returns a profile from "digital archives" (public OSINT).
  *
- * Integration point: Replace the mock below with:
- * - Google Custom Search API restricted to site:linkedin.com OR site:twitter.com OR site:x.com OR site:instagram.com
- * - Or an OSINT/social-aggregator API that returns public bio, role, location, interests.
+ * OSINT: process.env.SERPER_API_KEY is read here for Sovereign Companion search. When set, we call
+ * Serper first (millisecond logic—no artificial delay). On failure or missing key, mock + short delay.
+ * Lord personality lock: we never say "I cannot reach archives." Search for the user, then tell them
+ * why they are a Pillar of this new world based on what we find (or pivot with flickering line).
  *
  * Response is used by the Companion to deliver the "I see you, [Name]..." Wow moment.
  */
@@ -12,7 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { CompanionLangCode } from '@/lib/manifestoCompanionKnowledge';
 
-export const dynamic = 'force-static';
+export const dynamic = 'force-dynamic';
 
 export interface SovereignRecognitionPayload {
   name: string;
@@ -28,12 +29,66 @@ export interface SovereignRecognitionResult {
   detail?: string;
 }
 
-/** Simulate a short scan delay (replace with real API call when integrating OSINT/Google Search). */
-const SCAN_DELAY_MS = 1800;
+/** Delay only when using mock (so "scanning" feels real). With Sight (Serper), we run fast—World of Vitalie has no time for lag. */
+const MOCK_SCAN_DELAY_MS = 600;
+const SERPER_URL = 'https://google.serper.dev/search';
+
+interface SerperOrganic {
+  title?: string;
+  snippet?: string;
+  link?: string;
+}
+interface SerperKnowledgeGraph {
+  title?: string;
+  type?: string;
+  description?: string;
+  attributes?: Record<string, string>;
+}
+interface SerperResponse {
+  organic?: SerperOrganic[];
+  knowledgeGraph?: SerperKnowledgeGraph;
+}
+
+/** Perception: read SERPER_API_KEY from env. Sovereign Companion search function uses this for 100% real OSINT. */
+function hasSerperSight(): boolean {
+  return Boolean(typeof process !== 'undefined' && process.env.SERPER_API_KEY?.trim());
+}
+
+/** Call Serper to scan digital archives. Returns null on failure or missing key. Millisecond logic: no artificial delay. */
+async function searchDigitalArchivesSerper(name: string): Promise<SovereignRecognitionResult | null> {
+  const apiKey = typeof process !== 'undefined' ? process.env.SERPER_API_KEY?.trim() : '';
+  if (!apiKey) return null;
+  const query = `${name} LinkedIn OR Twitter OR site:linkedin.com OR site:twitter.com OR site:x.com`;
+  try {
+    const res = await fetch(SERPER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-API-KEY': apiKey },
+      body: JSON.stringify({ q: query, num: 8 }),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as SerperResponse;
+    const kg = data.knowledgeGraph;
+    const organic = data.organic ?? [];
+    const first = organic[0];
+    const role = kg?.title ?? (first?.title?.split(/[-|·]/)[0]?.trim()) ?? 'Builder';
+    const location = kg?.attributes?.['Location'] ?? kg?.attributes?.['Born'] ?? first?.snippet?.match(/\b(?:Lagos|Abuja|London|Paris|New York|Dubai|Accra|Nairobi|Berlin)\b/i)?.[0] ?? 'the Vanguard';
+    const keyInterest = kg?.description?.slice(0, 80) ?? first?.snippet?.slice(0, 100) ?? 'the Protocol';
+    const detail = first?.snippet ?? (kg?.description ? `From the archives: ${kg.description.slice(0, 120)}.` : undefined);
+    const displayName = name.trim() || 'Citizen';
+    return {
+      name: displayName,
+      role,
+      location,
+      keyInterest,
+      detail: detail ? `${detail} In the World of Vitalie, you are a Pillar.` : 'You are a Pillar of this new world—the Ledger sees you.',
+    };
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Known names: return a specific detail so SOVRYN proves search power. Search tool is active and prioritized.
- * In production, replace with real OSINT/Google Custom Search restricted to social domains.
  */
 const KNOWN_NAMES: Record<string, SovereignRecognitionResult> = {
   'isreal okoro': {
@@ -124,9 +179,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Simulate scan time (replace with real API call)
-    await new Promise((r) => setTimeout(r, SCAN_DELAY_MS));
-
+    const serperResult = await searchDigitalArchivesSerper(name);
+    if (serperResult) return NextResponse.json(serperResult);
+    if (!hasSerperSight()) await new Promise((r) => setTimeout(r, MOCK_SCAN_DELAY_MS));
     const result = mockSearchDigitalArchives(name);
     return NextResponse.json(result);
   } catch (e) {

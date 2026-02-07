@@ -5,6 +5,8 @@ import {
   AUTO_GREETING,
   getManifestoCompanionResponse,
   getReWelcomeForLanguage,
+  ensureSovereignAnchor,
+  FIRST_MESSAGE_GREETING,
   type CompanionResponse,
   type CompanionLangCode,
 } from '@/lib/manifestoCompanionKnowledge';
@@ -306,7 +308,7 @@ export function PublicSovereignCompanion() {
       try {
         const res = await fetch('/api/vlt-ledger/pff-metrics');
         const data = (await res.json()) as VltPffMetricsPayload;
-        const text = formatVerifiedPffMetrics(lang, data);
+        const text = ensureSovereignAnchor(formatVerifiedPffMetrics(lang, data));
         setMessages((prev) => [
           ...prev,
           { id: `vlt-${Date.now()}`, role: 'assistant', text },
@@ -323,6 +325,7 @@ export function PublicSovereignCompanion() {
       return;
     }
 
+    // Lord of Machines — tool-calling: when user asks about themselves → search() (OSINT) instantly
     if (isRecognitionRequest(t)) {
       setIsScanningRecognition(true);
       const name = getRecognitionName(t);
@@ -374,21 +377,29 @@ export function PublicSovereignCompanion() {
       return;
     }
 
+    // Lord of Machines — tool-calling: when user asks about code/logic → read_code() via getManifestoCompanionResponse (indexed: backend/src/economic, core, web/lib, manifesto)
+    const isFirstUserMessage = messages.filter((m) => m.role === 'user').length === 0;
+    const isHelloOrGoodMorning = /^(hello|hi|hey|good\s+morning|good\s+afternoon|good\s+evening)\s*!?\s*$/i.test(t);
+    const useFirstMessageGreeting = isFirstUserMessage && isHelloOrGoodMorning;
+
     const conversationContext: { role: 'user' | 'assistant'; text: string }[] = [
       ...messages.map((m) => ({ role: m.role, text: m.text })),
       { role: 'user', text: t },
     ].slice(-8);
-    const res: CompanionResponse = getManifestoCompanionResponse(
-      t,
-      architect,
-      preferredLang ?? undefined,
-      conversationContext,
-      typeof window !== 'undefined' ? new Date().getHours() : undefined
-    );
+    const res: CompanionResponse = useFirstMessageGreeting
+      ? { text: FIRST_MESSAGE_GREETING, lang: 'en' }
+      : getManifestoCompanionResponse(
+          t,
+          architect,
+          preferredLang ?? undefined,
+          conversationContext,
+          typeof window !== 'undefined' ? new Date().getHours() : undefined
+        );
+    const anchorText = ensureSovereignAnchor(res.text);
     setTimeout(() => {
       setMessages((prev) => [
         ...prev,
-        { id: `a-${Date.now()}`, role: 'assistant', text: res.text, codeSnippet: res.codeSnippet },
+        { id: `a-${Date.now()}`, role: 'assistant', text: anchorText, codeSnippet: res.codeSnippet },
       ]);
       setLastResponseLang((res.lang as CompanionLangCode) ?? null);
     }, 400);
