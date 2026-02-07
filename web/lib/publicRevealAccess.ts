@@ -43,6 +43,14 @@ export function isPreviewUrl(): boolean {
   return host.includes('deploy-preview-');
 }
 
+/** True when on the main app domain (custom domain). Same as pff2: full Protocol/Shield, no timer. */
+export function isAppDomain(): boolean {
+  if (typeof window === 'undefined') return false;
+  const host = window.location?.hostname ?? '';
+  const prod = getProductionDomain();
+  return host === prod || host.endsWith('.' + prod);
+}
+
 /** Check if current device_id (from storage or composite) is in the authorized list. Runs only on client. */
 export function isAuthorizedIdentitySync(): boolean {
   if (typeof window === 'undefined') return false;
@@ -76,10 +84,11 @@ export async function resolveAuthorizedIdentity(
   }
 }
 
-/** Show full Protocol (Vitalization, Treasury, Gate) when: Preview URL OR Authorized Identity. Else show Manifesto only. */
+/** Show full Protocol (Vitalization, Treasury, Gate) when: Preview URL, App Domain (custom), or Authorized Identity. Else show Manifesto only. */
 export function shouldShowFullProtocolSync(): boolean {
   if (typeof window === 'undefined') return true;
   if (isPreviewUrl()) return true;
+  if (isAppDomain()) return true; // Custom domain = full Shield like pff2
   if (!isProductionDomain()) return true;
   return isAuthorizedIdentitySync();
 }

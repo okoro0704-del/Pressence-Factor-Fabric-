@@ -108,6 +108,55 @@ import { QuadPillarGrid } from '@/components/dashboard/QuadPillarShield';
 
 const jetbrains = JetBrains_Mono({ weight: ['400', '600', '700'], subsets: ['latin'] });
 
+const VERIFIED_PILLARS_KEY = 'pff_verified_pillars';
+const VERIFIED_PILLARS_TTL_MS = 5 * 60 * 1000; // 5 min — resume GPS without re-scanning palm
+
+function hashForStorage(s: string): string {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h) ^ s.charCodeAt(i);
+  return (h >>> 0).toString(16).slice(0, 10);
+}
+
+function saveVerifiedPillar(phone: string, pillar: 'face' | 'palm' | 'device'): void {
+  try {
+    if (typeof sessionStorage === 'undefined') return;
+    const key = `${VERIFIED_PILLARS_KEY}_${hashForStorage(phone)}`;
+    const raw = sessionStorage.getItem(key);
+    const data = raw ? (JSON.parse(raw) as Record<string, number>) : {};
+    data[pillar] = Date.now();
+    sessionStorage.setItem(key, JSON.stringify(data));
+  } catch {
+    // ignore
+  }
+}
+
+function getVerifiedPillarsForResume(phone: string): { face: boolean; palm: boolean; device: boolean } | null {
+  try {
+    if (typeof sessionStorage === 'undefined') return null;
+    const key = `${VERIFIED_PILLARS_KEY}_${hashForStorage(phone)}`;
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return null;
+    const data = JSON.parse(raw) as Record<string, number>;
+    const now = Date.now();
+    if (now - (data.face ?? 0) > VERIFIED_PILLARS_TTL_MS) return null;
+    if (now - (data.palm ?? 0) > VERIFIED_PILLARS_TTL_MS) return null;
+    if (now - (data.device ?? 0) > VERIFIED_PILLARS_TTL_MS) return null;
+    return { face: true, palm: true, device: true };
+  } catch {
+    return null;
+  }
+}
+
+function clearVerifiedPillars(phone: string): void {
+  try {
+    if (typeof sessionStorage === 'undefined') return;
+    const key = `${VERIFIED_PILLARS_KEY}_${hashForStorage(phone)}`;
+    sessionStorage.removeItem(key);
+  } catch {
+    // ignore
+  }
+}
+
 export interface FourLayerGateProps {
   /** Hub verification (PC): force external fingerprint, then set MINTED and mint; redirect to /dashboard?minted=1 */
   hubVerification?: boolean;
@@ -415,12 +464,13 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     };
   }, [resetVerification]);
 
-  // When GPS pillar is active and scanning, after 3s show "Initializing Protocol..." (indoor mode)
+  // When GPS pillar is active and scanning, after 3s (desktop) / 5s (mobile) show "Initializing Protocol..." (indoor mode)
   useEffect(() => {
     if (currentLayer !== AuthLayer.GPS_LOCATION || authStatus !== AuthStatus.SCANNING) return;
-    const t = setTimeout(() => setGpsTakingLong(true), 3000);
+    const delay = isMobile ? 5000 : 3000;
+    const t = setTimeout(() => setGpsTakingLong(true), delay);
     return () => clearTimeout(t);
-  }, [currentLayer, authStatus]);
+  }, [currentLayer, authStatus, isMobile]);
 
   // Step 2 of 5: Compulsory App Download — skip on mobile/PWA (friction removal: they're already on app)
   useEffect(() => {
@@ -595,16 +645,18 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
 
     if (ENABLE_GPS_AS_FOURTH_PILLAR && effectiveMobile) startLocationRequestFromUserGesture(identityAnchor.phone);
 
+    const resumePillars = getVerifiedPillarsForResume(identityAnchor.phone);
+
     setAuthStatus(AuthStatus.SCANNING);
     setResult(null);
     setShowVerifyFromAuthorizedDevice(false);
     setShowTimeoutBypass(false);
     setGpsTakingLong(false);
-    setPillarFace(false);
-    setPillarPalm(false);
-    setPillarDevice(false);
+    setPillarFace(resumePillars?.face ?? false);
+    setPillarPalm(resumePillars?.palm ?? false);
+    setPillarDevice(resumePillars?.device ?? false);
     setPillarLocation(false);
-    setShowSovereignPalmScan(false);
+    setShowSovereignPalmScan(resumePillars ? !identityAnchor.isMinor : false);
     setQuadPillarAwaitingClockIn(false);
     palmResolveRef.current = null;
 
@@ -652,7 +704,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
       }
     }
 
-    setShowArchitectVision(true);
+    if (!resumePillars) setShowArchitectVision(true);
 
     const palmPromise = identityAnchor.isMinor
       ? undefined
@@ -674,15 +726,26 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
         skipDevicePillarForMobile: hubVerification ? false : false,
         scanTimeoutMs: isMobile ? MOBILE_SCAN_TIMEOUT_MS : undefined,
         requestLocationFirstForMobile: ENABLE_GPS_AS_FOURTH_PILLAR && effectiveMobile,
-        palmVerificationPromise: palmPromise,
+        palmVerificationPromise: resumePillars ? Promise.resolve() : palmPromise,
+        resumePillars123: resumePillars != null && ENABLE_GPS_AS_FOURTH_PILLAR,
         onPillarComplete: (pillar: PresencePillar) => {
+          if (typeof console !== 'undefined' && console.log) {
+            console.log(`[QuadPillar] Pillar verified: ${pillar}`);
+          }
           if (pillar === 'face') {
             setPillarFace(true);
+            saveVerifiedPillar(identityAnchor.phone, 'face');
             if (!identityAnchor.isMinor) setShowSovereignPalmScan(true);
             biometricPillarRef.current?.triggerExternalCapture();
           }
-          if (pillar === 'palm') setPillarPalm(true);
-          if (pillar === 'device') setPillarDevice(true);
+          if (pillar === 'palm') {
+            setPillarPalm(true);
+            saveVerifiedPillar(identityAnchor.phone, 'palm');
+          }
+          if (pillar === 'device') {
+            setPillarDevice(true);
+            saveVerifiedPillar(identityAnchor.phone, 'device');
+          }
           if (pillar === 'location') setPillarLocation(true);
         },
       }
@@ -707,6 +770,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
 
     // Quad-Pillar or Triple-Pillar success
     if (authResult.success && authResult.identity) {
+      clearVerifiedPillars(identityAnchor.phone);
       architectSuccessRef.current = {
         authResult,
         identityAnchor,

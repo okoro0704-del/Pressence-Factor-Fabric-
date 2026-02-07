@@ -398,8 +398,15 @@ const PFF_PILLAR_LOCATION_TS = 'pff_pillar_location_ts';
 const PILLAR_CACHE_MS = 24 * 60 * 60 * 1000;
 const MAXIMUM_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
-/** 3-second rule: if GPS doesn't return within 3s, use IP-location data to satisfy the Location pillar. */
-const GPS_TIMEOUT_MS = 3000;
+/** Desktop: 5s GPS timeout, then IP fallback. */
+const GPS_TIMEOUT_MS = 5000;
+/** Mobile: 15s GPS timeout — enables enableHighAccuracy and gives GPS time to acquire. */
+const GPS_TIMEOUT_MOBILE_MS = 15000;
+
+function isMobileUserAgent(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return /Android|iPhone|iPad|iPod|webOS|Mobile/i.test(navigator.userAgent);
+}
 
 /** Face-First Security: balance hidden until face match score >= 95% (variance <= 5). */
 export const FACE_MATCH_THRESHOLD_PERCENT = 95;
@@ -434,14 +441,16 @@ let pendingLocationFromUserGesture: Promise<LocationResult> | null = null;
 
 /**
  * Call this directly from the Start Verification button onClick so the browser allows geolocation (user gesture).
- * Parallel: launch IP fetch immediately; GPS with enableHighAccuracy: false and 3s timeout.
- * Multi-Profile: when identityAnchor is provided, cache is scoped so a different user gets separate location state.
+ * Parallel: launch IP fetch immediately; GPS with enableHighAccuracy: true and 15s timeout on mobile.
+ * Mobile browsers block GPS on non-secure (HTTP) connections — falls back to IP immediately.
  */
 export function startLocationRequestFromUserGesture(identityAnchor?: string): void {
   if (pendingLocationFromUserGesture) return;
 
   const locKey = locationKey(identityAnchor);
   const locTsKey = locationTsKey(identityAnchor);
+  const mobile = isMobileUserAgent();
+  const gpsTimeout = mobile ? GPS_TIMEOUT_MOBILE_MS : GPS_TIMEOUT_MS;
 
   pendingLocationFromUserGesture = new Promise<LocationResult>((resolve) => {
     let resolved = false;
@@ -479,7 +488,7 @@ export function startLocationRequestFromUserGesture(identityAnchor?: string): vo
 
     const gpsOptions: PositionOptions = {
       enableHighAccuracy: ENABLE_GPS_AS_FOURTH_PILLAR,
-      timeout: GPS_TIMEOUT_MS,
+      timeout: gpsTimeout,
       maximumAge: MAXIMUM_AGE_MS,
     };
 
@@ -492,7 +501,7 @@ export function startLocationRequestFromUserGesture(identityAnchor?: string): vo
           useIPFallback(false);
         }
       });
-    }, GPS_TIMEOUT_MS);
+    }, gpsTimeout);
 
     // After 1.2s use IP if available so we don't stick on "Locating GPS"
     setTimeout(() => {
@@ -508,6 +517,16 @@ export function startLocationRequestFromUserGesture(identityAnchor?: string): vo
       ipPromise.then((ipLoc) => {
         if (ipLoc) saveAndResolve({ latitude: ipLoc.latitude, longitude: ipLoc.longitude }, true, ipLoc.country_code, false);
         else if (!resolved) { resolved = true; resolve({ success: false, error: 'Geolocation not available' }); }
+      });
+      return;
+    }
+
+    // Mobile browsers block GPS on non-secure (HTTP) connections
+    if (typeof window !== 'undefined' && window.location?.protocol !== 'https:' && !window.location?.hostname?.startsWith('localhost')) {
+      clearTimeout(timeoutId);
+      ipPromise.then((ipLoc) => {
+        if (ipLoc && !resolved) saveAndResolve({ latitude: ipLoc.latitude, longitude: ipLoc.longitude }, true, ipLoc.country_code, false);
+        else if (!resolved) useIPFallback(false);
       });
       return;
     }
@@ -635,10 +654,29 @@ export async function verifyLocation(registeredCountryCode?: string, identityAnc
       return { success: false, error: 'Geolocation not available' };
     }
 
+    const mobile = isMobileUserAgent();
+    const gpsTimeout = mobile ? GPS_TIMEOUT_MOBILE_MS : GPS_TIMEOUT_MS;
+
+    // Mobile browsers block GPS on non-secure (HTTP) connections
+    if (typeof window !== 'undefined' && window.location?.protocol !== 'https:' && !window.location?.hostname?.startsWith('localhost')) {
+      const ipLoc = await ipPromise;
+      if (ipLoc) {
+        const match = !registeredCountryCode || ipLoc.country_code === registeredCountryCode;
+        if (match && typeof localStorage !== 'undefined') {
+          localStorage.setItem(locKey, JSON.stringify({ latitude: ipLoc.latitude, longitude: ipLoc.longitude }));
+          localStorage.setItem(locTsKey, String(Date.now()));
+        }
+        return match
+          ? { success: true, coords: { latitude: ipLoc.latitude, longitude: ipLoc.longitude }, fromIP: true, country_code: ipLoc.country_code }
+          : { success: false, error: 'GPS requires HTTPS; IP country does not match.' };
+      }
+      return { success: false, error: 'GPS requires HTTPS. Use a secure connection.' };
+    }
+
     const gpsPromise = new Promise<LocationResult>((resolve) => {
       const opts: PositionOptions = {
         enableHighAccuracy: ENABLE_GPS_AS_FOURTH_PILLAR,
-        timeout: GPS_TIMEOUT_MS,
+        timeout: gpsTimeout,
         maximumAge: MAXIMUM_AGE_MS,
       };
       navigator.geolocation.getCurrentPosition(
@@ -672,7 +710,7 @@ export async function verifyLocation(registeredCountryCode?: string, identityAnc
       );
     });
 
-    const threeSecTimeout = new Promise<LocationResult>((resolve) => {
+    const gpsTimeoutPromise = new Promise<LocationResult>((resolve) => {
       setTimeout(async () => {
         const ipLoc = await ipPromise;
         if (ipLoc) {
@@ -689,10 +727,10 @@ export async function verifyLocation(registeredCountryCode?: string, identityAnc
         } else {
           resolve({ success: false, error: 'Location timeout', permissionRequired: false });
         }
-      }, GPS_TIMEOUT_MS);
+      }, gpsTimeout);
     });
 
-    const rawResult = await Promise.race([gpsPromise, threeSecTimeout]);
+    const rawResult = await Promise.race([gpsPromise, gpsTimeoutPromise]);
     if (
       ENABLE_GPS_AS_FOURTH_PILLAR &&
       rawResult.success &&
@@ -1057,6 +1095,8 @@ export interface ResolveSovereignOptions {
   requestLocationFirstForMobile?: boolean;
   /** Pillar 2: Promise that resolves when user completes Sovereign Palm Scan (back-camera + palm overlay). When provided, quorum requires Face + Palm + Device. */
   palmVerificationPromise?: Promise<void>;
+  /** Resume after GPS timeout: Pillars 1–3 already verified, only run GPS. Saves re-scanning palm. */
+  resumePillars123?: boolean;
 }
 
 /** SOVEREIGN THRESHOLD: minimum layers that must pass to grant access (3-out-of-4 quorum) */
@@ -1080,6 +1120,7 @@ export async function resolveSovereignByPresence(
   const useExternalScanner = options?.useExternalScanner === true;
   const skipDevicePillarForMobile = options?.skipDevicePillarForMobile === true;
   const palmVerificationPromise = options?.palmVerificationPromise;
+  const resumePillars123 = options?.resumePillars123 === true;
   const useGpsPillar = ENABLE_GPS_AS_FOURTH_PILLAR;
 
   const fail = (layer: AuthLayer | null, message: string, timedOut?: boolean, twoPillarsOnly?: boolean): BiometricAuthResult => ({
@@ -1117,6 +1158,52 @@ export async function resolveSovereignByPresence(
       /** Pillar 2: Sovereign Palm Scan completed (resolved via palmVerificationPromise). */
       palm: false,
     };
+
+    // ——— RESUME: Pillars 1–3 already verified (GPS timed out); only run GPS ———
+    if (resumePillars123 && useGpsPillar) {
+      state.bio = { success: true, credential: { id: 'resume' }, identity: { phone_number: identityAnchorPhone } };
+      state.voice = { success: true, voicePrint: 'resume' };
+      state.tpm = { success: true, deviceHash: 'resume' };
+      state.palm = true;
+      onPillarComplete?.('face');
+      onPillarComplete?.('palm');
+      onPillarComplete?.('device');
+      onPillarComplete?.('voice');
+      onProgress?.(AuthLayer.GPS_LOCATION, AuthStatus.SCANNING);
+      const locationResult = await verifyLocation(registeredCountryCode, identityAnchorPhone);
+      state.location = locationResult;
+      if (locationResult.success && locationResult.coords) onPillarComplete?.('location');
+      const biometricResult = state.bio!;
+      const voiceResult = state.voice!;
+      const tpmResult = state.tpm!;
+      if (!locationResult.success || !locationResult.coords) {
+        return {
+          ...fail(AuthLayer.GPS_LOCATION, locationResult.error ?? 'GPS pillar failed. Retry.'),
+          ...(locationResult.manualVerificationRequired && { manualVerificationRequired: true }),
+        };
+      }
+      layersPassed.push(AuthLayer.BIOMETRIC_SIGNATURE, AuthLayer.SOVEREIGN_PALM, AuthLayer.HARDWARE_TPM, AuthLayer.VOICE_PRINT, AuthLayer.GPS_LOCATION);
+      const { resolvePhoneToIdentity } = await import('./phoneIdentity');
+      const genesisIdentity = await resolvePhoneToIdentity(identityAnchorPhone);
+      if (!genesisIdentity) return fail(null, 'Sovereign identity not found.');
+      const identity = genesisIdentity;
+      const compositeBiometricHash = await generateCompositeBiometricHash(
+        biometricResult.credential ?? { id: 'resume' },
+        voiceResult.voicePrint ?? 'resume',
+        tpmResult.deviceHash ?? 'resume',
+        `${locationResult.coords.latitude},${locationResult.coords.longitude}`
+      );
+      onProgress?.(null, AuthStatus.BANKING_UNLOCKED);
+      return {
+        success: true,
+        status: AuthStatus.BANKING_UNLOCKED,
+        layer: null,
+        phoneNumber: identityAnchorPhone,
+        identity,
+        layersPassed,
+        lastLocationCoords: locationResult.coords,
+      };
+    }
 
     // ——— PARALLEL: Face, Voice, Device (Phone Anchor). Optional: GPS (4th pillar). Pillar 2 (Palm) via promise. ———
     onProgress?.(AuthLayer.BIOMETRIC_SIGNATURE, AuthStatus.SCANNING);

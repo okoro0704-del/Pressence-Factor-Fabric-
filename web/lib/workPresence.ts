@@ -198,12 +198,20 @@ export async function recordClockIn(
       .limit(1)
       .maybeSingle();
 
-    if (selectError || !row?.id) return { ok: true };
+    if (selectError || !row?.id) {
+      if (typeof console !== 'undefined' && console.warn) {
+        console.warn('[QuadPillar] presence_handshakes: no row found for anchor — DB may be empty; UI shows Verified but backend insert required.');
+      }
+      return { ok: true };
+    }
     const { error: updateError } = await supabase
       .from('presence_handshakes')
       .update({ work_site_coords })
       .eq('id', row.id);
     if (updateError) return { ok: false, error: updateError.message };
+    if (typeof console !== 'undefined' && console.log) {
+      console.log('[QuadPillar] presence_handshakes: work_site_coords written for row', row.id);
+    }
     return { ok: true };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
