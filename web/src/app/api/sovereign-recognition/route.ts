@@ -13,6 +13,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { CompanionLangCode } from '@/lib/manifestoCompanionKnowledge';
 
+// Diagnostic: confirm SERPER_API_KEY is loaded (check terminal on first request or server start).
+console.log('Search Key Active:', !!process.env.SERPER_API_KEY);
+
 // Omit force-dynamic: incompatible with output: 'export' (static HTML). Use Netlify Function for server-side recognition on deploy.
 export interface SovereignRecognitionPayload {
   name: string;
@@ -68,9 +71,9 @@ function hasTavilySight(): boolean {
   return Boolean(typeof process !== 'undefined' && process.env.TAVILY_API_KEY?.trim());
 }
 
-/** Call Serper to scan digital archives. Returns null on failure or missing key. Millisecond logic: no artificial delay. */
+/** Call Serper to scan digital archives. Key from process.env.SERPER_API_KEY only. Returns null on failure or missing key. */
 async function searchDigitalArchivesSerper(name: string): Promise<SovereignRecognitionResult | null> {
-  const apiKey = typeof process !== 'undefined' ? process.env.SERPER_API_KEY?.trim() : '';
+  const apiKey = typeof process !== 'undefined' ? (process.env.SERPER_API_KEY ?? '').trim() : '';
   if (!apiKey) return null;
   const query = `${name} LinkedIn OR Twitter OR site:linkedin.com OR site:twitter.com OR site:x.com`;
   try {
@@ -98,7 +101,7 @@ async function searchDigitalArchivesSerper(name: string): Promise<SovereignRecog
       role,
       location,
       keyInterest,
-      detail: detail ? `${detail} In the World of Vitalie, you are a Pillar.` : 'You are a Pillar of this new world—the Ledger sees you.',
+      detail: detail ?? undefined,
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -135,7 +138,7 @@ async function searchDigitalArchivesTavily(name: string): Promise<SovereignRecog
     const role = first?.title?.split(/[-|·]/)[0]?.trim() ?? 'Builder';
     const location = snippet.match(/\b(?:Lagos|Abuja|London|Paris|New York|Dubai|Accra|Nairobi|Berlin)\b/i)?.[0] ?? 'the Vanguard';
     const keyInterest = snippet.slice(0, 100) || 'the Protocol';
-    const detail = snippet ? `${snippet.slice(0, 120)}. In the World of Vitalie, you are a Pillar.` : 'You are a Pillar of this new world—the Ledger sees you.';
+    const detail = snippet ? snippet.slice(0, 160) : undefined;
     return {
       name: displayName,
       role,
@@ -207,6 +210,10 @@ function mockSearchDigitalArchives(name: string): SovereignRecognitionResult {
   };
 }
 
+/**
+ * Force search logic: every request with a name must run Serper then Tavily first.
+ * No scripted shortcuts—mock only when both APIs fail or keys are missing.
+ */
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as SovereignRecognitionPayload;
@@ -218,6 +225,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Always execute search tools first when we have a name (client sends name for "search" or name queries).
     let result: SovereignRecognitionResult | null = await searchDigitalArchivesSerper(name);
     if (result) return NextResponse.json(result);
     result = await searchDigitalArchivesTavily(name);
