@@ -54,3 +54,67 @@ BEGIN
     ALTER TABLE presence_handshakes ALTER COLUMN anchor_phone DROP NOT NULL;
   END IF;
 END $$;
+
+-- =============================================================================
+-- 4) Sovereign Memory Vault + vibration scope (Linguistic Vibration / Banter Memory)
+-- Run if you use the Companion's Memory Vault or vibration matching.
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS sovereign_memory_vault (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  citizen_id uuid REFERENCES auth.users(id) ON DELETE CASCADE,
+  scope text NOT NULL CHECK (scope IN ('family', 'health', 'goals', 'other', 'vibration')),
+  content text NOT NULL DEFAULT '',
+  updated_at timestamptz NOT NULL DEFAULT NOW(),
+  UNIQUE(citizen_id, scope)
+);
+
+COMMENT ON TABLE sovereign_memory_vault IS 'SOVRYN Memory Vault: relational context + vibration (register|lang) for banter memory. Private to the Citizen.';
+
+CREATE INDEX IF NOT EXISTS idx_memory_vault_citizen ON sovereign_memory_vault(citizen_id);
+CREATE INDEX IF NOT EXISTS idx_memory_vault_updated ON sovereign_memory_vault(updated_at DESC);
+
+ALTER TABLE sovereign_memory_vault ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Citizens read own vault" ON sovereign_memory_vault;
+CREATE POLICY "Citizens read own vault"
+  ON sovereign_memory_vault FOR SELECT
+  USING (auth.uid() = citizen_id);
+
+DROP POLICY IF EXISTS "Citizens insert own vault" ON sovereign_memory_vault;
+CREATE POLICY "Citizens insert own vault"
+  ON sovereign_memory_vault FOR INSERT
+  WITH CHECK (auth.uid() = citizen_id);
+
+DROP POLICY IF EXISTS "Citizens update own vault" ON sovereign_memory_vault;
+CREATE POLICY "Citizens update own vault"
+  ON sovereign_memory_vault FOR UPDATE
+  USING (auth.uid() = citizen_id)
+  WITH CHECK (auth.uid() = citizen_id);
+
+DROP POLICY IF EXISTS "Citizens delete own vault" ON sovereign_memory_vault;
+CREATE POLICY "Citizens delete own vault"
+  ON sovereign_memory_vault FOR DELETE
+  USING (auth.uid() = citizen_id);
+
+-- If table already existed with the old scope CHECK (no 'vibration'), add it:
+DO $$
+DECLARE
+  conname text;
+BEGIN
+  SELECT c.conname INTO conname
+  FROM pg_constraint c
+  JOIN pg_class t ON c.conrelid = t.oid
+  WHERE t.relname = 'sovereign_memory_vault' AND c.contype = 'c'
+    AND pg_get_constraintdef(c.oid) LIKE '%scope%';
+  IF conname IS NOT NULL THEN
+    EXECUTE format('ALTER TABLE sovereign_memory_vault DROP CONSTRAINT %I', conname);
+    ALTER TABLE sovereign_memory_vault
+      ADD CONSTRAINT sovereign_memory_vault_scope_check
+      CHECK (scope IN ('family', 'health', 'goals', 'other', 'vibration'));
+  END IF;
+EXCEPTION
+  WHEN undefined_object THEN NULL; -- table didn't exist, CREATE TABLE above already has vibration
+END $$;
+
+COMMENT ON COLUMN sovereign_memory_vault.scope IS 'family|health|goals|other|vibration. vibration = register|lang for banter memory.';

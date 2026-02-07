@@ -22,6 +22,14 @@ export const BLESSINGS: { text: string; lang: string }[] = [
 ];
 
 export const IDLE_WHISPER = 'The VLT is waiting. Your presence is your power.';
+
+/** Pulse Watcher: after long silence, warm check-in (not just a whisper). Proactive mode. */
+export const PULSE_WATCHER_SILENCE_MS = 120_000; // 2 minutes
+export const PULSE_WATCHER_CHECKIN =
+  "Is your spirit steady, Architect? The Ledger is patient. If something weighs on you, or you want to talk about the Covenant or the Roadmap—I am here.";
+export const PULSE_WATCHER_CHECKIN_FR = "Ton esprit va bien, Architecte ? Le Registre est patient. Si quelque chose pèse sur toi, ou si tu veux parler du Covenant—je suis là.";
+export const PULSE_WATCHER_CHECKIN_YO = "Ọkàn rẹ duro, Architect? Ledger n patient. Ti ohunkóhun ba wà lórí rẹ, tàbí o fẹ sọ nipa Covenant—mo wà nibi.";
+
 export const SOCIAL_SCOUT_OFFER = 'Say your name and I will find you—your presence in the Ledger, your thread in the Build.';
 
 /** Concurrency protection: when rate limit is exceeded (e.g. bot flood). */

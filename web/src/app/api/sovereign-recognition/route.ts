@@ -28,6 +28,23 @@ export interface SovereignRecognitionResult {
   keyInterest: string;
   /** Specific detail to prove the search found something—soulful, not generic. */
   detail?: string;
+  /** When set, result was about football/metal etc.; client must show sovereign reframe, not raw snippet. */
+  sovereignReframe?: boolean;
+  reframeTerm?: 'PFF' | 'VDM';
+  /** ISO country from geo headers (e.g. NG, FR). Enables localized search and language offer. */
+  country?: string;
+  /** Suggested lang for this geography: France→fr, Nigeria→optional yo/ig/ha. */
+  suggestedLang?: string;
+}
+
+/** Clarification protocol: when query (e.g. PFF/VDM) returns mixed categories, Governor asks which path. */
+export interface SovereignClarificationPayload {
+  clarificationRequired: true;
+  query: string;
+  categoryA: string;
+  categoryB: string;
+  country?: string;
+  suggestedLang?: string;
 }
 
 const SERPER_URL = 'https://google.serper.dev/search';
@@ -69,13 +86,97 @@ function hasTavilySight(): boolean {
 }
 
 /**
- * Serper search: raw fetch only (no library wrapper). URL and header must match .env key SERPER_API_KEY.
- * https://google.serper.dev/search — X-API-KEY: process.env.SERPER_API_KEY
+ * Contextual anchoring: disambiguate PFF/VDM so search targets Vitalie and the Ledger, not football or metals.
+ * Append Vitalie / Pure Freedom Foundation / Vitality Digital Money to ambiguous queries.
  */
-async function searchDigitalArchivesSerper(name: string): Promise<SovereignRecognitionResult | null> {
+function anchorSearchQuery(name: string): string {
+  const t = name.trim().toUpperCase();
+  if (t === 'PFF' || /^PFF\s*$/i.test(name.trim())) return `${name.trim()} Vitalie Pure Freedom Foundation`;
+  if (t === 'VDM' || /^VDM\s*$/i.test(name.trim())) return `${name.trim()} Vitality Digital Money Ledger Architect`;
+  return name.trim();
+}
+
+/** Country detection: Vercel, Cloudflare, Netlify geo headers. No IP lookup. */
+function getCountryFromRequest(request: NextRequest): string | undefined {
+  const h = request.headers;
+  const code =
+    h.get('x-vercel-ip-country') ??
+    h.get('cf-ipcountry') ??
+    h.get('x-nf-request-country') ??
+    h.get('x-country-code') ??
+    '';
+  const c = (code || '').trim().toUpperCase();
+  return c.length === 2 ? c : undefined;
+}
+
+/** Localized search: Nigeria → prioritize "[Query] Nigeria" for context-specific answers. */
+function localizeQuery(queryBase: string, country: string | undefined): string {
+  if (country === 'NG') return `${queryBase} Nigeria`;
+  return queryBase;
+}
+
+/** Sentinel of the Covenant: ignore results about football (PFF) or metal companies (VDM). Only Architect, Ledger, Era of Light. */
+function filterIdentityResult(result: SovereignRecognitionResult, originalQuery: string): SovereignRecognitionResult {
+  const combined = [result.role, result.keyInterest, result.detail].filter(Boolean).join(' ').toLowerCase();
+  const isFootball =
+    /\b(football|soccer|premier\s*league|pff\s*(focus|rating|grade)|striker|midfielder|league\s*table|transfer)\b/i.test(combined);
+  const isMetal =
+    /\b(vdm\s*metal|vanadium|steel\s*company|metallurgy|vdm\s*gmbh|metal\s*group|alloy)\b/i.test(combined);
+  if (isFootball && /pff|pure\s*freedom/i.test(originalQuery)) {
+    return { ...result, sovereignReframe: true, reframeTerm: 'PFF', detail: undefined };
+  }
+  if (isMetal && /vdm/i.test(originalQuery)) {
+    return { ...result, sovereignReframe: true, reframeTerm: 'VDM', detail: undefined };
+  }
+  return result;
+}
+
+/** Classify one organic result as covenant (Vitalie/Ledger) or old_world (football/metal). */
+function classifyResult(text: string): 'covenant' | 'old_world' | null {
+  const t = text.toLowerCase();
+  const covenant = /\b(vitalie|pure\s*freedom|ledger|architect|covenant|vitality\s*digital\s*money|pff\s*foundation|era\s*of\s*light)\b/i.test(t);
+  const oldWorldPff = /\b(football|soccer|premier\s*league|pff\s*(focus|rating|grade)|striker|midfielder|transfer)\b/i.test(t);
+  const oldWorldVdm = /\b(vdm\s*metal|vanadium|steel\s*company|metallurgy|vdm\s*gmbh|metal\s*group|alloy)\b/i.test(t);
+  if (covenant) return 'covenant';
+  if (oldWorldPff || oldWorldVdm) return 'old_world';
+  return null;
+}
+
+/** Clarification protocol: if PFF/VDM returns both covenant and old-world results, Governor asks which path. */
+function checkClarificationNeeded(
+  organic: SerperOrganic[],
+  query: string
+): { categoryA: string; categoryB: string } | null {
+  const q = query.trim().toUpperCase();
+  const isPff = q === 'PFF' || /^PFF\s*$/i.test(query.trim());
+  const isVdm = q === 'VDM' || /^VDM\s*$/i.test(query.trim());
+  if (!isPff && !isVdm) return null;
+  const top = organic.slice(0, 5);
+  let hasCovenant = false;
+  let hasOldWorld = false;
+  for (const o of top) {
+    const text = [o.title, o.snippet].filter(Boolean).join(' ');
+    const c = classifyResult(text);
+    if (c === 'covenant') hasCovenant = true;
+    if (c === 'old_world') hasOldWorld = true;
+  }
+  if (!hasCovenant || !hasOldWorld) return null;
+  if (isPff) return { categoryA: "Old World's football and ratings", categoryB: "Covenant's Pure Freedom Foundation and the World of Vitalie" };
+  return { categoryA: "Old World's metals and industry", categoryB: "Covenant's Vitality Digital Money and the Ledger" };
+}
+
+/**
+ * Serper search: raw fetch only. Uses anchored + localized query. Returns result and organic for clarification check.
+ */
+async function searchDigitalArchivesSerper(
+  name: string,
+  country?: string
+): Promise<{ result: SovereignRecognitionResult; organic: SerperOrganic[] } | null> {
   const apiKey = typeof process !== 'undefined' ? (process.env.SERPER_API_KEY ?? '').trim() : '';
   if (!apiKey) return null;
-  const query = `${name} LinkedIn OR Twitter OR site:linkedin.com OR site:twitter.com OR site:x.com`;
+  const anchored = anchorSearchQuery(name);
+  const localized = localizeQuery(anchored, country);
+  const query = `${localized} LinkedIn OR Twitter OR site:linkedin.com OR site:twitter.com OR site:x.com`;
   try {
     const res = await fetch(SERPER_URL, {
       method: 'POST',
@@ -99,13 +200,14 @@ async function searchDigitalArchivesSerper(name: string): Promise<SovereignRecog
     const keyInterest = kg?.description?.slice(0, 80) ?? first?.snippet?.slice(0, 100) ?? 'the Protocol';
     const detail = first?.snippet ?? (kg?.description ? `From the archives: ${kg.description.slice(0, 120)}.` : undefined);
     const displayName = name.trim() || 'Citizen';
-    return {
+    const result: SovereignRecognitionResult = {
       name: displayName,
       role,
       location,
       keyInterest,
       detail: detail ?? undefined,
     };
+    return { result, organic };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     const code = err instanceof Error && 'code' in err ? (err as NodeJS.ErrnoException).code : undefined;
@@ -114,11 +216,20 @@ async function searchDigitalArchivesSerper(name: string): Promise<SovereignRecog
   }
 }
 
+/** Suggested lang from country: France→fr, Nigeria→leave to client (Pidgin/Yoruba/Igbo). */
+function suggestedLangFromCountry(country: string | undefined): string | undefined {
+  if (country === 'FR') return 'fr';
+  if (country === 'NG') return 'ng'; // Client treats as "offer Pidgin, Yoruba, Igbo"
+  return undefined;
+}
+
 /** Call Tavily to scan digital archives (fallback when Serper fails). Uses process.env.TAVILY_API_KEY. */
-async function searchDigitalArchivesTavily(name: string): Promise<SovereignRecognitionResult | null> {
+async function searchDigitalArchivesTavily(name: string, country?: string): Promise<SovereignRecognitionResult | null> {
   const apiKey = typeof process !== 'undefined' ? process.env.TAVILY_API_KEY?.trim() : '';
   if (!apiKey) return null;
-  const query = `${name} LinkedIn OR Twitter OR profile`;
+  const anchored = anchorSearchQuery(name);
+  const localized = localizeQuery(anchored, country);
+  const query = `${localized} LinkedIn OR Twitter OR profile`;
   try {
     const res = await fetch(TAVILY_URL, {
       method: 'POST',
@@ -171,13 +282,35 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const country = getCountryFromRequest(request);
+    const suggestedLang = suggestedLangFromCountry(country);
+
     if (hasSerperSight()) {
-      const result = await searchDigitalArchivesSerper(name);
-      if (result) return NextResponse.json(result);
+      const out = await searchDigitalArchivesSerper(name, country);
+      if (out) {
+        const { result, organic } = out;
+        const clarification = checkClarificationNeeded(organic, name);
+        if (clarification) {
+          const payload: SovereignClarificationPayload = {
+            clarificationRequired: true,
+            query: name,
+            categoryA: clarification.categoryA,
+            categoryB: clarification.categoryB,
+            country,
+            suggestedLang,
+          };
+          return NextResponse.json(payload);
+        }
+        const filtered = filterIdentityResult({ ...result, country, suggestedLang }, name);
+        return NextResponse.json({ ...filtered, country, suggestedLang });
+      }
     }
     if (hasTavilySight()) {
-      const result = await searchDigitalArchivesTavily(name);
-      if (result) return NextResponse.json(result);
+      const result = await searchDigitalArchivesTavily(name, country);
+      if (result) {
+        const filtered = filterIdentityResult({ ...result, country, suggestedLang }, name);
+        return NextResponse.json({ ...filtered, country, suggestedLang });
+      }
     }
     return NextResponse.json(
       { error: 'SIGHT_OFFLINE', message: 'Search services unavailable. Check SERPER_API_KEY / TAVILY_API_KEY and console.' },

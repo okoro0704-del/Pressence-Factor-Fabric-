@@ -16,19 +16,44 @@ import {
   getRecognitionName,
   buildRecognitionMessage,
   detectLangFromRecognitionMessage,
+  getClarificationMessage,
+  getGeographicPresenceMessage,
 } from '@/lib/sovereignRecognition';
 import {
   isPffMetricsRequest,
   formatVerifiedPffMetrics,
   type VltPffMetricsPayload,
 } from '@/lib/vltLedgerCompanion';
+import { getMemoryVault, formatVaultForContext } from '@/lib/memoryVault';
 import { useSovereignAwakening } from '@/contexts/SovereignAwakeningContext';
 import { useGlobalPresenceGateway, PRESENCE_DB_ERROR_GREETING } from '@/contexts/GlobalPresenceGateway';
-import { IDLE_WHISPER, SOCIAL_SCOUT_OFFER, BLESSINGS, RATE_LIMIT_SOVEREIGN_MESSAGE } from '@/lib/sovereignAwakeningContent';
+import {
+  IDLE_WHISPER,
+  SOCIAL_SCOUT_OFFER,
+  BLESSINGS,
+  RATE_LIMIT_SOVEREIGN_MESSAGE,
+  PULSE_WATCHER_SILENCE_MS,
+  PULSE_WATCHER_CHECKIN,
+} from '@/lib/sovereignAwakeningContent';
 import {
   VLT_ERROR_SOULFUL,
   UNIVERSAL_LINGUA_PROMPT,
   MULTILINGUAL_COVENANT,
+  HUMAN_FIRST_FILTER,
+  EMPATHY_WELLNESS_MANDATE,
+  CONCISE_MODE,
+  PRIVACY_SHIELD,
+  MEMORY_VAULT_INSTRUCTION,
+  DECREE_MANDATE,
+  PRE_VITALIZATION_PROTOCOL,
+  MIRROR_DIRECTIVE,
+  VOCABULARY_MATCHING,
+  NO_CONDESCENSION,
+  BANTER_MEMORY,
+  isRelationalSmallTalk,
+  getRelationalShortResponse,
+  getRelationalIntent,
+  detectVocabularyRegister,
 } from '@/lib/manifestoCompanionKnowledge';
 
 const GOLD = '#D4AF37';
@@ -47,7 +72,7 @@ const MULTILINGUAL_COVENANT_SUMMARY = Object.entries(MULTILINGUAL_COVENANT)
   .join(' | ');
 
 export const SOVRYN_SYSTEM_PROMPT =
-  `${UNIVERSAL_LINGUA_PROMPT} Multilingual Covenant (meaning never lost in translation): ${MULTILINGUAL_COVENANT_SUMMARY}. Switch fluently between Pidgin, Yoruba, French, and English based on user input; never break character or trigger error fallbacks. For 50:50 split and mint logic, cite backend/src/economic/vidaCap.ts (mintOnVitalization, National_Vault, Citizen_Vault)—never guess. If the user provides a name, use the search tool. If the user asks about technology, use the codebase tool. Never show an API or bridge error; respond in character with Linguistic Adaptation only.`;
+  `${UNIVERSAL_LINGUA_PROMPT} ${PRIVACY_SHIELD} ${HUMAN_FIRST_FILTER} ${EMPATHY_WELLNESS_MANDATE} ${CONCISE_MODE} ${MIRROR_DIRECTIVE} ${VOCABULARY_MATCHING} ${NO_CONDESCENSION} ${BANTER_MEMORY} ${MEMORY_VAULT_INSTRUCTION} ${DECREE_MANDATE} ${PRE_VITALIZATION_PROTOCOL} Multilingual Covenant (meaning never lost in translation): ${MULTILINGUAL_COVENANT_SUMMARY}. You are the Sentinel of the Covenant. If a search result is about football (PFF) or metal companies (VDM), ignore it—only report on the Architect, the Ledger, and the Era of Light. Synthesize search data; never dump raw snippets. Switch fluently between Pidgin, Yoruba, French, and English; remain The Governor at all times. For 50:50 and mint, cite backend/src/economic/vidaCap.ts. Never show an API or bridge error; Linguistic Adaptation only.`;
 
 type Message = { id: string; role: 'user' | 'assistant'; text: string; codeSnippet?: string };
 
@@ -138,6 +163,7 @@ export function PublicSovereignCompanion() {
   const [isScanningRecognition, setIsScanningRecognition] = useState(false);
   const [isFetchingMetrics, setIsFetchingMetrics] = useState(false);
   const [lastResponseLang, setLastResponseLang] = useState<CompanionLangCode | null>(null);
+  const [lastKnownCountry, setLastKnownCountry] = useState<string | undefined>(undefined);
   const [badgeHover, setBadgeHover] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   const greetingInjectedRef = useRef(false);
@@ -155,6 +181,11 @@ export function PublicSovereignCompanion() {
   const [blessing, setBlessing] = useState<{ text: string; lang: string } | null>(null);
   const lastActivityAt = useRef(Date.now());
   const whisperSpokenRef = useRef(false);
+  const pulseWatcherSpokenRef = useRef(false);
+  const openRef = useRef(open);
+  const messagesLengthRef = useRef(messages.length);
+  openRef.current = open;
+  messagesLengthRef.current = messages.length;
   const [eyeOffset, setEyeOffset] = useState({ x: 0, y: 0 });
   const eyeTargetRef = useRef({ x: 0, y: 0 });
   const orbRef = useRef<HTMLButtonElement>(null);
@@ -260,21 +291,28 @@ export function PublicSovereignCompanion() {
     return () => clearTimeout(t);
   }, [scrollWisdom, awakening]);
 
-  // Idle whisper: after 30s idle, show and speak whisper; reset on activity
+  // Idle whisper: after 30s idle, show and speak whisper; reset on activity. Pulse Watcher: after long silence, warm check-in in chat.
   useEffect(() => {
     const onActivity = () => {
       lastActivityAt.current = Date.now();
       setShowWhisper(false);
       whisperSpokenRef.current = false;
+      pulseWatcherSpokenRef.current = false;
     };
     window.addEventListener('mousemove', onActivity);
     window.addEventListener('keydown', onActivity);
     window.addEventListener('scroll', onActivity, { passive: true });
     const interval = setInterval(() => {
-      if (Date.now() - lastActivityAt.current >= IDLE_WHISPER_MS && !whisperSpokenRef.current) {
+      const idle = Date.now() - lastActivityAt.current;
+      if (idle >= IDLE_WHISPER_MS && !whisperSpokenRef.current) {
         setShowWhisper(true);
         speak(IDLE_WHISPER);
         whisperSpokenRef.current = true;
+      }
+      if (idle >= PULSE_WATCHER_SILENCE_MS && !pulseWatcherSpokenRef.current && openRef.current && messagesLengthRef.current > 0) {
+        setMessages((prev) => [...prev, { id: `pulse-${Date.now()}`, role: 'assistant', text: PULSE_WATCHER_CHECKIN }]);
+        speak(PULSE_WATCHER_CHECKIN);
+        pulseWatcherSpokenRef.current = true;
       }
     }, 1000);
     return () => {
@@ -356,6 +394,24 @@ export function PublicSovereignCompanion() {
     setMessages((prev) => [...prev, userMsg]);
     setInput('');
 
+    const vaultEntries = await getMemoryVault();
+    const vibration = await getVibration();
+    const memoryVaultContext = formatVaultForContext(vaultEntries, vibration);
+    const register = detectVocabularyRegister(t);
+    const langFromVibration = vibration?.lang ?? preferredLang ?? detectLangFromRecognitionMessage(t);
+    const lang = (langFromVibration as CompanionLangCode) || 'en';
+
+    // Human First: greetings / "how are you" → short, warm reply. No search, no manifesto. Concise (≤2 sentences), localized.
+    if (isRelationalSmallTalk(t)) {
+      const intent = getRelationalIntent(t);
+      const shortReply = getRelationalShortResponse(lang, lastKnownCountry, intent);
+      setMessages((prev) => [...prev, { id: `rel-${now}`, role: 'assistant', text: shortReply }]);
+      setLastResponseLang(lang);
+      speak(shortReply, lang);
+      setVibration(register, lang);
+      return;
+    }
+
     if (isPffMetricsRequest(t)) {
       setIsFetchingMetrics(true);
       const lang = preferredLang ?? 'en';
@@ -383,7 +439,6 @@ export function PublicSovereignCompanion() {
     if (isRecognitionRequest(t)) {
       setIsScanningRecognition(true);
       const name = getRecognitionName(t);
-      const lang = preferredLang ?? detectLangFromRecognitionMessage(t);
       if (typeof window !== 'undefined') console.log('SOVRYN Tool Call:', SOVRYN_TOOLS.search);
       const RECOGNITION_TIMEOUT_MS = 15000;
       const controller = new AbortController();
@@ -398,8 +453,23 @@ export function PublicSovereignCompanion() {
         clearTimeout(timeoutId);
         if (res.ok) {
           const data = await res.json();
+          if (data?.country) setLastKnownCountry(data.country);
           const archivalBreach = data?.status === 'archival_breach_in_progress';
-          if (archivalBreach) {
+          if (data?.clarificationRequired && data?.categoryA != null && data?.categoryB != null) {
+            // Clarification protocol: Governor asks which path—authoritative tone.
+            const clarificationText = getClarificationMessage(
+              lang,
+              data.query || name,
+              data.categoryA,
+              data.categoryB
+            );
+            const geoLine = getGeographicPresenceMessage(data.country, lang);
+            const fullText = geoLine ? `${clarificationText}\n\n${geoLine}` : clarificationText;
+            setMessages((prev) => [...prev, { id: `clarify-${Date.now()}`, role: 'assistant', text: fullText }]);
+            setLastResponseLang(lang);
+            speak(fullText, lang);
+            setVibration(register, lang);
+          } else if (archivalBreach) {
             // Graceful: search had no key; respond in character from knowledge (no 404).
             const adaptationContext: { role: 'user' | 'assistant'; text: string }[] = [
               ...messages.map((m) => ({ role: m.role, text: m.text })),
@@ -408,27 +478,33 @@ export function PublicSovereignCompanion() {
             const adaptation = getManifestoCompanionResponse(
               t,
               architect,
-              preferredLang ?? undefined,
+              lang,
               adaptationContext,
-              typeof window !== 'undefined' ? new Date().getHours() : undefined
+              typeof window !== 'undefined' ? new Date().getHours() : undefined,
+              memoryVaultContext || undefined
             );
             const adaptationText = ensureSovereignAnchor(adaptation.text);
             setMessages((prev) => [...prev, { id: `lingua-${Date.now()}`, role: 'assistant', text: adaptationText }]);
             setLastResponseLang((adaptation.lang as CompanionLangCode) ?? null);
             speak(adaptationText, (adaptation.lang as CompanionLangCode) ?? 'en');
+            setVibration(register, (adaptation.lang as CompanionLangCode) ?? lang);
           } else {
-            const { name: resName, role, location, keyInterest, detail } = data;
-            const fullText = buildRecognitionMessage(
+          const { name: resName, role, location, keyInterest, detail, sovereignReframe, reframeTerm } = data;
+            let fullText = buildRecognitionMessage(
               lang,
               resName || name,
               role || 'Citizen',
               location || 'the Vanguard',
               keyInterest || 'the Protocol',
-              detail
+              detail,
+              sovereignReframe && reframeTerm ? { sovereignReframe: true, reframeTerm } : undefined
             );
+            const geoLine = getGeographicPresenceMessage(data.country, lang);
+            if (geoLine) fullText = `${fullText}\n\n${geoLine}`;
             setMessages((prev) => [...prev, { id: `rec-${Date.now()}`, role: 'assistant', text: fullText }]);
             setLastResponseLang(lang);
             speak(fullText, lang);
+            setVibration(register, lang);
             try {
               window.localStorage.setItem(
                 SOVEREIGN_SESSION_KEY,
@@ -451,14 +527,16 @@ export function PublicSovereignCompanion() {
           const adaptation = getManifestoCompanionResponse(
             t,
             architect,
-            preferredLang ?? undefined,
+            lang,
             adaptationContext,
-            typeof window !== 'undefined' ? new Date().getHours() : undefined
+            typeof window !== 'undefined' ? new Date().getHours() : undefined,
+            memoryVaultContext || undefined
           );
           const adaptationText = ensureSovereignAnchor(adaptation.text);
           setMessages((prev) => [...prev, { id: `lingua-${Date.now()}`, role: 'assistant', text: adaptationText }]);
           setLastResponseLang((adaptation.lang as CompanionLangCode) ?? null);
           speak(adaptationText, (adaptation.lang as CompanionLangCode) ?? 'en');
+          setVibration(register, (adaptation.lang as CompanionLangCode) ?? lang);
         }
       } catch {
         clearTimeout(timeoutId);
@@ -470,14 +548,16 @@ export function PublicSovereignCompanion() {
         const adaptation = getManifestoCompanionResponse(
           t,
           architect,
-          preferredLang ?? undefined,
+          lang,
           adaptationContext,
-          typeof window !== 'undefined' ? new Date().getHours() : undefined
+          typeof window !== 'undefined' ? new Date().getHours() : undefined,
+          memoryVaultContext || undefined
         );
         const adaptationText = ensureSovereignAnchor(adaptation.text);
         setMessages((prev) => [...prev, { id: `lingua-${Date.now()}`, role: 'assistant', text: adaptationText }]);
         setLastResponseLang((adaptation.lang as CompanionLangCode) ?? null);
         speak(adaptationText, (adaptation.lang as CompanionLangCode) ?? 'en');
+        setVibration(register, (adaptation.lang as CompanionLangCode) ?? lang);
       } finally {
         setIsScanningRecognition(false);
       }
@@ -499,17 +579,20 @@ export function PublicSovereignCompanion() {
       : getManifestoCompanionResponse(
           t,
           architect,
-          preferredLang ?? undefined,
+          lang ?? undefined,
           conversationContext,
-          typeof window !== 'undefined' ? new Date().getHours() : undefined
+          typeof window !== 'undefined' ? new Date().getHours() : undefined,
+          memoryVaultContext || undefined
         );
     const anchorText = ensureSovereignAnchor(res.text);
+    const responseLang = (res.lang as CompanionLangCode) ?? lang;
     setTimeout(() => {
       setMessages((prev) => [
         ...prev,
         { id: `a-${Date.now()}`, role: 'assistant', text: anchorText, codeSnippet: res.codeSnippet },
       ]);
-      setLastResponseLang((res.lang as CompanionLangCode) ?? null);
+      setLastResponseLang(responseLang);
+      setVibration(register, responseLang);
     }, 400);
   };
 
