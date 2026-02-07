@@ -23,7 +23,7 @@ const RECOGNITION_TRIGGERS =
   /recognize me|who am i|search for me|find me|do you know me|scan me|scan my profile|my digital footprint|montre-moi|qui suis-je|reconnais-moi|quién soy|reconóceme|báwo ni mo rí|kedu onye m bụ/i;
 
 /** "Who is [Name]" or "tell me about [Name]" or "search for [Name]" — triggers search so SOVRYN finds a specific detail. Search is active and prioritized. */
-const WHO_IS_PATTERN = /^(who is|tell me about|look up|search for|find|who\'?s)\s+[\p{L}\s\-']{2,60}$/iu;
+const WHO_IS_PATTERN = /^(who is|tell me about|look up|search for|find|who'?s)\s+[\p{L}\s\-']{2,60}$/iu;
 
 /**
  * Returns true if the message should trigger Sovereign Recognition (search + Wow response).

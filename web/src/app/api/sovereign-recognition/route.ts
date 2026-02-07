@@ -13,8 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { CompanionLangCode } from '@/lib/manifestoCompanionKnowledge';
 
-export const dynamic = 'force-dynamic';
-
+// Omit force-dynamic: incompatible with output: 'export' (static HTML). Use Netlify Function for server-side recognition on deploy.
 export interface SovereignRecognitionPayload {
   name: string;
   lang?: CompanionLangCode | null;
