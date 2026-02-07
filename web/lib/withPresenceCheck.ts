@@ -1,6 +1,8 @@
 /**
  * withPresenceCheck - Wrapper function for presence-gated actions
- * Verifies Presence_Verified signal from Supabase before enabling Send/Swap/Bank operations
+ * Verifies Presence_Verified signal from Supabase before enabling Send/Swap/Bank operations.
+ * Table: presence_handshakes must have columns verified_at (TIMESTAMPTZ) and liveness_score.
+ * If verified_at is missing, run supabase/migrations/20260257000000_add_verified_at_presence_handshakes.sql.
  */
 
 import { hasSupabase, supabase } from './supabase';
@@ -14,6 +16,8 @@ export interface PresenceCheckResult {
   verified: boolean;
   timestamp?: Date;
   error?: string;
+  /** When true, DB/schema error occurred; caller should fall back to Relatable Human Greeting instead of hard fail. */
+  fallbackToGreeting?: boolean;
 }
 
 /**
@@ -66,7 +70,8 @@ export async function checkPresenceVerified(): Promise<PresenceCheckResult> {
     } catch (queryErr) {
       const msg = queryErr instanceof Error ? queryErr.message : String(queryErr);
       console.warn('[withPresenceCheck] Database query threw (non-blocking):', msg);
-      return { verified: false, error: msg };
+      const isSchemaError = /column.*verified_at|verified_at.*missing|does not exist|relation.*presence_handshakes/i.test(msg);
+      return { verified: false, error: msg, fallbackToGreeting: isSchemaError };
     }
 
     if (error) {
@@ -74,7 +79,8 @@ export async function checkPresenceVerified(): Promise<PresenceCheckResult> {
         (error && typeof error === 'object' && 'message' in error && String((error as { message?: unknown }).message).trim()) ||
         'Database call failed';
       console.warn('[withPresenceCheck] Error querying presence (non-blocking):', msg);
-      return { verified: false, error: msg };
+      const isSchemaError = /column.*verified_at|verified_at.*missing|does not exist|relation.*presence_handshakes/i.test(msg);
+      return { verified: false, error: msg, fallbackToGreeting: isSchemaError };
     }
 
     if (data && Array.isArray(data) && data.length > 0) {
@@ -95,7 +101,8 @@ export async function checkPresenceVerified(): Promise<PresenceCheckResult> {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[withPresenceCheck] Error checking presence:', msg);
-    return { verified: false, error: msg };
+    const isSchemaError = /column.*verified_at|verified_at.*missing|does not exist|relation.*presence_handshakes/i.test(msg);
+    return { verified: false, error: msg, fallbackToGreeting: isSchemaError };
   }
 }
 

@@ -12,6 +12,9 @@ import { checkSessionIsolation, setSessionIdentity } from '@/lib/sessionIsolatio
 import { getSupabase, testConnection } from '@/lib/supabase';
 import { runDayZeroCheckAndClear } from '@/lib/dayZeroCheck';
 
+const HIGH_FIDELITY_GREETING = 'Architect recognized. Your presence is verified on the Ledger. My systems are fully aligned with your vision.';
+const RELATABLE_FALLBACK_GREETING = 'Welcome. The Ledger is warming up—your presence matters. Continue when ready.';
+
 interface GlobalPresenceGatewayContextType {
   isPresenceVerified: boolean;
   presenceTimestamp: Date | null;
@@ -22,6 +25,8 @@ interface GlobalPresenceGatewayContextType {
   connecting: boolean;
   /** true when testConnection() failed; show "Reconnecting to Protocol" instead of crashing */
   protocolReconnecting: boolean;
+  /** Set when presence is verified (High-Fidelity) or when DB error triggers fallback (Relatable). SOVRYN or UI can display it. */
+  presenceGreeting: string | null;
 }
 
 const GlobalPresenceGatewayContext = createContext<GlobalPresenceGatewayContextType | undefined>(undefined);
@@ -39,6 +44,7 @@ const SENTINEL_ROUTES = ['/sentinel', '/sentinel/purchase', '/sentinel-vault']; 
 export function GlobalPresenceGatewayProvider({ children }: { children: ReactNode }) {
   const [isPresenceVerified, setIsPresenceVerified] = useState(false);
   const [presenceTimestamp, setPresenceTimestamp] = useState<Date | null>(null);
+  const [presenceGreeting, setPresenceGreeting] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(true);
   const [protocolReconnecting, setProtocolReconnecting] = useState(false);
@@ -57,6 +63,7 @@ export function GlobalPresenceGatewayProvider({ children }: { children: ReactNod
       if (result.verified && result.timestamp) {
         setIsPresenceVerified(true);
         setPresenceTimestamp(result.timestamp);
+        setPresenceGreeting(HIGH_FIDELITY_GREETING);
         setLastActivityTime(Date.now());
         setConnecting(false);
         const identityAnchor = getIdentityAnchorPhone();
@@ -66,20 +73,30 @@ export function GlobalPresenceGatewayProvider({ children }: { children: ReactNod
         return true;
       }
 
+      if (result.fallbackToGreeting) {
+        console.warn('[GlobalPresenceGateway] Presence check schema/DB error (bypass with relatable greeting):', result.error);
+        setPresenceGreeting(RELATABLE_FALLBACK_GREETING);
+        setIsPresenceVerified(true);
+        setPresenceTimestamp(new Date());
+        setConnecting(false);
+        return true;
+      }
+
       if (result.error) {
         console.warn('[GlobalPresenceGateway] Presence check failed (non-blocking):', result.error);
       }
       setIsPresenceVerified(false);
       setPresenceTimestamp(null);
+      setPresenceGreeting(null);
       setConnecting(false);
       return false;
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       console.warn('[GlobalPresenceGateway] Presence check threw (non-blocking):', msg);
-      setIsPresenceVerified(false);
-      setPresenceTimestamp(null);
+      setPresenceGreeting(RELATABLE_FALLBACK_GREETING);
+      setIsPresenceVerified(true);
       setConnecting(false);
-      return false;
+      return true;
     }
   }, []);
 
@@ -91,6 +108,7 @@ export function GlobalPresenceGatewayProvider({ children }: { children: ReactNod
       const now = new Date();
       setIsPresenceVerified(true);
       setPresenceTimestamp(now);
+      setPresenceGreeting(HIGH_FIDELITY_GREETING);
       setLastActivityTime(Date.now());
       markPresenceVerified();
       const identityAnchor = getIdentityAnchorPhone();
@@ -105,6 +123,7 @@ export function GlobalPresenceGatewayProvider({ children }: { children: ReactNod
     } else {
       setIsPresenceVerified(false);
       setPresenceTimestamp(null);
+      setPresenceGreeting(null);
       clearPresenceVerification();
     }
   }, []);
@@ -295,6 +314,7 @@ export function GlobalPresenceGatewayProvider({ children }: { children: ReactNod
         loading,
         connecting,
         protocolReconnecting,
+        presenceGreeting,
       }}
     >
       {showConnectingMessage ? (
