@@ -9,12 +9,12 @@ export const IS_PUBLIC_REVEAL = true;
 const ARCHITECT_COOKIE = 'pff_architect_access';
 const AUTHORIZED_STORAGE_KEY = 'pff_authorized_identity';
 
-/** Production domain for "public" mode (Manifesto only for non-authorized). */
+/** Production domain: timer/countdown (Manifesto) for visitors. Netlify URL = no timer, full protocol for working. */
 function getProductionDomain(): string {
   if (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_PRODUCTION_DOMAIN?.trim()) {
     return process.env.NEXT_PUBLIC_PRODUCTION_DOMAIN.trim();
   }
-  return 'pff2.netlify.app';
+  return 'pffprotocol.com';
 }
 
 /** Default Architect + Sentinel device IDs (can be overridden by NEXT_PUBLIC_AUTHORIZED_DEVICE_IDS comma-separated). */
@@ -28,7 +28,7 @@ function getAuthorizedDeviceIds(): string[] {
   ];
 }
 
-/** True when running on the production domain (e.g. pff2.netlify.app). Call only on client. */
+/** True when on custom domain (e.g. pffprotocol.com) — shows timer/Manifesto for visitors. pffwork.netlify.app = false = no timer. */
 export function isProductionDomain(): boolean {
   if (typeof window === 'undefined') return false;
   const host = window.location?.hostname ?? '';

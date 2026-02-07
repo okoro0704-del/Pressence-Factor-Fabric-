@@ -2,6 +2,10 @@
 
 **Purpose:** Move from the Netlify testing site to the Custom Domain while keeping the Netlify URL functional for the team. Ensure Architect Recognition (Supabase singleton + getVibration) is active on the new domain.
 
+**Timer behavior:**
+- **pffprotocol.com (custom domain):** Shows Manifesto & Countdown (timer) for visitors; authorized identities see full Protocol.
+- **pffwork.netlify.app:** No timer — full Protocol so you can keep working and testing.
+
 ---
 
 ## 1. Branch Alignment
