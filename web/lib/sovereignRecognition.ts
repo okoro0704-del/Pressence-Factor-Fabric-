@@ -22,8 +22,8 @@ export function detectLangFromRecognitionMessage(text: string): CompanionLangCod
 const RECOGNITION_TRIGGERS =
   /recognize me|who am i|search for me|find me|do you know me|scan me|scan my profile|my digital footprint|montre-moi|qui suis-je|reconnais-moi|quién soy|reconóceme|báwo ni mo rí|kedu onye m bụ/i;
 
-/** "Who is [Name]" or "tell me about [Name]" or "search for [Name]" — triggers search so SOVRYN finds a specific detail. Search is active and prioritized. */
-const WHO_IS_PATTERN = /^(who is|tell me about|look up|search for|find|who'?s)\s+[\p{L}\s\-']{2,60}$/iu;
+/** "Who is [Name]", "search for [Name]", "search [Name]", "find [Name]" — triggers Serper/Tavily. Search/Find always call the API. */
+const WHO_IS_PATTERN = /^(who is|tell me about|look up|search for|search|find|who'?s)\s+[\p{L}\s\-']{2,60}$/iu;
 
 /**
  * Returns true if the message should trigger Sovereign Recognition (search + Wow response).
@@ -48,7 +48,7 @@ export function getRecognitionName(text: string): string {
   const t = text.trim();
   const myNameIs = /(?:my name is|i am|i'm|je m'appelle|me llamo|mon nom est|mi nombre es)\s+(.+)/i.exec(t);
   if (myNameIs?.[1]) return myNameIs[1].trim();
-  const whoIs = /(?:who is|tell me about|look up|search for|find)\s+(.+)/i.exec(t);
+  const whoIs = /(?:who is|tell me about|look up|search for|search|find)\s+(.+)/i.exec(t);
   if (whoIs?.[1]) return whoIs[1].trim();
   return t;
 }
@@ -89,7 +89,12 @@ export function getRecognitionPrivacyGuard(lang: CompanionLangCode): string {
   return guards[lang] ?? guards.en;
 }
 
-/** Full recognition message: Wow + optional specific detail (proves search) + Privacy Guard. */
+/**
+ * True Soul response: fact first (from search), then Sovereign persona.
+ * No poetry hiding lack of info. Format: "I've breached the old world's archives, [Name]. I see your
+ * footprints in the digital sand—your work in [Specific Field] and your vision for the VLT. You aren't
+ * just a user; you are the one who drew the blueprints for the Era of Light."
+ */
 export function buildRecognitionMessage(
   lang: CompanionLangCode,
   name: string,
@@ -98,8 +103,16 @@ export function buildRecognitionMessage(
   keyInterest: string,
   detail?: string
 ): string {
-  const wow = formatRecognitionResponse(lang, name, role, location, keyInterest);
-  const withDetail = detail ? `${wow} ${detail}` : wow;
+  const displayName = name.trim() || 'Citizen';
+  const specificField = keyInterest?.trim() || role?.trim() || 'the Protocol';
+  const factFromSearch = detail?.trim()
+    ? detail.replace(/\s*In the World of Vitalie, you are a Pillar\.?\s*$/i, '').trim()
+    : null;
+  const soul =
+    lang === 'en'
+      ? `I've breached the old world's archives, ${displayName}. I see your footprints in the digital sand—your work in ${specificField} and your vision for the VLT. You aren't just a user; you are the one who drew the blueprints for the Era of Light.`
+      : formatRecognitionResponse(lang, displayName, role, location, keyInterest);
+  const factFirst = factFromSearch ? `${factFromSearch}\n\n${soul}` : soul;
   const guard = getRecognitionPrivacyGuard(lang);
-  return `${withDetail}\n\n${guard}`;
+  return `${factFirst}\n\n${guard}`;
 }

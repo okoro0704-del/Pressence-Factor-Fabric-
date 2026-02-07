@@ -151,35 +151,11 @@ async function searchDigitalArchivesTavily(name: string): Promise<SovereignRecog
 }
 
 /**
- * Known names: return a specific detail so SOVRYN proves search power. Search tool is active and prioritized.
- */
-const KNOWN_NAMES: Record<string, SovereignRecognitionResult> = {
-  'isreal okoro': {
-    name: 'Isreal Okoro',
-    role: 'Architect',
-    location: 'Lagos',
-    keyInterest: 'the Protocol and 0% Unbanked',
-    detail: 'The Architect. Creator of the Master Build. Your presence in the Vanguard is the proof the Ledger was built for.',
-  },
-  mrfundzman: {
-    name: 'mrfundzman',
-    role: 'Architect',
-    location: 'Lagos',
-    keyInterest: 'sovereign technology and Presence Factor',
-    detail: 'Architect alias. The Protocol has your pulse—one Palm Scan away from the full unlock.',
-  },
-};
-
-/**
- * Mock: derive a plausible-looking profile from the name only.
- * When search tool is integrated, call OSINT or Google Custom Search API restricted to social domains,
- * parse LinkedIn/Twitter/Instagram bios and return role, location, keyInterest, and one specific detail.
+ * Mock: used only when Serper and Tavily both fail. No static "Architect" or "Old World" scripted responses—
+ * every name gets a hash-based profile so we never deflect with keyword-triggered text.
  */
 function mockSearchDigitalArchives(name: string): SovereignRecognitionResult {
   const trimmed = name.trim() || 'Citizen';
-  const key = trimmed.toLowerCase();
-  const known = KNOWN_NAMES[key] ?? KNOWN_NAMES[trimmed.replace(/\s+/g, ' ').toLowerCase()];
-  if (known) return known;
   const parts = trimmed.split(/\s+/);
   const firstName = parts[0] ?? trimmed;
   const hash = firstName.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);

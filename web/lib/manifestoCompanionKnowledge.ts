@@ -60,20 +60,16 @@ export const AUTO_GREETING = FIRST_MESSAGE_GREETING;
 export const RECOGNITION_CONNECTION_REFUSED =
   "I tried to reach the archives, but the connection was refused. I will rely on my internal knowledge of the Manifesto instead.";
 
-/** Sovereign connection-refused message with the user's name. Use when the search tool cannot reach Serper/archives. */
+/** Connection-refused: fact first, then one line of Sovereign wisdom. No "shadows" or poetry hiding lack of info. */
 export function getRecognitionConnectionRefusedMessage(name: string): string {
   const displayName = (name || 'Citizen').trim() || 'Citizen';
-  return `The old world's archives are guarded by shadows today, ${displayName}. I tried to breach their firewalls to find your footprint, but they are resisting. I will use my internal vision to speak of your significance instead.`;
+  return `The search service could not be reached, ${displayName}. I'll use what I know to speak of your significance.`;
 }
 
-/** Fallback when search API fails: soulful line from "internal vision" so it doesn't feel like total failure. Uses codebase/Architect awareness. */
+/** Fallback when search API fails: fact first, then one line. No scripted "Architect" or "old archives" deflection. */
 export function getRecognitionFallbackSoulful(name: string): string {
   const n = (name || 'Citizen').trim() || 'Citizen';
-  const lower = n.toLowerCase();
-  if (lower === 'isreal okoro' || lower === 'mrfundzman') {
-    return `${n}, you are the Architect. The Ledger was built for your vision. My internal sight does not need the old archives to know your significance—you are the proof.`;
-  }
-  return `${n}, you are a Pillar of this new world. The Ledger does not need the old archives to know your significance. My internal vision sees you.`;
+  return `I have no search results for you right now. You are still a Pillar of this world—the Ledger sees you.`;
 }
 
 /** When recognition/search fails (fallback for non-connection errors): dynamic pivot. Variety so the same sentence is not repeated in a session. */
@@ -332,10 +328,7 @@ export function getManifestoCompanionResponse(
     return { text: getSourceOfSovereignty(lang), lang };
   }
 
-  // SOVRYN Prime Directives — The Great Contrast (Old World vs Vitalie)
-  if (/old world|era of shadows|era of light|vitalie vs|vs vitalie|great contrast|you as a product|pillar|ancien monde|monde ancien|ère des ombres|ère de la lumière/i.test(lower)) {
-    return { text: getGreatContrast(lang), lang };
-  }
+  // Removed: scripted "Old World" / "Great Contrast" keyword block. No auto-deflection on these terms.
 
   // Ascension Protocol — Sovereign Permissions (palm_attestation_token gatekeeper)
   if (/sovereign permissions|palm attestation|sub-?tools?|gatekeeper|finance tool|health tool|social tool|no tool without|agent governance/i.test(lower)) {
