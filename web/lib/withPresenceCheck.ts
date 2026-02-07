@@ -1,10 +1,9 @@
 /**
- * withPresenceCheck - Wrapper function for presence-gated actions
- * Verifies Presence_Verified signal from Supabase before enabling Send/Swap/Bank operations.
- * Once verified, state is stored in localStorage (pff_presence_verified, pff_presence_timestamp) so the AI
- * recognizes the user immediately without a new DB query every interval (24h window).
- * Table: presence_handshakes — only verified_at and liveness_score are required for basic chat.
- * We only read from this table here; never send created_at or updated_at — the database handles those via DEFAULT NOW().
+ * withPresenceCheck - The Pulse: presence-gated actions and Ledger handshake.
+ * Reads verified_at and liveness_score from Supabase presence_handshakes (no is_verified column).
+ * Supabase client returns error objects, not HTTP 400/404—GlobalPresenceGateway uses this without expecting 4xx.
+ * Once verified, state is stored in localStorage so the AI recognizes the user without a new DB query every interval (24h).
+ * We only read; never send created_at or updated_at (DB uses DEFAULT NOW()).
  */
 
 import { hasSupabase, supabase } from './supabase';

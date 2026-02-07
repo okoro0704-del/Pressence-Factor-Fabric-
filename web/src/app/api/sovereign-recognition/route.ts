@@ -1,12 +1,12 @@
 /**
- * Sovereign Recognition (Social Sync) API.
- * Accepts a name and returns a profile from "digital archives" (public OSINT).
+ * Sovereign Recognition (The Eyes) API.
+ * Accepts a name and optional lang; returns a profile from digital archives (Serper/Tavily).
+ * Keys: SERPER_API_KEY and TAVILY_API_KEY are read from .env.local (Next.js loads env for server routes).
+ * Search results (name, role, location, keyInterest, detail) are the response context—the client
+ * feeds them into buildRecognitionMessage() and never ignores them; when res.ok, the AI response
+ * is built solely from this payload. On 4xx/5xx or timeout, client uses Linguistic Adaptation (no error UI).
  *
- * App Router: file at web/src/app/api/sovereign-recognition/route.ts. Exports POST handler.
- * With output: 'export' (static build), this route is not deployed on Netlify. Netlify serves
- * /api/sovereign-recognition via redirect to web/netlify/functions/sovereign-recognition.js (see netlify.toml).
- *
- * Env: SERPER_API_KEY, TAVILY_API_KEY. If present, real fetch to serper.dev then tavily.com.
+ * Netlify: redirect to web/netlify/functions/sovereign-recognition.js; set env vars in Netlify dashboard.
  */
 
 import { NextRequest, NextResponse } from 'next/server';

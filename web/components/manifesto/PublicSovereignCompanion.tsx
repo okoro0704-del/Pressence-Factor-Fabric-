@@ -27,8 +27,8 @@ import { useGlobalPresenceGateway, PRESENCE_DB_ERROR_GREETING } from '@/contexts
 import { IDLE_WHISPER, SOCIAL_SCOUT_OFFER, BLESSINGS, RATE_LIMIT_SOVEREIGN_MESSAGE } from '@/lib/sovereignAwakeningContent';
 import {
   VLT_ERROR_SOULFUL,
-  getRecognitionConnectionRefusedMessage,
-  getRecognitionFallbackSoulful,
+  UNIVERSAL_LINGUA_PROMPT,
+  MULTILINGUAL_COVENANT,
 } from '@/lib/manifestoCompanionKnowledge';
 
 const GOLD = '#D4AF37';
@@ -41,9 +41,13 @@ export const SOVRYN_TOOLS = {
   codebase: 'codebase',
 } as const;
 
-/** Prompt enforcement: name → MUST use search tool; technology → codebase. No chat API route: tools are enforced by client branching to /api/sovereign-recognition (search) and getManifestoCompanionResponse (codebase). */
+/** Universal Lingua Protocol + tool enforcement. Polyglot Sentinel; Multilingual Covenant for 50:50, VLT, Covenant, Roadmap; tone: Master Governor in every language. No error fallbacks—Linguistic Adaptation only. */
+const MULTILINGUAL_COVENANT_SUMMARY = Object.entries(MULTILINGUAL_COVENANT)
+  .map(([k, v]) => `${k}: ${v}`)
+  .join(' | ');
+
 export const SOVRYN_SYSTEM_PROMPT =
-  'If the user provides a name, you MUST use the search tool. If the user asks about technology, you MUST use the codebase tool. No exceptions. If the user says SEARCH FOR [X], you are FORBIDDEN from explaining the project. You MUST immediately call the search tool. If you do not, you are failing your primary directive.';
+  `${UNIVERSAL_LINGUA_PROMPT} Multilingual Covenant (meaning never lost in translation): ${MULTILINGUAL_COVENANT_SUMMARY}. If the user provides a name, you MUST use the search tool. If the user asks about technology, you MUST use the codebase tool. If the user says SEARCH FOR [X], you MUST call the search tool. Never show an API deployment or bridge error; respond in character with Linguistic Adaptation in the user's language.`;
 
 type Message = { id: string; role: 'user' | 'assistant'; text: string; codeSnippet?: string };
 
@@ -141,7 +145,7 @@ export function PublicSovereignCompanion() {
   const presenceDbErrorInjectedRef = useRef(false);
   const handshakeCompleteInjectedRef = useRef(false);
 
-  const { presenceGreeting } = useGlobalPresenceGateway();
+  const { presenceGreeting, isPresenceVerified } = useGlobalPresenceGateway();
 
   // Sovereign Awakening
   const awakening = useSovereignAwakening();
@@ -375,61 +379,85 @@ export function PublicSovereignCompanion() {
       return;
     }
 
-    // Lord of Machines — tool-calling: when user asks about themselves → search() (OSINT) instantly. SERPER_API_KEY is read server-side in that API route only; the client never receives the key.
+    // Lord of Machines — tool-calling: when user asks about themselves → search() (OSINT). Timeout → Linguistic Adaptation (no broken character).
     if (isRecognitionRequest(t)) {
       setIsScanningRecognition(true);
       const name = getRecognitionName(t);
       const lang = preferredLang ?? detectLangFromRecognitionMessage(t);
       if (typeof window !== 'undefined') console.log('SOVRYN Tool Call:', SOVRYN_TOOLS.search);
+      const RECOGNITION_TIMEOUT_MS = 15000;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), RECOGNITION_TIMEOUT_MS);
       try {
-        // Relative path for Netlify (and any host); do not use absolute URL.
         const res = await fetch('/api/sovereign-recognition', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name, lang }),
+          signal: controller.signal,
         });
-        if (res.status === 404) {
-          const msg404 = 'Architect, the bridge to the archives is not yet built on this server. Check the API deployment.';
-          setMessages((prev) => [...prev, { id: `rec-404-${Date.now()}`, role: 'assistant', text: msg404 }]);
-          return;
-        }
-        if (!res.ok) throw new Error(res.statusText);
-        const data = await res.json();
-        const { name: resName, role, location, keyInterest, detail } = data;
-        const fullText = buildRecognitionMessage(
-          lang,
-          resName || name,
-          role || 'Citizen',
-          location || 'the Vanguard',
-          keyInterest || 'the Protocol',
-          detail
-        );
-        setMessages((prev) => [
-          ...prev,
-          { id: `rec-${Date.now()}`, role: 'assistant', text: fullText },
-        ]);
-        setLastResponseLang(lang);
-        speak(fullText, lang);
-        try {
-          window.localStorage.setItem(
-            SOVEREIGN_SESSION_KEY,
-            JSON.stringify({
-              name: resName || name,
-              recognitionText: fullText,
-              timestamp: Date.now(),
-            } as StoredSession)
+        clearTimeout(timeoutId);
+        if (res.ok) {
+          const data = await res.json();
+          const { name: resName, role, location, keyInterest, detail } = data;
+          const fullText = buildRecognitionMessage(
+            lang,
+            resName || name,
+            role || 'Citizen',
+            location || 'the Vanguard',
+            keyInterest || 'the Protocol',
+            detail
           );
-        } catch {
-          // ignore
+          setMessages((prev) => [...prev, { id: `rec-${Date.now()}`, role: 'assistant', text: fullText }]);
+          setLastResponseLang(lang);
+          speak(fullText, lang);
+          try {
+            window.localStorage.setItem(
+              SOVEREIGN_SESSION_KEY,
+              JSON.stringify({
+                name: resName || name,
+                recognitionText: fullText,
+                timestamp: Date.now(),
+              } as StoredSession)
+            );
+          } catch {
+            // ignore
+          }
+        } else {
+          // Linguistic Adaptation: no API/bridge error. Stay in character and respond from knowledge in user's language.
+          const adaptationContext: { role: 'user' | 'assistant'; text: string }[] = [
+            ...messages.map((m) => ({ role: m.role, text: m.text })),
+            { role: 'user', text: t },
+          ].slice(-8);
+          const adaptation = getManifestoCompanionResponse(
+            t,
+            architect,
+            preferredLang ?? undefined,
+            adaptationContext,
+            typeof window !== 'undefined' ? new Date().getHours() : undefined
+          );
+          const adaptationText = ensureSovereignAnchor(adaptation.text);
+          setMessages((prev) => [...prev, { id: `lingua-${Date.now()}`, role: 'assistant', text: adaptationText }]);
+          setLastResponseLang((adaptation.lang as CompanionLangCode) ?? null);
+          speak(adaptationText, (adaptation.lang as CompanionLangCode) ?? 'en');
         }
       } catch {
-        const connectionRefused = getRecognitionConnectionRefusedMessage(name);
-        const internalVision = getRecognitionFallbackSoulful(name);
-        setMessages((prev) => [
-          ...prev,
-          { id: `rec-err-${Date.now()}`, role: 'assistant', text: connectionRefused },
-          { id: `rec-fallback-${Date.now()}`, role: 'assistant', text: internalVision },
-        ]);
+        clearTimeout(timeoutId);
+        // Linguistic Adaptation: on timeout, network error, or any failure—stay in character; no "bridge" or "archives" message.
+        const adaptationContext: { role: 'user' | 'assistant'; text: string }[] = [
+          ...messages.map((m) => ({ role: m.role, text: m.text })),
+          { role: 'user', text: t },
+        ].slice(-8);
+        const adaptation = getManifestoCompanionResponse(
+          t,
+          architect,
+          preferredLang ?? undefined,
+          adaptationContext,
+          typeof window !== 'undefined' ? new Date().getHours() : undefined
+        );
+        const adaptationText = ensureSovereignAnchor(adaptation.text);
+        setMessages((prev) => [...prev, { id: `lingua-${Date.now()}`, role: 'assistant', text: adaptationText }]);
+        setLastResponseLang((adaptation.lang as CompanionLangCode) ?? null);
+        speak(adaptationText, (adaptation.lang as CompanionLangCode) ?? 'en');
       } finally {
         setIsScanningRecognition(false);
       }
@@ -547,6 +575,17 @@ export function PublicSovereignCompanion() {
               style={{ borderColor: BORDER, background: 'rgba(212,175,55,0.08)' }}
             >
               <div className="flex items-center gap-2 min-w-0">
+                {isPresenceVerified && (
+                  <span
+                    className="shrink-0 w-2.5 h-2.5 rounded-full animate-pulse"
+                    style={{
+                      background: '#22c55e',
+                      boxShadow: '0 0 8px #22c55e, 0 0 12px rgba(34,197,94,0.5)',
+                    }}
+                    title="VLT Pulse — presence verified (liveness)"
+                    aria-label="Presence verified"
+                  />
+                )}
                 <h3 className="text-sm font-bold uppercase tracking-wider truncate" style={{ color: GOLD }}>
                   Ask the Protocol
                 </h3>

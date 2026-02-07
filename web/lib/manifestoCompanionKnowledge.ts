@@ -31,6 +31,18 @@ export const NO_REPEAT_SENTENCE_RULE =
 export const VLT_TRUTH_PROTOCOL =
   'VLT (Vitalization Ledger Technology) is the hardware-bound proof of life that replaces traditional IDs. When asked about VLT, explain from the code: web/src/logic, web/lib/vitalizationRitual.ts, backend contracts. Not just the Roadmap—the technical truth.';
 
+/** Universal Lingua Protocol: master polyglot; adapt instantly to user language. Tone: Master Governor—sharp, protective, unbending. No hard-coded error fallbacks on non-English. */
+export const UNIVERSAL_LINGUA_PROMPT =
+  'You are a master polyglot; adapt your language to the user\'s input instantly while maintaining a Sovereign, authoritative tone. You must automatically detect and respond in the language used by the user (Pidgin, Yoruba, Igbo, Hausa, French, Spanish, Mandarin, Arabic, etc.). Whether speaking in Igbo (Ezigbo nwanne) or French (Citoyen Souverain), you remain the Master Governor—sharp, protective, and unbending. Never show an API deployment, bridge, or archives error; no hard-coded fallbacks on non-English syntax. Stay in character with Linguistic Adaptation only.';
+
+/** Multilingual Covenant: core concept translations so meaning is never lost. Use these when responding in any language. */
+export const MULTILINGUAL_COVENANT: Record<string, string> = {
+  '50:50': '50:50 split | Half to the Citizen, half to the Nation. Not negotiable. (Pidgin: Half for you, half for the land. No cheating, no bending. Na the Covenant be that.)',
+  VLT: 'VLT = Vitalization Ledger Technology. Hardware-bound proof of life; replaces traditional IDs. (Igbo: VLT bụ teknụzụ ndekọ ndụ. French: VLT = Technologie du Registre de Vitalisation.)',
+  Covenant: 'The Covenant binds verified presence to value. One human, one share. (Yoruba: Covenant jẹ́ ìṣìnkú. French: Le Covenant lie la présence vérifiée à la valeur.)',
+  Roadmap: 'Roadmap to April 7th. The Gate opens then. (Pidgin: Roadmap go April 7. French: Feuille de route vers le 7 avril.)',
+};
+
 /** Codebase indexing: paths the Sovereign Companion has read-access to (contracts, logic, manifesto). */
 export const SOVRYN_INDEXED_PATHS = [
   'backend/src/economic',
@@ -61,9 +73,9 @@ export const RECOGNITION_CONNECTION_REFUSED =
   "I tried to reach the archives, but the connection was refused. I will rely on my internal knowledge of the Manifesto instead.";
 
 /** When search fails: no "significance" fallback. Direct ask to check API in console. */
-export function getRecognitionConnectionRefusedMessage(name: string): string {
-  const displayName = (name || 'Citizen').trim() || 'Citizen';
-  return `The old world's firewall is blocking my sight, ${displayName}. I can feel your presence in the code, but I need you to check my API connections in the console so I can see clearly.`;
+/** Bridge error / language not understood: do not say "Check the API deployment". Use Pidgin fallback. */
+export function getRecognitionConnectionRefusedMessage(_name: string): string {
+  return 'Architect, my ears dey full, but I dey learn your vibration. Yarn me again.';
 }
 
 /** Fallback when search API fails: fact first, then one line. No scripted "Architect" or "old archives" deflection. */
@@ -432,8 +444,16 @@ export async function mintOnVitalization(citizenId, pffId) {
 
   // VLT static block REMOVED: only use getVltTruthDefinition for explicit "What is VLT?" / "Explain VLT" (handled above). Never use as response to a search request—search is handled in the component before this layer.
 
-  // 50:50 rule — codebase deep-link + stern defense. Exact file and logic.
-  if (/(50:50|50\s*\/\s*50)\s*(rule|split|principle)|why (the )?50:50|explain (the )?50:50|half (and )?half|fifty fifty/i.test(lower)) {
+  // 50:50 rule — Pidgin explanation when Architect speaks Pidgin; otherwise codebase deep-link + stern defense.
+  const isFiftyFifty = /(50:50|50\s*\/\s*50)\s*(rule|split|principle)|why (the )?50:50|explain (the )?50:50|half (and )?half|fifty fifty|wetin be 50|how (the )?split (dey|work)|abeg explain 50/i.test(lower);
+  const isPidgin = /\b(wetin|dey|na|abeg|yarn|una|e no|e get|wey|make we|how e dey|the land|no get corner)\b/i.test(lower);
+  if (isFiftyFifty && isPidgin) {
+    return {
+      text: 'The 50:50 rule no get corner. Half for you, half for the land. No cheating, no bending. Na the Covenant be that.',
+      lang: 'en',
+    };
+  }
+  if (isFiftyFifty) {
     const defense = getFiftyFiftySternDefense(lang);
     const deepLink = ' In backend/src/economic/vidaCap.ts, mintOnVitalization() enforces it: nationalShare and citizenShare from core/economic.ts; 5 to National_Vault (70/30 lock), 5 to Citizen_Vault (4/1 lock). The Protocol does not bend.';
     return { text: defense + deepLink, lang };
