@@ -227,13 +227,6 @@ export function CitizenWalletContent({
         <FamilyVault />
       </div>
 
-      <div className="flex flex-wrap gap-3 pt-4">
-        <Link href="/humanity/" className="text-sm font-medium text-[#c9a227] hover:text-[#e8c547] transition-colors">Humanity Ledger →</Link>
-        <Link href="/pulse/" className="text-sm font-medium text-[#c9a227] hover:text-[#e8c547] transition-colors">National Pulse →</Link>
-        <Link href="/treasury/" className="text-sm font-medium text-[#c9a227] hover:text-[#e8c547] transition-colors">National Treasury →</Link>
-        <Link href="/companion/" className="text-sm font-medium text-[#c9a227] hover:text-[#e8c547] transition-colors">SOVRYN Companion →</Link>
-      </div>
-
       <TreasuryFacePulseModal
         isOpen={showFacePulseModal}
         onClose={() => setShowFacePulseModal(false)}
