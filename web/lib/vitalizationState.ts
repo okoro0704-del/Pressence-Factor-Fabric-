@@ -70,9 +70,15 @@ export function shouldNeverRedirectBack(): boolean {
   }
 }
 
+/** Clear vitalization completion flags (session + localStorage). Call on logout so user is sent back to language/gate. */
 export function clearVitalizationComplete(): void {
   try {
     if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem(VITALIZATION_COMPLETE_KEY);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(VITALIZATION_COMPLETE_STORAGE_KEY);
+      localStorage.removeItem(IS_VITALIZED_KEY);
+      localStorage.removeItem(PFF_VITALIZED_KEY);
+    }
   } catch {
     // ignore
   }

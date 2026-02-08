@@ -14,6 +14,7 @@ import { getTrustLevel, shouldSuggestSovereignShield } from '@/lib/trustLevel';
 import { requestTerminateSession } from '@/lib/deviceTerminateSession';
 import { clearVitalizationComplete } from '@/lib/vitalizationState';
 import { resetBiometrics } from '@/lib/resetBiometrics';
+import { getSupabase } from '@/lib/supabase';
 
 const GOLD = '#D4AF37';
 
@@ -38,13 +39,19 @@ export default function SettingsPage() {
     getCompositeDeviceFingerprint().then(setCurrentDeviceId);
   }, []);
 
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
     clearPresenceVerification();
     clearVitalizationComplete();
     clearIdentityAnchorForSession();
     clearSessionForLogout();
+    try {
+      const supabase = getSupabase();
+      if (supabase?.auth?.signOut) await (supabase.auth as { signOut: () => Promise<{ error: unknown }> }).signOut();
+    } catch {
+      // ignore
+    }
     if (typeof window !== 'undefined') {
-      window.location.href = '/language';
+      window.location.assign('/language');
     } else {
       router.replace('/language');
     }
