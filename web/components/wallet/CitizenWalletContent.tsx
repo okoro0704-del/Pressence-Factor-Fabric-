@@ -32,9 +32,12 @@ export function CitizenWalletContent({
   const [personalVaultRevealed] = useState(true);
   const [showFacePulseModal, setShowFacePulseModal] = useState(false);
   const [merchantWallet, setMerchantWallet] = useState<string | null>(null);
+  const [hasIdentity, setHasIdentity] = useState<boolean | null>(null);
 
   useEffect(() => {
-    fetchUserBalances(getIdentityAnchorPhone()).then((row) => {
+    const phone = getIdentityAnchorPhone();
+    setHasIdentity(!!phone);
+    fetchUserBalances(phone).then((row) => {
       if (row) {
         setUserBalances({
           vida_balance: row.vida_balance,
@@ -45,6 +48,23 @@ export function CitizenWalletContent({
       }
     });
   }, []);
+
+  if (hasIdentity === null) {
+    return (
+      <div className="rounded-2xl border border-[#2a2a2e] bg-[#16161a]/80 p-8 flex items-center justify-center min-h-[200px]">
+        <p className="text-sm text-[#6b6b70]">Loading your wallet…</p>
+      </div>
+    );
+  }
+
+  if (hasIdentity === false) {
+    return (
+      <div className="rounded-2xl border border-[#2a2a2e] bg-[#16161a]/80 p-8 text-center">
+        <p className="text-[#a0a0a5] mb-2">Your wallet is tied to your sovereign identity.</p>
+        <p className="text-sm text-[#6b6b70]">Complete vitalization to see your balance, VIDA, and merchant mode.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
