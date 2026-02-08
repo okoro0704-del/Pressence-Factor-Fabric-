@@ -7,6 +7,7 @@ import {
   FULL_SPENDABLE_USD,
   VESTING_DAYS,
 } from '@/lib/sovereignTreasurySplit';
+import { VIDA_PRICE_USD } from '@/lib/economic';
 
 export interface TripleVaultDisplayProps {
   /** Sentinel fee already paid (for display; Current Power is fixed at $900 after 0.1 VIDA Sentinel). */
@@ -17,6 +18,8 @@ export interface TripleVaultDisplayProps {
   faceVerified?: boolean;
   /** BETA: show full $1,000 spendable (no Sentinel fee). */
   betaLiquidityTest?: boolean;
+  /** USD to NGN rate for Naira-First display (1 USD = usdToNgn NGN). When set, primary amounts show in ₦. */
+  usdToNgn?: number;
 }
 
 const BALANCE_MASK = '••••••';
@@ -26,15 +29,21 @@ export function TripleVaultDisplay({
   globalUserCount = 0,
   faceVerified = true,
   betaLiquidityTest = false,
+  usdToNgn,
 }: TripleVaultDisplayProps) {
   const currentPowerUsd = betaLiquidityTest ? FULL_SPENDABLE_USD : CURRENT_POWER_SPENDABLE_USD;
-  /** 1 VIDA liquid = $1,000.00 USD (exact display). */
+  const nairaFirst = typeof usdToNgn === 'number' && usdToNgn > 0;
+  const rate = usdToNgn ?? 0;
+  const totalWealthNaira = TOTAL_WEALTH_VIDA * VIDA_PRICE_USD * rate;
+  const spendableNaira = currentPowerUsd * rate;
+  const formatNaira = (n: number) => `₦${Math.round(n).toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
   const formatUsd = (n: number) =>
     n.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const formatVida = (n: number) =>
     `${n.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} VIDA`;
   const showVida = (n: number) => (faceVerified ? formatVida(n) : BALANCE_MASK);
   const showUsd = (n: number) => (faceVerified ? formatUsd(n) : BALANCE_MASK);
+  const showNaira = (n: number) => (faceVerified ? formatNaira(n) : BALANCE_MASK);
 
   return (
     <div className="space-y-4">
@@ -57,12 +66,17 @@ export function TripleVaultDisplay({
           </div>
           <div className="mb-4 p-3 bg-[#c9a227]/10 border border-[#c9a227]/40 rounded-lg flex items-center justify-between">
             <span className="text-xs font-bold text-[#e8c547] uppercase tracking-wider">Total Wealth</span>
-            <span className="text-lg font-bold font-mono text-[#e8c547]">{formatVida(TOTAL_WEALTH_VIDA)}</span>
+            <span className="text-lg font-bold font-mono text-[#e8c547]">
+              {nairaFirst ? formatNaira(totalWealthNaira) : formatVida(TOTAL_WEALTH_VIDA)}
+            </span>
           </div>
+          {nairaFirst && (
+            <p className="text-[10px] text-[#6b6b70] mb-2 -mt-1">Sovereign Reserve Value: $5,000</p>
+          )}
         </>
       )}
 
-      {/* Balance 1 — Total Wealth: 5 VIDA */}
+      {/* Balance 1 — Total Wealth: Naira-First or 5 VIDA */}
       <div className="relative bg-gradient-to-br from-amber-600/25 via-[#c9a227]/20 to-amber-800/15 rounded-xl p-5 border-2 border-amber-500/50 overflow-hidden">
         <div className="absolute -top-10 -right-10 w-32 h-32 bg-amber-400/20 rounded-full blur-3xl" />
         <div className="relative z-10 flex items-center justify-between">
@@ -71,10 +85,12 @@ export function TripleVaultDisplay({
             <p className="text-[10px] text-amber-200/80 uppercase tracking-wide">Citizen allocation (5 VIDA minted)</p>
           </div>
           <span className="text-2xl font-bold font-mono text-amber-300 tracking-tight" title={!faceVerified ? 'Verify face to view' : undefined}>
-            {showVida(TOTAL_WEALTH_VIDA)}
+            {nairaFirst ? showNaira(totalWealthNaira) : showVida(TOTAL_WEALTH_VIDA)}
           </span>
         </div>
-        <p className="text-[10px] text-[#6b6b70] mt-2 uppercase tracking-wide">4/1 vesting: 4 locked 365 days, 1 spendable (minus Sentinel)</p>
+        <p className="text-[10px] text-[#6b6b70] mt-2 uppercase tracking-wide">
+          {nairaFirst ? 'Sovereign Reserve Value: $5,000. ' : ''}4/1 vesting: 4 locked 365 days, 1 spendable (minus Sentinel)
+        </p>
       </div>
 
       {/* Balance 2 — Future Value (Locked): 4 VIDA */}
@@ -97,7 +113,7 @@ export function TripleVaultDisplay({
         <p className="text-[10px] text-[#6b6b70] mt-2 uppercase tracking-wide">VestingContract: unlocks in {VESTING_DAYS} days</p>
       </div>
 
-      {/* Balance 3 — Current Power (Spendable): $900 */}
+      {/* Balance 3 — Current Power (Spendable): Naira-First or USD */}
       <div className="relative bg-gradient-to-br from-emerald-600/20 via-green-700/15 to-emerald-800/10 rounded-xl p-5 border-2 border-emerald-500/50 overflow-hidden">
         <div className="absolute -top-10 -right-10 w-32 h-32 bg-emerald-400/20 rounded-full blur-3xl" />
         <div className="relative z-10">
@@ -107,13 +123,14 @@ export function TripleVaultDisplay({
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-2xl font-bold font-mono text-emerald-300 tracking-tight" title={!faceVerified ? 'Verify face to view' : undefined}>
-              {showUsd(currentPowerUsd)}
+              {nairaFirst ? showNaira(spendableNaira) : showUsd(currentPowerUsd)}
             </span>
             {faceVerified && (
-              <span className="text-xs text-[#6b6b70]">worth of VIDA</span>
+              <span className="text-xs text-[#6b6b70]">{nairaFirst ? 'Spendable' : 'worth of VIDA'}</span>
             )}
           </div>
           <p className="text-[10px] text-[#6b6b70] mt-2 uppercase tracking-wide">
+            {nairaFirst ? 'Sovereign Reserve Value: $1,000. ' : ''}
             {betaLiquidityTest ? 'BETA: Full 1 VIDA spendable (no fees). Spendable from Vault C.' : 'After Sentinel fee (0.1 VIDA → Sentinel). Spendable from Vault C.'}
           </p>
         </div>
@@ -123,9 +140,15 @@ export function TripleVaultDisplay({
       <div className="bg-[#0d0d0f] rounded-xl p-4 border border-[#2a2a2e]">
         <h4 className="text-xs font-bold text-[#e8c547] uppercase tracking-wider mb-2">4/1 Vesting</h4>
         <p className="text-[10px] text-[#6b6b70] uppercase tracking-wide">
-          {FUTURE_VALUE_LOCKED_VIDA} VIDA locked (untransferable) for {VESTING_DAYS} days. 1 VIDA spendable{betaLiquidityTest ? ' (BETA: no fee)' : '; $100 (0.1 VIDA) Sentinel fee'} → Current Power ${currentPowerUsd.toLocaleString()}.
+          {FUTURE_VALUE_LOCKED_VIDA} VIDA locked (untransferable) for {VESTING_DAYS} days. 1 VIDA spendable{betaLiquidityTest ? ' (BETA: no fee)' : '; $100 (0.1 VIDA) Sentinel fee'} → Current Power {nairaFirst ? formatNaira(spendableNaira) : `$${currentPowerUsd.toLocaleString()}`}.
         </p>
       </div>
+
+      {nairaFirst && (
+        <p className="text-[9px] text-[#5a5a60] text-center">
+          <a href="https://www.exchangerate-api.com" target="_blank" rel="noopener noreferrer" className="hover:underline">Rates by Exchange Rate API</a>
+        </p>
+      )}
     </div>
   );
 }

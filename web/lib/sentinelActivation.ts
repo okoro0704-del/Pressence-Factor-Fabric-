@@ -42,6 +42,25 @@ export function clearIdentityAnchorForSession(): void {
 }
 
 /**
+ * Clear session for logout but preserve Passkey Anchor and identity for 2-second re-entry.
+ * Does NOT delete the Passkey from device hardware; does NOT clear pff_identity_anchor_phone
+ * or vitalization anchor so /login can auto-trigger Face/Palm and unlock without re-typing phone.
+ */
+export function clearSessionForLogout(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    sessionStorage.removeItem('pff_gate_identity_anchor');
+    localStorage.removeItem('pff_gate_identity_anchor');
+    localStorage.removeItem('pff_session_phone');
+    localStorage.removeItem('pff_session_uid');
+    // Do NOT clear IDENTITY_ANCHOR_STORAGE_KEY so instant re-entry on /login works
+    // Do NOT clear pff_vitalized_anchor (vitalizationAnchor) — same reason
+  } catch {
+    // ignore
+  }
+}
+
+/**
  * Get Guardian phone for a Dependent (from sentinel_identities.metadata.guardian_phone).
  * Returns null if not a dependent or no guardian linked.
  */

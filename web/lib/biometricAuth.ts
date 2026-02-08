@@ -1633,3 +1633,14 @@ export function isFaceVerifiedForBalance(): boolean {
     return false;
   }
 }
+
+/** Call after successful Face Pulse verification (95%+ match) to reveal balance and unlock Send/Transfer for 24h. */
+export function markFaceVerifiedForBalance(): void {
+  if (typeof sessionStorage === 'undefined') return;
+  try {
+    sessionStorage.setItem('pff_face_verified', 'true');
+    sessionStorage.setItem('pff_face_verified_ts', String(Date.now()));
+  } catch {
+    // ignore
+  }
+}

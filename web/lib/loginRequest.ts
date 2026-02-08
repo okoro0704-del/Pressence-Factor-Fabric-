@@ -207,6 +207,21 @@ export async function completeLoginBridge(requestId: string): Promise<
   setIdentityAnchorForSession(phone);
   setSessionIdentity(phone, userId);
 
+  // Sovereign Device Handshake: apply citizen_hash and device anchor from phone so laptop is anchored
+  try {
+    const { getHandshakePayload, deleteHandshakePayload } = await import('./sovereignDeviceHandshake');
+    const { setVitalizationAnchor } = await import('./vitalizationAnchor');
+    const { anchorIdentityToDevice } = await import('./sovereignSSO');
+    const payload = await getHandshakePayload(requestId);
+    if (payload?.citizen_hash) {
+      await setVitalizationAnchor(payload.citizen_hash, phone);
+      await anchorIdentityToDevice(payload.citizen_hash, phone);
+    }
+    await deleteHandshakePayload(requestId);
+  } catch (e) {
+    console.warn('[loginBridge] Handshake payload apply failed:', e);
+  }
+
   // Security Persistence: store laptop as Trusted Device in authorized_devices for faster future logins
   const deviceInfo = requestRow.device_info as { laptop_device_id?: string; laptop_device_name?: string } | null;
   if (deviceInfo?.laptop_device_id && phone) {

@@ -6,11 +6,12 @@ import { useRouter } from 'next/navigation';
 import { BiometricStrictnessSlider } from '@/components/settings/BiometricStrictnessSlider';
 import { AppShell } from '@/components/layout/AppShell';
 import { SentinelDevicesManager } from '@/components/dashboard/SentinelDevicesManager';
-import { getIdentityAnchorPhone, clearIdentityAnchorForSession } from '@/lib/sentinelActivation';
+import { getIdentityAnchorPhone, clearSessionForLogout } from '@/lib/sentinelActivation';
 import { clearPresenceVerification } from '@/lib/withPresenceCheck';
 import { getCompositeDeviceFingerprint } from '@/lib/biometricAuth';
 import { getTrustLevel, shouldSuggestSovereignShield } from '@/lib/trustLevel';
 import { requestTerminateSession } from '@/lib/deviceTerminateSession';
+import { clearVitalizationComplete } from '@/lib/vitalizationState';
 
 const GOLD = '#D4AF37';
 
@@ -35,7 +36,8 @@ export default function SettingsPage() {
 
   const handleSignOut = () => {
     clearPresenceVerification();
-    clearIdentityAnchorForSession();
+    clearVitalizationComplete();
+    clearSessionForLogout();
     if (typeof window !== 'undefined') {
       window.location.href = '/';
     } else {
@@ -75,18 +77,21 @@ export default function SettingsPage() {
 
           <div className="rounded-xl border p-4" style={{ borderColor: 'rgba(212, 175, 55, 0.3)' }}>
             <h2 className="text-sm font-semibold uppercase tracking-wider mb-2" style={{ color: GOLD }}>
-              Link Device
+              Sovereign Device Links
             </h2>
             <p className="text-sm text-[#a0a0a5] mb-3">
-              Scan the QR code on your laptop login screen with your phone to approve login and add the laptop as a trusted device.
+              Link your laptop or another device by scanning its QR code with your phone. The phone securely shares your identity anchor so the new device can access your vault.
             </p>
             <Link
-              href="/link-device"
+              href="/link-device/scan"
               className="inline-block px-4 py-2 rounded-lg font-medium text-sm transition-colors"
               style={{ background: 'rgba(212, 175, 55, 0.15)', color: GOLD }}
             >
-              Open Link Device
+              Link New Device
             </Link>
+            <p className="text-xs text-[#6b6b70] mt-2">
+              Opens the camera to scan the QR code on your laptop. Or <Link href="/link-device" className="underline hover:text-[#e8c547]">open Link Device</Link> and enter the URL from the laptop screen.
+            </p>
           </div>
 
           {phone && (
@@ -95,7 +100,7 @@ export default function SettingsPage() {
                 Linked Devices
               </h2>
               <p className="text-sm text-[#a0a0a5] mb-4">
-                Manage devices that can access your vault. Use &quot;Terminate Session&quot; to sign out that device remotely (it will reload to the login screen).
+                Manage devices that can access your vault. &quot;Revoke Access&quot; instantly kills the remote session and purges the anchor on that device. &quot;Terminate Session&quot; signs out that device remotely.
               </p>
               <SentinelDevicesManager
                 phoneNumber={phone}

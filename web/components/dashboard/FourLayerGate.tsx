@@ -111,7 +111,9 @@ const DualVitalizationCapture = dynamic(
 import { DailyUnlockCelebration } from '@/components/dashboard/DailyUnlockCelebration';
 import { useSovereignCompanion } from '@/contexts/SovereignCompanionContext';
 import { IS_PUBLIC_REVEAL, isVettedUser, isArchitect } from '@/lib/publicRevealAccess';
-import { ENABLE_GPS_AS_FOURTH_PILLAR, ENABLE_DUAL_VITALIZATION_CAPTURE } from '@/lib/constants';
+import { ENABLE_GPS_AS_FOURTH_PILLAR, ENABLE_DUAL_VITALIZATION_CAPTURE, ROUTES } from '@/lib/constants';
+import { setVitalizationComplete } from '@/lib/vitalizationState';
+import { anchorIdentityToDevice } from '@/lib/sovereignSSO';
 import { recordClockIn, getLastClockInCoords } from '@/lib/workPresence';
 import { QuadPillarGrid } from '@/components/dashboard/QuadPillarShield';
 
@@ -119,6 +121,8 @@ const jetbrains = JetBrains_Mono({ weight: ['400', '600', '700'], subsets: ['lat
 
 const VERIFIED_PILLARS_KEY = 'pff_verified_pillars';
 const VERIFIED_PILLARS_TTL_MS = 5 * 60 * 1000; // 5 min — resume GPS without re-scanning palm
+/** Session persistence: when user starts scan, set so refresh keeps them on gate. */
+const SOV_STATUS_KEY = 'sov_status';
 
 function hashForStorage(s: string): string {
   let h = 5381;
@@ -384,7 +388,8 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
       setSessionIdentity(phone);
       setWelcomeGreeting(getTimeBasedGreeting());
       setShowWelcomeHome(true);
-      setTimeout(() => router.replace('/dashboard'), 2600);
+      try { localStorage.removeItem(SOV_STATUS_KEY); } catch { /* ignore */ }
+      setTimeout(() => router.replace(ROUTES.DASHBOARD), 2600);
     } catch (e) {
       setInstantLoginError(e instanceof Error ? e.message : 'Face scan failed. Try again.');
     } finally {
@@ -545,13 +550,17 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     setSessionStatus(getSessionStatus());
   }, [mounted]);
 
-  // Update session status periodically
+  // Update session status periodically (ref so we can clear when all pillars verified — stops flickering)
+  const sessionStatusIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   useEffect(() => {
     const interval = setInterval(() => {
       setSessionStatus(getSessionStatus());
     }, 1000);
-
-    return () => clearInterval(interval);
+    sessionStatusIntervalRef.current = interval;
+    return () => {
+      if (sessionStatusIntervalRef.current) clearInterval(sessionStatusIntervalRef.current);
+      sessionStatusIntervalRef.current = null;
+    };
   }, []);
 
   // On exit: clear all Approved statuses so next entry requires fresh scan
@@ -582,7 +591,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     if (pillarFace && pillarPalm && pillarDevice) {
       gpsRedirectToManualSetupDoneRef.current = true;
       setAuthStatus(AuthStatus.IDLE);
-      router.push('/vitalization/gps-manual-setup');
+      router.push(ROUTES.VITALIZATION_GPS_MANUAL_SETUP);
     }
   }, [pillarFace, pillarPalm, pillarDevice, pillarLocation, router]);
 
@@ -594,6 +603,17 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     const unwatch = startGpsWatch(identityAnchor.phone);
     return unwatch;
   }, [showArchitectVision, showSovereignPalmScan, showDualVitalization, identityAnchor?.phone]);
+
+  /** Architect Override: when all 4 pillars verified, clear timers and set state before QuadPillarGrid redirects. */
+  const handleAllPillarsVerified = useCallback(() => {
+    if (sessionStatusIntervalRef.current) {
+      clearInterval(sessionStatusIntervalRef.current);
+      sessionStatusIntervalRef.current = null;
+    }
+    setPresenceVerified(true);
+    if (identityAnchor?.phone) setIdentityAnchorForSession(identityAnchor.phone);
+    setVitalizationComplete();
+  }, [identityAnchor?.phone, setPresenceVerified]);
 
   const getLayerIcon = (layer: AuthLayer) => {
     switch (layer) {
@@ -697,6 +717,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
       isDependent: payload.isDependent === true,
     };
     setIdentityAnchor(anchor);
+    setIdentityAnchorForSession(payload.phoneNumber);
     try {
       const json = JSON.stringify(anchor);
       sessionStorage.setItem(GATE_IDENTITY_STORAGE_KEY, json);
@@ -733,14 +754,22 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     setSessionIdentity(identityAnchor.phone);
     const stored = await getStoredBiometricAnchors(identityAnchor.phone);
     const faceHash = getFaceHashFromSession(identityAnchor.phone) ?? (stored.ok ? (stored.anchors.face_hash?.trim() ?? null) : null);
-    if (faceHash) void setVitalizationAnchor(faceHash, identityAnchor.phone);
+    if (faceHash) {
+      void setVitalizationAnchor(faceHash, identityAnchor.phone);
+      void anchorIdentityToDevice(faceHash, identityAnchor.phone);
+    }
     await logGuestAccessIfNeeded();
+    try {
+      localStorage.removeItem(SOV_STATUS_KEY);
+    } catch {
+      // ignore
+    }
     if (hubVerification) {
       setAuthStatus(AuthStatus.IDLE);
       setCurrentLayer(null);
       setTransitioningToDashboard(true);
       setTimeout(() => {
-        router.replace('/dashboard?minted=1');
+        router.replace(`${ROUTES.DASHBOARD}?minted=1`);
       }, 1000);
       return;
     }
@@ -756,6 +785,12 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     }
     if (biometricPendingRef.current) return;
     biometricPendingRef.current = true;
+
+    try {
+      localStorage.setItem(SOV_STATUS_KEY, 'vitalizing');
+    } catch {
+      // ignore
+    }
 
     if (typeof navigator !== 'undefined' && navigator.vibrate) {
       navigator.vibrate([100, 50, 100, 50, 200]);
@@ -945,7 +980,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
           return;
         }
         // GPS failed: redirect to dedicated page (one-way ticket to dashboard).
-        router.push('/vitalization/gps-manual-setup');
+        router.push(ROUTES.VITALIZATION_GPS_MANUAL_SETUP);
         return;
       }
       setArchitectVerificationSuccess(true);
@@ -984,7 +1019,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
       const variance = varianceMatch ? parseFloat(varianceMatch[1]) : 5.0;
 
       if (useEarthAnchorMsg && faceAndPalmPassed && gpsFailed) {
-        router.push('/vitalization/gps-manual-setup');
+        router.push(ROUTES.VITALIZATION_GPS_MANUAL_SETUP);
       } else if (!isVitalized) {
         setScanToast('retry');
         setAuthStatus(AuthStatus.IDLE);
@@ -1145,12 +1180,12 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
   };
 
   const handleVaultAnimationComplete = () => {
+    try { localStorage.removeItem(SOV_STATUS_KEY); } catch { /* ignore */ }
     setTransitioningToDashboard(true);
     const next = searchParams.get('next');
-    const raw = next && typeof next === 'string' && next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard';
-    const target = raw === '/vitalization' || raw.startsWith('/vitalization/') ? '/dashboard' : raw;
+    const raw = next && typeof next === 'string' && next.startsWith('/') && !next.startsWith('//') ? next : ROUTES.DASHBOARD;
+    const target = raw === ROUTES.VITALIZATION || raw.startsWith(ROUTES.VITALIZATION + '/') ? ROUTES.DASHBOARD : raw;
     setTimeout(() => {
-      // Client-side navigation so GlobalPresenceGateway state (isPresenceVerified) is preserved and dashboard does not redirect back.
       router.replace(target);
     }, 1000);
   };
@@ -1403,7 +1438,8 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     }
 
     setPresenceVerified(true);
-    router.replace('/dashboard');
+    try { localStorage.removeItem(SOV_STATUS_KEY); } catch { /* ignore */ }
+    router.replace(ROUTES.DASHBOARD);
   }, [loginRequestId, router]);
 
   const handleLoginRequestDenied = useCallback(() => {
@@ -2222,6 +2258,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
                 gpsSelfCertifyAvailable={false}
                 onGrantLocation={identityAnchor?.phone ? () => startLocationRequestFromUserGesture(identityAnchor.phone) : undefined}
                 onManualLocation={undefined}
+                onAllVerified={handleAllPillarsVerified}
               />
             ) : (
               <PresenceProgressRing

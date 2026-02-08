@@ -324,6 +324,14 @@ export async function triggerIdentityMismatchAlert(
       },
     });
 
+    // Enterprise Kill-Switch: device that detected mismatch immediately purges session and returns to Shield
+    try {
+      const { purgeSessionAndReturnToShield } = await import('./sovereignSSO');
+      purgeSessionAndReturnToShield();
+    } catch {
+      // ignore
+    }
+
     return { success: true, alertId: auditLog.id };
   } catch (error) {
     console.error('Failed to trigger identity mismatch alert:', error);

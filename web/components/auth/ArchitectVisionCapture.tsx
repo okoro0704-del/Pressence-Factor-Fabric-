@@ -25,31 +25,15 @@ const BLUE_MESH_DIM = 'rgba(59, 130, 246, 0.45)';
 const MIN_BRIGHTNESS_THRESHOLD = 70;   // was ~100; 30% lower
 const MIN_CONFIDENCE_THRESHOLD = 62;   // was ~88; 30% lower — scan proceeds even if not studio-perfect
 
-/** AI Mesh Overlay: face oval + radial lines (blue dots). Always drawn; gold on success. */
+/** Architect Override: scan box overlay removed. Camera is full-screen with gold progress bar at bottom only. */
 function drawPlaceholderMesh(
-  ctx: CanvasRenderingContext2D,
-  w: number,
-  h: number,
-  gold: boolean,
-  faceDetected: boolean
+  _ctx: CanvasRenderingContext2D,
+  _w: number,
+  _h: number,
+  _gold: boolean,
+  _faceDetected: boolean
 ) {
-  const cx = w / 2;
-  const cy = h / 2;
-  const rx = w * 0.35;
-  const ry = h * 0.45;
-  const strokeColor = gold ? MESH_SUCCESS_COLOR : faceDetected ? BLUE_MESH : BLUE_MESH_DIM;
-  ctx.strokeStyle = strokeColor;
-  ctx.lineWidth = gold ? 2.5 : 1.5;
-  ctx.beginPath();
-  ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
-  ctx.stroke();
-  for (let i = 0; i < 12; i++) {
-    const a = (i / 12) * Math.PI * 2;
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.lineTo(cx + rx * 0.9 * Math.cos(a), cy + ry * 0.9 * Math.sin(a));
-    ctx.stroke();
-  }
+  // No center scan box/oval — full-screen camera feed only; progress bar is in BiometricScanProgressBar at bottom.
 }
 
 /** Bypass: when active, confidence drops to 0.3 and lighting warnings are ignored for 30s. */
@@ -288,20 +272,20 @@ export function ArchitectVisionCapture({
 
   return (
     <div
-      className="fixed inset-0 z-[300] flex flex-col items-center justify-center bg-black"
+      className="fixed inset-0 z-[300] flex flex-col bg-black"
       style={{
         paddingTop: 'env(safe-area-inset-top, 0)',
         paddingBottom: 'env(safe-area-inset-bottom, 0)',
       }}
     >
-      <div className="relative w-full max-w-2xl aspect-[4/3] max-h-[80vh] overflow-hidden rounded-xl border-2 border-[#D4AF37]/50 shadow-[0_0_60px_rgba(212,175,55,0.2)] mx-auto touch-manipulation">
-        {/* Video + canvas overlay */}
+      {/* Full-screen camera feed — no center scan box; gold progress bar at bottom only */}
+      <div className="relative flex-1 w-full min-h-0 flex flex-col justify-end">
         <video
           ref={videoRef}
-          className="absolute inset-0 w-full h-full object-cover mirror"
+          className="absolute inset-0 w-full h-full object-cover"
+          style={{ transform: 'scaleX(-1)' }}
           playsInline
           muted
-          style={{ transform: 'scaleX(-1)' }}
         />
         <canvas
           ref={canvasRef}
@@ -309,7 +293,7 @@ export function ArchitectVisionCapture({
           style={{ transform: 'scaleX(-1)' }}
         />
 
-        {/* Gold scanning line + progress bar (0–100% over 3–5s), smooth Verified transition */}
+        {/* Gold progress bar at bottom only — fills as Face Pulse completes (no center scan box) */}
         <BiometricScanProgressBar
           isActive={isOpen && cameraStatus === 'ready' && !meshGold}
           durationMs={4000}
@@ -368,6 +352,7 @@ export function ArchitectVisionCapture({
       </div>
 
       {/* Initializing overlay: sleek loader while camera is warming up */}
+
       {cameraStatus === 'initializing' && (
         <div className="absolute inset-0 z-[200] flex flex-col items-center justify-center bg-black/90">
           <div className="h-8 w-8 rounded-full border-2 border-[#e8c547] border-t-transparent animate-spin mb-4" />

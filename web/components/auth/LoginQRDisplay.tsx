@@ -73,10 +73,10 @@ export function LoginQRDisplay({ requestId, onDenied, onError }: LoginQRDisplayP
             <span className="text-4xl" aria-hidden>📱</span>
           </div>
           <h1 className={`text-2xl font-black uppercase tracking-wider mb-2 ${jetbrains.className}`} style={{ color: GOLD }}>
-            Scan with your phone
+            Authorization Requested on Master Device
           </h1>
           <p className="text-sm text-[#a0a0a5]">
-            Open PFF on your phone → Link Device → Scan this QR. You’ll be logged in instantly.
+            Open PFF on your phone. You’ll get a prompt to verify DNA — or scan this QR to approve. Laptop unlocks on 95%+ match.
           </p>
         </div>
         <div

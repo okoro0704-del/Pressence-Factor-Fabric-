@@ -17,3 +17,9 @@ This app uses the same profiles and login-request logic as defined in the databa
 - **Migration:** `20260240000000_login_requests.sql`. Realtime must be enabled for `login_requests` in Supabase Dashboard (Database → Replication).
 
 All profile and login-request reads/writes in this project use these tables and the logic above.
+
+### `sovereign_device_handshake`
+- **Usage:** Cross-device anchoring: when the phone approves a laptop login (Link Device / QR scan), it writes `citizen_hash` and `device_anchor_token` here. The laptop reads the row after login request is APPROVED, applies the anchor locally, then deletes the row.
+- **Key columns:** `request_id` (UUID, FK to login_requests), `citizen_hash`, `device_anchor_token`, `created_at`.
+- **Lib:** `lib/sovereignDeviceHandshake.ts` — `sendHandshakePayload`, `getHandshakePayload`, `deleteHandshakePayload`.
+- **Migration:** `20260263000000_sovereign_device_handshake.sql`. Run in Supabase SQL Editor if not applied via migrations.

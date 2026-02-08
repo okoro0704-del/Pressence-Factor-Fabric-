@@ -3,6 +3,7 @@ import './globals.css';
 import { GlobalPresenceGatewayProvider } from '@/contexts/GlobalPresenceGateway';
 import { SovereignSeedProvider } from '@/contexts/SovereignSeedContext';
 import { GhostSessionGuard } from '@/components/GhostSessionGuard';
+import { SovereignSSOListener } from '@/components/dashboard/SovereignSSOListener';
 import { RegisterServiceWorker } from '@/components/RegisterServiceWorker';
 import { BiometricSessionProvider } from '@/contexts/BiometricSessionContext';
 import { SovereignCompanionProvider } from '@/contexts/SovereignCompanionContext';
@@ -260,6 +261,8 @@ export default function RootLayout({
           <SovereignSeedProvider>
             <SovereignCompanionProvider>
               <GhostSessionGuard>
+                {/* Sentinel Listener: SSO auth requests + Lock Identity kill-switch */}
+                <SovereignSSOListener />
                 {/* app-root: base layer; overlays when inactive must unmount or use pointer-events-none to avoid dead screen */}
                 <div id="app-root" className="relative z-0 min-h-screen">
                   {children}

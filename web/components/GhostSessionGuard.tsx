@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { checkGhostSession } from '@/lib/ghostSessionCheck';
+import { isSessionLocked, clearSessionLocked } from '@/lib/sovereignSSO';
 
 interface GhostSessionGuardProps {
   children: ReactNode;
@@ -11,7 +12,7 @@ interface GhostSessionGuardProps {
 /**
  * Hard Reset Safety Valve — runs at app start.
  * If auth has a session but no matching user_profiles row (ghost), sign out, clear storage, redirect to /vitalization.
- * Ensures Dashboard is never shown with a ghost session; clean state before any protected content loads.
+ * If session was locked (kill-switch), clear flag and redirect to Shield (/).
  */
 export function GhostSessionGuard({ children }: GhostSessionGuardProps) {
   const router = useRouter();
@@ -19,12 +20,22 @@ export function GhostSessionGuard({ children }: GhostSessionGuardProps) {
 
   useEffect(() => {
     let cancelled = false;
+    if (typeof window !== 'undefined' && isSessionLocked()) {
+      clearSessionLocked();
+      router.replace('/');
+      setStatus('ok');
+      return;
+    }
     checkGhostSession().then((result) => {
       if (cancelled) return;
       if (result === 'cleared') {
         setStatus('cleared');
         router.replace('/vitalization');
       } else {
+        if (typeof window !== 'undefined' && isSessionLocked()) {
+          clearSessionLocked();
+          router.replace('/');
+        }
         setStatus('ok');
       }
     });

@@ -7,6 +7,9 @@ import { Hand, Smartphone, Loader2 } from 'lucide-react';
 import { approveLoginRequestWithDeviceToken } from '@/lib/loginRequest';
 import { getAssertion, isWebAuthnSupported } from '@/lib/webauthn';
 import { getCompositeDeviceFingerprint } from '@/lib/biometricAuth';
+import { getVitalizationAnchor } from '@/lib/vitalizationAnchor';
+import { getDeviceAnchorToken } from '@/lib/sovereignSSO';
+import { sendHandshakePayload } from '@/lib/sovereignDeviceHandshake';
 
 const GOLD = '#D4AF37';
 
@@ -50,6 +53,11 @@ export default function LinkDevicePage() {
           })();
       const result = await approveLoginRequestWithDeviceToken(requestId.trim(), deviceId, token);
       if (result.ok) {
+        const anchor = await getVitalizationAnchor();
+        const deviceAnchorToken = getDeviceAnchorToken();
+        if (anchor.citizenHash) {
+          await sendHandshakePayload(requestId.trim(), anchor.citizenHash, deviceAnchorToken);
+        }
         setStatus('success');
       } else {
         setErrorMessage(result.error ?? 'Approval failed.');

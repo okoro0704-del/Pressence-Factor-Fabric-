@@ -108,6 +108,12 @@ body {
   animation: ticker 40s linear infinite;
 }
 
+/* Sovereign Companion — typing indicator pulse */
+@keyframes sovereignTypingPulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
 /* Spendable VIDA count-up shimmer (gold sweep) */
 @keyframes vida-shimmer {
   0% { background-position: 200% 50%; }

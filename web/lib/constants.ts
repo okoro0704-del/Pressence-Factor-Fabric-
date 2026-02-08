@@ -29,3 +29,12 @@ export const PILLAR_CONFIRMATIONS = QUAD_PILLAR_DEFINITIONS.map((p) => p.confirm
 
 /** When true, use DualVitalizationCapture (Face Frame + Palm Frame simultaneously) instead of ArchitectVision + SovereignPalmScan sequentially. */
 export const ENABLE_DUAL_VITALIZATION_CAPTURE = true;
+
+/** Verified routes for Quad-Pillar / Vitalization flow. Use these constants to avoid 404s. */
+export const ROUTES = {
+  DASHBOARD: '/dashboard',
+  VITALIZATION: '/vitalization',
+  VITALIZATION_GPS_MANUAL_SETUP: '/vitalization/gps-manual-setup',
+  VITALIZATION_MASTER_KEY: '/vitalization/master-key',
+  VITALIZATION_RESTORE_IDENTITY: '/vitalization/restore-identity',
+} as const;

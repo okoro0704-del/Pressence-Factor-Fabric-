@@ -4,6 +4,9 @@ import { useEffect, useRef } from 'react';
 import { getIdentityAnchorPhone } from '@/lib/sentinelActivation';
 import { getCompositeDeviceFingerprint } from '@/lib/biometricAuth';
 import { subscribeToTerminateSession } from '@/lib/deviceTerminateSession';
+import { clearVitalizationComplete } from '@/lib/vitalizationState';
+import { clearDeviceAnchorToken } from '@/lib/sovereignSSO';
+import { clearVitalizationAnchor } from '@/lib/vitalizationAnchor';
 
 /**
  * When user is logged in, subscribe to Realtime terminate signals for this device.
@@ -21,7 +24,12 @@ export function TerminateSessionListener() {
     getCompositeDeviceFingerprint().then((deviceId) => {
       if (cancelled) return;
       unsubRef.current = subscribeToTerminateSession(deviceId, () => {
-        if (typeof window !== 'undefined') window.location.reload();
+        if (typeof window !== 'undefined') {
+          clearVitalizationComplete();
+          clearDeviceAnchorToken();
+          clearVitalizationAnchor();
+          window.location.reload();
+        }
       });
     });
 

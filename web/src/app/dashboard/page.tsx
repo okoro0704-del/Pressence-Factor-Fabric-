@@ -11,6 +11,7 @@ import { getIdentityAnchorPhone } from '@/lib/sentinelActivation';
 import { getProfileFaceAndSeed } from '@/lib/recoverySeedStorage';
 import { startVerifiedMintListener } from '@/lib/sovryn/verifiedMintListener';
 import { isArchitect } from '@/lib/manifestoUnveiling';
+import { setVitalizationComplete } from '@/lib/vitalizationState';
 
 /**
  * DASHBOARD PAGE - PROTECTED (VAULT)
@@ -35,6 +36,11 @@ export default function DashboardPage() {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // State lockdown: user has reached Dashboard — set flag so app will not return to scanner unless they log out
+  useEffect(() => {
+    if (mounted) setVitalizationComplete();
+  }, [mounted]);
 
   // Allow dashboard for architects or anyone with identity anchor (post-vitalization). Do not redirect back — let user stay on dashboard.
   useEffect(() => {

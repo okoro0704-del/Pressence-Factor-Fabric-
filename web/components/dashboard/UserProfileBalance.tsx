@@ -22,7 +22,6 @@ import {
   NATIONAL_CONTRIBUTION_VIDA,
   NET_SPENDABLE_VIDA,
   VIDA_PRICE_USD,
-  NAIRA_RATE,
 } from '@/lib/sovereignHandshakeConstants';
 import { LIQUID_TIER_USD } from '@/lib/economic';
 import { CURRENT_POWER_SPENDABLE_USD, CURRENT_POWER_SPENDABLE_VIDA, TOTAL_WEALTH_VIDA, FUTURE_VALUE_LOCKED_VIDA } from '@/lib/sovereignTreasurySplit';
@@ -31,10 +30,12 @@ import { isFaceVerifiedForBalance } from '@/lib/biometricAuth';
 import { getMintStatus, getSpendingUnlocked, getBiometricSpendingActive, MINT_STATUS_MINTED } from '@/lib/mintStatus';
 import { hasFaceAndSeed } from '@/lib/recoverySeedStorage';
 import { SpendingLockModal } from './SpendingLockModal';
+import { TreasuryFacePulseModal } from './TreasuryFacePulseModal';
 import { getPendingSwapAfterRelink } from './IdentityReLinkModal';
 import { deriveRSKWalletFromSeed } from '@/lib/sovryn/derivedWallet';
 import { getVidaBalanceOnChain } from '@/lib/sovryn/vidaBalance';
 import { RSK_MAINNET } from '@/lib/sovryn/config';
+import { useUsdToNgnRate } from '@/lib/useUsdToNgnRate';
 
 /** Protocol Release: spending unlocked when is_fully_verified or face_hash present. Badge text when active. */
 const BIOMETRIC_SPENDING_ACTIVE = 'Biometric Spending Active';
@@ -60,6 +61,8 @@ export function UserProfileBalance({
   const [pendingResumeAmount, setPendingResumeAmount] = useState('');
   const [showPresenceModal, setShowPresenceModal] = useState(false);
   const [showLockModal, setShowLockModal] = useState(false);
+  const [showFacePulseModal, setShowFacePulseModal] = useState(false);
+  const [goldPulseActive, setGoldPulseActive] = useState(false);
   const [fingerprintVerified, setFingerprintVerified] = useState(false);
   const [spendingUnlocked, setSpendingUnlocked] = useState(false);
   const [biometricSpendingActive, setBiometricSpendingActive] = useState(false);
@@ -75,6 +78,7 @@ export function UserProfileBalance({
   const sentinelVerified = BETA_LIQUIDITY_TEST || (hasLicense && tokenVerified);
   const effectiveSpendableVida = BETA_LIQUIDITY_TEST ? BETA_SPENDABLE_VIDA : CURRENT_POWER_SPENDABLE_VIDA;
   const effectiveSpendableUsd = BETA_LIQUIDITY_TEST ? BETA_SPENDABLE_USD : CURRENT_POWER_SPENDABLE_USD;
+  const { rate: usdToNgn } = useUsdToNgnRate();
 
   /** Total Vitalized Citizens — from DB (user_profiles where is_fully_verified = true). Displays 1 until a new entry is created. */
   const [vitalizedCount, setVitalizedCount] = useState<number>(1);
@@ -208,8 +212,15 @@ export function UserProfileBalance({
     setIsPresenceVerified(true);
   };
 
-  /** Protocol Release: unlock when is_fully_verified or face_hash present. Bypass palm lock modal when active. */
-  const canSpend = spendingUnlocked || biometricSpendingActive;
+  const handleFacePulseVerified = () => {
+    setFaceVerifiedForBalance(true);
+    setShowFacePulseModal(false);
+    setGoldPulseActive(true);
+    setTimeout(() => setGoldPulseActive(false), 2500);
+  };
+
+  /** Protocol Release: unlock when is_fully_verified or face_hash present. After Face Pulse ritual (95%+), also unlock for this session. */
+  const canSpend = spendingUnlocked || biometricSpendingActive || faceVerifiedForBalance;
 
   const handleSwapClick = () => {
     if (!canSpend) {
@@ -253,7 +264,12 @@ export function UserProfileBalance({
 
   /** Sovereign Treasury Split: spendable after Sentinel fee = $900; in BETA_LIQUIDITY_TEST = $1,000. */
   const availableCashUsd = effectiveSpendableUsd;
-  const yourShareNaira = vaultData.personal_share_50 * VIDA_PRICE_USD * NAIRA_RATE;
+  const yourShareNaira = vaultData.personal_share_50 * VIDA_PRICE_USD * usdToNgn;
+  /** Naira-First: Total Wealth = 5 VIDA × $1,000 × USD/NGN rate. */
+  const totalWealthUsd = TOTAL_WEALTH_VIDA * VIDA_PRICE_USD;
+  const totalWealthNaira = totalWealthUsd * usdToNgn;
+  const spendableNaira = effectiveSpendableUsd * usdToNgn;
+  const formatNaira = (n: number) => `₦${Math.round(n).toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
 
   return (
     <div className="space-y-6">
@@ -286,14 +302,21 @@ export function UserProfileBalance({
         </div>
       </div>
 
-      <div className="bg-[#16161a] rounded-xl p-6 border border-[#2a2a2e]">
+      <div
+        className={`bg-[#16161a] rounded-xl p-6 border border-[#2a2a2e] transition-all duration-500 ${goldPulseActive ? 'gold-pulse-unlock' : ''}`}
+        data-treasury-balance-block
+      >
         {!showBalanceAsMinted && (
-          <div className="mb-4 p-3 bg-amber-500/15 border border-amber-500/40 rounded-lg flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowFacePulseModal(true)}
+            className="mb-4 w-full p-3 bg-amber-500/15 border border-amber-500/40 rounded-lg flex items-center gap-2 text-left hover:bg-amber-500/25 hover:border-amber-500/60 transition-colors cursor-pointer"
+          >
             <span className="text-amber-400 text-lg" aria-hidden>🔒</span>
             <p className="text-sm text-amber-200/90">
               Face-First Security: Verify face (95%+ match) to view balance and National Reserve data.
             </p>
-          </div>
+          </button>
         )}
         {/* Protocol Release: Biometric Spending Active when is_fully_verified or face_hash present. Send/Transfer enabled. */}
         <div className="mb-4 flex items-center justify-center">
@@ -306,10 +329,14 @@ export function UserProfileBalance({
               </svg>
             </div>
           ) : (
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#3a3a3e] border border-[#4a4a4e]">
+            <button
+              type="button"
+              onClick={() => setShowFacePulseModal(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#3a3a3e] border border-[#4a4a4e] hover:bg-[#4a4a4e] hover:border-[#5a5a5e] transition-colors cursor-pointer"
+            >
               <span className="text-xl text-[#8b8b95]" aria-hidden>🔒</span>
               <span className="text-xs font-medium text-[#8b8b95] uppercase tracking-wider">Complete Face Pulse to enable Send and Transfer.</span>
-            </div>
+            </button>
           )}
         </div>
         {/* Confirmation: once tx is mined, show golden checkmark + "5 VIDA MINTED ON BITCOIN LAYER 2" + Proof of Wealth link */}
@@ -335,13 +362,15 @@ export function UserProfileBalance({
             </a>
           </div>
         )}
-        {/* Prominent balance from chain (balanceOf) or fallback 5.00 VIDA when MINTED */}
+        {/* Prominent balance from chain (balanceOf) or fallback 5.00 VIDA when MINTED — Naira-First */}
         {showBalanceAsMinted && (
           <div className="mb-4 p-4 bg-[#c9a227]/10 border-2 border-[#c9a227]/40 rounded-xl text-center">
             <p className="text-3xl font-bold font-mono text-[#e8c547] tracking-tight">
-              {TOTAL_WEALTH_VIDA} VIDA
+              {formatNaira(totalWealthNaira)}
             </p>
-            <p className="text-sm text-[#6b6b70] mt-1">Total Wealth (4 locked, {effectiveSpendableUsd.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 })} spendable{BETA_LIQUIDITY_TEST ? ' — no fees' : ' after Sentinel'})</p>
+            <p className="text-sm text-[#6b6b70] mt-1">Total Wealth</p>
+            <p className="text-xs text-[#6b6b70] mt-0.5">Sovereign Reserve Value: $5,000</p>
+            <p className="text-xs text-[#6b6b70] mt-1">4 locked · {formatNaira(spendableNaira)} Spendable{BETA_LIQUIDITY_TEST ? ' — no fees' : ' after Sentinel'}</p>
             <div className="mt-3 flex flex-col gap-2">
               <button
                 type="button"
@@ -362,7 +391,7 @@ export function UserProfileBalance({
                 </a>
               )}
             </div>
-            <p className="text-[10px] text-[#6b6b70] mt-1.5">Swap spendable VIDA for DLLR (max {effectiveSpendableVida} VIDA · $4,000 locked)</p>
+            <p className="text-[10px] text-[#6b6b70] mt-1.5">Swap spendable VIDA for DLLR (max {effectiveSpendableVida} VIDA · {formatNaira(4 * VIDA_PRICE_USD * usdToNgn)} locked)</p>
           </div>
         )}
         <TripleVaultDisplay
@@ -370,6 +399,7 @@ export function UserProfileBalance({
           globalUserCount={vitalizedCount}
           faceVerified={showBalanceAsMinted}
           betaLiquidityTest={BETA_LIQUIDITY_TEST}
+          usdToNgn={usdToNgn}
         />
 
         {/* Unified Swap · Send · Receive — clustered for quick access to $1,000 liquid VIDA */}
@@ -401,7 +431,13 @@ export function UserProfileBalance({
             </button>
           </div>
           {showBalanceAsMinted && !canSpend && (
-            <p className="text-xs text-[#8b8b95] text-center mt-2 uppercase tracking-wider">Complete Face Pulse to enable Send and Transfer.</p>
+            <button
+              type="button"
+              onClick={() => setShowFacePulseModal(true)}
+              className="w-full text-xs text-[#8b8b95] text-center mt-2 uppercase tracking-wider hover:text-[#e8c547] transition-colors cursor-pointer"
+            >
+              Complete Face Pulse to enable Send and Transfer.
+            </button>
           )}
         </div>
 
@@ -416,7 +452,7 @@ export function UserProfileBalance({
               <p className="text-xs font-bold text-red-400 uppercase tracking-wider mb-1">Transaction Limit Notice</p>
               <p className="text-xs text-[#6b6b70] leading-relaxed">
                 Swap and Send are limited to <span className="font-mono text-emerald-400">Current Power (Spendable)</span>{' '}
-                ({showBalanceAsMinted ? availableCashUsd.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }) : '••••••'}).
+                ({showBalanceAsMinted ? formatNaira(spendableNaira) : '••••••'}).
                 Future Value ({FUTURE_VALUE_LOCKED_VIDA} VIDA) is locked for 365 days: <span className="font-mono text-red-400">"Asset Locked: VestingContract."</span>
               </p>
             </div>
@@ -427,14 +463,20 @@ export function UserProfileBalance({
       <div className="bg-[#16161a] rounded-xl p-6 border border-[#2a2a2e]">
         <h3 className="text-sm font-semibold text-[#6b6b70] uppercase tracking-wider mb-4">5 VIDA Minted Cap — Sovereign Liquidity</h3>
         <div className="space-y-4">
-          <div className="p-4 bg-[#0d0d0f] rounded-lg border border-[#2a2a2e]">
+          <div
+            role={showBalanceAsMinted ? undefined : 'button'}
+            tabIndex={showBalanceAsMinted ? undefined : 0}
+            onClick={showBalanceAsMinted ? undefined : () => setShowFacePulseModal(true)}
+            onKeyDown={showBalanceAsMinted ? undefined : (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowFacePulseModal(true); } }}
+            className={`p-4 bg-[#0d0d0f] rounded-lg border border-[#2a2a2e] ${!showBalanceAsMinted ? 'cursor-pointer hover:border-amber-500/50 hover:bg-[#16161a] transition-colors' : ''}`}
+          >
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-[#6b6b70]">Total Wealth</span>
               <span className="text-xl font-bold text-[#c9a227]">
-                {showBalanceAsMinted ? `${TOTAL_WEALTH_VIDA} VIDA` : '•••••• VIDA'}
+                {showBalanceAsMinted ? formatNaira(totalWealthNaira) : '••••••'}
               </span>
             </div>
-            <p className="text-xs text-[#6b6b70] mt-1">{showBalanceAsMinted ? `Future Value 4 VIDA locked · Current Power ${effectiveSpendableUsd.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 })} spendable` : 'Verify face to view'}</p>
+            <p className="text-xs text-[#6b6b70] mt-1">{showBalanceAsMinted ? `Sovereign Reserve Value: $5,000 · ${formatNaira(spendableNaira)} Spendable` : 'Verify face to view (click to open Face Pulse)'}</p>
           </div>
 
           <div className="p-4 bg-[#0d0d0f] rounded-lg border border-[#2a2a2e]">
@@ -455,7 +497,7 @@ export function UserProfileBalance({
               <div className="flex items-center justify-between">
                 <span className="text-sm text-[#6b6b70]">After Sentinel fee (0.1 VIDA → Sentinel)</span>
                 <span className="text-base font-mono text-emerald-400">
-                  {showBalanceAsMinted ? `${availableCashUsd.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 })} worth of VIDA` : '••••••'}
+                  {showBalanceAsMinted ? `${formatNaira(spendableNaira)} Spendable` : '••••••'}
                 </span>
               </div>
               <div className="flex items-center justify-between">
@@ -469,10 +511,10 @@ export function UserProfileBalance({
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-bold text-emerald-400 uppercase tracking-wider">= Sovereign Liquidity (Vault C)</span>
               <span className="text-2xl font-bold text-emerald-300" title={!showBalanceAsMinted ? 'Verify face to view' : undefined}>
-                {showBalanceAsMinted ? availableCashUsd.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }) : '••••••'}
+                {showBalanceAsMinted ? formatNaira(spendableNaira) : '••••••'}
               </span>
             </div>
-            <p className="text-xs text-[#6b6b70] mt-1">{showBalanceAsMinted ? `Sentinel Network Fee: 0.1 VIDA ($100 / $1,000) to authorize minting protocol. Liquid after fee: ${CURRENT_POWER_SPENDABLE_USD.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 })}.` : 'Verify face (95%+ match) to view'}</p>
+            <p className="text-xs text-[#6b6b70] mt-1">{showBalanceAsMinted ? `Sovereign Reserve Value: $1,000. Sentinel fee 0.1 VIDA ($100). Liquid after fee: ${formatNaira(spendableNaira)}.` : 'Verify face (95%+ match) to view'}</p>
           </div>
 
           <div className="p-4 bg-[#0d0d0f] rounded-lg border border-[#2a2a2e]">
@@ -522,10 +564,27 @@ export function UserProfileBalance({
         onPresenceVerified={handlePresenceVerified}
       />
 
+      <TreasuryFacePulseModal
+        isOpen={showFacePulseModal}
+        onClose={() => setShowFacePulseModal(false)}
+        onVerified={handleFacePulseVerified}
+      />
+
       <SpendingLockModal
         isOpen={showLockModal}
         onClose={() => setShowLockModal(false)}
       />
+
+      <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes gold-pulse-unlock {
+          0% { box-shadow: 0 0 0 0 rgba(212, 175, 55, 0); border-color: #2a2a2e; }
+          15% { box-shadow: 0 0 30px 4px rgba(212, 175, 55, 0.5); border-color: #e8c547; }
+          50% { box-shadow: 0 0 50px 8px rgba(212, 175, 55, 0.4); border-color: #c9a227; }
+          85% { box-shadow: 0 0 30px 4px rgba(212, 175, 55, 0.3); border-color: #e8c547; }
+          100% { box-shadow: 0 0 0 0 rgba(212, 175, 55, 0); border-color: #2a2a2e; }
+        }
+        .gold-pulse-unlock { animation: gold-pulse-unlock 2.5s ease-out forwards; }
+      ` }} />
     </div>
   );
 }

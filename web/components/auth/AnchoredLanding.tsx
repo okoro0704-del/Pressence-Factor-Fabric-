@@ -89,8 +89,35 @@ export function AnchoredLanding() {
     );
   }
 
+  // No saved identity (e.g. cleared or race): offer fallback to full registration
   if (!anchor?.citizenHash) {
-    return null;
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#050505] p-4">
+        <div
+          className="absolute inset-0 opacity-30 pointer-events-none"
+          style={{ background: 'radial-gradient(ellipse 80% 50% at 50% 40%, rgba(212, 175, 55, 0.15) 0%, transparent 60%)' }}
+          aria-hidden
+        />
+        <p className="relative z-10 text-sm text-center max-w-xs mb-6" style={{ color: '#a0a0a5' }}>
+          No saved identity found.
+        </p>
+        <button
+          type="button"
+          onClick={() => {
+            clearVitalizationAnchor();
+            router.replace('/');
+          }}
+          className="relative z-10 px-6 py-3 rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/50"
+          style={{
+            background: 'linear-gradient(145deg, rgba(212, 175, 55, 0.15) 0%, rgba(212, 175, 55, 0.08) 100%)',
+            border: '1px solid rgba(212, 175, 55, 0.4)',
+            color: '#D4AF37',
+          }}
+        >
+          Continue to registration
+        </button>
+      </div>
+    );
   }
 
   if (showOverlay) {

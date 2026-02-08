@@ -8,15 +8,13 @@
  * User may proceed when Core Mesh is verified; Pillar 4 (GPS) can remain Initializing or Self-Attested.
  * Lightweight for browser; native mobile GPS integration prepared for April 7th.
  *
- * Registration: Biological Signature Mismatch red screen and 29s lockout are disabled for non-VITALIZED
- * users (handled in FourLayerGate — only a simple "Retry Scan" button is shown on scan failure).
- *
- * Biometric Scan Progress Bar: gold scanning line over the video feed, 0-100% progress over 3-5s,
- * smooth green Verified transition; thumb-friendly and centered on mobile.
+ * Architect Override: when allPillarsVerified is true, onAllVerified is called once and parent
+ * performs one-time redirect (router.replace('/dashboard')) and clears verification interval timers.
  */
 
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { QUAD_PILLAR_DEFINITIONS } from '@/lib/constants';
+import { useRouter } from 'next/navigation';
+import { QUAD_PILLAR_DEFINITIONS, ROUTES } from '@/lib/constants';
 
 const GOLD = '#D4AF37';
 const GREEN = '#22c55e';
@@ -190,6 +188,8 @@ export interface QuadPillarGridProps {
   onManualLocation?: () => void;
   /** When true, GPS did not respond in 10s — show Self-Certify so user is not stuck */
   gpsSelfCertifyAvailable?: boolean;
+  /** Architect Override: called once when all four pillars become verified. Parent should router.replace(/dashboard) and clear verification timers. */
+  onAllVerified?: () => void;
 }
 
 /** Core Mesh = Pillars 1 (Face), 2 (Palm), 3 (Identity Anchor) verified. Proceed allowed without GPS. */
@@ -208,10 +208,21 @@ export function QuadPillarGrid({
   onGrantLocation,
   onManualLocation,
   gpsSelfCertifyAvailable = false,
+  onAllVerified,
 }: QuadPillarGridProps) {
+  const router = useRouter();
   const verified = [faceVerified, palmVerified, phoneAnchorVerified, locationVerified];
   const allVerified = verified.every(Boolean);
   const coreMesh = coreMeshComplete(faceVerified, palmVerified, phoneAnchorVerified);
+  const allVerifiedFiredRef = useRef(false);
+
+  // One-time redirect when all pillars verified: stop flickering and go to dashboard
+  useEffect(() => {
+    if (!allVerified || allVerifiedFiredRef.current) return;
+    allVerifiedFiredRef.current = true;
+    onAllVerified?.();
+    router.replace(ROUTES.DASHBOARD);
+  }, [allVerified, onAllVerified, router]);
 
   return (
     <div className="w-full">

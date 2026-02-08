@@ -57,8 +57,9 @@ export function SentinelDevicesManager({ phoneNumber, deviceLimit, currentDevice
   };
 
   const handleRevoke = async (deviceId: string, deviceName: string) => {
-    if (confirm(`Are you sure you want to revoke access to "${deviceName}"?`)) {
+    if (confirm(`Are you sure you want to revoke access to "${deviceName}"? The device will be signed out and its local anchor purged.`)) {
       await revokeDeviceAuthorization(deviceId);
+      onTerminateSession?.(deviceId);
       await loadDevices();
     }
   };
@@ -307,7 +308,9 @@ function DeviceCard({
             ) : (
               <div className="flex items-center gap-2">
                 <h3 className="text-xl font-bold text-[#D4AF37] font-mono">
-                  {device.device_nickname || device.device_name}
+                  {device.is_primary
+                    ? (device.device_nickname || device.device_name)
+                    : `${device.device_nickname || device.device_name} - Authorized Shadow`}
                 </h3>
                 {!isRevoked && (
                   <button

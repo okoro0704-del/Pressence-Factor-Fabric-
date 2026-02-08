@@ -1,19 +1,21 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { JetBrains_Mono } from 'next/font/google';
-import { verifyBiometricSignature } from '@/lib/biometricAuth';
+import { verifyBiometricSignature, FACE_MATCH_THRESHOLD_PERCENT } from '@/lib/biometricAuth';
 import { deriveFaceHashFromCredential, matchFaceTemplate } from '@/lib/biometricAnchorSync';
 import { getProfileWithPrimarySentinel } from '@/lib/roleAuth';
 import { getCompositeDeviceFingerprint } from '@/lib/biometricAuth';
 import { updatePrimarySentinelDeviceForMigration, sendNewDeviceAccessAlert } from '@/lib/deviceMigration';
-import { setIdentityAnchorForSession } from '@/lib/sentinelActivation';
+import { setIdentityAnchorForSession, getIdentityAnchorPhone } from '@/lib/sentinelActivation';
 import { useGlobalPresenceGateway } from '@/contexts/GlobalPresenceGateway';
 import { setSessionIdentity } from '@/lib/sessionIsolation';
+import { setVitalizationComplete } from '@/lib/vitalizationState';
 import { logGuestAccessIfNeeded } from '@/lib/guestMode';
 import { getLinkedMobileDeviceId } from '@/lib/phoneIdBridge';
+import { ensurePasskeyAnchor, sovereignEntryHaptic } from '@/src/lib/auth/passkeyEngine';
 import { Loader2, Smartphone, ShieldCheck } from 'lucide-react';
 
 const jetbrains = JetBrains_Mono({ weight: ['400', '600', '700'], subsets: ['latin'] });
@@ -41,6 +43,36 @@ export function RemoteLoginScreen({ onSuccess, onCancel }: RemoteLoginScreenProp
   const [linkedDevice, setLinkedDevice] = useState<{ maskedId: string; deviceName: string | null } | null>(null);
   const pendingPhoneRef = useRef<string | null>(null);
   const isPc = typeof navigator !== 'undefined' && !/Android|iPhone|iPad|iPod|webOS|Mobile/i.test(navigator.userAgent);
+  const instantAttemptedRef = useRef(false);
+
+  // Instant recognition: if sov_anchor exists in localStorage, auto-trigger Face/Palm on load.
+  // If scan matches hardware Passkey (95%+), skip email/OTP/password and go to dashboard (2-Second Rule).
+  useEffect(() => {
+    if (instantAttemptedRef.current || step !== 'id') return;
+    const phone = getIdentityAnchorPhone();
+    if (!phone?.trim()) return;
+    instantAttemptedRef.current = true;
+    setLoading(true);
+    (async () => {
+      try {
+        await ensurePasskeyAnchor();
+        const bioResult = await verifyBiometricSignature(phone.trim(), { learningMode: false });
+        const score = bioResult.variance != null ? 100 - bioResult.variance : 100;
+        if (bioResult.success && score >= FACE_MATCH_THRESHOLD_PERCENT) {
+          setVitalizationComplete();
+          sovereignEntryHaptic();
+          await grantAccess(phone.trim());
+          router.replace('/dashboard');
+          return;
+        }
+      } catch {
+        // Fall through to normal ID entry
+      } finally {
+        setLoading(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once when step is id and phone exists
+  }, [step]);
 
   const handleSubmitId = async () => {
     const trimmed = sovereignId.trim().replace(/\D/g, '');

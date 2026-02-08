@@ -5,6 +5,10 @@ import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useGlobalPresenceGateway } from '@/contexts/GlobalPresenceGateway';
 import { getIdentityAnchorPhone } from '@/lib/sentinelActivation';
 import { getMintStatusForPresence, getMintStatus, MINT_STATUS_PENDING_HARDWARE, MINT_STATUS_MINTED } from '@/lib/mintStatus';
+import { getVitalizationStatus, DEVICE_NOT_ANCHORED_MESSAGE } from '@/lib/vitalizationState';
+import { ROUTES } from '@/lib/constants';
+
+const SOV_STATUS_MESSAGE_KEY = 'pff_sov_status_message';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -14,11 +18,10 @@ interface ProtectedRouteProps {
 const HYDRATION_GRACE_MS = 600;
 
 /**
- * PROTECTED ROUTE WRAPPER (Clean State Guard)
- * Dashboard and protected pages load only when:
- * - Auth session + user_profiles row exist (enforced by GhostSessionGuard at app start; ghost sessions are cleared and redirected to /vitalization).
- * - Biometric / presence is verified (checked here via isPresenceVerified or mint_status PENDING_HARDWARE/MINTED).
- * Redirects to 4-Layer Gate if presence is not verified.
+ * PROTECTED ROUTE WRAPPER — Single source of truth for vitalization state.
+ * - no_citizen_record → force /vitalization (registration).
+ * - needs_restore → /vitalization/restore-identity.
+ * - vitalized / no_user → then presence check; if not verified, redirect to gate with status message (not error).
  */
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { isPresenceVerified, loading, setPresenceVerified } = useGlobalPresenceGateway();
@@ -27,6 +30,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const searchParams = useSearchParams();
   const [isChecking, setIsChecking] = useState(true);
   const [graceElapsed, setGraceElapsed] = useState(false);
+  const vitalizationCheckedRef = useRef(false);
 
   useEffect(() => {
     if (pathname === '/') {
@@ -43,6 +47,24 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     let cancelled = false;
 
     const run = async () => {
+      const status = await getVitalizationStatus();
+      if (cancelled) return;
+
+      if (status === 'no_citizen_record') {
+        try { sessionStorage.setItem(SOV_STATUS_MESSAGE_KEY, DEVICE_NOT_ANCHORED_MESSAGE); } catch { /* ignore */ }
+        router.replace(ROUTES.VITALIZATION);
+        vitalizationCheckedRef.current = true;
+        return;
+      }
+      if (status === 'needs_restore') {
+        try { sessionStorage.removeItem(SOV_STATUS_MESSAGE_KEY); } catch { /* ignore */ }
+        router.replace(ROUTES.VITALIZATION_RESTORE_IDENTITY);
+        vitalizationCheckedRef.current = true;
+        return;
+      }
+
+      vitalizationCheckedRef.current = true;
+
       if (isPresenceVerified) {
         if (!cancelled) setIsChecking(false);
         return;
@@ -70,7 +92,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
       if (!graceElapsed) return;
       if (!cancelled && !isPresenceVerified) {
         setIsChecking(false);
-        console.warn('[ProtectedRoute] Presence not verified, redirecting to gate');
+        try { sessionStorage.setItem(SOV_STATUS_MESSAGE_KEY, DEVICE_NOT_ANCHORED_MESSAGE); } catch { /* ignore */ }
         const next = searchParams.get('next') || pathname;
         const gateUrl = next && next !== '/' ? `/?next=${encodeURIComponent(next)}` : '/';
         router.replace(gateUrl);
@@ -101,5 +123,17 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   if (!isPresenceVerified) return null;
 
   return <>{children}</>;
+}
+
+/** Read status message set when redirecting to gate (Device not yet Anchored). Clear after read so it shows once. */
+export function readAndClearSovStatusMessage(): string | null {
+  if (typeof sessionStorage === 'undefined') return null;
+  try {
+    const msg = sessionStorage.getItem(SOV_STATUS_MESSAGE_KEY);
+    if (msg) sessionStorage.removeItem(SOV_STATUS_MESSAGE_KEY);
+    return msg;
+  } catch {
+    return null;
+  }
 }
 

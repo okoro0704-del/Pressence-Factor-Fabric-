@@ -18,11 +18,12 @@ import {
 import { useTripleTapReset } from '@/lib/useTripleTapReset';
 import { TerminateSessionListener } from '@/components/dashboard/TerminateSessionListener';
 import { shouldShowFullProtocolSync } from '@/lib/publicRevealAccess';
+import { getVitalizationStatus, DEVICE_NOT_ANCHORED_MESSAGE } from '@/lib/vitalizationState';
 
 /** Settings nav icon: use named ref so bundler does not drop it (avoids "SlidersHorizontal is not defined"). */
 const SettingsNavIcon = SlidersHorizontal;
 
-/** Bottom tab bar and sidebar: Dashboard, Treasury, Elections, Master, Command, Settings, Companion (last). */
+/** Bottom tab bar and sidebar: Dashboard, Treasury, Elections, Master, Command, Settings, Companion (last). Vitalize First: all except Vitalization disabled until is_vitalized. */
 const NAV = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/treasury', label: 'Treasury', icon: Landmark },
@@ -32,6 +33,8 @@ const NAV = [
   { href: '/settings', label: 'Settings', icon: SettingsNavIcon },
   { href: '/companion', label: 'Companion', icon: Bot },
 ];
+
+const VITALIZATION_HREF = '/vitalization';
 
 /**
  * AppShell — Public Gatekeeper: on production domain, only Authorized Identities see full Protocol.
@@ -43,6 +46,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [redirectToManifesto, setRedirectToManifesto] = useState(false);
+  const [vitalized, setVitalized] = useState<boolean | null>(null);
   const handleLogoClick = useTripleTapReset();
 
   useEffect(() => {
@@ -52,6 +56,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       router.replace('/');
     }
   }, [router]);
+
+  useEffect(() => {
+    getVitalizationStatus().then((status) => setVitalized(status === 'vitalized'));
+  }, [pathname]);
 
   if (redirectToManifesto) {
     return (
@@ -97,17 +105,29 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </button>
         </div>
         <nav className="p-2 space-y-1 flex-1">
+          {vitalized === false && (
+            <Link
+              href={VITALIZATION_HREF}
+              className="min-h-[48px] flex items-center gap-3 px-3 rounded-lg touch-manipulation bg-[#D4AF37]/20 text-[#D4AF37] border border-[#D4AF37]/40"
+            >
+              <LayoutDashboard className="w-5 h-5 shrink-0" />
+              {sidebarOpen && <span className="text-sm font-medium truncate">Vitalize First</span>}
+            </Link>
+          )}
           {NAV.map(({ href, label, icon: Icon }) => {
             const active = pathname === href || pathname.startsWith(href + '/');
+            const locked = vitalized === false;
             return (
               <Link
                 key={href}
-                href={href}
+                href={locked ? VITALIZATION_HREF : href}
                 className={`
                   min-h-[48px] flex items-center gap-3 px-3 rounded-lg touch-manipulation
                   transition-colors
-                  ${active ? 'bg-[#D4AF37]/20 text-[#D4AF37]' : 'text-[#a0a0a5] hover:bg-[#16161a] hover:text-[#f5f5f5]'}
+                  ${locked ? 'opacity-60 text-[#6b6b70] hover:opacity-100 hover:text-[#D4AF37]' : ''}
+                  ${active && !locked ? 'bg-[#D4AF37]/20 text-[#D4AF37]' : !locked ? 'text-[#a0a0a5] hover:bg-[#16161a] hover:text-[#f5f5f5]' : ''}
                 `}
+                title={locked ? DEVICE_NOT_ANCHORED_MESSAGE : undefined}
               >
                 <Icon className="w-5 h-5 shrink-0" />
                 {sidebarOpen && <span className="text-sm font-medium truncate">{label}</span>}
@@ -132,16 +152,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="flex items-center justify-around min-h-[56px] px-2">
           {NAV.map(({ href, label, icon: Icon }) => {
             const active = pathname === href || pathname.startsWith(href + '/');
+            const locked = vitalized === false;
             return (
               <Link
                 key={href}
-                href={href}
+                href={locked ? VITALIZATION_HREF : href}
                 className={`
                   min-h-[48px] min-w-[48px] flex flex-col items-center justify-center gap-0.5 rounded-lg touch-manipulation px-2 py-2
                   transition-colors duration-200
-                  ${active ? 'text-[#D4AF37] bg-[#D4AF37]/10' : 'text-[#6b6b70] hover:text-[#a0a0a5] active:bg-[#16161a]'}
+                  ${locked ? 'opacity-60 text-[#6b6b70]' : ''}
+                  ${active && !locked ? 'text-[#D4AF37] bg-[#D4AF37]/10' : !locked ? 'text-[#6b6b70] hover:text-[#a0a0a5] active:bg-[#16161a]' : ''}
                 `}
                 aria-current={active ? 'page' : undefined}
+                title={locked ? DEVICE_NOT_ANCHORED_MESSAGE : undefined}
               >
                 <Icon className="w-6 h-6 shrink-0" />
                 <span className="text-[10px] font-medium truncate max-w-[64px]">{label}</span>

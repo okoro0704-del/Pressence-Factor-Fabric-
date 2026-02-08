@@ -4,7 +4,8 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ManualLocationInputScreen } from '@/components/auth/ManualLocationInputScreen';
 import { setPillarLocationFromManualEntry } from '@/lib/biometricAuth';
-import { getIdentityAnchorPhone } from '@/lib/sentinelActivation';
+import { getIdentityAnchorPhone, setIdentityAnchorForSession } from '@/lib/sentinelActivation';
+import { ROUTES } from '@/lib/constants';
 import { useGlobalPresenceGateway } from '@/contexts/GlobalPresenceGateway';
 
 /**
@@ -30,8 +31,10 @@ export default function GpsManualSetupPage() {
       return;
     }
     setPillarLocationFromManualEntry(phone, city, country);
+    setIdentityAnchorForSession(phone);
     setPresenceVerified(true);
-    router.push('/dashboard');
+    try { localStorage.removeItem('sov_status'); } catch { /* ignore */ }
+    router.push(ROUTES.DASHBOARD);
   };
 
   const handleCancel = () => {

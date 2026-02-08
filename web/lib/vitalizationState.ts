@@ -1,0 +1,98 @@
+/**
+ * Single Source of Truth for Vitalization State and Navigation.
+ * Used by root/layout, ProtectedRoute, and AppShell to:
+ * - Force stay on /vitalization when user exists but citizen_record (Supabase face_hash) is empty.
+ * - Show Restore Identity when citizen_record exists but local_hash (vitalization anchor) is missing.
+ * - Allow Dashboard when both exist.
+ */
+
+import { getIdentityAnchorPhone } from './sentinelActivation';
+import { getVitalizationAnchor } from './vitalizationAnchor';
+import { getSupabase } from './supabase';
+
+export type VitalizationStatus =
+  | 'no_user'           // No identity anchor (phone) — show gate / registration
+  | 'no_citizen_record' // User (phone) exists but no Supabase row or no face_hash → force /vitalization
+  | 'needs_restore'     // Supabase has face_hash but local anchor (citizenHash) missing → Restore Identity page
+  | 'vitalized';        // Both citizen_record and local_hash exist → allow Dashboard
+
+/** User-facing status message when device is not yet anchored (replaces "Details not stored" as error). */
+export const DEVICE_NOT_ANCHORED_MESSAGE =
+  'Device not yet Anchored. Please complete Vitalization to secure this device.';
+
+/** State lockdown: when true, app must not return to scanner unless user manually logs out. */
+export const VITALIZATION_COMPLETE_KEY = 'VITALIZATION_COMPLETE';
+
+export function setVitalizationComplete(): void {
+  try {
+    if (typeof sessionStorage !== 'undefined') sessionStorage.setItem(VITALIZATION_COMPLETE_KEY, 'true');
+  } catch {
+    // ignore
+  }
+}
+
+export function clearVitalizationComplete(): void {
+  try {
+    if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem(VITALIZATION_COMPLETE_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+export function isVitalizationComplete(): boolean {
+  try {
+    return typeof sessionStorage !== 'undefined' && sessionStorage.getItem(VITALIZATION_COMPLETE_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Resolve current vitalization status from identity anchor, Supabase user_profiles, and local anchor.
+ * Call from client only (uses localStorage and Supabase).
+ */
+export async function getVitalizationStatus(): Promise<VitalizationStatus> {
+  if (typeof window === 'undefined') return 'no_user';
+
+  const phone = getIdentityAnchorPhone();
+  if (!phone?.trim()) return 'no_user';
+
+  const supabase = getSupabase();
+  if (!supabase) return 'no_citizen_record';
+
+  try {
+    const { data, error } = await (supabase as any)
+      .from('user_profiles')
+      .select('face_hash')
+      .eq('phone_number', phone.trim())
+      .maybeSingle();
+
+    if (error || !data) return 'no_citizen_record';
+    const faceHash = (data as { face_hash?: string | null }).face_hash;
+    if (!faceHash || !String(faceHash).trim()) return 'no_citizen_record';
+
+    const anchor = await getVitalizationAnchor();
+    if (!anchor.citizenHash || !anchor.citizenHash.trim()) return 'needs_restore';
+
+    return 'vitalized';
+  } catch {
+    return 'no_citizen_record';
+  }
+}
+
+/**
+ * Synchronous check: is the device considered vitalized for menu/routing?
+ * True when local storage has a valid vitalization anchor (isVitalized + citizenHash).
+ * Use for instant UI (e.g. enabling nav); use getVitalizationStatus() for full routing decisions.
+ */
+export function isDeviceVitalizedSync(): boolean {
+  if (typeof window === 'undefined') return false;
+  const phone = getIdentityAnchorPhone();
+  if (!phone?.trim()) return false;
+  try {
+    const raw = localStorage.getItem('pff_vitalized_anchor');
+    return !!raw?.trim();
+  } catch {
+    return false;
+  }
+}
