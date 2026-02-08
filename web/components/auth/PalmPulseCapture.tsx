@@ -355,15 +355,7 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
         </div>
       )}
 
-      {status !== 'denied' && (
-        <button
-          type="button"
-          onClick={onClose}
-          className="mt-6 px-6 py-2 rounded-lg border-2 border-[#22c55e]/60 text-[#22c55e] hover:bg-[#22c55e]/10"
-        >
-          Cancel
-        </button>
-      )}
+      {/* Cancel removed during scan phase: auto-transition (UX overhaul) */}
     </div>
   );
 }

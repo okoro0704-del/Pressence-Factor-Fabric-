@@ -1101,7 +1101,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     [goToDashboard, isFirstRun, setSpendableVidaAnimation]
   );
 
-  /** Dual-Pillar: Scan 1 Face Pulse (done), Scan 2 Palm Pulse (Palm Wave) to authorize $100 daily unlock. When IS_PUBLIC_REVEAL && !vetted, skip Palm Scan. */
+  /** Dual-Pillar: Scan 1 Face Pulse (done), auto-advance to Palm after 1s. When IS_PUBLIC_REVEAL && !vetted, skip Palm. All pillars complete → dashboard without click. */
   const handleArchitectVisionComplete = useCallback(async () => {
     setBiometricSessionVerified();
     setShowArchitectVision(false);
@@ -1121,7 +1121,8 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
       await proceedAfterSecondPillar(p);
       return;
     }
-    setShowPalmPulse(true);
+    // Auto-transition to next pillar after 1s (no manual click)
+    setTimeout(() => setShowPalmPulse(true), 1000);
   }, [setBiometricSessionVerified, proceedAfterSecondPillar]);
 
   const handlePalmSuccess = useCallback(

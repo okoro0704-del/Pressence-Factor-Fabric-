@@ -5,7 +5,7 @@ import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useGlobalPresenceGateway } from '@/contexts/GlobalPresenceGateway';
 import { getIdentityAnchorPhone } from '@/lib/sentinelActivation';
 import { getMintStatusForPresence, getMintStatus, MINT_STATUS_PENDING_HARDWARE, MINT_STATUS_MINTED } from '@/lib/mintStatus';
-import { getVitalizationStatus, DEVICE_NOT_ANCHORED_MESSAGE } from '@/lib/vitalizationState';
+import { getVitalizationStatus, DEVICE_NOT_ANCHORED_MESSAGE, shouldNeverRedirectBack } from '@/lib/vitalizationState';
 import { ROUTES } from '@/lib/constants';
 
 const SOV_STATUS_MESSAGE_KEY = 'pff_sov_status_message';
@@ -47,6 +47,16 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     let cancelled = false;
 
     const run = async () => {
+      // Hard rule: once vitalization is complete, never redirect back except on explicit logout.
+      if (shouldNeverRedirectBack()) {
+        if (!cancelled) {
+          setPresenceVerified(true);
+          vitalizationCheckedRef.current = true;
+          setIsChecking(false);
+        }
+        return;
+      }
+
       const status = await getVitalizationStatus();
       if (cancelled) return;
 

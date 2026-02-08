@@ -3,6 +3,11 @@
  * Reads pff_role cookie (set client-side after role is loaded from Supabase).
  * If role is missing or insufficient, redirects to /dashboard with ?unauthorized=1.
  *
+ * Note: /vitalization and /registration are NOT redirected here (middleware cannot read
+ * localStorage). Client-side guard: ProtectedRoute + shouldNeverRedirectBack() — when
+ * vitalization_complete (or is_vitalized / pff_VITALIZED) is true, app never redirects
+ * user back to /vitalization or /registration.
+ *
  * EMERGENCY BYPASS (temporary): Set PFF_EMERGENCY_BYPASS_IP to your IP, or set
  * cookie pff_emergency_bypass to PFF_EMERGENCY_BYPASS_SECRET, to allow /master
  * without MASTER_ARCHITECT role. Remove after restoring access.

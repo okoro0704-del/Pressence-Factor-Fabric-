@@ -2,8 +2,8 @@
 
 /**
  * Face Hash Scanner — Auto-start when camera is active.
- * When scan is VERIFIED: save faceHash, show "PROCEED TO DASHBOARD" (gold), auto-redirect to /dashboard after 1.5s.
- * No Cancel button in success state.
+ * When scan is VERIFIED: save faceHash, auto-redirect to /dashboard (quiet, no manual button). Scanner shuts down immediately to save battery.
+ * No Cancel button in success state. Redirect uses router.replace() for smooth transition without flicker.
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -17,6 +17,7 @@ import {
 } from '@/lib/biometricAnchorSync';
 import { verifyBiometricSignature } from '@/lib/biometricAuth';
 import { getIdentityAnchorPhone, setIdentityAnchorForSession } from '@/lib/sentinelActivation';
+import { setVitalizationComplete } from '@/lib/vitalizationState';
 import { ROUTES } from '@/lib/constants';
 
 export type ScannerStatus = 'idle' | 'searching' | 'scanning' | 'VERIFIED' | 'error';
@@ -25,7 +26,7 @@ export interface ScannerProps {
   phoneNumber?: string | null;
   onAnchorSaved?: (step: number) => void;
   onStatusChange?: (status: ScannerStatus) => void;
-  /** Delay in ms before auto-redirect after VERIFIED. Default 1500. */
+  /** Delay in ms before auto-redirect after VERIFIED. Default 1000 for quiet, immediate transition. */
   redirectDelayMs?: number;
   autoRedirect?: boolean;
 }
@@ -38,13 +39,15 @@ export function Scanner({
   phoneNumber: phoneProp,
   onAnchorSaved,
   onStatusChange,
-  redirectDelayMs = 1500,
+  redirectDelayMs = 1000,
   autoRedirect = true,
 }: ScannerProps) {
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const scanTriggeredRef = useRef(false);
+  /** Kill the watcher: when true, stop all polling, intervals, and state updates to prevent redirect loop/flicker */
+  const isRedirectingRef = useRef(false);
   const [status, setStatus] = useState<ScannerStatus>('searching');
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
@@ -54,6 +57,7 @@ export function Scanner({
 
   const saveHashAndNotify = useCallback(
     (faceHash: string) => {
+      if (isRedirectingRef.current) return;
       setPersistentFaceHash(faceHash, phone ?? undefined);
       if (phone?.trim()) setFaceHashInSession(phone.trim(), faceHash);
       if (progressIntervalRef.current) {
@@ -62,21 +66,18 @@ export function Scanner({
       }
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
+      if (isRedirectingRef.current) return;
       setProgress(100);
       setStatus('VERIFIED');
       onStatusChange?.('VERIFIED');
       onAnchorSaved?.(1);
-      // Persistence: save is_vitalized so user never sees this screen again
-      try {
-        if (typeof localStorage !== 'undefined') localStorage.setItem('is_vitalized', 'true');
-      } catch {
-        /* ignore */
-      }
+      setVitalizationComplete();
     },
     [phone, onAnchorSaved, onStatusChange]
   );
 
   const runScan = useCallback(async () => {
+    if (isRedirectingRef.current) return;
     if (!phone?.trim()) {
       setError('Identity anchor required. Enter phone number first.');
       setStatus('error');
@@ -89,6 +90,13 @@ export function Scanner({
 
     const startTime = Date.now();
     progressIntervalRef.current = setInterval(() => {
+      if (isRedirectingRef.current) {
+        if (progressIntervalRef.current) {
+          clearInterval(progressIntervalRef.current);
+          progressIntervalRef.current = null;
+        }
+        return;
+      }
       const elapsed = Date.now() - startTime;
       const pct = Math.min(99, Math.round((elapsed / SCAN_DURATION_MS) * 100));
       setProgress(pct);
@@ -96,6 +104,7 @@ export function Scanner({
 
     try {
       const result = await verifyBiometricSignature(phone.trim(), { learningMode: false });
+      if (isRedirectingRef.current) return;
       if (progressIntervalRef.current) {
         clearInterval(progressIntervalRef.current);
         progressIntervalRef.current = null;
@@ -107,6 +116,7 @@ export function Scanner({
           return;
         }
       }
+      if (isRedirectingRef.current) return;
       setError(result.error ?? 'Verification failed');
       setStatus('error');
       onStatusChange?.('error');
@@ -115,6 +125,7 @@ export function Scanner({
         clearInterval(progressIntervalRef.current);
         progressIntervalRef.current = null;
       }
+      if (isRedirectingRef.current) return;
       const message = err instanceof Error ? err.message : String(err);
       if (NO_PASSKEYS_PATTERN.test(message)) {
         try {
@@ -135,7 +146,7 @@ export function Scanner({
     }
   }, [phone, saveHashAndNotify, onStatusChange]);
 
-  // Camera: request stream and auto-start scan when active
+  // Camera: request stream and auto-start scan when active. Cleanup: physically shut down camera on leave.
   useEffect(() => {
     if (typeof window === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
       setStatus('error');
@@ -149,29 +160,39 @@ export function Scanner({
     navigator.mediaDevices
       .getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false })
       .then((stream) => {
+        if (isRedirectingRef.current) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
         streamRef.current = stream;
         video.srcObject = stream;
         video.play().then(() => {
-          if (!scanTriggeredRef.current) {
+          if (!isRedirectingRef.current && !scanTriggeredRef.current) {
             scanTriggeredRef.current = true;
             runScan();
           }
         }).catch(() => {
-          if (!scanTriggeredRef.current) {
+          if (!isRedirectingRef.current && !scanTriggeredRef.current) {
             scanTriggeredRef.current = true;
             runScan();
           }
         });
       })
       .catch((err) => {
-        setError(err?.message ?? 'Camera access denied');
-        setStatus('error');
-        onStatusChange?.('error');
+        if (!isRedirectingRef.current) {
+          setError(err?.message ?? 'Camera access denied');
+          setStatus('error');
+          onStatusChange?.('error');
+        }
       });
 
     return () => {
-      streamRef.current?.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
+      isRedirectingRef.current = true;
+      const stream = streamRef.current;
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
       if (progressIntervalRef.current) {
         clearInterval(progressIntervalRef.current);
         progressIntervalRef.current = null;
@@ -179,30 +200,32 @@ export function Scanner({
     };
   }, []);
 
-  // VERIFIED → auto-redirect to dashboard after 1.5s (triggers initial release + toast on dashboard)
+  // VERIFIED → hard redirect (router.replace). Kill watcher first so no more state updates; anchor confirmation before navigate.
   useEffect(() => {
     if (status !== 'VERIFIED' || !autoRedirect) return;
     const t = setTimeout(() => {
+      if (isRedirectingRef.current) return;
+      isRedirectingRef.current = true;
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
+      const stream = streamRef.current;
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
       if (phone?.trim()) {
         setIdentityAnchorForSession(phone.trim());
         if (typeof sessionStorage !== 'undefined') {
           sessionStorage.setItem('pff_initial_release_phone', phone.trim());
         }
       }
-      router.push(`${ROUTES.DASHBOARD}?initial_release=1`);
+      setVitalizationComplete();
+      router.replace(`${ROUTES.DASHBOARD}?initial_release=1`);
     }, redirectDelayMs);
     return () => clearTimeout(t);
   }, [status, autoRedirect, redirectDelayMs, router, phone]);
-
-  const handleProceedToDashboard = useCallback(() => {
-    if (phone?.trim()) {
-      setIdentityAnchorForSession(phone.trim());
-      if (typeof sessionStorage !== 'undefined') {
-        sessionStorage.setItem('pff_initial_release_phone', phone.trim());
-      }
-    }
-    router.push(`${ROUTES.DASHBOARD}?initial_release=1`);
-  }, [router, phone]);
 
   const handleRetry = useCallback(() => {
     scanTriggeredRef.current = false;
@@ -278,21 +301,11 @@ export function Scanner({
           />
         </svg>
       </div>
-      {/* VERIFIED: Gold "PROCEED TO DASHBOARD" (no Cancel) */}
+      {/* VERIFIED: auto-redirect only (no manual button); scanner already stopped in saveHashAndNotify for battery */}
       {status === 'VERIFIED' && (
-        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-10">
-          <button
-            type="button"
-            onClick={handleProceedToDashboard}
-            className="py-3 px-8 rounded-xl font-bold text-sm uppercase tracking-wider transition-opacity hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/50 focus:ring-offset-2 focus:ring-offset-black"
-            style={{
-              background: `linear-gradient(145deg, ${GOLD}, #C9A227)`,
-              color: '#0d0d0f',
-              boxShadow: '0 0 24px rgba(212, 175, 55, 0.4)',
-            }}
-          >
-            PROCEED TO DASHBOARD
-          </button>
+        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-10 text-center">
+          <p className="text-sm font-semibold uppercase tracking-wider" style={{ color: GOLD }}>VERIFIED</p>
+          <p className="text-xs text-[#a0a0a5] mt-1">Redirecting to dashboard…</p>
         </div>
       )}
 

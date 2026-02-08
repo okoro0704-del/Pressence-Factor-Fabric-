@@ -215,11 +215,14 @@ export function QuadPillarGrid({
   const allVerified = verified.every(Boolean);
   const coreMesh = coreMeshComplete(faceVerified, palmVerified, phoneAnchorVerified);
   const allVerifiedFiredRef = useRef(false);
+  /** Kill the watcher: when true, no further redirects or state updates (stops redirect loop/flicker) */
+  const isRedirectingRef = useRef(false);
 
-  // One-time redirect when all pillars verified: stop flickering and go to dashboard
+  // One-time hard redirect when all pillars verified; guard so we never double-fire
   useEffect(() => {
-    if (!allVerified || allVerifiedFiredRef.current) return;
+    if (!allVerified || allVerifiedFiredRef.current || isRedirectingRef.current) return;
     allVerifiedFiredRef.current = true;
+    isRedirectingRef.current = true;
     onAllVerified?.();
     router.replace(ROUTES.DASHBOARD);
   }, [allVerified, onAllVerified, router]);

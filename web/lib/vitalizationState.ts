@@ -29,12 +29,16 @@ export const PFF_VITALIZED_KEY = 'pff_VITALIZED';
 /** Persistence: user never sees vitalization screen again after successful scan. */
 export const IS_VITALIZED_KEY = 'is_vitalized';
 
+/** Anchor confirmation: set before redirect so route guard never sends user back to /vitalization or /registration. */
+export const VITALIZATION_COMPLETE_STORAGE_KEY = 'vitalization_complete';
+
 export function setVitalizationComplete(): void {
   try {
     if (typeof sessionStorage !== 'undefined') sessionStorage.setItem(VITALIZATION_COMPLETE_KEY, 'true');
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(PFF_VITALIZED_KEY, '1');
       localStorage.setItem(IS_VITALIZED_KEY, 'true');
+      localStorage.setItem(VITALIZATION_COMPLETE_STORAGE_KEY, 'true');
     }
   } catch {
     // ignore
@@ -45,6 +49,22 @@ export function setVitalizationComplete(): void {
 export function isVitalizedFlag(): boolean {
   try {
     return typeof localStorage !== 'undefined' && localStorage.getItem(PFF_VITALIZED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Single source of truth: app must NEVER redirect this user back to gate/vitalization/scanner
+ * except on explicit logout (or session clear). Once vitalization is complete, user stays where they are.
+ */
+export function shouldNeverRedirectBack(): boolean {
+  try {
+    if (typeof localStorage === 'undefined') return false;
+    if (localStorage.getItem(VITALIZATION_COMPLETE_STORAGE_KEY) === 'true') return true;
+    if (localStorage.getItem(IS_VITALIZED_KEY) === 'true') return true;
+    if (localStorage.getItem(PFF_VITALIZED_KEY) === '1') return true;
+    return false;
   } catch {
     return false;
   }

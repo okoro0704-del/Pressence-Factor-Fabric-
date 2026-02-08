@@ -1,4 +1,18 @@
-# Fix Netlify "Skipped" Build — Nothing Deploying
+"Implement Remote Biometric Authorization (Sentinel Push):
+
+Login Trigger: When a user attempts to access PFF on a linked laptop, instead of a password, show a screen: 'Authorization Requested on Master Device.'
+
+Master Device Notification: Use Firebase Cloud Messaging (FCM) or a Supabase Realtime trigger to send a high-priority prompt to the Architect's phone.
+
+The Ritual: The prompt on the phone should say: 'Access requested from [Laptop Name]. Verify DNA to Grant.'
+
+Biometric Handshake: Tapping the notification opens the 2-second Face/Palm scanner on the phone.
+
+Instant Unlock: Upon a 95%+ match, the phone sends a 'Success' signal to the laptop, which automatically unlocks the Naira Treasury and Dashboard.
+
+Failed Attempt Alert: If the scan fails or is ignored, the laptop remains locked, and an audit log entry is created: 'Unauthorized Access Blocked.'"
+
+🏛️ THE ENTERPRISE SECURITY FLOW# Fix Netlify "Skipped" Build — Nothing Deploying
 
 If your Netlify deploy log shows **Building: Skipped**, **Deploying: Skipped**, and only **Post-processing: Complete**, no files are being built or published. Your live site will be empty or stale.
 

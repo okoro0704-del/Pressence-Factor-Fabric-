@@ -11,7 +11,8 @@ import { getIdentityAnchorPhone } from '@/lib/sentinelActivation';
 import { getProfileFaceAndSeed } from '@/lib/recoverySeedStorage';
 import { startVerifiedMintListener } from '@/lib/sovryn/verifiedMintListener';
 import { isArchitect } from '@/lib/manifestoUnveiling';
-import { setVitalizationComplete } from '@/lib/vitalizationState';
+import { setVitalizationComplete, shouldNeverRedirectBack } from '@/lib/vitalizationState';
+import { authorizeInitialRelease } from '@/lib/masterArchitectInit';
 
 /**
  * DASHBOARD PAGE - PROTECTED (VAULT)
@@ -25,10 +26,13 @@ export default function DashboardPage() {
   const [vaultStable, setVaultStable] = useState(false);
   /** When gasless mint completes, tx hash is set; UI shows "5 VIDA MINTED ON BITCOIN LAYER 2" with golden checkmark. */
   const [mintTxHash, setMintTxHash] = useState<string | null>(null);
+  /** Toast: "Presence Confirmed. $100 Initial Release Authorized." (one-time after Scanner → dashboard) */
+  const [initialReleaseToast, setInitialReleaseToast] = useState(false);
   const searchParams = useSearchParams();
   const router = useRouter();
   const unauthorized = searchParams.get('unauthorized') === '1';
   const showMintedBanner = searchParams.get('minted') === '1';
+  const initialReleaseParam = searchParams.get('initial_release') === '1';
   /** Allow dashboard when architect OR when user has completed vitalization (identity + mint status). Avoids redirect-to-home after vitalization. */
   const [vitalizedOrArchitect, setVitalizedOrArchitect] = useState(false);
   const [accessChecked, setAccessChecked] = useState(false);
@@ -42,7 +46,7 @@ export default function DashboardPage() {
     if (mounted) setVitalizationComplete();
   }, [mounted]);
 
-  // Allow dashboard for architects or anyone with identity anchor (post-vitalization). Do not redirect back — let user stay on dashboard.
+  // Allow dashboard for architects or anyone with identity anchor (post-vitalization). Never redirect back once vitalized — stay on dashboard unless user explicitly logs out.
   useEffect(() => {
     if (!mounted) return;
     let cancelled = false;
@@ -55,14 +59,14 @@ export default function DashboardPage() {
         return;
       }
       const phone = getIdentityAnchorPhone();
-      if (!phone) {
+      if (!phone && !shouldNeverRedirectBack()) {
         if (!cancelled) {
           setAccessChecked(true);
           router.replace('/');
         }
         return;
       }
-      // Has identity anchor (set after vitalization): allow access and do not redirect back.
+      // Has identity anchor or has completed vitalization before: allow access and do not redirect back.
       if (!cancelled) {
         setVitalizedOrArchitect(true);
         setAccessChecked(true);
@@ -124,6 +128,30 @@ export default function DashboardPage() {
     return () => removePopState?.();
   }, [mounted, vaultStable, router]);
 
+  /** Initial release: one-time trigger from Scanner VERIFIED → dashboard. Credit $100 (0.1 VIDA) and show toast. */
+  useEffect(() => {
+    if (!mounted || !initialReleaseParam) return;
+    const phone =
+      (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('pff_initial_release_phone')) ||
+      getIdentityAnchorPhone();
+    if (!phone?.trim()) return;
+    let cancelled = false;
+    authorizeInitialRelease(phone.trim()).then((res) => {
+      if (cancelled) return;
+      if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem('pff_initial_release_phone');
+      router.replace('/dashboard', { scroll: false });
+      if (res.ok && res.credited) setInitialReleaseToast(true);
+    });
+    return () => { cancelled = true; };
+  }, [mounted, initialReleaseParam, router]);
+
+  /** Dismiss initial release toast after 5s */
+  useEffect(() => {
+    if (!initialReleaseToast) return;
+    const t = setTimeout(() => setInitialReleaseToast(false), 5000);
+    return () => clearTimeout(t);
+  }, [initialReleaseToast]);
+
   if (!mounted || !accessChecked) {
     return null;
   }
@@ -165,6 +193,14 @@ export default function DashboardPage() {
             role="alert"
           >
             Unauthorized Access. You do not have the required role for that page.
+          </div>
+        )}
+        {initialReleaseToast && (
+          <div
+            className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] px-4 py-3 rounded-xl border-2 border-[#D4AF37]/60 bg-[#0d0d0f]/95 shadow-lg shadow-[#D4AF37]/20 text-center text-sm font-semibold text-[#D4AF37]"
+            role="status"
+          >
+            Presence Confirmed. $100 Initial Release Authorized.
           </div>
         )}
         <DashboardContent

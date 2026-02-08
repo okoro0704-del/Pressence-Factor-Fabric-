@@ -206,15 +206,7 @@ export function SovereignPalmScan({ isOpen, onClose, onSuccess, onError }: Sover
         </div>
       )}
 
-      {status !== 'denied' && (
-        <button
-          type="button"
-          onClick={onClose}
-          className="mt-6 px-6 py-2 rounded-lg border-2 border-[#6b6b70] text-[#a0a0a5] hover:bg-[#16161a]"
-        >
-          Cancel
-        </button>
-      )}
+      {/* Cancel removed during scan phase: auto-transition to next pillar (UX overhaul) */}
     </div>
   );
 }

@@ -413,15 +413,7 @@ export function ArchitectVisionCapture({
         </div>
       )}
 
-      {cameraStatus !== 'denied' && (
-        <button
-          type="button"
-          onClick={onClose}
-          className="mt-6 px-6 py-2 rounded-lg border-2 border-[#D4AF37]/60 text-[#e8c547] hover:bg-[#D4AF37]/10 transition-colors"
-        >
-          {closeLabel}
-        </button>
-      )}
+      {/* Cancel removed during scanning: auto-transition only (UX overhaul). Denied state has Retry/Cancel in overlay above. */}
 
     </div>
   );
