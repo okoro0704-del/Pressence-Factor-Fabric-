@@ -7,7 +7,7 @@ import { ProtectedRoute } from '@/components/dashboard/ProtectedRoute';
 import { BiometricStrictnessSlider } from '@/components/settings/BiometricStrictnessSlider';
 import { AppShell } from '@/components/layout/AppShell';
 import { SentinelDevicesManager } from '@/components/dashboard/SentinelDevicesManager';
-import { getIdentityAnchorPhone, clearSessionForLogout } from '@/lib/sentinelActivation';
+import { getIdentityAnchorPhone, clearIdentityAnchorForSession, clearSessionForLogout } from '@/lib/sentinelActivation';
 import { clearPresenceVerification } from '@/lib/withPresenceCheck';
 import { getCompositeDeviceFingerprint } from '@/lib/biometricAuth';
 import { getTrustLevel, shouldSuggestSovereignShield } from '@/lib/trustLevel';
@@ -41,11 +41,12 @@ export default function SettingsPage() {
   const handleSignOut = () => {
     clearPresenceVerification();
     clearVitalizationComplete();
+    clearIdentityAnchorForSession();
     clearSessionForLogout();
     if (typeof window !== 'undefined') {
-      window.location.href = '/';
+      window.location.href = '/language';
     } else {
-      router.replace('/');
+      router.replace('/language');
     }
   };
 

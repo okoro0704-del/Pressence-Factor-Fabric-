@@ -33,15 +33,23 @@ export function WalletSovereignIdCard() {
       setLoading(false);
       return;
     }
+    const deviceInfoPromise =
+      typeof navigator !== 'undefined'
+        ? Promise.resolve().then(() => getCurrentDeviceInfo()).catch(() => null)
+        : Promise.resolve(null);
     Promise.all([
-      getIdCardProfile(p),
-      getCitizenStatusForPhone(p),
-      typeof navigator !== 'undefined' ? Promise.resolve(getCurrentDeviceInfo()) : Promise.resolve(null),
-    ]).then(([profileRes, status, deviceInfo]) => {
-      setName(profileRes?.ok && profileRes.profile?.full_name ? profileRes.profile.full_name.trim() : null);
-      setVitalizationStatus(status);
-      setDeviceName(deviceInfo?.deviceName ?? null);
-    }).finally(() => setLoading(false));
+      getIdCardProfile(p).catch(() => ({ ok: false })),
+      getCitizenStatusForPhone(p).catch(() => 'PENDING' as const),
+      deviceInfoPromise,
+    ])
+      .then(([profileRes, status, deviceInfo]) => {
+        const profile = profileRes && typeof profileRes === 'object' && 'profile' in profileRes ? (profileRes as { profile?: { full_name?: string } }).profile : undefined;
+        setName(profile?.full_name ? String(profile.full_name).trim() : null);
+        setVitalizationStatus(status);
+        setDeviceName(deviceInfo?.deviceName ?? null);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
   if (loading || !phone) {
