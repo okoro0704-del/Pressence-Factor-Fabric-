@@ -21,13 +21,13 @@ import { getIdentityAnchorPhone } from '@/lib/sentinelActivation';
 
 const SettingsNavIcon = SlidersHorizontal;
 
-/** Bottom bar: Dashboard, Treasury, Wallet, Settings, Companion (Elections removed). */
+/** Bottom bar: Dashboard, Treasury, Wallet, Companion, Settings (Settings last). */
 const NAV = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/treasury', label: 'Treasury', icon: Landmark },
   { href: '/wallet', label: 'Wallet', icon: Wallet },
-  { href: '/settings', label: 'Settings', icon: SettingsNavIcon },
   { href: '/companion', label: 'Companion', icon: MessageCircle },
+  { href: '/settings', label: 'Settings', icon: SettingsNavIcon },
 ];
 
 /** When user is on one of these pages, bottom tab always navigates to href (don't lock). */
