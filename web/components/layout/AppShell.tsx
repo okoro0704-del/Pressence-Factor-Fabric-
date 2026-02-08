@@ -16,9 +16,9 @@ import { getVitalizationStatus, DEVICE_NOT_ANCHORED_MESSAGE } from '@/lib/vitali
 import { getCitizenStatusForPhone } from '@/lib/supabaseTelemetry';
 import { getIdentityAnchorPhone } from '@/lib/sentinelActivation';
 
-/** Bottom bar: only Elections / Voting (all other items removed). */
+/** Bottom bar: Elections / Voting (inside Treasury). */
 const NAV = [
-  { href: '/government/elections', label: 'Elections / Voting', icon: Vote },
+  { href: '/treasury', label: 'Elections / Voting', icon: Vote },
 ];
 
 /** When user is on one of these pages, bottom tab always navigates to href (don't lock). */
