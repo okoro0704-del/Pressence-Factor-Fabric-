@@ -18,6 +18,9 @@ import { calculateAge } from './phoneIdentity';
 /** Variance threshold — 30% more lenient for standard indoor lighting (0.5% → 0.65%). */
 export const UNIVERSAL_VARIANCE_THRESHOLD = 0.65;
 
+/** During 9-day Vitalization Ritual: 60% confidence (variance <= 40). */
+export const LEARNING_MODE_VARIANCE_THRESHOLD = 40;
+
 export interface IdentityAnchor {
   phone_number: string;
   anchor_type: 'PHONE_INPUT' | 'GENESIS_QR';
@@ -240,7 +243,8 @@ export function isBiometricQuorumSatisfied(
 export async function verifyUniversalIdentity(
   anchor: IdentityAnchor,
   biometricDataOrLayerResults: unknown | BiometricLayerResults,
-  liveAudioData?: unknown
+  liveAudioData?: unknown,
+  options?: { learningMode?: boolean }
 ): Promise<UniversalIdentityResult> {
   try {
     const anchorResult = await fetchIdentityAnchor(anchor.phone_number);
@@ -289,11 +293,14 @@ export async function verifyUniversalIdentity(
 
     // Legacy path: single-layer check (backward compat)
     const variance = 0.2;
-    if (variance > UNIVERSAL_VARIANCE_THRESHOLD) {
+    const threshold = options?.learningMode ? LEARNING_MODE_VARIANCE_THRESHOLD : UNIVERSAL_VARIANCE_THRESHOLD;
+    if (variance > threshold) {
       return {
         success: false,
         variance,
-        error: `Biometric variance ${variance.toFixed(2)}% exceeds 0.5% threshold.`,
+        error: options?.learningMode
+          ? `Biometric variance ${variance.toFixed(2)}% exceeds ${LEARNING_MODE_VARIANCE_THRESHOLD}% Learning Mode threshold.`
+          : `Biometric variance ${variance.toFixed(2)}% exceeds 0.5% threshold.`,
       };
     }
     if (!vocalExempt && liveAudioData && targetIdentity.voice_print_hash) {

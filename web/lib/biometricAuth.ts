@@ -91,7 +91,8 @@ const VOICE_NOISE_HIGH_THRESHOLD = 0.35;
  * REQUIRES IDENTITY ANCHOR (phone number) before scan
  */
 export async function verifyBiometricSignature(
-  identityAnchorPhone?: string
+  identityAnchorPhone?: string,
+  options?: { learningMode?: boolean }
 ): Promise<{ success: boolean; credential?: any; identity?: any; variance?: number; error?: string }> {
   try {
     // IDENTITY ANCHOR REQUIRED
@@ -170,7 +171,7 @@ export async function verifyBiometricSignature(
       timestamp: new Date().toISOString()
     };
 
-    const matchResult = await verifyUniversalIdentity(anchor, credentialForHash);
+    const matchResult = await verifyUniversalIdentity(anchor, credentialForHash, undefined, { learningMode: options?.learningMode });
 
     if (!matchResult.success) {
       return {
@@ -1134,6 +1135,8 @@ export interface ResolveSovereignOptions {
   palmVerificationPromise?: Promise<void>;
   /** Resume after GPS timeout: Pillars 1–3 already verified, only run GPS. Saves re-scanning palm. */
   resumePillars123?: boolean;
+  /** 9-Day Vitalization Ritual: use 60% confidence instead of 99%; collect data but allow pass. */
+  learningMode?: boolean;
 }
 
 /** SOVEREIGN THRESHOLD: minimum layers that must pass to grant access (3-out-of-4 quorum) */
@@ -1158,6 +1161,7 @@ export async function resolveSovereignByPresence(
   const skipDevicePillarForMobile = options?.skipDevicePillarForMobile === true;
   const palmVerificationPromise = options?.palmVerificationPromise;
   const resumePillars123 = options?.resumePillars123 === true;
+  const learningMode = options?.learningMode === true;
   const useGpsPillar = ENABLE_GPS_AS_FOURTH_PILLAR;
 
   const fail = (layer: AuthLayer | null, message: string, timedOut?: boolean, twoPillarsOnly?: boolean): BiometricAuthResult => ({
@@ -1249,7 +1253,7 @@ export async function resolveSovereignByPresence(
     if (useGpsPillar) onProgress?.(AuthLayer.GPS_LOCATION, AuthStatus.SCANNING);
     if (palmVerificationPromise) onProgress?.(AuthLayer.SOVEREIGN_PALM, AuthStatus.SCANNING);
 
-    const bioP = verifyBiometricSignature(identityAnchorPhone).then((r) => {
+    const bioP = verifyBiometricSignature(identityAnchorPhone, { learningMode }).then((r) => {
       state.bio = r;
       if (r.success && r.credential != null) onPillarComplete?.('face');
       return r;

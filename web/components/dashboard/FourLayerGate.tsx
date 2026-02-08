@@ -87,6 +87,7 @@ import { getAssertion, isWebAuthnSupported } from '@/lib/webauthn';
 import { getLinkedMobileDeviceId } from '@/lib/phoneIdBridge';
 import { useSoftStart, incrementTrustLevel } from '@/lib/trustLevel';
 import { recordDailyScan, getVitalizationStatus, DAILY_UNLOCK_VIDA_AMOUNT } from '@/lib/vitalizationRitual';
+import { LEARNING_MODE_DAYS, getLearningModeMessage, LEDGER_SYNC_MESSAGE } from '@/lib/learningMode';
 import { getBiometricStrictness, strictnessToConfig } from '@/lib/biometricStrictness';
 import dynamic from 'next/dynamic';
 import { verifyOrEnrollPalm } from '@/lib/palmHashProfile';
@@ -107,7 +108,7 @@ const DualVitalizationCapture = dynamic(
 import { DailyUnlockCelebration } from '@/components/dashboard/DailyUnlockCelebration';
 import { useSovereignCompanion } from '@/contexts/SovereignCompanionContext';
 import { getNativeAppUrl } from '@/lib/appStoreUrls';
-import { IS_PUBLIC_REVEAL, isVettedUser } from '@/lib/publicRevealAccess';
+import { IS_PUBLIC_REVEAL, isVettedUser, isArchitect } from '@/lib/publicRevealAccess';
 import { ENABLE_GPS_AS_FOURTH_PILLAR, ENABLE_DUAL_VITALIZATION_CAPTURE } from '@/lib/constants';
 import { recordClockIn, getLastClockInCoords } from '@/lib/workPresence';
 import { QuadPillarGrid } from '@/components/dashboard/QuadPillarShield';
@@ -205,6 +206,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     type: MismatchEventType;
     variance: number;
     similarity: number;
+    useSoftMessage?: boolean;
   } | null>(null);
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>(SessionStatus.NO_SESSION);
   const [showAwaitingAuth, setShowAwaitingAuth] = useState(false);
@@ -297,6 +299,10 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
   const [architectMode, setArchitectMode] = useState(false);
   /** Face Pulse fail count: after 2 failures show "Use Backup Anchor" (Sovereign Palm + Device ID only). */
   const [faceFailCount, setFaceFailCount] = useState(0);
+  /** 9-Day Learning Mode: when streak < 9, failed verification does NOT block; show soft message. */
+  const learningModeRef = useRef<{ active: boolean; day: number }>({ active: false, day: 1 });
+  /** Show Learning Mode message instead of BiologicalMismatchScreen when in grace period. */
+  const [showLearningModeMessage, setShowLearningModeMessage] = useState(false);
   /** Biometric sensitivity for Architect Vision: from profile slider; overridden by soft-start (streak < 10 or first run) to 0.3 / no brightness. */
   const [visionConfidenceThreshold, setVisionConfidenceThreshold] = useState(0.3);
   const [visionEnforceBrightness, setVisionEnforceBrightness] = useState(false);
@@ -394,6 +400,9 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     setCurrentLayer(null);
     setShowTimeoutBypass(false);
     setShowVerifyFromAuthorizedDevice(false);
+    setShowMismatchScreen(false);
+    setMismatchData(null);
+    setShowLearningModeMessage(false);
     setGpsTakingLong(false);
     try {
       if (typeof localStorage !== 'undefined') {
@@ -668,7 +677,15 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     setResult(null);
     setShowVerifyFromAuthorizedDevice(false);
     setShowTimeoutBypass(false);
+    setShowMismatchScreen(false);
+    setMismatchData(null);
+    setShowLearningModeMessage(false);
     setGpsTakingLong(false);
+    const vitalizationStatus = await getVitalizationStatus(identityAnchor.phone);
+    const streak = vitalizationStatus?.streak ?? 0;
+    const isLearningMode = streak < LEARNING_MODE_DAYS;
+    const learningModeDay = Math.min(Math.max(1, streak), LEARNING_MODE_DAYS);
+    learningModeRef.current = { active: isLearningMode, day: learningModeDay };
     setPillarFace(resumePillars?.face ?? false);
     setPillarPalm(resumePillars?.palm ?? false);
     setPillarDevice(resumePillars?.device ?? false);
@@ -751,6 +768,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
         requestLocationFirstForMobile: ENABLE_GPS_AS_FOURTH_PILLAR && effectiveMobile,
         palmVerificationPromise: resumePillars ? Promise.resolve() : palmPromise,
         resumePillars123: resumePillars != null && ENABLE_GPS_AS_FOURTH_PILLAR,
+        learningMode: learningModeRef.current.active,
         onPillarComplete: (pillar: PresencePillar) => {
           if (typeof console !== 'undefined' && console.log) {
             console.log(`[QuadPillar] Pillar verified: ${pillar}`);
@@ -842,28 +860,34 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
         authResult.layersPassed?.includes(AuthLayer.SOVEREIGN_PALM);
       const gpsFailed = ENABLE_GPS_AS_FOURTH_PILLAR && !authResult.layersPassed?.includes(AuthLayer.GPS_LOCATION);
       const useEarthAnchorMsg = faceAndPalmPassed && gpsFailed && (authResult.manualVerificationRequired || authResult.timedOut);
-      const errorMsg = useEarthAnchorMsg ? GPS_EARTH_ANCHOR_SEARCHING_MESSAGE : (authResult.errorMessage || '');
+      const rawError = useEarthAnchorMsg ? GPS_EARTH_ANCHOR_SEARCHING_MESSAGE : (authResult.errorMessage || '');
+      const isDnaOrBiologicalError = /DNA|Architect|biological|Template does not match|face.*match|mismatch/i.test(rawError);
+      const errorMsg = isDnaOrBiologicalError ? LEDGER_SYNC_MESSAGE : rawError;
       let mismatchType = MismatchEventType.BIOLOGICAL_HASH_MISMATCH;
 
-      if (errorMsg.includes('twin') || errorMsg.includes('Twin')) {
+      if (errorMsg.includes('twin') || rawError.includes('twin') || rawError.includes('Twin')) {
         mismatchType = MismatchEventType.TWIN_DETECTED;
-      } else if (errorMsg.includes('family') || errorMsg.includes('Family')) {
+      } else if (errorMsg.includes('family') || rawError.includes('family') || rawError.includes('Family')) {
         mismatchType = MismatchEventType.FAMILY_MEMBER_DETECTED;
-      } else if (errorMsg.includes('harmonic') || errorMsg.includes('Harmonic')) {
+      } else if (errorMsg.includes('harmonic') || rawError.includes('harmonic') || rawError.includes('Harmonic')) {
         mismatchType = MismatchEventType.VOCAL_HARMONIC_MISMATCH;
       }
 
       // Extract variance from error message (if available)
-      const varianceMatch = errorMsg.match(/(\d+\.\d+)%/);
+      const varianceMatch = rawError.match(/(\d+\.?\d*)%/);
       const variance = varianceMatch ? parseFloat(varianceMatch[1]) : 5.0;
 
-      // Show biological mismatch screen
-      setMismatchData({
-        type: mismatchType,
-        variance,
-        similarity: 100 - variance,
-      });
-      setShowMismatchScreen(true);
+      if (learningModeRef.current.active) {
+        setShowLearningModeMessage(true);
+      } else {
+        setMismatchData({
+          type: mismatchType,
+          variance,
+          similarity: 100 - variance,
+          useSoftMessage: isDnaOrBiologicalError,
+        });
+        setShowMismatchScreen(true);
+      }
     }
     } finally {
       biometricPendingRef.current = false;
@@ -1529,6 +1553,60 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     );
   }
 
+  // 9-Day Learning Mode: vibration mismatch — show soft message instead of blocking
+  if (showLearningModeMessage) {
+    const day = learningModeRef.current.day;
+    return (
+      <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center p-4">
+        <div
+          className="absolute inset-0 opacity-20 pointer-events-none"
+          style={{ background: 'radial-gradient(circle at center, rgba(212, 175, 55, 0.3) 0%, rgba(5, 5, 5, 0) 70%)' }}
+          aria-hidden
+        />
+        <div
+          className="relative z-10 rounded-2xl border-2 p-8 max-w-md w-full text-center"
+          style={{
+            background: 'linear-gradient(180deg, rgba(30, 28, 22, 0.98) 0%, rgba(15, 14, 10, 0.99) 100%)',
+            borderColor: 'rgba(212, 175, 55, 0.6)',
+          }}
+        >
+          <p className="text-2xl mb-4" style={{ color: '#D4AF37' }}>
+            ✨ AI is Learning Mode
+          </p>
+          <p className="text-sm text-[#a0a0a5] mb-6">
+            {getLearningModeMessage(day)}
+          </p>
+          <div className="flex flex-col gap-3">
+            {faceFailCount >= 2 && isArchitect() && (
+              <button
+                type="button"
+                onClick={() => {
+                  setShowLearningModeMessage(false);
+                  goToDashboard();
+                }}
+                className="w-full py-3 rounded-xl border-2 border-[#D4AF37] text-[#D4AF37] font-bold uppercase tracking-wider hover:bg-[#D4AF37]/10"
+              >
+                Sovereign Manual Bypass
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setShowLearningModeMessage(false);
+                resetVerification();
+                handleStartAuthentication();
+              }}
+              className="w-full py-4 rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#C9A227] text-black font-bold uppercase tracking-wider"
+              style={{ boxShadow: '0 0 30px rgba(212, 175, 55, 0.5)' }}
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Show biological mismatch screen
   if (showMismatchScreen && mismatchData) {
     return (
@@ -1537,7 +1615,15 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
         variance={mismatchData.variance}
         similarityScore={mismatchData.similarity}
         accountOwnerName={identityAnchor?.name}
+        useSoftMessage={mismatchData.useSoftMessage}
         onDismiss={handleMismatchDismiss}
+        onRetry={() => {
+          handleMismatchDismiss();
+          resetVerification();
+          handleStartAuthentication();
+        }}
+        showSovereignManualBypass={faceFailCount >= 2 && isArchitect()}
+        onSovereignManualBypass={goToDashboard}
       />
     );
   }
@@ -2119,6 +2205,15 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
               </p>
             )}
             <div className="flex flex-col gap-4 py-4">
+              {faceFailCount >= 2 && isArchitect() && (
+                <button
+                  type="button"
+                  onClick={goToDashboard}
+                  className="relative z-50 w-full min-h-[48px] py-3 rounded-lg font-bold uppercase tracking-wider transition-all duration-200 cursor-pointer border-2 border-[#D4AF37] text-[#D4AF37] touch-manipulation hover:bg-[#D4AF37]/10"
+                >
+                  Sovereign Manual Bypass
+                </button>
+              )}
               {faceFailCount >= 2 && (
                 <button
                   type="button"
@@ -2214,7 +2309,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
         verificationSuccess={architectVerificationSuccess}
         onComplete={handleArchitectVisionComplete}
         isMasterArchitectInit={isFirstRun || softStart}
-        confidenceThreshold={visionConfidenceThreshold}
+        confidenceThreshold={learningModeRef.current.active ? 0.6 : visionConfidenceThreshold}
         enforceBrightnessCheck={visionEnforceBrightness}
       />
 

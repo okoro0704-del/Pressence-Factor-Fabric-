@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { JetBrains_Mono } from 'next/font/google';
 import { MismatchEventType } from '@/lib/identityMismatchDetection';
+import { LEDGER_SYNC_MESSAGE } from '@/lib/learningMode';
 
 const jetbrains = JetBrains_Mono({ weight: ['400', '600', '700'], subsets: ['latin'] });
 
@@ -11,7 +12,11 @@ interface BiologicalMismatchScreenProps {
   variance: number;
   similarityScore: number;
   accountOwnerName?: string;
+  useSoftMessage?: boolean;
   onDismiss?: () => void;
+  onRetry?: () => void;
+  showSovereignManualBypass?: boolean;
+  onSovereignManualBypass?: () => void;
 }
 
 export function BiologicalMismatchScreen({
@@ -19,7 +24,11 @@ export function BiologicalMismatchScreen({
   variance,
   similarityScore,
   accountOwnerName,
+  useSoftMessage = false,
   onDismiss,
+  onRetry,
+  showSovereignManualBypass = false,
+  onSovereignManualBypass,
 }: BiologicalMismatchScreenProps) {
   const [countdown, setCountdown] = useState(60);
 
@@ -52,6 +61,7 @@ export function BiologicalMismatchScreen({
   };
 
   const getDescription = () => {
+    if (useSoftMessage) return LEDGER_SYNC_MESSAGE;
     switch (mismatchType) {
       case MismatchEventType.TWIN_DETECTED:
         return 'Your facial structure shows high similarity to the account owner, but your unique biological markers (pores, bone structure, ocular distances) do not match.';
@@ -60,7 +70,7 @@ export function BiologicalMismatchScreen({
       case MismatchEventType.VOCAL_HARMONIC_MISMATCH:
         return 'Your vocal tract resonance and harmonic peaks do not match the account owner. Even siblings have unique vocal signatures.';
       default:
-        return 'Your biological signature does not match the account owner. Access to this Sovereign Vault is denied.';
+        return LEDGER_SYNC_MESSAGE;
     }
   };
 
@@ -185,13 +195,36 @@ export function BiologicalMismatchScreen({
           </div>
 
           {/* Countdown */}
-          <div className="text-center">
+          <div className="text-center mb-6">
             <p className="text-sm mb-2" style={{ color: '#6b6b70' }}>
               Portal locked. Retry in:
             </p>
             <p className="text-4xl font-black" style={{ color: '#ef4444' }}>
               {countdown}s
             </p>
+          </div>
+
+          {/* Retry / Sovereign Manual Bypass */}
+          <div className="flex flex-col gap-3">
+            {showSovereignManualBypass && onSovereignManualBypass && (
+              <button
+                type="button"
+                onClick={onSovereignManualBypass}
+                className="w-full py-3 rounded-lg border-2 border-[#D4AF37] text-[#D4AF37] font-bold uppercase tracking-wider hover:bg-[#D4AF37]/10"
+              >
+                Sovereign Manual Bypass
+              </button>
+            )}
+            {onRetry && (
+              <button
+                type="button"
+                onClick={onRetry}
+                className="w-full py-3 rounded-lg bg-[#D4AF37] text-black font-bold uppercase tracking-wider hover:opacity-90"
+                style={{ boxShadow: '0 0 20px rgba(212, 175, 55, 0.5)' }}
+              >
+                Retry
+              </button>
+            )}
           </div>
         </div>
 
