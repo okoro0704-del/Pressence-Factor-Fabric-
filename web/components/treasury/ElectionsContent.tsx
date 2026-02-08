@@ -21,13 +21,15 @@ interface ElectionRow {
 export interface ElectionsContentProps {
   /** When true, header shows Wallet link instead of Treasury (used when embedded in /treasury). */
   insideTreasury?: boolean;
+  /** When true, render only the content sections (no full-page main/header). Used at bottom of Treasury page. */
+  embedded?: boolean;
 }
 
 /**
  * Elections / Voting UI — National Referendum list and launch.
  * Used inside Treasury page and on /government/elections.
  */
-export function ElectionsContent({ insideTreasury = false }: ElectionsContentProps) {
+export function ElectionsContent({ insideTreasury = false, embedded = false }: ElectionsContentProps) {
   const [elections, setElections] = useState<ElectionRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -106,45 +108,8 @@ export function ElectionsContent({ insideTreasury = false }: ElectionsContentPro
     }
   };
 
-  return (
-    <main className="min-h-screen bg-[#050505] text-[#f5f5f5] relative">
-      <header className="relative z-10 border-b border-[#2a2a2e] bg-[#0d0d0f]/95 backdrop-blur px-4 py-4">
-        <div className="max-w-4xl mx-auto flex items-center justify-between flex-wrap gap-3">
-          <div>
-            <h1 className="text-xl font-bold bg-gradient-to-r from-[#D4AF37] to-[#e8c547] bg-clip-text text-transparent tracking-tight">
-              Elections / Voting
-            </h1>
-            <p className="text-xs text-[#6b6b70] mt-0.5">
-              National Referendum · One person, one vote
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            {insideTreasury ? (
-              <Link
-                href="/wallet"
-                className="text-sm font-medium text-[#D4AF37] hover:text-[#e8c547] transition-colors"
-              >
-                Wallet →
-              </Link>
-            ) : (
-              <Link
-                href="/treasury"
-                className="text-sm font-medium text-[#D4AF37] hover:text-[#e8c547] transition-colors"
-              >
-                Treasury →
-              </Link>
-            )}
-            <Link
-              href="/dashboard"
-              className="text-sm font-medium text-[#D4AF37] hover:text-[#e8c547] transition-colors"
-            >
-              ← Dashboard
-            </Link>
-          </div>
-        </div>
-      </header>
-
-      <div className="relative z-10 max-w-4xl mx-auto p-4 md:p-6 space-y-6">
+  const content = (
+    <div className={embedded ? 'space-y-6' : 'relative z-10 max-w-4xl mx-auto p-4 md:p-6 space-y-6'}>
         {message && (
           <div
             className={`p-4 rounded-lg border text-sm ${
@@ -278,7 +243,59 @@ export function ElectionsContent({ insideTreasury = false }: ElectionsContentPro
             </div>
           )}
         </section>
-      </div>
+    </div>
+  );
+
+  if (embedded) {
+    return (
+      <section className="mt-10 pt-8 border-t border-[#2a2a2e]">
+        <h2 className="text-lg font-bold uppercase tracking-wider mb-2" style={{ color: '#D4AF37' }}>
+          Elections / Voting · National Referendum
+        </h2>
+        <p className="text-xs text-[#6b6b70] mb-6">Launch referendums and view elections. One person, one vote.</p>
+        {content}
+      </section>
+    );
+  }
+
+  return (
+    <main className="min-h-screen bg-[#050505] text-[#f5f5f5] relative">
+      <header className="relative z-10 border-b border-[#2a2a2e] bg-[#0d0d0f]/95 backdrop-blur px-4 py-4">
+        <div className="max-w-4xl mx-auto flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h1 className="text-xl font-bold bg-gradient-to-r from-[#D4AF37] to-[#e8c547] bg-clip-text text-transparent tracking-tight">
+              Elections / Voting
+            </h1>
+            <p className="text-xs text-[#6b6b70] mt-0.5">
+              National Referendum · One person, one vote
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            {insideTreasury ? (
+              <Link
+                href="/wallet"
+                className="text-sm font-medium text-[#D4AF37] hover:text-[#e8c547] transition-colors"
+              >
+                Wallet →
+              </Link>
+            ) : (
+              <Link
+                href="/treasury"
+                className="text-sm font-medium text-[#D4AF37] hover:text-[#e8c547] transition-colors"
+              >
+                Treasury →
+              </Link>
+            )}
+            <Link
+              href="/dashboard"
+              className="text-sm font-medium text-[#D4AF37] hover:text-[#e8c547] transition-colors"
+            >
+              ← Dashboard
+            </Link>
+          </div>
+        </div>
+      </header>
+      {content}
     </main>
   );
 }

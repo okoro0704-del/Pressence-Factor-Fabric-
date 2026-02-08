@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
 import { SovereignPulseBar } from '@/components/dashboard/SovereignPulseBar';
 import { NationalReserveCharts } from '@/components/dashboard/NationalReserveCharts';
 import { NationalBlockCommand } from '@/components/dashboard/NationalBlockCommand';
@@ -157,16 +156,6 @@ export function NationalTreasuryContent() {
               )}
             </div>
           </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-4">
-          <Link
-            href="/government/elections/"
-            className="text-sm font-bold uppercase tracking-wider"
-            style={{ color: GOLD }}
-          >
-            Elections / Voting →
-          </Link>
         </div>
 
         <NationalReserveCharts />
