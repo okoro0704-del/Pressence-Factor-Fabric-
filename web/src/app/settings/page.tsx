@@ -12,6 +12,7 @@ import { getCompositeDeviceFingerprint } from '@/lib/biometricAuth';
 import { getTrustLevel, shouldSuggestSovereignShield } from '@/lib/trustLevel';
 import { requestTerminateSession } from '@/lib/deviceTerminateSession';
 import { clearVitalizationComplete } from '@/lib/vitalizationState';
+import { resetBiometrics } from '@/lib/resetBiometrics';
 
 const GOLD = '#D4AF37';
 
@@ -20,6 +21,8 @@ export default function SettingsPage() {
   const [phone, setPhone] = useState<string | null>(null);
   const [currentDeviceId, setCurrentDeviceId] = useState<string | null>(null);
   const [trustLevel, setTrustLevel] = useState<number>(0);
+  const [resettingBiometrics, setResettingBiometrics] = useState(false);
+  const [resetBiometricsMessage, setResetBiometricsMessage] = useState<string | null>(null);
 
   useEffect(() => {
     setPhone(getIdentityAnchorPhone());
@@ -94,6 +97,46 @@ export default function SettingsPage() {
             </p>
           </div>
 
+          <div className="rounded-xl border p-4" style={{ borderColor: 'rgba(212, 175, 55, 0.3)' }}>
+            <h2 className="text-sm font-semibold uppercase tracking-wider mb-2" style={{ color: GOLD }}>
+              Reset Biometrics
+            </h2>
+            <p className="text-sm text-[#a0a0a5] mb-3">
+              Clear primary sentinel device and stored face hashes so you can re-enroll (e.g. new device or re-scan).
+            </p>
+            {resetBiometricsMessage && (
+              <p className={`text-sm mb-3 ${resetBiometricsMessage.startsWith('✓') ? 'text-green-400' : 'text-red-400'}`}>
+                {resetBiometricsMessage}
+              </p>
+            )}
+            <button
+              type="button"
+              disabled={resettingBiometrics}
+              onClick={async () => {
+                const anchor = getIdentityAnchorPhone();
+                if (!anchor) {
+                  setResetBiometricsMessage('No identity anchor in session. Complete the gate first.');
+                  return;
+                }
+                if (!confirm('Reset My Biometrics will clear your primary device and face hashes. You will need to complete verification again. Continue?')) return;
+                setResettingBiometrics(true);
+                setResetBiometricsMessage(null);
+                const result = await resetBiometrics(anchor);
+                setResettingBiometrics(false);
+                if (result.ok) {
+                  localStorage.clear();
+                  sessionStorage.clear();
+                  window.location.href = '/vitalization?reset=1';
+                  return;
+                }
+                setResetBiometricsMessage(result.error ?? 'Reset failed.');
+              }}
+              className="px-4 py-2 rounded-lg border border-amber-500/50 text-amber-400 hover:bg-amber-500/10 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {resettingBiometrics ? 'Resetting…' : 'Reset My Biometrics'}
+            </button>
+          </div>
+
           {phone && (
             <div className="rounded-xl border p-4" style={{ borderColor: 'rgba(212, 175, 55, 0.3)' }}>
               <h2 className="text-sm font-semibold uppercase tracking-wider mb-2" style={{ color: GOLD }}>
@@ -130,10 +173,10 @@ export default function SettingsPage() {
 
         <div className="mt-8">
           <Link
-            href="/dashboard"
+            href="/wallet/"
             className="text-sm text-[#6b6b70] hover:text-[#e8c547] transition-colors"
           >
-            ← Back to Dashboard
+            ← Back to Wallet
           </Link>
         </div>
       </main>

@@ -41,12 +41,7 @@
 
 # Root serves Public Sovereign Portal (no redirect needed - index.tsx handles it)
 
-# SPA routing fallback
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
-  force = false
+# Do not use catch-all to index.html — static export has per-route index.html files.
 
 # Security headers (including biometric camera and microphone for PFF / SOVRYN Companion)
 [[headers]]

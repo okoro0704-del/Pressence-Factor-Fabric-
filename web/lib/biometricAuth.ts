@@ -94,7 +94,7 @@ const VOICE_NOISE_HIGH_THRESHOLD = 0.35;
  */
 export async function verifyBiometricSignature(
   identityAnchorPhone?: string,
-  options?: { learningMode?: boolean }
+  options?: { learningMode?: boolean; useSovereignHashOnly?: boolean }
 ): Promise<{ success: boolean; credential?: any; identity?: any; variance?: number; error?: string }> {
   try {
     // IDENTITY ANCHOR REQUIRED
@@ -105,48 +105,44 @@ export async function verifyBiometricSignature(
       };
     }
 
-    // Check if WebAuthn is supported
-    if (!window.PublicKeyCredential) {
-      return { success: false, error: 'WebAuthn not supported on this device' };
-    }
+    // Passkey bypass: use internal Sovereign Hash only (no browser passkey pop-up)
+    const useSovereignHashOnly = options?.useSovereignHashOnly === true;
 
-    // Check for platform authenticator (Face/Fingerprint)
-    const biometricAvailable = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
-
-    if (!biometricAvailable) {
-      return { success: false, error: 'No biometric authenticator available' };
-    }
-
-    // Activate camera/biometric: try real WebAuthn get() to get assertion (triggers platform face/fingerprint).
-    // onFacesDetected equivalent: we derive a Base64-safe mathematical hash from the credential and persist as face_hash.
     let credentialForHash: { id?: string; rawId?: ArrayBuffer | Uint8Array; response?: { clientDataJSON?: ArrayBuffer | Uint8Array; authenticatorData?: ArrayBuffer | Uint8Array } } | undefined = undefined;
-    try {
-      const challenge = new Uint8Array(32);
-      if (typeof crypto !== 'undefined' && crypto.getRandomValues) crypto.getRandomValues(challenge);
-      const options: CredentialRequestOptions = {
-        publicKey: {
-          challenge,
-          timeout: 60000,
-          userVerification: 'required',
-          allowCredentials: [],
-        },
-      };
-      const cred = await navigator.credentials.get(options);
-      const pkCred = cred as PublicKeyCredential | null;
-      if (pkCred?.rawId && pkCred.response) {
-        const authResp = pkCred.response as AuthenticatorAssertionResponse;
-        credentialForHash = {
-          id: pkCred.id,
-          rawId: pkCred.rawId,
-          response: {
-            clientDataJSON: authResp.clientDataJSON,
-            authenticatorData: authResp.authenticatorData,
-          },
-        };
+
+    if (!useSovereignHashOnly && typeof window !== 'undefined' && window.PublicKeyCredential) {
+      const biometricAvailable = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+      if (biometricAvailable) {
+        try {
+          const challenge = new Uint8Array(32);
+          if (typeof crypto !== 'undefined' && crypto.getRandomValues) crypto.getRandomValues(challenge);
+          const reqOptions: CredentialRequestOptions = {
+            publicKey: {
+              challenge,
+              timeout: 60000,
+              userVerification: 'required',
+              allowCredentials: [],
+            },
+          };
+          const cred = await navigator.credentials.get(reqOptions);
+          const pkCred = cred as PublicKeyCredential | null;
+          if (pkCred?.rawId && pkCred.response) {
+            const authResp = pkCred.response as AuthenticatorAssertionResponse;
+            credentialForHash = {
+              id: pkCred.id,
+              rawId: pkCred.rawId,
+              response: {
+                clientDataJSON: authResp.clientDataJSON,
+                authenticatorData: authResp.authenticatorData,
+              },
+            };
+          }
+        } catch (_) {
+          // No passkey / user cancelled; fall through to Sovereign Hash
+        }
       }
-    } catch (_) {
-      // Fallback: no real credential (e.g. no existing key); use deterministic hash from phone + timestamp.
     }
+
     if (!credentialForHash) {
       const ts = Date.now();
       const randomBytes = new Uint8Array(32);

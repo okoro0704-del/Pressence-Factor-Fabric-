@@ -2,13 +2,10 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { GlobalPresenceGatewayProvider } from '@/contexts/GlobalPresenceGateway';
 import { SovereignSeedProvider } from '@/contexts/SovereignSeedContext';
-import { GhostSessionGuard } from '@/components/GhostSessionGuard';
-import { SovereignSSOListener } from '@/components/dashboard/SovereignSSOListener';
+import { SovereignAuthGuard } from '@/components/dashboard/SovereignAuthGuard';
+import { SovereignCompanionProvider } from '@/contexts/SovereignCompanionContext';
 import { RegisterServiceWorker } from '@/components/RegisterServiceWorker';
 import { BiometricSessionProvider } from '@/contexts/BiometricSessionContext';
-import { SovereignCompanionProvider } from '@/contexts/SovereignCompanionContext';
-import { CompanionEyes } from '@/components/dashboard/CompanionEyes';
-import Script from 'next/script';
 
 /** Force static generation for all routes (consolidate to single static site). */
 export const dynamic = 'force-static';
@@ -63,214 +60,19 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
         <link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192.png" />
         <link rel="apple-touch-icon" sizes="512x512" href="/icons/icon-512.png" />
-
-        {/* CRITICAL BYPASS: Inline script that runs BEFORE React loads */}
-        <Script
-          id="critical-bypass-pre-react"
-          strategy="beforeInteractive"
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                // ROOT DEVICE IDENTIFIERS - DUAL-HASH RECOGNITION
-                const AUTHORIZED_DEVICE_IDS = [
-                  'HP-LAPTOP-ROOT-SOVEREIGN-001', // Legacy laptop identifier
-                  'DEVICE-3B5B738BB',              // Modern device fingerprint
-                ];
-
-                const AUTHORIZED_HARDWARE_HASHES = [
-                  '8423250efbaecab0f28237786161709d794c71deb0dcfb8ebd92b14e1cc643db', // Legacy laptop hash
-                  'ed14836c09db1ddf316404fd39df41f9869494d428a5859e4419825dc8ea6dfd', // Modern hardware hash
-                ];
-
-                const SOVEREIGN_COOKIE_KEY = 'PFF_SOVEREIGN_COOKIE';
-                const COOKIE_EXPIRY_DAYS = 365;
-
-                // Check for valid Sovereign Cookie
-                function hasSovereignCookie() {
-                  try {
-                    var cookieStr = localStorage.getItem(SOVEREIGN_COOKIE_KEY);
-                    if (!cookieStr) return false;
-
-                    var cookie = JSON.parse(cookieStr);
-                    var now = Date.now();
-
-                    if (cookie.granted && cookie.expiry > now) {
-                      return true;
-                    }
-
-                    localStorage.removeItem(SOVEREIGN_COOKIE_KEY);
-                    return false;
-                  } catch (err) {
-                    return false;
-                  }
-                }
-
-                // Set Sovereign Cookie
-                function setSovereignCookie() {
-                  try {
-                    var expiryDate = new Date();
-                    expiryDate.setDate(expiryDate.getDate() + COOKIE_EXPIRY_DAYS);
-
-                    var cookieValue = {
-                      granted: true,
-                      timestamp: Date.now(),
-                      expiry: expiryDate.getTime(),
-                    };
-
-                    localStorage.setItem(SOVEREIGN_COOKIE_KEY, JSON.stringify(cookieValue));
-                  } catch (err) {
-                  }
-                }
-
-                // Check if this is a ROOT device
-                try {
-                  // Check for Sovereign Cookie first (fastest path)
-                  var isRootDevice = hasSovereignCookie();
-
-                  if (!isRootDevice) {
-                    const deviceId = localStorage.getItem('device_id');
-                    const hardwareHash = localStorage.getItem('hardware_tpm_hash');
-                    const rootAccess = localStorage.getItem('PFF_ROOT_ACCESS');
-
-                    // Array-based authorization check
-                    isRootDevice = (
-                      (deviceId && AUTHORIZED_DEVICE_IDS.indexOf(deviceId) !== -1) ||
-                      (hardwareHash && AUTHORIZED_HARDWARE_HASHES.indexOf(hardwareHash) !== -1) ||
-                      rootAccess === 'GRANTED' ||
-                      deviceId === 'HP-LAPTOP-ROOT-SOVEREIGN-001' // Legacy fallback
-                    );
-                  }
-
-                  if (isRootDevice) {
-                    // Set Sovereign Cookie for 365-day bypass
-                    setSovereignCookie();
-
-                    // Grant ROOT access
-                    localStorage.setItem('PFF_ROOT_ACCESS', 'GRANTED');
-                    localStorage.setItem('presence_verified', 'true');
-                    localStorage.setItem('device_authorized', 'true');
-                    localStorage.setItem('isLocked', 'false');
-                    localStorage.setItem('isAuthorized', 'true');
-
-                    // Inject CSS to hide ALL lock overlays IMMEDIATELY
-                    const style = document.createElement('style');
-                    style.id = 'critical-bypass-styles';
-                    style.innerHTML = \`
-                      /* CRITICAL BYPASS: Force hide all lock overlays */
-                      [class*="lock"],
-                      [class*="overlay"],
-                      [class*="hoverboard"],
-                      [class*="hover-board"],
-                      [class*="verification"],
-                      [class*="pending"],
-                      [class*="loading-overlay"],
-                      [id*="lock"],
-                      [id*="overlay"],
-                      [id*="hoverboard"],
-                      [id*="hover-board"],
-                      [data-lock],
-                      [data-overlay],
-                      [data-hoverboard] {
-                        display: none !important;
-                        visibility: hidden !important;
-                        opacity: 0 !important;
-                        pointer-events: none !important;
-                        position: absolute !important;
-                        left: -9999px !important;
-                      }
-                    \`;
-                    document.head.appendChild(style);
-
-                    // Continuously purge overlays every 100ms for first 5 seconds
-                    let purgeCount = 0;
-                    const purgeInterval = setInterval(function() {
-                      const selectors = [
-                        '[class*="lock"]',
-                        '[class*="overlay"]',
-                        '[class*="hoverboard"]',
-                        '[id*="lock"]',
-                        '[id*="overlay"]',
-                        '[id*="hoverboard"]'
-                      ];
-
-                      let removed = 0;
-                      selectors.forEach(function(selector) {
-                        const elements = document.querySelectorAll(selector);
-                        elements.forEach(function(el) {
-                          const classList = el.className.toLowerCase();
-                          const id = el.id.toLowerCase();
-
-                          if (
-                            classList.includes('lock') ||
-                            classList.includes('overlay') ||
-                            classList.includes('hoverboard') ||
-                            id.includes('lock') ||
-                            id.includes('overlay') ||
-                            id.includes('hoverboard')
-                          ) {
-                            el.style.display = 'none';
-                            el.style.visibility = 'hidden';
-                            el.style.opacity = '0';
-                            el.style.pointerEvents = 'none';
-                            el.style.position = 'absolute';
-                            el.style.left = '-9999px';
-                            removed++;
-                          }
-                        });
-                      });
-
-                      purgeCount++;
-                      if (purgeCount >= 50) {
-                        clearInterval(purgeInterval);
-                      }
-                    }, 100);
-                  }
-                } catch (err) {
-                }
-              })();
-            `,
-          }}
-        />
-        {/* Schema cache clear: on next reload, clear local state so app fetches new 5 VIDA MINTING CAP structure */}
-        <Script
-          id="pff-schema-cache-clear"
-          strategy="beforeInteractive"
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                var PFF_APP_SCHEMA_VERSION = '5-VIDA-MINTING-1';
-                try {
-                  var stored = typeof localStorage !== 'undefined' ? localStorage.getItem('PFF_APP_SCHEMA_VERSION') : null;
-                  if (stored !== PFF_APP_SCHEMA_VERSION) {
-                    if (typeof localStorage !== 'undefined') {
-                      localStorage.clear();
-                      localStorage.setItem('PFF_APP_SCHEMA_VERSION', PFF_APP_SCHEMA_VERSION);
-                    }
-                    if (typeof sessionStorage !== 'undefined') sessionStorage.clear();
-                  }
-                } catch (e) {
-                }
-              })();
-            `,
-          }}
-        />
       </head>
       <body className="bg-[#0d0d0f] text-[#f5f5f5] antialiased">
         <GlobalPresenceGatewayProvider>
           <BiometricSessionProvider>
-          <SovereignSeedProvider>
-            <SovereignCompanionProvider>
-              <GhostSessionGuard>
-                {/* Sentinel Listener: SSO auth requests + Lock Identity kill-switch */}
-                <SovereignSSOListener />
-                {/* app-root: base layer; overlays when inactive must unmount or use pointer-events-none to avoid dead screen */}
-                <div id="app-root" className="relative z-0 min-h-screen">
-                  {children}
-                </div>
-              </GhostSessionGuard>
-              <CompanionEyes />
-            </SovereignCompanionProvider>
-          </SovereignSeedProvider>
+            <SovereignSeedProvider>
+              <SovereignCompanionProvider>
+                <SovereignAuthGuard>
+                  <div id="app-root" className="relative z-0 min-h-screen">
+                    {children}
+                  </div>
+                </SovereignAuthGuard>
+              </SovereignCompanionProvider>
+            </SovereignSeedProvider>
           </BiometricSessionProvider>
           <RegisterServiceWorker />
         </GlobalPresenceGatewayProvider>

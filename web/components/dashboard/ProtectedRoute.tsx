@@ -1,10 +1,8 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { useRouter, usePathname, useSearchParams } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useGlobalPresenceGateway } from '@/contexts/GlobalPresenceGateway';
-import { getIdentityAnchorPhone } from '@/lib/sentinelActivation';
-import { getMintStatusForPresence, getMintStatus, MINT_STATUS_PENDING_HARDWARE, MINT_STATUS_MINTED } from '@/lib/mintStatus';
 import { getVitalizationStatus, DEVICE_NOT_ANCHORED_MESSAGE, shouldNeverRedirectBack } from '@/lib/vitalizationState';
 import { ROUTES } from '@/lib/constants';
 
@@ -15,19 +13,18 @@ interface ProtectedRouteProps {
 }
 
 /** Hard Navigation Lock: do not redirect to gate while vault/session is hydrating (avoid bounce). */
-const HYDRATION_GRACE_MS = 600;
+const HYDRATION_GRACE_MS = 400;
 
 /**
- * PROTECTED ROUTE WRAPPER — Single source of truth for vitalization state.
- * - no_citizen_record → force /vitalization (registration).
+ * PROTECTED ROUTE — Only redirect for registration state. No liveness/presence/camera.
+ * - no_citizen_record → /vitalization (sign-up).
  * - needs_restore → /vitalization/restore-identity.
- * - vitalized / no_user → then presence check; if not verified, redirect to gate with status message (not error).
+ * - Otherwise: show children. Vitalization required only for sign-in and device-approval.
  */
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { isPresenceVerified, loading, setPresenceVerified } = useGlobalPresenceGateway();
+  const { loading, setPresenceVerified } = useGlobalPresenceGateway();
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   const [isChecking, setIsChecking] = useState(true);
   const [graceElapsed, setGraceElapsed] = useState(false);
   const vitalizationCheckedRef = useRef(false);
@@ -42,12 +39,11 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   }, [pathname]);
 
   useEffect(() => {
-    if (pathname === '/' || loading) return;
+    if (pathname === '/' || !graceElapsed) return;
 
     let cancelled = false;
 
     const run = async () => {
-      // Hard rule: once vitalization is complete, never redirect back except on explicit logout.
       if (shouldNeverRedirectBack()) {
         if (!cancelled) {
           setPresenceVerified(true);
@@ -74,63 +70,32 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
       }
 
       vitalizationCheckedRef.current = true;
-
-      if (isPresenceVerified) {
-        if (!cancelled) setIsChecking(false);
-        return;
-      }
-      const phone = getIdentityAnchorPhone();
-      if (phone) {
-        let allowed = pathname.startsWith('/dashboard');
-        if (!allowed) {
-          const res = await getMintStatusForPresence(phone);
-          if (res.ok && (res.mint_status === MINT_STATUS_PENDING_HARDWARE || res.mint_status === MINT_STATUS_MINTED || res.is_minted)) {
-            allowed = true;
-          } else {
-            const direct = await getMintStatus(phone);
-            if (direct.ok && (direct.mint_status === MINT_STATUS_PENDING_HARDWARE || direct.mint_status === MINT_STATUS_MINTED)) {
-              allowed = true;
-            }
-          }
-        }
-        if (!cancelled && allowed) {
-          setPresenceVerified(true);
-          setIsChecking(false);
-          return;
-        }
-      }
-      if (!graceElapsed) return;
-      if (!cancelled && !isPresenceVerified) {
-        setIsChecking(false);
-        try { sessionStorage.setItem(SOV_STATUS_MESSAGE_KEY, DEVICE_NOT_ANCHORED_MESSAGE); } catch { /* ignore */ }
-        const next = searchParams.get('next') || pathname;
-        const gateUrl = next && next !== '/' ? `/?next=${encodeURIComponent(next)}` : '/';
-        router.replace(gateUrl);
-      } else if (!cancelled) {
-        setIsChecking(false);
-      }
+      setPresenceVerified(true);
+      if (!cancelled) setIsChecking(false);
     };
 
     run();
     return () => { cancelled = true; };
-  }, [isPresenceVerified, loading, pathname, router, searchParams, setPresenceVerified, graceElapsed]);
+  }, [loading, pathname, router, setPresenceVerified, graceElapsed]);
 
-  useEffect(() => {
-    if (isPresenceVerified) setIsChecking(false);
-  }, [isPresenceVerified]);
-
-  if (loading || isChecking) {
+  if (loading && !vitalizationCheckedRef.current) {
     return (
       <div className="min-h-screen bg-[#050505] flex items-center justify-center">
         <div className="text-center space-y-4">
           <div className="w-16 h-16 border-4 border-[#D4AF37] border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-lg text-[#D4AF37] font-semibold">Verifying Presence...</p>
+          <p className="text-lg text-[#D4AF37] font-semibold">Loading…</p>
         </div>
       </div>
     );
   }
 
-  if (!isPresenceVerified) return null;
+  if (isChecking) {
+    return (
+      <div className="min-h-screen bg-[#050505] flex items-center justify-center">
+        <p className="text-sm text-[#6b6b70]">Loading…</p>
+      </div>
+    );
+  }
 
   return <>{children}</>;
 }

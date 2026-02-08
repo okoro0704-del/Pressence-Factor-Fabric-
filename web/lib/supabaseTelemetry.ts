@@ -6,6 +6,7 @@
 
 import { supabase, hasSupabase } from './supabase';
 import { VIDA_USD_VALUE } from './economic';
+import { isMasterOverride } from './masterOverride';
 
 // ============================================================================
 // SOVEREIGN BLOCK EXCHANGE RATES & 10-CAP MASTER MATH
@@ -207,6 +208,32 @@ export async function fetchCitizenVault(): Promise<CitizenVault | null> {
     return citizenVault;
   } catch (err) {
     return null;
+  }
+}
+
+/**
+ * Fetch current user's citizen_status from Supabase (single source of truth for header/body).
+ * Returns 'VITALIZED' when is_minted or face_hash present; else 'PENDING'.
+ * Master Override: when user is Isreal (Architect), always VITALIZED so all devices link to one High-Command profile.
+ */
+export async function getCitizenStatusForPhone(phoneNumber: string | null): Promise<'VITALIZED' | 'PENDING'> {
+  if (!phoneNumber?.trim()) return 'PENDING';
+  if (isMasterOverride(phoneNumber)) return 'VITALIZED';
+  if (!hasSupabase()) return 'PENDING';
+  try {
+    const { data, error } = await (supabase as any)
+      .from('user_profiles')
+      .select('vitalization_status, is_minted, face_hash, full_name')
+      .eq('phone_number', phoneNumber.trim())
+      .maybeSingle();
+    if (error || !data) return 'PENDING';
+    const fullName = (data as { full_name?: string }).full_name;
+    if (typeof fullName === 'string' && /isreal\s+okoro/i.test(fullName)) return 'VITALIZED';
+    if (data.vitalization_status === 'VITALIZED' || data.vitalization_status === 'Master_Vitalization') return 'VITALIZED';
+    if (data.is_minted === true || (data.face_hash && String(data.face_hash).trim())) return 'VITALIZED';
+    return 'PENDING';
+  } catch {
+    return 'PENDING';
   }
 }
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { fetchCitizenVault, getVitalizedCitizensCount, type CitizenVault } from '@/lib/supabaseTelemetry';
+import { fetchCitizenVault, getVitalizedCitizensCount, getCitizenStatusForPhone, type CitizenVault } from '@/lib/supabaseTelemetry';
 import { getCitizenVaultData } from '@/lib/mockDataService';
 import { SendVidaModal } from './SendVidaModal';
 import { VIDASwapModal } from './VIDASwapModal';
@@ -28,6 +28,7 @@ import { CURRENT_POWER_SPENDABLE_USD, CURRENT_POWER_SPENDABLE_VIDA, TOTAL_WEALTH
 import { BETA_LIQUIDITY_TEST, BETA_SPENDABLE_VIDA, BETA_SPENDABLE_USD, SOVRYN_AMM_SWAP_URL } from '@/lib/betaLiquidityTest';
 import { isFaceVerifiedForBalance } from '@/lib/biometricAuth';
 import { getMintStatus, getSpendingUnlocked, getBiometricSpendingActive, MINT_STATUS_MINTED } from '@/lib/mintStatus';
+import { isArchitect } from '@/lib/manifestoUnveiling';
 import { hasFaceAndSeed } from '@/lib/recoverySeedStorage';
 import { SpendingLockModal } from './SpendingLockModal';
 import { TreasuryFacePulseModal } from './TreasuryFacePulseModal';
@@ -44,12 +45,15 @@ export function UserProfileBalance({
   vaultStable = false,
   mintTxHash = null,
   openSwapFromUrl = false,
+  obfuscate = false,
 }: {
   vaultStable?: boolean;
   /** When set (tx mined), show golden checkmark + "5 VIDA MINTED ON BITCOIN LAYER 2". */
   mintTxHash?: string | null;
   /** When true (e.g. /dashboard?openSwap=1), open swap modal and auto-resume with pending amount from sessionStorage. */
   openSwapFromUrl?: boolean;
+  /** When true (Personal Vault privacy), show **** for all balances until Face Scan. */
+  obfuscate?: boolean;
 }) {
   const router = useRouter();
   const [vaultData, setVaultData] = useState<CitizenVault | null>(null);
@@ -82,17 +86,24 @@ export function UserProfileBalance({
 
   /** Total Vitalized Citizens — from DB (user_profiles where is_fully_verified = true). Displays 1 until a new entry is created. */
   const [vitalizedCount, setVitalizedCount] = useState<number>(1);
+  /** Single source of truth: citizen_status from Supabase (sync header & body). */
+  const [citizenStatus, setCitizenStatus] = useState<'VITALIZED' | 'PENDING'>('PENDING');
 
   useEffect(() => {
     async function loadVaultData() {
       setLoading(true);
-      const liveData = await fetchCitizenVault();
-      
+      const phone = getIdentityAnchorPhone();
+      const [liveData, status] = await Promise.all([
+        fetchCitizenVault(),
+        getCitizenStatusForPhone(phone ?? null),
+      ]);
+      setCitizenStatus(status);
       const mockData = liveData || getCitizenVaultData();
+      const displayStatus = status === 'VITALIZED' ? 'VITALIZED' : (mockData.status || 'PENDING');
       setVaultData({
         owner: mockData.owner || 'Isreal Okoro',
         alias: mockData.alias || 'mrfundzman',
-        status: mockData.status || 'VITALIZED',
+        status: displayStatus,
         total_vida_cap_minted: GROSS_SOVEREIGN_GRANT_VIDA,
         personal_share_50: NET_SPENDABLE_VIDA,
         state_contribution_50: NATIONAL_CONTRIBUTION_VIDA,
@@ -127,9 +138,27 @@ export function UserProfileBalance({
     return () => clearInterval(interval);
   }, []);
 
-  // Face-First Security: balance hidden until face match >= 95%
+  // Balance visible immediately when vitalized or Architect (no Daily Pulse required)
   useEffect(() => {
-    const check = () => setFaceVerifiedForBalance(isFaceVerifiedForBalance());
+    const check = async () => {
+      const fromSync = isFaceVerifiedForBalance();
+      if (fromSync) {
+        setFaceVerifiedForBalance(true);
+        return;
+      }
+      if (isArchitect()) {
+        setFaceVerifiedForBalance(true);
+        return;
+      }
+      const phone = getIdentityAnchorPhone();
+      if (phone) {
+        const res = await getBiometricSpendingActive(phone);
+        if (res.ok && res.active) setFaceVerifiedForBalance(true);
+        else setFaceVerifiedForBalance(fromSync);
+      } else {
+        setFaceVerifiedForBalance(fromSync);
+      }
+    };
     check();
     window.addEventListener('focus', check);
     const interval = setInterval(check, 10000);
@@ -219,8 +248,8 @@ export function UserProfileBalance({
     setTimeout(() => setGoldPulseActive(false), 2500);
   };
 
-  /** Protocol Release: unlock when is_fully_verified or face_hash present. After Face Pulse ritual (95%+), also unlock for this session. */
-  const canSpend = spendingUnlocked || biometricSpendingActive || faceVerifiedForBalance;
+  /** Unlock when obfuscate off (no liveness), or spending unlocked, or biometric/face verified. */
+  const canSpend = !obfuscate || spendingUnlocked || biometricSpendingActive || faceVerifiedForBalance;
 
   const handleSwapClick = () => {
     if (!canSpend) {
@@ -234,7 +263,8 @@ export function UserProfileBalance({
     }
   };
 
-  const showBalanceAsMinted = faceVerifiedForBalance || mintedBySeed;
+  /** When obfuscate is false (no liveness gate), always show balance and allow spend. Only sign-in and device-approval require vitalization. */
+  const showBalanceAsMinted = !obfuscate || (faceVerifiedForBalance || mintedBySeed);
 
   const handleSendClick = () => {
     if (!canSpend) {
@@ -292,8 +322,10 @@ export function UserProfileBalance({
             <h3 className="text-lg font-bold text-[#e8c547]">{vaultData.owner}</h3>
             <p className="text-sm text-[#6b6b70]">@{vaultData.alias}</p>
           </div>
-          <div className="px-3 py-1 bg-green-500/20 border border-green-500/30 rounded-full">
-            <span className="text-xs font-semibold text-green-400 uppercase">{vaultData.status}</span>
+          <div className={`px-3 py-1 rounded-full border ${citizenStatus === 'VITALIZED' ? 'bg-green-500/20 border-green-500/30 shadow-[0_0_12px_rgba(34,197,94,0.4)]' : 'bg-[#2a2a2e] border-[#4a4a4e]'}`}>
+            <span className={`text-xs font-semibold uppercase ${citizenStatus === 'VITALIZED' ? 'text-green-400' : 'text-[#8b8b95]'}`}>
+              {citizenStatus === 'VITALIZED' ? 'CITIZEN ACTIVE' : (vaultData.status || 'PENDING')}
+            </span>
           </div>
         </div>
         <div className="pt-4 border-t border-[#2a2a2e]">

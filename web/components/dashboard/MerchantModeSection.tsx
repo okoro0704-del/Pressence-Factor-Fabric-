@@ -14,9 +14,13 @@ import { requestNotificationPermission } from '@/lib/merchantNotifications';
 
 export interface MerchantModeSectionProps {
   onMerchantModeChange?: (enabled: boolean, walletAddress: string | null) => void;
+  /** When true, hide wallet address and QR until face scan (Personal Vault privacy). */
+  obfuscate?: boolean;
+  /** Call when user requests face scan to reveal Merchant QR. */
+  onRequestFaceScan?: () => void;
 }
 
-export function MerchantModeSection({ onMerchantModeChange }: MerchantModeSectionProps) {
+export function MerchantModeSection({ onMerchantModeChange, obfuscate = false, onRequestFaceScan }: MerchantModeSectionProps) {
   const [enabled, setEnabled] = useState(false);
   const [walletAddress, setWalletAddressState] = useState<string | null>(null);
 
@@ -55,13 +59,14 @@ export function MerchantModeSection({ onMerchantModeChange }: MerchantModeSectio
   };
 
   const displayWallet = walletAddress ?? getIdentityAnchorPhone();
-  const showQR = enabled && displayWallet;
+  const showQR = enabled && displayWallet && !obfuscate;
+  const showObfuscated = enabled && obfuscate;
 
   return (
     <section className="rounded-xl border border-[#2a2a2e] bg-[#16161a] p-4 mt-6">
       <h2 className="text-sm font-semibold text-[#c9a227] mb-2">Merchant Mode</h2>
       <p className="text-xs text-[#6b6b70] mb-3">
-        Accept VIDA payments from citizens. When on, a permanent QR linked to your wallet is shown; customers scan to pay from their Sovereign Liquidity (5 VIDA cap).
+        Accept VIDA payments from citizens. When on, your Personal Wallet Address is shown as a high-contrast QR code for instant P2P payments.
       </p>
       <div className="flex items-center gap-3 mb-3">
         <button
@@ -81,12 +86,29 @@ export function MerchantModeSection({ onMerchantModeChange }: MerchantModeSectio
         </button>
         <span className="text-sm text-[#a0a0a5]">{enabled ? 'On' : 'Off'}</span>
       </div>
+      {showObfuscated && (
+        <div className="mt-4 pt-4 border-t border-[#2a2a2e] rounded-xl border-2 border-amber-500/40 bg-amber-500/10 p-4 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+          <span className="text-2xl" aria-hidden>🔒</span>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-amber-200/95">Merchant QR is private</p>
+            <p className="text-xs text-amber-200/80 mt-0.5">Wallet: ****</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => onRequestFaceScan?.()}
+            className="px-4 py-2 rounded-lg bg-amber-500/30 border border-amber-500/50 text-amber-200 font-semibold text-sm hover:bg-amber-500/40 transition-colors cursor-pointer"
+          >
+            Reveal with Face Scan
+          </button>
+        </div>
+      )}
       {showQR && displayWallet && (
         <div className="mt-4 pt-4 border-t border-[#2a2a2e]">
-          <p className="text-xs text-[#6b6b70] mb-2">Payment QR — link to wallet: {displayWallet}</p>
-          <div className="inline-block p-3 bg-white rounded-lg">
-            <MerchantQRCode walletAddress={displayWallet} size={200} />
+          <p className="text-xs text-[#6b6b70] mb-2">Payment QR — Personal Wallet Address (P2P):</p>
+          <div className="inline-block p-4 rounded-lg bg-white border-2 border-[#0d0d0f]" style={{ boxShadow: '0 0 0 4px rgba(212,175,55,0.3)' }}>
+            <MerchantQRCode walletAddress={displayWallet} size={220} highContrast />
           </div>
+          <p className="text-xs font-mono text-[#a0a0a5] mt-2 break-all">{displayWallet}</p>
           <div className="mt-4">
             <MerchantStoreSign walletAddress={displayWallet} />
           </div>

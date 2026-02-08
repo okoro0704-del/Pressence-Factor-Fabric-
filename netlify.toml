@@ -1,21 +1,19 @@
-# PFF — Netlify must BUILD the web app (do not use "Deploy without building" or "Skip builds").
-# If deploy log shows Building: Skipped / Deploying: Skipped, see docs/NETLIFY-FIX-SKIPPED-BUILD.md
-#
-# When this repo is connected to Netlify, base directory must be "web" so build runs there.
-# DEPLOY TO BOTH URLS: One deploy serves BOTH the Netlify app URL and your custom domain.
-# Supabase: add both your custom domain and https://*.netlify.app to Auth URL / Redirect URLs.
+# PFF — Netlify build must run. Set in Netlify UI: Base directory = web, Build command = npm run build, Publish = out.
+# If "Deploy successful" but site not updated: use "Clear cache and deploy" or deploy from CLI (see web/docs/NETLIFY-DEPLOY-FIX.md).
 
 [build]
   base = "web"
   command = "npm run build"
   publish = "out"
-  # Ignore nothing; ensure build runs (Netlify UI must NOT have "Skip builds" enabled)
 
 [build.environment]
-  NODE_VERSION = "20.10.0"
+  NODE_VERSION = "20"
+  CI = "true"
   NEXT_TELEMETRY_DISABLED = "1"
   NETLIFY_NEXT_PLUGIN_SKIP = "true"
   NODE_OPTIONS = "--max-old-space-size=4096"
+  # Force install and build (avoid skip)
+  NPM_FLAGS = "--legacy-peer-deps"
 
 # Required in Netlify UI (Site → Build & deploy → Environment):
 # NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY

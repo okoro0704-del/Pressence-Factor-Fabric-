@@ -3,71 +3,45 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
   Landmark,
-  Vote,
-  Shield,
-  Settings2,
+  Wallet,
   SlidersHorizontal,
   ChevronLeft,
   Menu,
-  Bot,
 } from 'lucide-react';
 import { useTripleTapReset } from '@/lib/useTripleTapReset';
 import { TerminateSessionListener } from '@/components/dashboard/TerminateSessionListener';
-import { shouldShowFullProtocolSync } from '@/lib/publicRevealAccess';
 import { getVitalizationStatus, DEVICE_NOT_ANCHORED_MESSAGE } from '@/lib/vitalizationState';
+import { getCitizenStatusForPhone } from '@/lib/supabaseTelemetry';
+import { getIdentityAnchorPhone } from '@/lib/sentinelActivation';
 
-/** Settings nav icon: use named ref so bundler does not drop it (avoids "SlidersHorizontal is not defined"). */
 const SettingsNavIcon = SlidersHorizontal;
 
-/** Bottom tab bar and sidebar: Dashboard, Treasury, Elections, Master, Command, Settings, Companion (last). Vitalize First: all except Vitalization disabled until is_vitalized. */
+/** Nav: Dashboard (overview), Treasury (country), Wallet (citizen), Settings. */
 const NAV = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/treasury', label: 'Treasury', icon: Landmark },
-  { href: '/government/elections', label: 'Elections', icon: Vote },
-  { href: '/master/dashboard', label: 'Master', icon: Shield },
-  { href: '/master/command-center', label: 'Command', icon: Settings2 },
+  { href: '/wallet', label: 'Wallet', icon: Wallet },
   { href: '/settings', label: 'Settings', icon: SettingsNavIcon },
-  { href: '/companion', label: 'Companion', icon: Bot },
 ];
 
 const VITALIZATION_HREF = '/vitalization';
 
-/**
- * AppShell — Public Gatekeeper: on production domain, only Authorized Identities see full Protocol.
- * If URL is production and user is not authorized, redirect to / (Manifesto & Countdown).
- * Preview URLs (deploy-preview-*) and non-production always show full Protocol. Build-safe (client-only).
- */
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [redirectToManifesto, setRedirectToManifesto] = useState(false);
   const [vitalized, setVitalized] = useState<boolean | null>(null);
   const handleLogoClick = useTripleTapReset();
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (!shouldShowFullProtocolSync()) {
-      setRedirectToManifesto(true);
-      router.replace('/');
-    }
-  }, [router]);
-
-  useEffect(() => {
-    getVitalizationStatus().then((status) => setVitalized(status === 'vitalized'));
+    getCitizenStatusForPhone(getIdentityAnchorPhone()).then((status) => setVitalized(status === 'VITALIZED'));
+    getVitalizationStatus().then((status) => {
+      if (status === 'vitalized') setVitalized(true);
+    });
   }, [pathname]);
-
-  if (redirectToManifesto) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#050505]" style={{ color: '#6b6b70' }}>
-        <p className="text-sm">Redirecting…</p>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-[#0d0d0f]">

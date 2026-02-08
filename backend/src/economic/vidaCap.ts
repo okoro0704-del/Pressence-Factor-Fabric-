@@ -55,8 +55,7 @@ export interface MintOnVitalizationResult extends VidaCapAllocation {
  * Mint on Vitalization: 10 VIDA per new user (or 2 after cap).
  * 50:50 split: 5 → National_Vault (70/30 lock), 5 → Citizen_Vault (4/1 lock).
  * National: hasSignedSovereignClauses = false → 70% remains untouchable.
- * Citizen: 1 VIDA released via 9-Day Ritual ($100/day until $1,000 spendable).
- * Day Zero: first 0.1 VIDA ($100) is credited to spendable_balance_vida immediately—no 24-hour vesting.
+ * Citizen: 1 VIDA released on Vitalization (Day Zero). Single Quad-Pillar Handshake = 100% vitalization; no 9-day or 10-day vesting.
  */
 const INITIAL_SPENDABLE_VIDA = 0.1;
 

@@ -8,17 +8,21 @@ import { NationalReserveCharts } from '../dashboard/NationalReserveCharts';
 import { NationalBlockCommand } from '../dashboard/NationalBlockCommand';
 import { UserProfileBalance } from '../dashboard/UserProfileBalance';
 import { SovereignIdCard } from '../dashboard/SovereignIdCard';
-import { VitalizationCountdown } from '../dashboard/VitalizationCountdown';
 import { PresenceOverrideModal } from '../dashboard/PresenceOverrideModal';
 import { FamilyVault } from '../dashboard/FamilyVault';
 import { MerchantModeSection } from '../dashboard/MerchantModeSection';
 import { MerchantSalesTab } from '../dashboard/MerchantSalesTab';
+import { SovereignPulseBar } from '../dashboard/SovereignPulseBar';
 import type { GlobalIdentity } from '@/lib/phoneIdentity';
 import { getIdentityAnchorPhone } from '@/lib/sentinelActivation';
 import { getCurrentUserRole, canAccessStaffPortal } from '@/lib/roleAuth';
 import { resetBiometrics } from '@/lib/resetBiometrics';
 import { isMerchantMode, getMerchantWalletAddress } from '@/lib/merchantMode';
-import { fetchNationalBlockReserves } from '@/lib/supabaseTelemetry';
+import { fetchLedgerStats } from '@/lib/ledgerStats';
+import { fetchUserBalances } from '@/lib/userBalances';
+import { TreasuryFacePulseModal } from '../dashboard/TreasuryFacePulseModal';
+
+const GOLD = '#D4AF37';
 
 export function DashboardContent({
   vaultStable = false,
@@ -35,25 +39,52 @@ export function DashboardContent({
   const [resettingBiometrics, setResettingBiometrics] = useState(false);
   const [resetBiometricsMessage, setResetBiometricsMessage] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'sales'>('overview');
+  const [treasuryTab, setTreasuryTab] = useState<'personal' | 'national'>('personal');
   const [merchantWallet, setMerchantWallet] = useState<string | null>(null);
   const [merchantModeOn, setMerchantModeOn] = useState(false);
   const [showStaffPortal, setShowStaffPortal] = useState(false);
-  const [totalNationalVida, setTotalNationalVida] = useState<number | null>(null);
+  /** National Treasury (public): from global ledger_stats. */
+  const [ledgerStats, setLedgerStats] = useState<{
+    totalReserveVida: number;
+    totalVitalizedCount: number;
+    totalMintedVida: number;
+  } | null>(null);
+  /** Personal Vault: no liveness gate — balances and Merchant QR visible without face scan. Only sign-in and device-approval require vitalization. */
+  const [personalVaultRevealed, setPersonalVaultRevealed] = useState(true);
+  const [showFacePulseModal, setShowFacePulseModal] = useState(false);
+  /** Personal Treasury: from user_balances table when available. */
+  const [userBalances, setUserBalances] = useState<{
+    vida_balance: number;
+    dllr_balance: number;
+    usdt_balance: number;
+    vngn_balance: number;
+  } | null>(null);
   const handleHeaderTitleClick = useTripleTapReset();
 
   useEffect(() => {
-    fetchNationalBlockReserves().then((reserves) => {
-      if (reserves) {
-        const total =
-          reserves.national_vault_vida_cap +
-          reserves.vida_cap_liquidity +
-          reserves.national_vida_pool_vida_cap;
-        setTotalNationalVida(total);
-      } else {
-        setTotalNationalVida(null);
+    fetchLedgerStats().then((s) => {
+      setLedgerStats({
+        totalReserveVida: s.totalReserveVida,
+        totalVitalizedCount: s.totalVitalizedCount,
+        totalMintedVida: s.totalMintedVida,
+      });
+    });
+  }, []);
+
+  useEffect(() => {
+    fetchUserBalances(getIdentityAnchorPhone()).then((row) => {
+      if (row) {
+        setUserBalances({
+          vida_balance: row.vida_balance,
+          dllr_balance: row.dllr_balance,
+          usdt_balance: row.usdt_balance,
+          vngn_balance: row.vngn_balance,
+        });
       }
     });
   }, []);
+
+  // No face scan required for vault: personalVaultRevealed stays true (set in initial state).
 
   useEffect(() => {
     setMerchantModeOn(isMerchantMode());
@@ -130,19 +161,13 @@ export function DashboardContent({
       </header>
 
       <div className="flex-1 p-4 md:p-6 max-w-6xl mx-auto w-full">
-        {/* Sync to Mobile — show prominently on laptop so user can pair phone */}
-        <section className="hidden lg:block mb-6 rounded-2xl border-2 p-6 max-w-lg mx-auto" style={{ borderColor: 'rgba(212, 175, 55, 0.5)', background: 'linear-gradient(180deg, rgba(30, 28, 22, 0.6) 0%, rgba(15, 14, 10, 0.8) 100%)' }}>
-          <h2 className="text-lg font-bold text-[#D4AF37] uppercase tracking-wider mb-2">Sync to Mobile</h2>
-          <p className="text-sm text-[#a0a0a5] mb-4">
-            Open Sovereign on your phone and scan the QR from the laptop login screen, or open the link below to pair this device.
-          </p>
-          <Link
-            href="/link-device"
-            className="inline-flex items-center gap-2 px-4 py-3 rounded-xl font-semibold text-sm uppercase tracking-wider transition-all border-2 hover:opacity-95"
-            style={{ borderColor: 'rgba(212, 175, 55, 0.6)', color: '#D4AF37', background: 'rgba(212, 175, 55, 0.1)' }}
-          >
-            Open Link Device / QR Pairing
-          </Link>
+        {/* Sovereign Pulse — 4 metrics */}
+        <SovereignPulseBar className="mb-6" />
+
+        {/* Sync to Mobile — compact */}
+        <section className="hidden lg:flex lg:items-center lg:gap-4 lg:mb-6 rounded-xl border p-4 max-w-2xl" style={{ borderColor: `rgba(212,175,55,0.4)`, background: 'rgba(15,14,10,0.6)' }}>
+          <span className="text-sm font-bold uppercase tracking-wider" style={{ color: GOLD }}>Sync to Mobile</span>
+          <Link href="/link-device" className="text-sm font-semibold" style={{ color: GOLD }}>Link Device / QR →</Link>
         </section>
         {/* Tabs: Overview | Sales (for merchants) */}
         {merchantModeOn && (
@@ -177,92 +202,145 @@ export function DashboardContent({
           </div>
         ) : (
           <>
-        {/* ——— Personal Treasury (top section): utility ——— */}
-        <section className="rounded-2xl border-2 border-[#2a2a2e] bg-[#16161a]/80 p-6 mb-8 shadow-inner">
-          <h2 className="text-xl font-bold text-[#e8c547] uppercase tracking-wider mb-1">
-            Personal Treasury
-          </h2>
-          <p className="text-xs text-[#6b6b70] mb-6">
-            Quick access to your $1,000 liquid VIDA — Swap, Send, and Receive.
-          </p>
-          <VitalizationCountdown phoneNumber={getIdentityAnchorPhone()} />
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div>
-              <h3 className="text-sm font-semibold text-[#6b6b70] uppercase tracking-wider mb-3">
-                Sovereign ID
-              </h3>
-              <SovereignIdCard />
-            </div>
-            <div>
-              <UserProfileBalance
-                vaultStable={vaultStable}
-                mintTxHash={mintTxHash}
-                openSwapFromUrl={openSwapFromUrl}
-              />
-            </div>
-            <div className="lg:col-span-2">
-              <FamilyVault />
-            </div>
+        {/* ——— Treasury: [PERSONAL] | [NATIONAL] ——— */}
+        <section className="rounded-2xl border-2 p-6 mb-8" style={{ borderColor: 'rgba(212,175,55,0.35)', background: 'rgba(22,22,26,0.9)' }}>
+          <div className="flex gap-2 border-b mb-6 pb-3" style={{ borderColor: 'rgba(212,175,55,0.25)' }}>
+            <button
+              type="button"
+              onClick={() => setTreasuryTab('personal')}
+              className={`px-4 py-2 rounded-lg text-sm font-bold uppercase tracking-wider transition-colors ${
+                treasuryTab === 'personal'
+                  ? 'bg-[#D4AF37]/20 border border-[#D4AF37]/60'
+                  : 'border border-transparent text-[#6b6b70] hover:text-[#a0a0a5]'
+              }`}
+              style={treasuryTab === 'personal' ? { color: GOLD } : {}}
+            >
+              Personal
+            </button>
+            <button
+              type="button"
+              onClick={() => setTreasuryTab('national')}
+              className={`px-4 py-2 rounded-lg text-sm font-bold uppercase tracking-wider transition-colors ${
+                treasuryTab === 'national'
+                  ? 'bg-[#D4AF37]/20 border border-[#D4AF37]/60'
+                  : 'border border-transparent text-[#6b6b70] hover:text-[#a0a0a5]'
+              }`}
+              style={treasuryTab === 'national' ? { color: GOLD } : {}}
+            >
+              National
+            </button>
           </div>
-        </section>
 
-        {/* Visual divider: Personal (utility) vs National (transparency) */}
-        <div className="flex items-center gap-4 mb-6">
-          <div className="flex-1 h-px bg-gradient-to-r from-transparent via-[#3b82f6]/50 to-transparent" />
-          <span className="text-[10px] font-semibold text-[#6b6b70] uppercase tracking-widest">
-            National transparency
-          </span>
-          <div className="flex-1 h-px bg-gradient-to-r from-transparent via-[#3b82f6]/50 to-transparent" />
-        </div>
-
-        {/* ——— National Treasury (bottom section): transparency ——— */}
-        <section className="rounded-2xl border-2 border-[#3b82f6]/30 bg-[#0d0d0f]/90 p-6 mb-8">
-          <h2 className="text-xl font-bold text-[#3b82f6] uppercase tracking-wider mb-1">
-            National Treasury
-          </h2>
-          <p className="text-sm text-[#a0a0a5] mb-6">
-            Total Sovereign Assets in Reserve:{' '}
-            <span className="font-mono font-semibold text-[#3b82f6]">
-              {totalNationalVida != null
-                ? `${totalNationalVida.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VIDA`
-                : '—'}
-            </span>
-          </p>
-          <div className="space-y-6">
-            <NationalReserveCharts />
-            <div>
-              <h3 className="text-sm font-semibold text-[#6b6b70] uppercase tracking-wider mb-4">
-                National Block Command
-              </h3>
-              <NationalBlockCommand />
+          {treasuryTab === 'personal' && (
+            <div className="space-y-6">
+              {!personalVaultRevealed && (
+                <div className="rounded-xl border-2 border-amber-500/40 bg-amber-500/10 p-4 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                  <span className="text-2xl" aria-hidden>🔒</span>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-amber-200/95">Personal Vault is private</p>
+                    <p className="text-xs text-amber-200/80 mt-0.5">Balances and Merchant QR are hidden until you verify with a face scan (95%+ match).</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowFacePulseModal(true)}
+                    className="px-4 py-2 rounded-lg bg-amber-500/30 border border-amber-500/50 text-amber-200 font-semibold text-sm hover:bg-amber-500/40 transition-colors cursor-pointer"
+                  >
+                    Reveal with Face Scan
+                  </button>
+                </div>
+              )}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div>
+                  <h3 className="text-xs font-bold text-[#6b6b70] uppercase tracking-wider mb-2">Sovereign ID</h3>
+                  <SovereignIdCard />
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold text-[#6b6b70] uppercase tracking-wider mb-2">VIDA</h3>
+                  <UserProfileBalance
+                    vaultStable={vaultStable}
+                    mintTxHash={mintTxHash}
+                    openSwapFromUrl={openSwapFromUrl}
+                    obfuscate={!personalVaultRevealed}
+                  />
+                </div>
+              </div>
+              <div>
+                <h3 className="text-xs font-bold text-[#6b6b70] uppercase tracking-wider mb-3">Wallets · VIDA · DLLR · USDT · vNGN</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="rounded-xl border-2 p-4" style={{ borderColor: 'rgba(212,175,55,0.4)', background: 'rgba(212,175,55,0.08)' }}>
+                    <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: GOLD }}>VIDA</span>
+                    <p className="text-lg font-bold font-mono mt-1" style={{ color: GOLD }}>
+                      {!personalVaultRevealed ? '****' : userBalances != null ? `${userBalances.vida_balance.toFixed(2)} VIDA` : 'See above'}
+                    </p>
+                  </div>
+                  <MultiCurrencyBalanceCards variant="cardsOnly" obfuscate={!personalVaultRevealed} />
+                  <div className="rounded-xl border-2 p-4" style={{ borderColor: 'rgba(180,180,180,0.4)', background: 'rgba(180,180,180,0.06)' }}>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#a0a0a5]">vNGN</span>
+                    <p className="text-lg font-bold font-mono mt-1 text-[#a0a0a5]">
+                      {!personalVaultRevealed ? '****' : userBalances != null ? `${userBalances.vngn_balance.toFixed(2)} vNGN` : '— vNGN'}
+                    </p>
+                    <p className="text-[10px] text-[#6b6b70] mt-1">Naira stable · RSK</p>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <h3 className="text-xs font-bold text-[#6b6b70] uppercase tracking-wider mb-2">Swap / Convert</h3>
+                <p className="text-xs text-[#6b6b70] mb-2">Convert VIDA → DLLR or USDT in User balance card above.</p>
+              </div>
+              <div>
+                <MerchantModeSection
+                  onMerchantModeChange={handleMerchantModeChange}
+                  obfuscate={!personalVaultRevealed}
+                  onRequestFaceScan={() => setShowFacePulseModal(true)}
+                />
+              </div>
+              <div className="lg:col-span-2">
+                <FamilyVault />
+              </div>
             </div>
-          </div>
+          )}
+
+          {treasuryTab === 'national' && (
+            <div className="space-y-6">
+              <p className="text-xs text-[#6b6b70]">
+                Public view — any Vitalized citizen can see this collective wealth. Data from global ledger_stats table.
+              </p>
+              <div className="flex flex-wrap items-baseline gap-6">
+                <div>
+                  <span className="text-xs font-bold text-[#6b6b70] uppercase tracking-wider">Total Reserve</span>
+                  <p className="text-2xl font-bold font-mono" style={{ color: GOLD }}>
+                    {ledgerStats != null
+                      ? `${ledgerStats.totalReserveVida.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VIDA`
+                      : '—'}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-xs font-bold text-[#6b6b70] uppercase tracking-wider">Total Vitalized</span>
+                  <p className="text-2xl font-bold font-mono" style={{ color: GOLD }}>
+                    {ledgerStats != null ? ledgerStats.totalVitalizedCount.toLocaleString() : '—'}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-xs font-bold text-[#6b6b70] uppercase tracking-wider">Minted VIDA</span>
+                  <p className="text-2xl font-bold font-mono" style={{ color: GOLD }}>
+                    {ledgerStats != null
+                      ? `${ledgerStats.totalMintedVida.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VIDA`
+                      : '—'}
+                  </p>
+                </div>
+                <Link href="/government/elections" className="text-sm font-bold uppercase tracking-wider ml-auto" style={{ color: GOLD }}>Elections / Voting →</Link>
+              </div>
+              <NationalReserveCharts />
+              <div>
+                <h3 className="text-xs font-bold text-[#6b6b70] uppercase tracking-wider mb-3">National Block Command</h3>
+                <NationalBlockCommand />
+              </div>
+            </div>
+          )}
         </section>
 
         <div className="max-w-2xl">
-          <section className="mb-6">
-            <h2 className="text-sm font-semibold text-[#6b6b70] uppercase tracking-wider mb-3">
-              Protocol Vault — DLLR & USDT
-            </h2>
-            <p className="text-xs text-[#6b6b70] mb-3">
-              Multi-currency balances on Rootstock (RSK). Active Spending Power appears after you convert VIDA to DLLR.
-            </p>
-            <MultiCurrencyBalanceCards />
-          </section>
-
-          <section className="rounded-xl border border-[#2a2a2e] bg-[#16161a] p-4">
-            <h2 className="text-sm font-semibold text-[#c9a227] mb-2">The Gated Handshake</h2>
-            <p className="text-sm text-[#a0a0a5] leading-relaxed">
-              All Sovryn actions — Zero (0% interest loans), Spot Exchange, lending, borrowing — are
-              gated by <strong className="text-[#e8c547]">withPresence(transaction)</strong>. Your
-              wallet signs RSK transactions only after the PFF Fabric verifies your physical presence
-              via biometric handshake. No trade or loan can be initiated without it.
-            </p>
-          </section>
-
-          <MerchantModeSection onMerchantModeChange={handleMerchantModeChange} />
-
-          <section className="rounded-xl border border-[#2a2a2e] bg-[#16161a] p-4 mt-6">
+          <section className="rounded-xl border p-4 mt-4" style={{ borderColor: 'rgba(212,175,55,0.25)', background: 'rgba(22,22,26,0.8)' }}>
             <h2 className="text-sm font-semibold text-[#c9a227] mb-2">Settings</h2>
             <p className="text-xs text-[#6b6b70] mb-3">
               Clear primary sentinel device and stored face hashes so you can re-enroll (e.g. new device or re-scan).
@@ -346,6 +424,16 @@ export function DashboardContent({
         isOpen={showPresenceModal}
         onClose={() => setShowPresenceModal(false)}
         onPresenceVerified={handlePresenceVerified}
+      />
+
+      {/* Personal Treasury: Face Scan to reveal balances and Merchant QR */}
+      <TreasuryFacePulseModal
+        isOpen={showFacePulseModal}
+        onClose={() => setShowFacePulseModal(false)}
+        onVerified={() => {
+          setPersonalVaultRevealed(true);
+          setShowFacePulseModal(false);
+        }}
       />
 
       {/* AI Companion moved to last page: /companion (Companion nav item) — activated there. */}

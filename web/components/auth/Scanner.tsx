@@ -12,7 +12,6 @@ import {
   setPersistentFaceHash,
   setFaceHashInSession,
   deriveFaceHashFromCredential,
-  persistFaceHash,
   sha256Hex,
 } from '@/lib/biometricAnchorSync';
 import { verifyBiometricSignature } from '@/lib/biometricAuth';
@@ -103,7 +102,7 @@ export function Scanner({
     }, 150);
 
     try {
-      const result = await verifyBiometricSignature(phone.trim(), { learningMode: false });
+      const result = await verifyBiometricSignature(phone.trim(), { learningMode: false, useSovereignHashOnly: true });
       if (isRedirectingRef.current) return;
       if (progressIntervalRef.current) {
         clearInterval(progressIntervalRef.current);
@@ -112,8 +111,16 @@ export function Scanner({
       if (result.success && result.credential) {
         const hash = await deriveFaceHashFromCredential(result.credential);
         if (hash?.trim()) {
-          saveHashAndNotify(hash);
-          return;
+          const anchorRes = await fetch('/api/v1/anchor-citizen', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ face_hash: hash, phone_number: phone.trim() }),
+          });
+          const anchorJson = (await anchorRes.json().catch(() => ({}))) as { ok?: boolean; id?: string };
+          if (anchorRes.ok && anchorJson.ok) {
+            saveHashAndNotify(hash);
+            return;
+          }
         }
       }
       if (isRedirectingRef.current) return;
@@ -130,11 +137,17 @@ export function Scanner({
       if (NO_PASSKEYS_PATTERN.test(message)) {
         try {
           const fallbackHash = await sha256Hex(`${phone!.trim()}-${Date.now()}-anchor`);
-          const persistResult = await persistFaceHash(phone!.trim(), fallbackHash);
-          if (persistResult.ok) {
+          const anchorRes = await fetch('/api/v1/anchor-citizen', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ face_hash: fallbackHash, phone_number: phone!.trim() }),
+          });
+          const anchorJson = (await anchorRes.json().catch(() => ({}))) as { ok?: boolean; id?: string };
+          if (anchorRes.ok && anchorJson.ok) {
             saveHashAndNotify(fallbackHash);
             return;
           }
+          setError('Passkey unavailable. Could not save to Vault.');
         } catch (e) {
           setError('Passkey unavailable. Could not save to Vault.');
         }

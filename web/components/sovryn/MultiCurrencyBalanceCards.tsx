@@ -10,8 +10,10 @@ import {
 import { deriveRSKWalletFromSeed } from '@/lib/sovryn/derivedWallet';
 import { getIdentityAnchorPhone } from '@/lib/sentinelActivation';
 
+type MultiCurrencyBalanceCardsProps = { variant?: 'default' | 'cardsOnly'; /** When true, show **** instead of balances (Personal Vault privacy). */ obfuscate?: boolean };
+
 /** DLLR: Gold/Silver. USDT: Green. Official-style balance cards for Protocol Vault. */
-export function MultiCurrencyBalanceCards() {
+export function MultiCurrencyBalanceCards({ variant = 'default', obfuscate = false }: MultiCurrencyBalanceCardsProps) {
   const [address, setAddress] = useState<string | null>(null);
   const [dllrBalance, setDllrBalance] = useState<string | null>(null);
   const [usdtBalance, setUsdtBalance] = useState<string | null>(null);
@@ -90,15 +92,8 @@ export function MultiCurrencyBalanceCards() {
 
   const activeSpendingUsd = dllrBalance != null ? parseFloat(dllrBalance) : null;
 
-  return (
-    <div className="space-y-4">
-      <h3 className="text-sm font-semibold text-[#6b6b70] uppercase tracking-wider">
-        Multi-Currency Liquidity Bridge
-      </h3>
-      {error && (
-        <p className="text-xs text-red-400">{error}</p>
-      )}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+  const cards = (
+    <div className={variant === 'cardsOnly' ? 'contents' : 'grid grid-cols-1 sm:grid-cols-2 gap-4'}>
         {/* DLLR — Gold/Silver */}
         <div
           className="rounded-xl border-2 p-5 flex flex-col"
@@ -117,7 +112,7 @@ export function MultiCurrencyBalanceCards() {
             </span>
           </div>
           <p className="text-2xl font-bold font-mono" style={{ color: '#FFD700' }}>
-            {loading ? '…' : dllrBalance != null ? `${dllrBalance} DLLR` : '—'}
+            {obfuscate ? '****' : loading ? '…' : dllrBalance != null ? `${dllrBalance} DLLR` : '—'}
           </p>
           <p className="text-[10px] text-[#6b6b70] mt-1">Pegged $1.00 · RSK</p>
         </div>
@@ -140,14 +135,34 @@ export function MultiCurrencyBalanceCards() {
             </span>
           </div>
           <p className="text-2xl font-bold font-mono" style={{ color: '#00A368' }}>
-            {loading ? '…' : usdtBalance != null ? `${usdtBalance} USDT` : '—'}
+            {obfuscate ? '****' : loading ? '…' : usdtBalance != null ? `${usdtBalance} USDT` : '—'}
           </p>
           <p className="text-[10px] text-[#6b6b70] mt-1">Pegged $1.00 · RSK</p>
         </div>
-      </div>
+    </div>
+  );
+
+  if (variant === 'cardsOnly') {
+    return (
+      <>
+        {error && <p className="text-xs text-red-400 col-span-2">{error}</p>}
+        {cards}
+      </>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-sm font-semibold text-[#6b6b70] uppercase tracking-wider">
+        Multi-Currency Liquidity Bridge
+      </h3>
+      {error && (
+        <p className="text-xs text-red-400">{error}</p>
+      )}
+      {cards}
 
       {/* Active Spending Power — show when user has DLLR (after conversion) */}
-      {activeSpendingUsd != null && activeSpendingUsd > 0 && (
+      {!obfuscate && activeSpendingUsd != null && activeSpendingUsd > 0 && (
         <div className="rounded-xl border-2 border-emerald-500/50 bg-emerald-500/10 p-4">
           <p className="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-1">
             Active Spending Power

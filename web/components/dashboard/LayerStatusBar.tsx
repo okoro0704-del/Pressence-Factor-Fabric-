@@ -6,6 +6,8 @@ import { ScanLine, Hand, Smartphone, MapPin } from 'lucide-react';
 import { getSessionStatus, SessionStatus } from '@/lib/sessionManagement';
 import { getTripleAnchorState } from '@/lib/tripleAnchor';
 import { ENABLE_GPS_AS_FOURTH_PILLAR } from '@/lib/constants';
+import { getCitizenStatusForPhone } from '@/lib/supabaseTelemetry';
+import { getIdentityAnchorPhone } from '@/lib/sentinelActivation';
 
 const jetbrains = JetBrains_Mono({ weight: ['400', '600', '700'], subsets: ['latin'] });
 
@@ -22,6 +24,8 @@ export interface LayerStatusBarProps {
   locationVerified?: boolean;
   /** When true, show bar even with NO_SESSION (e.g. registration flow) so 0/4 is visible */
   forceShow?: boolean;
+  /** When 'VITALIZED', header shows CITIZEN ACTIVE with green glow (single source from Supabase) */
+  citizenStatus?: 'VITALIZED' | 'PENDING';
 }
 
 /**
@@ -35,9 +39,11 @@ export function LayerStatusBar({
   deviceVerified,
   locationVerified = false,
   forceShow = false,
+  citizenStatus: citizenStatusProp,
 }: LayerStatusBarProps = {}) {
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>(SessionStatus.NO_SESSION);
   const [tripleAnchor, setTripleAnchor] = useState({ face: false, fingerprint: false, device: false });
+  const [citizenStatusFromSupabase, setCitizenStatusFromSupabase] = useState<'VITALIZED' | 'PENDING'>('PENDING');
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -53,6 +59,19 @@ export function LayerStatusBar({
     }, 500);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (citizenStatusProp !== undefined) {
+      setCitizenStatusFromSupabase(citizenStatusProp);
+      return;
+    }
+    const phone = getIdentityAnchorPhone();
+    getCitizenStatusForPhone(phone ?? null).then(setCitizenStatusFromSupabase);
+    const t = setInterval(() => {
+      getCitizenStatusForPhone(getIdentityAnchorPhone() ?? null).then(setCitizenStatusFromSupabase);
+    }, 10000);
+    return () => clearInterval(t);
+  }, [citizenStatusProp]);
 
   if (!forceShow && (sessionStatus === SessionStatus.NO_SESSION || sessionStatus === SessionStatus.SESSION_EXPIRED)) {
     return null;
@@ -71,13 +90,18 @@ export function LayerStatusBar({
   const allGold = verifiedList.every(Boolean);
   const coreMeshActive = showGps && face && palm && device && !location;
 
-  const borderColor = allGold ? GREEN : coreMeshActive ? GREEN : count >= 1 ? GOLD : RED;
-  const statusText = allGold
+  const isVitalized = citizenStatusProp === 'VITALIZED' || citizenStatusFromSupabase === 'VITALIZED';
+  const borderColor = isVitalized ? GREEN : allGold ? GREEN : coreMeshActive ? GREEN : count >= 1 ? GOLD : RED;
+  const statusText = isVitalized
+    ? 'CITIZEN ACTIVE'
+    : allGold
     ? (showGps ? 'QUAD ANCHOR VERIFIED' : 'TRIPLE ANCHOR VERIFIED')
     : coreMeshActive
     ? 'CORE MESH ACTIVE'
     : `ANCHOR ${count}/${totalPillars}`;
-  const subText = allGold
+  const subText = isVitalized
+    ? '1 VIDA Unlocked'
+    : allGold
     ? '1 VIDA Unlocked'
     : coreMeshActive
     ? 'Face · Palm · Device verified (GPS optional)'
@@ -94,22 +118,26 @@ export function LayerStatusBar({
   ];
 
   const sovereignGlow =
-    allGold || coreMeshActive ? '0 0 15px rgba(34,197,94,0.5), 0 0 40px rgba(34,197,94,0.25)' : undefined;
-  const progressPct = allGold ? 100 : coreMeshActive ? (3 / totalPillars) * 100 : (count / totalPillars) * 100;
+    isVitalized || allGold || coreMeshActive ? '0 0 15px rgba(34,197,94,0.5), 0 0 40px rgba(34,197,94,0.25)' : undefined;
+  const progressPct = isVitalized || allGold ? 100 : coreMeshActive ? (3 / totalPillars) * 100 : (count / totalPillars) * 100;
 
   return (
     <div
       className="fixed top-0 left-0 right-0 z-50 border-b transition-all duration-500"
       style={{
+        flexShrink: 0,
+        paddingLeft: 'env(safe-area-inset-left, 0)',
+        paddingRight: 'env(safe-area-inset-right, 0)',
+        paddingTop: 'env(safe-area-inset-top, 0)',
         background: 'linear-gradient(135deg, rgba(5, 5, 5, 0.95) 0%, rgba(0, 0, 0, 0.98) 100%)',
         borderColor,
         backdropFilter: 'blur(10px)',
         boxShadow: sovereignGlow ?? `0 4px 20px ${borderColor}40`,
       }}
     >
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-2 sm:py-3">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-2 sm:py-3" style={{ flexShrink: 0 }}>
+        <div className="flex items-center justify-between gap-2" style={{ flexShrink: 0 }}>
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1 shrink-0">
             <div className="text-xl sm:text-2xl shrink-0">{allGold ? '✅' : '🔐'}</div>
             <div className="min-w-0">
               <p className={`text-xs sm:text-sm font-black tracking-wider truncate ${jetbrains.className}`} style={{ color: borderColor }}>

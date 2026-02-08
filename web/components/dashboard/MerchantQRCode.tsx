@@ -8,9 +8,11 @@ interface MerchantQRCodeProps {
   walletAddress: string;
   size?: number;
   className?: string;
+  /** High-contrast (black on white) for instant P2P scan in Merchant Mode. */
+  highContrast?: boolean;
 }
 
-export function MerchantQRCode({ walletAddress, size = 200, className = '' }: MerchantQRCodeProps) {
+export function MerchantQRCode({ walletAddress, size = 200, className = '', highContrast = false }: MerchantQRCodeProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -20,9 +22,9 @@ export function MerchantQRCode({ walletAddress, size = 200, className = '' }: Me
     QRCode.toCanvas(canvasRef.current, uri, {
       width: size,
       margin: 2,
-      color: { dark: '#0d0d0f', light: '#ffffff' },
+      color: highContrast ? { dark: '#000000', light: '#ffffff' } : { dark: '#0d0d0f', light: '#ffffff' },
     }).catch((e) => setError(e instanceof Error ? e.message : 'QR failed'));
-  }, [walletAddress, size]);
+  }, [walletAddress, size, highContrast]);
 
   if (error) {
     return <div className={`text-red-400 text-sm ${className}`}>QR error: {error}</div>;

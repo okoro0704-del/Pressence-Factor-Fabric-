@@ -2,51 +2,36 @@
 
 import { useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { DashboardContent } from '@/components/sovryn/DashboardContent';
+import Link from 'next/link';
 import { ProtectedRoute } from '@/components/dashboard/ProtectedRoute';
+import { AppShell } from '@/components/layout/AppShell';
+import { SovereignPulseBar } from '@/components/dashboard/SovereignPulseBar';
 import { VitalizationRequestListener } from '@/components/dashboard/VitalizationRequestListener';
 import { LoginRequestListener } from '@/components/dashboard/LoginRequestListener';
-import { getMintStatus, MINT_STATUS_PENDING_HARDWARE } from '@/lib/mintStatus';
 import { getIdentityAnchorPhone } from '@/lib/sentinelActivation';
-import { getProfileFaceAndSeed } from '@/lib/recoverySeedStorage';
-import { startVerifiedMintListener } from '@/lib/sovryn/verifiedMintListener';
-import { isArchitect } from '@/lib/manifestoUnveiling';
 import { setVitalizationComplete, shouldNeverRedirectBack } from '@/lib/vitalizationState';
-import { authorizeInitialRelease } from '@/lib/masterArchitectInit';
+import { isArchitect } from '@/lib/manifestoUnveiling';
+import { Landmark, Wallet } from 'lucide-react';
 
-/**
- * DASHBOARD PAGE - PROTECTED (VAULT)
- * Reads face_hash and recovery_seed_hash on entry. If both present: show 5 VIDA, stop back/bounce.
- * Success trigger: navigation.reset to Vault only when both confirmed in Supabase.
- */
+const GOLD = '#D4AF37';
+
+/** Dashboard = overview: Pulse bar + links to Wallet (citizen) and Treasury (country). */
 export default function DashboardPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [mounted, setMounted] = useState(false);
   const [identityPhone, setIdentityPhone] = useState<string | null>(null);
-  const [pendingHardware, setPendingHardware] = useState(false);
-  const [vaultStable, setVaultStable] = useState(false);
-  /** When gasless mint completes, tx hash is set; UI shows "5 VIDA MINTED ON BITCOIN LAYER 2" with golden checkmark. */
-  const [mintTxHash, setMintTxHash] = useState<string | null>(null);
-  /** Toast: "Presence Confirmed. $100 Initial Release Authorized." (one-time after Scanner → dashboard) */
-  const [initialReleaseToast, setInitialReleaseToast] = useState(false);
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const unauthorized = searchParams.get('unauthorized') === '1';
-  const showMintedBanner = searchParams.get('minted') === '1';
-  const initialReleaseParam = searchParams.get('initial_release') === '1';
-  /** Allow dashboard when architect OR when user has completed vitalization (identity + mint status). Avoids redirect-to-home after vitalization. */
-  const [vitalizedOrArchitect, setVitalizedOrArchitect] = useState(false);
   const [accessChecked, setAccessChecked] = useState(false);
+  const [vitalizedOrArchitect, setVitalizedOrArchitect] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // State lockdown: user has reached Dashboard — set flag so app will not return to scanner unless they log out
   useEffect(() => {
     if (mounted) setVitalizationComplete();
   }, [mounted]);
 
-  // Allow dashboard for architects or anyone with identity anchor (post-vitalization). Never redirect back once vitalized — stay on dashboard unless user explicitly logs out.
   useEffect(() => {
     if (!mounted) return;
     let cancelled = false;
@@ -66,7 +51,6 @@ export default function DashboardPage() {
         }
         return;
       }
-      // Has identity anchor or has completed vitalization before: allow access and do not redirect back.
       if (!cancelled) {
         setVitalizedOrArchitect(true);
         setAccessChecked(true);
@@ -79,84 +63,10 @@ export default function DashboardPage() {
     if (mounted) setIdentityPhone(getIdentityAnchorPhone());
   }, [mounted]);
 
-  useEffect(() => {
-    if (!mounted) return;
-    const phone = getIdentityAnchorPhone();
-    if (!phone) return;
-    getMintStatus(phone).then((res) => {
-      if (res.ok && res.mint_status === MINT_STATUS_PENDING_HARDWARE) {
-        setPendingHardware(true);
-      }
-    });
-  }, [mounted]);
-
-  /** Vault stability: on entry read face_hash, recovery_seed_hash, vida_mint_tx_hash. If both anchors present, set vaultStable; if tx hash present, show confirmation UI. */
-  useEffect(() => {
-    if (!mounted) return;
-    let cancelled = false;
-    (async () => {
-      const phone = getIdentityAnchorPhone();
-      if (!phone) return;
-      const profile = await getProfileFaceAndSeed(phone);
-      if (cancelled || !profile.ok) return;
-      const bothPresent = !!(profile.face_hash && profile.recovery_seed_hash);
-      if (bothPresent) setVaultStable(true);
-      if (profile.ok && profile.vida_mint_tx_hash) setMintTxHash(profile.vida_mint_tx_hash);
-    })();
-    return () => { cancelled = true; };
-  }, [mounted]);
-
-  /** When is_fully_verified becomes TRUE, trigger mintVidaToken (5 VIDA to derived RSK wallet); receipt saved to Supabase. */
-  useEffect(() => {
-    if (!mounted || !vaultStable) return;
-    const phone = getIdentityAnchorPhone();
-    if (!phone) return;
-    const cleanup = startVerifiedMintListener(phone, (result) => {
-      if (result.txHash) setMintTxHash(result.txHash);
-    }, { pollIntervalMs: 20000 });
-    return cleanup;
-  }, [mounted, vaultStable]);
-
-  /** When both anchors present: disable back navigation (no going back / bouncing). */
-  useEffect(() => {
-    if (!mounted || typeof window === 'undefined' || !vaultStable) return;
-    let removePopState: (() => void) | null = null;
-    window.history.replaceState({ vaultLocked: true }, '', window.location.pathname + window.location.search);
-    const onPopState = () => router.replace('/dashboard');
-    window.addEventListener('popstate', onPopState);
-    removePopState = () => window.removeEventListener('popstate', onPopState);
-    return () => removePopState?.();
-  }, [mounted, vaultStable, router]);
-
-  /** Initial release: one-time trigger from Scanner VERIFIED → dashboard. Credit $100 (0.1 VIDA) and show toast. */
-  useEffect(() => {
-    if (!mounted || !initialReleaseParam) return;
-    const phone =
-      (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('pff_initial_release_phone')) ||
-      getIdentityAnchorPhone();
-    if (!phone?.trim()) return;
-    let cancelled = false;
-    authorizeInitialRelease(phone.trim()).then((res) => {
-      if (cancelled) return;
-      if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem('pff_initial_release_phone');
-      router.replace('/dashboard', { scroll: false });
-      if (res.ok && res.credited) setInitialReleaseToast(true);
-    });
-    return () => { cancelled = true; };
-  }, [mounted, initialReleaseParam, router]);
-
-  /** Dismiss initial release toast after 5s */
-  useEffect(() => {
-    if (!initialReleaseToast) return;
-    const t = setTimeout(() => setInitialReleaseToast(false), 5000);
-    return () => clearTimeout(t);
-  }, [initialReleaseToast]);
-
   if (!mounted || !accessChecked) {
     return null;
   }
 
-  // Redirect only when not architect and not vitalized (no identity or no mint status)
   if (!vitalizedOrArchitect) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#050505]" style={{ color: '#6b6b70' }}>
@@ -167,50 +77,41 @@ export default function DashboardPage() {
 
   return (
     <ProtectedRoute>
-      <main
-        className="min-h-screen bg-[#0d0d0f] pb-36 md:pb-0"
-        data-vault-stable={vaultStable ? 'true' : undefined}
-      >
-        {pendingHardware && (
-          <div
-            className="bg-[#C0C0C0]/25 border-b border-[#C0C0C0]/60 px-4 py-4 text-center text-[#a0a0a8] text-sm font-semibold uppercase tracking-wider"
-            role="status"
-          >
-            Vitalization Incomplete. Visit a Sentinel Hub with an Industrial Scanner to mint your 5 VIDA CAP.
+      <AppShell>
+        <main className="min-h-screen bg-[#0d0d0f] pb-24 md:pb-8 flex flex-col">
+          <header className="shrink-0 border-b border-[#2a2a2e] bg-[#16161a]/95 backdrop-blur px-4 py-3 safe-area-top">
+            <h1 className="text-lg font-bold bg-gradient-to-r from-[#e8c547] to-[#c9a227] bg-clip-text text-transparent">
+              PFF Dashboard
+            </h1>
+            <p className="text-xs text-[#6b6b70] mt-0.5">Overview · Wallet · National Treasury</p>
+          </header>
+          <div className="flex-1 p-4 md:p-6 max-w-2xl mx-auto w-full">
+            <SovereignPulseBar className="mb-6" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Link
+                href="/wallet/"
+                className="rounded-2xl border-2 p-6 flex flex-col items-center justify-center gap-3 transition-colors hover:border-[#D4AF37]/60"
+                style={{ borderColor: 'rgba(212,175,55,0.4)', background: 'rgba(212,175,55,0.08)' }}
+              >
+                <Wallet className="w-12 h-12" style={{ color: GOLD }} />
+                <span className="text-lg font-bold uppercase tracking-wider" style={{ color: GOLD }}>Your Wallet</span>
+                <p className="text-xs text-[#6b6b70] text-center">Balance, VIDA, Merchant Mode, Family Vault</p>
+              </Link>
+              <Link
+                href="/treasury/"
+                className="rounded-2xl border-2 p-6 flex flex-col items-center justify-center gap-3 transition-colors hover:border-[#D4AF37]/60"
+                style={{ borderColor: 'rgba(212,175,55,0.4)', background: 'rgba(212,175,55,0.08)' }}
+              >
+                <Landmark className="w-12 h-12" style={{ color: GOLD }} />
+                <span className="text-lg font-bold uppercase tracking-wider" style={{ color: GOLD }}>National Treasury</span>
+                <p className="text-xs text-[#6b6b70] text-center">Country reserve, elections, block command</p>
+              </Link>
+            </div>
           </div>
-        )}
-        {showMintedBanner && (
-          <div
-            className="bg-[#D4AF37]/20 border-b border-[#D4AF37]/50 px-4 py-3 text-center text-[#D4AF37] text-sm font-bold uppercase tracking-wider"
-            role="status"
-          >
-            5 VIDA CAP SUCCESSFULLY MINTED
-          </div>
-        )}
-        {unauthorized && (
-          <div
-            className="bg-red-500/20 border-b border-red-500/50 px-4 py-3 text-center text-red-400 text-sm font-medium"
-            role="alert"
-          >
-            Unauthorized Access. You do not have the required role for that page.
-          </div>
-        )}
-        {initialReleaseToast && (
-          <div
-            className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] px-4 py-3 rounded-xl border-2 border-[#D4AF37]/60 bg-[#0d0d0f]/95 shadow-lg shadow-[#D4AF37]/20 text-center text-sm font-semibold text-[#D4AF37]"
-            role="status"
-          >
-            Presence Confirmed. $100 Initial Release Authorized.
-          </div>
-        )}
-        <DashboardContent
-          vaultStable={vaultStable}
-          mintTxHash={mintTxHash}
-          openSwapFromUrl={searchParams.get('openSwap') === '1'}
-        />
+        </main>
         {identityPhone && <VitalizationRequestListener phoneNumber={identityPhone} />}
         {identityPhone && <LoginRequestListener phoneNumber={identityPhone} />}
-      </main>
+      </AppShell>
     </ProtectedRoute>
   );
 }
