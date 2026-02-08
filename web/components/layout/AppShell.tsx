@@ -28,6 +28,12 @@ const NAV = [
   { href: '/settings', label: 'Settings', icon: SettingsNavIcon },
 ];
 
+/** When user is on one of these pages, bottom tab always navigates to href (don't lock). */
+const PROTECTED_PATHS = ['/dashboard', '/treasury', '/wallet', '/settings'];
+function isOnProtectedPath(pathname: string) {
+  return PROTECTED_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'));
+}
+
 const VITALIZATION_HREF = '/vitalization';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -35,6 +41,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [vitalized, setVitalized] = useState<boolean | null>(null);
   const handleLogoClick = useTripleTapReset();
+  /** On protected pages, tabs always go to their route (nav works). */
+  const navUnlocked = isOnProtectedPath(pathname) || vitalized === true;
 
   useEffect(() => {
     getCitizenStatusForPhone(getIdentityAnchorPhone()).then((status) => setVitalized(status === 'VITALIZED'));
@@ -90,7 +98,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           )}
           {NAV.map(({ href, label, icon: Icon }) => {
             const active = pathname === href || pathname.startsWith(href + '/');
-            const locked = vitalized === false;
+            const locked = !navUnlocked;
             return (
               <Link
                 key={href}
@@ -126,19 +134,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="flex items-center justify-around min-h-[56px] px-2">
           {NAV.map(({ href, label, icon: Icon }) => {
             const active = pathname === href || pathname.startsWith(href + '/');
-            const locked = vitalized === false;
+            const locked = !navUnlocked;
             return (
               <Link
                 key={href}
                 href={locked ? VITALIZATION_HREF : href}
+                prefetch={true}
                 className={`
-                  min-h-[48px] min-w-[48px] flex flex-col items-center justify-center gap-0.5 rounded-lg touch-manipulation px-2 py-2
+                  min-h-[48px] min-w-[56px] flex flex-col items-center justify-center gap-0.5 rounded-lg touch-manipulation px-2 py-2
                   transition-colors duration-200
                   ${locked ? 'opacity-60 text-[#6b6b70]' : ''}
                   ${active && !locked ? 'text-[#D4AF37] bg-[#D4AF37]/10' : !locked ? 'text-[#6b6b70] hover:text-[#a0a0a5] active:bg-[#16161a]' : ''}
                 `}
                 aria-current={active ? 'page' : undefined}
-                title={locked ? DEVICE_NOT_ANCHORED_MESSAGE : undefined}
+                title={locked ? DEVICE_NOT_ANCHORED_MESSAGE : label}
               >
                 <Icon className="w-6 h-6 shrink-0" />
                 <span className="text-[10px] font-medium truncate max-w-[64px]">{label}</span>
