@@ -29,6 +29,7 @@ import { VaultDoorAnimation } from './VaultDoorAnimation';
 import { useGlobalPresenceGateway } from '@/contexts/GlobalPresenceGateway';
 import { IdentityAnchorInput } from '@/components/auth/IdentityAnchorInput';
 import { BiologicalMismatchScreen } from '@/components/auth/BiologicalMismatchScreen';
+import { ManualLocationInputScreen } from '@/components/auth/ManualLocationInputScreen';
 import { MismatchEventType } from '@/lib/identityMismatchDetection';
 import {
   initializeZeroPersistenceSession,
@@ -303,6 +304,11 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
   const learningModeRef = useRef<{ active: boolean; day: number }>({ active: false, day: 1 });
   /** Show Learning Mode message instead of BiologicalMismatchScreen when in grace period. */
   const [showLearningModeMessage, setShowLearningModeMessage] = useState(false);
+  /** Registration flow: subtle toast instead of mismatch lockout (Scan not clear. Please try again.) */
+  const [scanToast, setScanToast] = useState<string | null>(null);
+  /** GPS failed: manual city/country entry to proceed */
+  const [showManualLocationInput, setShowManualLocationInput] = useState(false);
+  const gpsFailureAuthRef = useRef<{ identityAnchor: typeof identityAnchor } | null>(null);
   /** Biometric sensitivity for Architect Vision: from profile slider; overridden by soft-start (streak < 10 or first run) to 0.3 / no brightness. */
   const [visionConfidenceThreshold, setVisionConfidenceThreshold] = useState(0.3);
   const [visionEnforceBrightness, setVisionEnforceBrightness] = useState(false);
@@ -681,11 +687,15 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     setMismatchData(null);
     setShowLearningModeMessage(false);
     setGpsTakingLong(false);
-    const vitalizationStatus = await getVitalizationStatus(identityAnchor.phone);
+    const [vitalizationStatus, mintRes] = await Promise.all([
+      getVitalizationStatus(identityAnchor.phone),
+      getMintStatus(identityAnchor.phone),
+    ]);
     const streak = vitalizationStatus?.streak ?? 0;
     const isLearningMode = streak < LEARNING_MODE_DAYS;
     const learningModeDay = Math.min(Math.max(1, streak), LEARNING_MODE_DAYS);
     learningModeRef.current = { active: isLearningMode, day: learningModeDay };
+    const isVitalized = mintRes.ok && mintRes.mint_status === MINT_STATUS_MINTED;
     setPillarFace(resumePillars?.face ?? false);
     setPillarPalm(resumePillars?.palm ?? false);
     setPillarDevice(resumePillars?.device ?? false);
@@ -859,7 +869,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
         authResult.layersPassed?.includes(AuthLayer.BIOMETRIC_SIGNATURE) &&
         authResult.layersPassed?.includes(AuthLayer.SOVEREIGN_PALM);
       const gpsFailed = ENABLE_GPS_AS_FOURTH_PILLAR && !authResult.layersPassed?.includes(AuthLayer.GPS_LOCATION);
-      const useEarthAnchorMsg = faceAndPalmPassed && gpsFailed && (authResult.manualVerificationRequired || authResult.timedOut);
+      const useEarthAnchorMsg = faceAndPalmPassed && gpsFailed;
       const rawError = useEarthAnchorMsg ? GPS_EARTH_ANCHOR_SEARCHING_MESSAGE : (authResult.errorMessage || '');
       const isDnaOrBiologicalError = /DNA|Architect|biological|Template does not match|face.*match|mismatch/i.test(rawError);
       const errorMsg = isDnaOrBiologicalError ? LEDGER_SYNC_MESSAGE : rawError;
@@ -877,16 +887,23 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
       const varianceMatch = rawError.match(/(\d+\.?\d*)%/);
       const variance = varianceMatch ? parseFloat(varianceMatch[1]) : 5.0;
 
-      if (learningModeRef.current.active) {
+      if (useEarthAnchorMsg && faceAndPalmPassed && gpsFailed) {
+        gpsFailureAuthRef.current = { identityAnchor };
+        setShowManualLocationInput(true);
+      } else if (!isVitalized) {
+        setScanToast('Scan not clear. Please try again.');
+        setAuthStatus(AuthStatus.IDLE);
+        setShowArchitectVision(true);
+        setTimeout(() => setScanToast(null), 3500);
+      } else if (learningModeRef.current.active) {
         setShowLearningModeMessage(true);
       } else {
-        setMismatchData({
-          type: mismatchType,
-          variance,
-          similarity: 100 - variance,
-          useSoftMessage: isDnaOrBiologicalError,
-        });
-        setShowMismatchScreen(true);
+        // Sentinel Lock: full Biological Signature Mismatch UI only in SovereignVault / high-value flows.
+        // At the Gate (Architect), never block with mismatch screen — use subtle toast and stay on scanner.
+        setScanToast('Scan not clear. Please try again.');
+        setAuthStatus(AuthStatus.IDLE);
+        setShowArchitectVision(true);
+        setTimeout(() => setScanToast(null), 3500);
       }
     }
     } finally {
@@ -1553,6 +1570,25 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     );
   }
 
+  // GPS failed: manual city/country entry to proceed (no hang)
+  if (showManualLocationInput && identityAnchor) {
+    return (
+      <ManualLocationInputScreen
+        onProceed={(_city: string, _country: string) => {
+          setShowManualLocationInput(false);
+          gpsFailureAuthRef.current = null;
+          setPillarLocation(true);
+          goToDashboard();
+        }}
+        onCancel={() => {
+          setShowManualLocationInput(false);
+          gpsFailureAuthRef.current = null;
+          setAuthStatus(AuthStatus.IDLE);
+        }}
+      />
+    );
+  }
+
   // 9-Day Learning Mode: vibration mismatch — show soft message instead of blocking
   if (showLearningModeMessage) {
     const day = learningModeRef.current.day;
@@ -1607,7 +1643,8 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     );
   }
 
-  // Show biological mismatch screen
+  // Biological Signature Mismatch full UI only in SovereignVault / high-value flows (see gate handler above).
+  // Gate never shows this screen; scan failure at gate uses toast only.
   if (showMismatchScreen && mismatchData) {
     return (
       <BiologicalMismatchScreen
@@ -1624,6 +1661,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
         }}
         showSovereignManualBypass={faceFailCount >= 2 && isArchitect()}
         onSovereignManualBypass={goToDashboard}
+        hideSecurityNotice
       />
     );
   }
@@ -1943,13 +1981,29 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
       transition={{ duration: 0.5 }}
       className="min-h-screen bg-[#050505] flex flex-col items-center justify-center p-4 relative step-transition-wrapper"
     >
-      {/* 4/4 Layers Verified Status Bar — real-time sync with QuadPillarShield */}
+      {/* 4/4 Layers Verified Status Bar — real-time sync with QuadPillarShield, forceShow so 0/4 visible during registration */}
       <LayerStatusBar
         faceVerified={pillarFace}
         palmVerified={pillarPalm}
         deviceVerified={pillarDevice}
         locationVerified={pillarLocation}
+        forceShow
       />
+
+      {/* Subtle toast during registration: "Scan not clear. Please try again." — no lockout */}
+      {scanToast && (
+        <div
+          className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[60] px-6 py-3 rounded-xl border text-sm font-medium shadow-lg animate-in fade-in duration-300"
+          style={{
+            background: 'rgba(30, 28, 22, 0.98)',
+            borderColor: 'rgba(212, 175, 55, 0.5)',
+            color: '#e8c547',
+          }}
+          role="status"
+        >
+          {scanToast}
+        </div>
+      )}
 
       {/* Background Glow — pointer-events-none so it does not block clicks */}
       <div
@@ -2023,9 +2077,13 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
                 palmVerified={pillarPalm}
                 phoneAnchorVerified={pillarDevice}
                 locationVerified={pillarLocation}
-                gpsPillarMessage={result?.manualVerificationRequired ? 'Manual Verification Required' : undefined}
+                gpsPillarMessage={!pillarLocation ? (gpsTakingLong ? 'Initializing Protocol…' : 'GPS unavailable — enter city/country') : undefined}
                 gpsTakingLong={gpsTakingLong}
                 onGrantLocation={identityAnchor?.phone ? () => startLocationRequestFromUserGesture(identityAnchor.phone) : undefined}
+                onManualLocation={identityAnchor && !pillarLocation ? () => {
+                  setShowManualLocationInput(true);
+                  gpsFailureAuthRef.current = { identityAnchor };
+                } : undefined}
               />
             ) : (
               <PresenceProgressRing

@@ -20,6 +20,8 @@ export interface LayerStatusBarProps {
   palmVerified?: boolean;
   deviceVerified?: boolean;
   locationVerified?: boolean;
+  /** When true, show bar even with NO_SESSION (e.g. registration flow) so 0/4 is visible */
+  forceShow?: boolean;
 }
 
 /**
@@ -32,6 +34,7 @@ export function LayerStatusBar({
   palmVerified,
   deviceVerified,
   locationVerified = false,
+  forceShow = false,
 }: LayerStatusBarProps = {}) {
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>(SessionStatus.NO_SESSION);
   const [tripleAnchor, setTripleAnchor] = useState({ face: false, fingerprint: false, device: false });
@@ -51,7 +54,7 @@ export function LayerStatusBar({
     return () => clearInterval(interval);
   }, []);
 
-  if (sessionStatus === SessionStatus.NO_SESSION || sessionStatus === SessionStatus.SESSION_EXPIRED) {
+  if (!forceShow && (sessionStatus === SessionStatus.NO_SESSION || sessionStatus === SessionStatus.SESSION_EXPIRED)) {
     return null;
   }
 

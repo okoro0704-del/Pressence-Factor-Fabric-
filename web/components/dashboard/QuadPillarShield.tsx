@@ -31,6 +31,8 @@ export interface QuadPillarGridProps {
   gpsTakingLong?: boolean;
   /** Callback when user taps Grant Location (triggers browser location permission) */
   onGrantLocation?: () => void;
+  /** When GPS fails (manual verification required), allow manual city/country entry */
+  onManualLocation?: () => void;
 }
 
 /** Four pillars in a compact 2x2 grid — no scrolling on mobile */
@@ -42,6 +44,7 @@ export function QuadPillarGrid({
   gpsPillarMessage,
   gpsTakingLong = false,
   onGrantLocation,
+  onManualLocation,
 }: QuadPillarGridProps) {
   const verified = [faceVerified, palmVerified, phoneAnchorVerified, locationVerified];
   const allVerified = verified.every(Boolean);
@@ -53,6 +56,7 @@ export function QuadPillarGrid({
           const v = verified[i];
           const isGpsPillar = pillar.id === 4;
           const showGrantButton = isGpsPillar && !v && gpsTakingLong && onGrantLocation;
+          const showManualEntry = isGpsPillar && !v && gpsPillarMessage && onManualLocation;
           const pendingMsg = !v && isGpsPillar && gpsPillarMessage ? gpsPillarMessage : gpsTakingLong ? 'Initializing Protocol…' : '…';
           return (
             <div
@@ -82,6 +86,15 @@ export function QuadPillarGrid({
                   className="mt-2 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all border-2 border-[#D4AF37] bg-[#D4AF37]/20 text-[#D4AF37] hover:bg-[#D4AF37]/30"
                 >
                   Grant Location
+                </button>
+              )}
+              {showManualEntry && (
+                <button
+                  type="button"
+                  onClick={onManualLocation}
+                  className="mt-2 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all border-2 border-[#6b6b70] text-[#a0a0a5] hover:bg-[#D4AF37]/10 hover:border-[#D4AF37] hover:text-[#D4AF37]"
+                >
+                  Enter City/Country
                 </button>
               )}
             </div>

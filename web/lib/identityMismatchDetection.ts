@@ -262,7 +262,8 @@ export async function captureIntruderSnapshot(
 
 /**
  * Trigger Identity Mismatch Alert
- * Logs mismatch event and sends push notification to account owner
+ * Logs mismatch event and sends push notification to account owner.
+ * Context purge: skip Security Alert / Audit Log for non-vitalized users (registration flow).
  */
 export async function triggerIdentityMismatchAlert(
   accountOwnerPhone: string,
@@ -271,6 +272,14 @@ export async function triggerIdentityMismatchAlert(
   severity: 'CRITICAL' | 'HIGH' | 'MEDIUM'
 ): Promise<{ success: boolean; alertId?: string; error?: string }> {
   try {
+    // Only run audit/alert for vitalized users; no heavy trail for someone just getting in the door
+    const { getMintStatus, MINT_STATUS_MINTED } = await import('./mintStatus');
+    const mintRes = await getMintStatus(accountOwnerPhone);
+    const isVitalized = mintRes.ok && mintRes.mint_status === MINT_STATUS_MINTED;
+    if (!isVitalized) {
+      return { success: true };
+    }
+
     // Create alert message
     const message = generateAlertMessage(mismatchType, intruderCapture.variance_percentage);
 

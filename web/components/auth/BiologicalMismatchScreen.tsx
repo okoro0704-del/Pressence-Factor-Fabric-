@@ -17,6 +17,8 @@ interface BiologicalMismatchScreenProps {
   onRetry?: () => void;
   showSovereignManualBypass?: boolean;
   onSovereignManualBypass?: () => void;
+  /** When true, hide Security Alert Sent / Audit Log (e.g. gate flow, non-vault) */
+  hideSecurityNotice?: boolean;
 }
 
 export function BiologicalMismatchScreen({
@@ -29,6 +31,7 @@ export function BiologicalMismatchScreen({
   onRetry,
   showSovereignManualBypass = false,
   onSovereignManualBypass,
+  hideSecurityNotice = false,
 }: BiologicalMismatchScreenProps) {
   const [countdown, setCountdown] = useState(60);
 
@@ -172,27 +175,29 @@ export function BiologicalMismatchScreen({
             </div>
           </div>
 
-          {/* Security Notice */}
-          <div
-            className="rounded-lg border p-4 mb-6"
-            style={{
-              background: 'rgba(212, 175, 55, 0.05)',
-              borderColor: 'rgba(212, 175, 55, 0.3)',
-            }}
-          >
-            <div className="flex items-start gap-3">
-              <div className="text-2xl">🔒</div>
-              <div>
-                <p className="text-xs font-bold mb-2" style={{ color: '#D4AF37' }}>
-                  Security Alert Sent
-                </p>
-                <p className="text-xs leading-relaxed" style={{ color: '#a0a0a5' }}>
-                  {accountOwnerName || 'The account owner'} has been notified of this unauthorized access attempt.
-                  Your biometric snapshot has been captured and stored in the Sovereign Audit Log.
-                </p>
+          {/* Security Notice — hidden for gate/non-vault flows to reduce friction */}
+          {!hideSecurityNotice && (
+            <div
+              className="rounded-lg border p-4 mb-6"
+              style={{
+                background: 'rgba(212, 175, 55, 0.05)',
+                borderColor: 'rgba(212, 175, 55, 0.3)',
+              }}
+            >
+              <div className="flex items-start gap-3">
+                <div className="text-2xl">🔒</div>
+                <div>
+                  <p className="text-xs font-bold mb-2" style={{ color: '#D4AF37' }}>
+                    Security Alert Sent
+                  </p>
+                  <p className="text-xs leading-relaxed" style={{ color: '#a0a0a5' }}>
+                    {accountOwnerName || 'The account owner'} has been notified of this unauthorized access attempt.
+                    Your biometric snapshot has been captured and stored in the Sovereign Audit Log.
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Countdown */}
           <div className="text-center mb-6">
