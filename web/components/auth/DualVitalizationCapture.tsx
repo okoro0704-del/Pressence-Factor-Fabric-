@@ -10,6 +10,7 @@
  */
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { BiometricScanProgressBar } from '@/components/dashboard/QuadPillarShield';
 
 const GOLD = '#D4AF37';
 const PENDING = 'rgba(107, 107, 112, 0.5)';
@@ -367,7 +368,7 @@ export function DualVitalizationCapture({
         paddingBottom: 'env(safe-area-inset-bottom, 0)',
       }}
     >
-      <div className="relative w-full max-w-2xl aspect-[4/3] max-h-[80vh] overflow-hidden rounded-xl border-2 border-[#D4AF37]/50 shadow-[0_0_40px_rgba(212,175,55,0.2)]">
+      <div className="relative w-full max-w-2xl aspect-[4/3] max-h-[80vh] overflow-hidden rounded-xl border-2 border-[#D4AF37]/50 shadow-[0_0_40px_rgba(212,175,55,0.2)] mx-auto touch-manipulation">
         <video
           ref={videoRef}
           className="absolute inset-0 w-full h-full object-cover"
@@ -376,6 +377,13 @@ export function DualVitalizationCapture({
           muted
         />
         <canvas ref={canvasRef} className="hidden" aria-hidden />
+
+        {/* Gold scanning line + progress bar (0–100% over ~4s), smooth Verified transition */}
+        <BiometricScanProgressBar
+          isActive={isOpen && status === 'ready'}
+          durationMs={4000}
+          overlay
+        />
 
         {/* Instructional text */}
         <p

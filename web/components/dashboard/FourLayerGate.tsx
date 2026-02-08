@@ -306,6 +306,8 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
   const [showLearningModeMessage, setShowLearningModeMessage] = useState(false);
   /** Registration flow: subtle toast instead of mismatch lockout (Scan not clear. Please try again.) */
   const [scanToast, setScanToast] = useState<string | null>(null);
+  /** When presence_handshakes write fails (e.g. identity_mesh_hash column missing). */
+  const [ledgerSyncError, setLedgerSyncError] = useState(false);
   /** GPS failed: manual city/country entry to proceed */
   const [showManualLocationInput, setShowManualLocationInput] = useState(false);
   const gpsFailureAuthRef = useRef<{ identityAnchor: typeof identityAnchor } | null>(null);
@@ -410,6 +412,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     setMismatchData(null);
     setShowLearningModeMessage(false);
     setGpsTakingLong(false);
+    setLedgerSyncError(false);
     try {
       if (typeof localStorage !== 'undefined') {
         const keys: string[] = [];
@@ -829,6 +832,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
 
     // Quad-Pillar or Triple-Pillar success
     if (authResult.success && authResult.identity) {
+      setLedgerSyncError(!!authResult.ledgerSyncError);
       clearVerifiedPillars(identityAnchor.phone);
       architectSuccessRef.current = {
         authResult,
@@ -2002,6 +2006,20 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
           role="status"
         >
           {scanToast}
+        </div>
+      )}
+      {/* Ledger Sync Error: presence_handshakes write failed (e.g. add identity_mesh_hash column in Supabase) */}
+      {ledgerSyncError && (
+        <div
+          className="fixed top-20 left-1/2 -translate-x-1/2 z-[60] px-6 py-3 rounded-xl border text-sm font-medium shadow-lg animate-in fade-in duration-300"
+          style={{
+            background: 'rgba(30, 28, 22, 0.98)',
+            borderColor: 'rgba(239, 68, 68, 0.6)',
+            color: '#fca5a5',
+          }}
+          role="alert"
+        >
+          Ledger Sync Error
         </div>
       )}
 

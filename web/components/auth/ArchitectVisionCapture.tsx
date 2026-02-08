@@ -12,6 +12,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { speakSovereignSuccess } from '@/lib/sovereignVoice';
 import { useSovereignCompanion } from '@/contexts/SovereignCompanionContext';
+import { BiometricScanProgressBar } from '@/components/dashboard/QuadPillarShield';
 
 const BLUE_LASER = 'rgba(59, 130, 246, 0.95)';
 const MESH_COLOR = 'rgba(212, 175, 55, 0.6)';
@@ -286,8 +287,14 @@ export function ArchitectVisionCapture({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[300] flex flex-col items-center justify-center bg-black">
-      <div className="relative w-full max-w-2xl aspect-[4/3] max-h-[80vh] overflow-hidden rounded-xl border-2 border-[#D4AF37]/50 shadow-[0_0_60px_rgba(212,175,55,0.2)]">
+    <div
+      className="fixed inset-0 z-[300] flex flex-col items-center justify-center bg-black"
+      style={{
+        paddingTop: 'env(safe-area-inset-top, 0)',
+        paddingBottom: 'env(safe-area-inset-bottom, 0)',
+      }}
+    >
+      <div className="relative w-full max-w-2xl aspect-[4/3] max-h-[80vh] overflow-hidden rounded-xl border-2 border-[#D4AF37]/50 shadow-[0_0_60px_rgba(212,175,55,0.2)] mx-auto touch-manipulation">
         {/* Video + canvas overlay */}
         <video
           ref={videoRef}
@@ -302,15 +309,11 @@ export function ArchitectVisionCapture({
           style={{ transform: 'scaleX(-1)' }}
         />
 
-        {/* Blue laser scan line — moves up and down during processing */}
-        <div
-          className="absolute left-0 right-0 h-1 pointer-events-none z-10 architect-vision-laser"
-          style={{
-            top: '30%',
-            background: `linear-gradient(90deg, transparent, ${BLUE_LASER}, transparent)`,
-            boxShadow: `0 0 20px ${BLUE_LASER}`,
-          }}
-          data-animate={verificationSuccess !== true}
+        {/* Gold scanning line + progress bar (0–100% over 3–5s), smooth Verified transition */}
+        <BiometricScanProgressBar
+          isActive={isOpen && cameraStatus === 'ready' && !meshGold}
+          durationMs={4000}
+          overlay
         />
 
         {/* HUD */}
@@ -416,18 +419,6 @@ export function ArchitectVisionCapture({
         </button>
       )}
 
-      <style dangerouslySetInnerHTML={{
-        __html: `
-          .architect-vision-laser[data-animate="true"] {
-            animation: architect-laser-scan 2s ease-in-out infinite;
-            top: 20%;
-          }
-          @keyframes architect-laser-scan {
-            0%, 100% { top: 20%; }
-            50% { top: 80%; }
-          }
-        `,
-      }} />
     </div>
   );
 }

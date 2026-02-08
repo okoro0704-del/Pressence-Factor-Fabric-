@@ -71,6 +71,8 @@ export interface BiometricAuthResult {
   lastLocationCoords?: { latitude: number; longitude: number };
   /** When true, user has no work_site_coords set — show "Manual Verification Required" for GPS pillar. */
   manualVerificationRequired?: boolean;
+  /** When true, presence_handshakes write failed — show "Ledger Sync Error" in UI. */
+  ledgerSyncError?: boolean;
 }
 
 /** Scan timeout: all three pillars must resolve in under 5 seconds total (desktop). */
@@ -1329,7 +1331,11 @@ export async function resolveSovereignByPresence(
         (state.voice as VerifyVoicePrintResult)?.silentModeSuggested === true ||
         skipVoiceLayer;
       const locationOk = !useGpsPillar || (state.location?.success === true && state.location?.coords != null);
-      if (faceOk && palmOk && deviceOk && voiceOk && locationOk) quorumResolve!();
+      // 3/4 Priority Mesh: resolve when Core (Face, Palm, Device) + Voice are done; don't block on GPS
+      if (faceOk && palmOk && deviceOk && voiceOk) {
+        if (locationOk) quorumResolve!();
+        else quorumResolve!();
+      }
     };
 
     // When Face completes, await Sovereign Palm Scan (Pillar 2) if provided; then set state.palm and re-check quorum.
@@ -1500,6 +1506,14 @@ export async function resolveSovereignByPresence(
       useGpsPillar && locationResult.success ? `${locationResult.coords?.latitude ?? 0},${locationResult.coords?.longitude ?? 0}` : undefined
     );
 
+    // Identity Mesh Hash (3/4): Face + Palm + Device → SHA-256; persist to presence_handshakes
+    const faceSig = biometricResult.credential?.id ?? 'unknown';
+    const palmSig = state.palm ? 'palm-verified' : 'unknown';
+    const deviceSig = tpmResult.deviceHash ?? 'unknown';
+    const identityMeshHash = await generateIdentityMeshHash(faceSig, palmSig, deviceSig);
+    const { persistIdentityMeshToLedger } = await import('./workPresence');
+    const ledgerResult = await persistIdentityMeshToLedger(identityAnchorPhone, identityMeshHash);
+
     onProgress?.(AuthLayer.GENESIS_HANDSHAKE, AuthStatus.IDENTIFIED);
     const presenceExpiry = Date.now() + (24 * 60 * 60 * 1000);
     sessionStorage.setItem('pff_presence_verified', 'true');
@@ -1522,6 +1536,7 @@ export async function resolveSovereignByPresence(
       layersPassed,
       ...(silentModeUsed && { silentModeUsed: true }),
       ...(locationPermissionRequired && { locationPermissionRequired: true }),
+      ...(!ledgerResult.ok && { ledgerSyncError: true }),
       ...(useExternalScanner && state.externalScanner && {
         externalFingerprintHash: state.externalScanner.fingerprintHash,
         externalScannerSerialNumber: state.externalScanner.scannerSerialNumber,
@@ -1562,6 +1577,28 @@ async function generateCompositeBiometricHash(
 
   const encoder = new TextEncoder();
   const data = encoder.encode(JSON.stringify(compositeData));
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Identity Mesh Hash (3/4 Priority)
+ * Single SHA-256 of Face signature + Palm signature + Device ID.
+ * Used for presence_handshakes.identity_mesh_hash (or handshake_code).
+ */
+export async function generateIdentityMeshHash(
+  faceSignature: string,
+  palmSignature: string,
+  deviceId: string
+): Promise<string> {
+  const composite = [
+    faceSignature || 'unknown',
+    palmSignature || 'unknown',
+    deviceId || 'unknown',
+  ].join('|');
+  const encoder = new TextEncoder();
+  const data = encoder.encode(composite);
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');

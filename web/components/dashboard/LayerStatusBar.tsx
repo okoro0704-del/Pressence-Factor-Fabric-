@@ -26,7 +26,7 @@ export interface LayerStatusBarProps {
 
 /**
  * Quad-Pillar Security Status Bar
- * Face → Palm → Device → GPS. All four must turn Gold when ENABLE_GPS_AS_FOURTH_PILLAR.
+ * Face → Palm → Device → GPS. 3/4 Priority: Core Mesh (1,2,3) turns Sovereign Green; header stays 0/4 until pillars verified.
  * Real-time sync with QuadPillarShield when pillar props provided.
  */
 export function LayerStatusBar({
@@ -69,10 +69,21 @@ export function LayerStatusBar({
   const verifiedList = showGps ? [face, palm, device, location] : [face, palm, device];
   const count = verifiedList.filter(Boolean).length;
   const allGold = verifiedList.every(Boolean);
+  const coreMeshActive = showGps && face && palm && device && !location;
 
-  const borderColor = allGold ? GREEN : count >= 1 ? GOLD : RED;
-  const statusText = allGold ? (showGps ? 'QUAD ANCHOR VERIFIED' : 'TRIPLE ANCHOR VERIFIED') : `ANCHOR ${count}/${totalPillars}`;
-  const subText = allGold ? '1 VIDA Unlocked' : showGps ? 'Face → Palm → Device → GPS' : 'Face → Palm → Device';
+  const borderColor = allGold ? GREEN : coreMeshActive ? GREEN : count >= 1 ? GOLD : RED;
+  const statusText = allGold
+    ? (showGps ? 'QUAD ANCHOR VERIFIED' : 'TRIPLE ANCHOR VERIFIED')
+    : coreMeshActive
+    ? 'CORE MESH ACTIVE'
+    : `ANCHOR ${count}/${totalPillars}`;
+  const subText = allGold
+    ? '1 VIDA Unlocked'
+    : coreMeshActive
+    ? 'Face · Palm · Device verified (GPS optional)'
+    : showGps
+    ? 'Face → Palm → Device → GPS'
+    : 'Face → Palm → Device';
 
   type IconProps = { size?: number; className?: string; 'aria-hidden'?: boolean };
   const icons: { key: string; verified: boolean; Icon: React.ComponentType<IconProps>; label: string }[] = [
@@ -82,7 +93,9 @@ export function LayerStatusBar({
     ...(showGps ? [{ key: 'gps', verified: location, Icon: MapPin as React.ComponentType<IconProps>, label: 'GPS' }] : []),
   ];
 
-  const sovereignGlow = allGold ? '0 0 15px rgba(255,215,0,0.5), 0 0 40px rgba(212,175,55,0.25)' : undefined;
+  const sovereignGlow =
+    allGold || coreMeshActive ? '0 0 15px rgba(34,197,94,0.5), 0 0 40px rgba(34,197,94,0.25)' : undefined;
+  const progressPct = allGold ? 100 : coreMeshActive ? (3 / totalPillars) * 100 : (count / totalPillars) * 100;
 
   return (
     <div
@@ -138,7 +151,7 @@ export function LayerStatusBar({
           <div
             className="h-full transition-all duration-500"
             style={{
-              width: `${(count / totalPillars) * 100}%`,
+              width: `${progressPct}%`,
               background: `linear-gradient(90deg, ${borderColor} 0%, ${borderColor}80 100%)`,
               boxShadow: `0 0 10px ${borderColor}60`,
             }}

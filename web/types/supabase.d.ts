@@ -74,6 +74,8 @@ export interface Database {
           liveness_score: number | null;
           /** Work site { lat, lng } at clock-in (Quad-Pillar audit). */
           work_site_coords: { lat?: number; lng?: number } | null;
+          /** SHA-256 of Face + Palm + Device (3/4 Core Mesh). Run RUN_IN_SUPABASE_SQL_EDITOR.sql to add column. */
+          identity_mesh_hash?: string | null;
           [key: string]: unknown;
         };
         Insert: Partial<Database['public']['Tables']['presence_handshakes']['Row']>;

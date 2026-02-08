@@ -219,6 +219,59 @@ export async function recordClockIn(
   }
 }
 
+/**
+ * Persist Identity Mesh Hash to presence_handshakes.
+ * Stores the SHA-256 mesh hash (Face + Palm + Device) in identity_mesh_hash or handshake_code.
+ * If the write fails (e.g. column missing or RLS), returns { ok: false } so UI can show "Ledger Sync Error".
+ * Table should have identity_mesh_hash (text) or handshake_code (text); add via migration if needed.
+ */
+export async function persistIdentityMeshToLedger(
+  anchorPhone: string,
+  identityMeshHash: string
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const supabase = getSupabase();
+    if (!supabase) return { ok: false, error: 'Supabase not available' };
+
+    const now = new Date().toISOString();
+    const payload = {
+      anchor_phone: anchorPhone,
+      verified_at: now,
+      liveness_score: 100,
+      identity_mesh_hash: identityMeshHash,
+    } as Record<string, unknown>;
+
+    const { data: existing } = await supabase
+      .from('presence_handshakes')
+      .select('id')
+      .eq('anchor_phone', anchorPhone)
+      .order('verified_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existing?.id) {
+      const { error: updateError } = await supabase
+        .from('presence_handshakes')
+        .update({
+          verified_at: now,
+          liveness_score: 100,
+          identity_mesh_hash: identityMeshHash,
+        } as Record<string, unknown>)
+        .eq('id', existing.id);
+      if (updateError) return { ok: false, error: updateError.message };
+    } else {
+      const { error: insertError } = await supabase
+        .from('presence_handshakes')
+        .insert(payload);
+      if (insertError) return { ok: false, error: insertError.message };
+    }
+    return { ok: true };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false, error: msg };
+  }
+}
+
 /** Last clock-in coords from session (for UI or re-use). */
 export function getLastClockInCoords(): { latitude: number; longitude: number } | null {
   if (typeof sessionStorage === 'undefined') return null;

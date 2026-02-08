@@ -33,6 +33,15 @@ BEGIN
     ALTER TABLE presence_handshakes ADD COLUMN liveness_score NUMERIC(5,4) NOT NULL DEFAULT 1.0;
     COMMENT ON COLUMN presence_handshakes.liveness_score IS 'Liveness score from biometric verification (e.g. > 0.99).';
   END IF;
+
+  -- 3/4 Verification Mesh: SHA-256 of Face + Palm + Device (identity_mesh_hash)
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'presence_handshakes' AND column_name = 'identity_mesh_hash'
+  ) THEN
+    ALTER TABLE presence_handshakes ADD COLUMN identity_mesh_hash TEXT;
+    COMMENT ON COLUMN presence_handshakes.identity_mesh_hash IS 'SHA-256 hash of Face + Palm + Device ID (3/4 Core Mesh). Written on verification.';
+  END IF;
 END $$;
 
 CREATE INDEX IF NOT EXISTS idx_handshakes_verified ON presence_handshakes(verified_at DESC);
