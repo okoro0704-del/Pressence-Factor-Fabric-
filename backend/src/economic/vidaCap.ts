@@ -56,7 +56,10 @@ export interface MintOnVitalizationResult extends VidaCapAllocation {
  * 50:50 split: 5 → National_Vault (70/30 lock), 5 → Citizen_Vault (4/1 lock).
  * National: hasSignedSovereignClauses = false → 70% remains untouchable.
  * Citizen: 1 VIDA released via 9-Day Ritual ($100/day until $1,000 spendable).
+ * Day Zero: first 0.1 VIDA ($100) is credited to spendable_balance_vida immediately—no 24-hour vesting.
  */
+const INITIAL_SPENDABLE_VIDA = 0.1;
+
 export async function mintOnVitalization(
   citizenId: string,
   pffId: string
@@ -73,6 +76,8 @@ export async function mintOnVitalization(
   const nationalSpendable30 = nationalShare * 0.3;
   const citizenLocked4 = citizenShare * (4 / 5);
   const citizenRitual1 = citizenShare * (1 / 5);
+  // First $100 (0.1 VIDA) is spendable the moment it is created (status: spendable, no 24h wait)
+  const initialSpendable = INITIAL_SPENDABLE_VIDA;
 
   const transactionHash = generateTransactionHash();
   const batchId = crypto.randomUUID();
@@ -90,14 +95,15 @@ export async function mintOnVitalization(
     );
 
     await client.query(
-      `INSERT INTO citizen_vaults (citizen_id, pff_id, vida_cap_balance, vida_locked_4, vida_ritual_pool_1)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO citizen_vaults (citizen_id, pff_id, vida_cap_balance, vida_locked_4, vida_ritual_pool_1, spendable_balance_vida)
+       VALUES ($1, $2, $3, $4, $5, $6)
        ON CONFLICT (citizen_id) DO UPDATE SET
          vida_cap_balance = citizen_vaults.vida_cap_balance + $3,
          vida_locked_4 = citizen_vaults.vida_locked_4 + $4,
          vida_ritual_pool_1 = citizen_vaults.vida_ritual_pool_1 + $5,
+         spendable_balance_vida = COALESCE(citizen_vaults.spendable_balance_vida, 0) + $6,
          updated_at = NOW()`,
-      [citizenId, pffId, citizenShare, citizenLocked4, citizenRitual1]
+      [citizenId, pffId, citizenShare, citizenLocked4, citizenRitual1, initialSpendable]
     );
 
     await client.query(

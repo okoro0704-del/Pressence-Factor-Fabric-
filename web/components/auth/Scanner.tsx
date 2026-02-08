@@ -1,9 +1,9 @@
 'use client';
 
 /**
- * Face Hash Scanner — Auto-start when camera is active, status in bottom 20%.
- * When scan is VERIFIED: save faceHash to LocalStorage + session, then auto-redirect to /vitalization/master-key after 1s.
- * No manual Start Scan; center of camera 100% clear; all status/progress in bottom 20%.
+ * Face Hash Scanner — Auto-start when camera is active.
+ * When scan is VERIFIED: save faceHash, show "PROCEED TO DASHBOARD" (gold), auto-redirect to /dashboard after 1.5s.
+ * No Cancel button in success state.
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -16,7 +16,7 @@ import {
   sha256Hex,
 } from '@/lib/biometricAnchorSync';
 import { verifyBiometricSignature } from '@/lib/biometricAuth';
-import { getIdentityAnchorPhone } from '@/lib/sentinelActivation';
+import { getIdentityAnchorPhone, setIdentityAnchorForSession } from '@/lib/sentinelActivation';
 import { ROUTES } from '@/lib/constants';
 
 export type ScannerStatus = 'idle' | 'searching' | 'scanning' | 'VERIFIED' | 'error';
@@ -25,7 +25,7 @@ export interface ScannerProps {
   phoneNumber?: string | null;
   onAnchorSaved?: (step: number) => void;
   onStatusChange?: (status: ScannerStatus) => void;
-  /** Delay in ms before auto-redirect after VERIFIED. Default 1000. */
+  /** Delay in ms before auto-redirect after VERIFIED. Default 1500. */
   redirectDelayMs?: number;
   autoRedirect?: boolean;
 }
@@ -38,7 +38,7 @@ export function Scanner({
   phoneNumber: phoneProp,
   onAnchorSaved,
   onStatusChange,
-  redirectDelayMs = 1000,
+  redirectDelayMs = 1500,
   autoRedirect = true,
 }: ScannerProps) {
   const router = useRouter();
@@ -66,6 +66,12 @@ export function Scanner({
       setStatus('VERIFIED');
       onStatusChange?.('VERIFIED');
       onAnchorSaved?.(1);
+      // Persistence: save is_vitalized so user never sees this screen again
+      try {
+        if (typeof localStorage !== 'undefined') localStorage.setItem('is_vitalized', 'true');
+      } catch {
+        /* ignore */
+      }
     },
     [phone, onAnchorSaved, onStatusChange]
   );
@@ -173,14 +179,30 @@ export function Scanner({
     };
   }, []);
 
-  // VERIFIED → redirect after 1s
+  // VERIFIED → auto-redirect to dashboard after 1.5s (triggers initial release + toast on dashboard)
   useEffect(() => {
     if (status !== 'VERIFIED' || !autoRedirect) return;
     const t = setTimeout(() => {
-      router.push(ROUTES.VITALIZATION_MASTER_KEY);
+      if (phone?.trim()) {
+        setIdentityAnchorForSession(phone.trim());
+        if (typeof sessionStorage !== 'undefined') {
+          sessionStorage.setItem('pff_initial_release_phone', phone.trim());
+        }
+      }
+      router.push(`${ROUTES.DASHBOARD}?initial_release=1`);
     }, redirectDelayMs);
     return () => clearTimeout(t);
-  }, [status, autoRedirect, redirectDelayMs, router]);
+  }, [status, autoRedirect, redirectDelayMs, router, phone]);
+
+  const handleProceedToDashboard = useCallback(() => {
+    if (phone?.trim()) {
+      setIdentityAnchorForSession(phone.trim());
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.setItem('pff_initial_release_phone', phone.trim());
+      }
+    }
+    router.push(`${ROUTES.DASHBOARD}?initial_release=1`);
+  }, [router, phone]);
 
   const handleRetry = useCallback(() => {
     scanTriggeredRef.current = false;
@@ -214,89 +236,14 @@ export function Scanner({
       });
   }, [runScan]);
 
-  // Bottom 20%: status indicator (non-clickable except Retry in fail state)
-  const renderStatusBar = () => {
-    if (status === 'searching') {
-      return (
-        <div
-          className="w-full py-4 px-4 text-center text-sm font-bold uppercase tracking-wider text-[#D4AF37] scanner-pulse-border"
-          style={{
-            borderTop: '2px solid rgba(212, 175, 55, 0.7)',
-            boxShadow: '0 0 20px rgba(212, 175, 55, 0.25)',
-            background: 'rgba(10, 10, 12, 0.95)',
-          }}
-        >
-          <style dangerouslySetInnerHTML={{ __html: `
-            @keyframes scanner-pulse { 0%, 100% { opacity: 0.7; box-shadow: 0 0 16px rgba(212,175,55,0.3); } 50% { opacity: 1; box-shadow: 0 0 24px rgba(212,175,55,0.5); } }
-            .scanner-pulse-border { animation: scanner-pulse 1.5s ease-in-out infinite; }
-          ` }} />
-          FINDING ARCHITECT...
-        </div>
-      );
-    }
-    if (status === 'scanning') {
-      return (
-        <div
-          className="w-full py-4 px-4 text-center text-sm font-bold uppercase tracking-wider"
-          style={{
-            borderTop: '2px solid rgba(212, 175, 55, 0.5)',
-            background: 'rgba(10, 10, 12, 0.95)',
-            color: '#e8c547',
-          }}
-        >
-          <p>SCANNING... {progress}%</p>
-          <div className="mt-2 h-1.5 w-full max-w-xs mx-auto rounded-full bg-[#2a2a2e] overflow-hidden">
-            <div
-              className="h-full rounded-full transition-all duration-300"
-              style={{ width: `${progress}%`, background: `linear-gradient(90deg, ${GOLD}, #e8c547)` }}
-            />
-          </div>
-        </div>
-      );
-    }
-    if (status === 'VERIFIED') {
-      return (
-        <div
-          className="w-full py-4 px-4 text-center text-sm font-bold uppercase tracking-wider"
-          style={{
-            borderTop: '2px solid rgba(34, 197, 94, 0.6)',
-            background: 'rgba(10, 10, 12, 0.95)',
-            color: '#22c55e',
-          }}
-        >
-          SCANNING SUCCESSFUL
-        </div>
-      );
-    }
-    if (status === 'error') {
-      return (
-        <div
-          className="w-full py-4 px-4 text-center"
-          style={{
-            borderTop: '2px solid rgba(239, 68, 68, 0.6)',
-            background: 'rgba(10, 10, 12, 0.95)',
-          }}
-        >
-          <p className="text-sm font-bold uppercase tracking-wider text-red-400 mb-3">SCANNING FAILED</p>
-          <button
-            type="button"
-            onClick={handleRetry}
-            className="py-2.5 px-6 rounded-xl font-bold text-sm uppercase tracking-wider transition-opacity hover:opacity-90"
-            style={{ background: GOLD, color: '#0d0d0f' }}
-          >
-            RETRY SCAN
-          </button>
-        </div>
-      );
-    }
-    return null;
-  };
+  // Full-screen camera, 100% clear. Only a circular progress ring (2px Gold) around the feed.
+  const radius = 48;
+  const circumference = 2 * Math.PI * radius;
+  const strokeOffset = circumference * (1 - progress / 100);
 
-  // Full layout: camera top 80% (center clear), status bottom 20%
   return (
-    <div className="fixed inset-0 z-[200] flex flex-col bg-black">
-      {/* Top 80%: camera only — 100% clear center */}
-      <div className="flex-1 min-h-0 relative flex items-center justify-center" style={{ height: '80%' }}>
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black">
+      <div className="absolute inset-0 flex items-center justify-center">
         <video
           ref={videoRef}
           className="w-full h-full object-cover"
@@ -305,10 +252,63 @@ export function Scanner({
           muted
         />
       </div>
-      {/* Bottom 20%: status indicator only */}
-      <div className="shrink-0 flex flex-col justify-end" style={{ height: '20%', minHeight: '100px' }}>
-        {renderStatusBar()}
+      {/* Progress ring: 2px Gold border around viewport, fills as scanningProgress increases */}
+      <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+        <svg className="w-full h-full max-w-[min(100vw,100vh)] max-h-[min(100vw,100vh)]" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">
+          <circle
+            cx="50"
+            cy="50"
+            r={radius}
+            fill="none"
+            stroke="rgba(212, 175, 55, 0.25)"
+            strokeWidth="2"
+          />
+          <circle
+            cx="50"
+            cy="50"
+            r={radius}
+            fill="none"
+            stroke={GOLD}
+            strokeWidth="2"
+            strokeDasharray={circumference}
+            strokeDashoffset={strokeOffset}
+            strokeLinecap="round"
+            transform="rotate(-90 50 50)"
+            style={{ transition: 'stroke-dashoffset 0.15s ease-out' }}
+          />
+        </svg>
       </div>
+      {/* VERIFIED: Gold "PROCEED TO DASHBOARD" (no Cancel) */}
+      {status === 'VERIFIED' && (
+        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-10">
+          <button
+            type="button"
+            onClick={handleProceedToDashboard}
+            className="py-3 px-8 rounded-xl font-bold text-sm uppercase tracking-wider transition-opacity hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/50 focus:ring-offset-2 focus:ring-offset-black"
+            style={{
+              background: `linear-gradient(145deg, ${GOLD}, #C9A227)`,
+              color: '#0d0d0f',
+              boxShadow: '0 0 24px rgba(212, 175, 55, 0.4)',
+            }}
+          >
+            PROCEED TO DASHBOARD
+          </button>
+        </div>
+      )}
+
+      {/* Error: minimal retry only when failed */}
+      {status === 'error' && (
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10">
+          <button
+            type="button"
+            onClick={handleRetry}
+            className="py-2.5 px-6 rounded-xl font-bold text-sm uppercase tracking-wider transition-opacity hover:opacity-90"
+            style={{ background: GOLD, color: '#0d0d0f' }}
+          >
+            Retry
+          </button>
+        </div>
+      )}
     </div>
   );
 }

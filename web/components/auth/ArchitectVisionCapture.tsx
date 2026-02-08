@@ -59,6 +59,12 @@ export interface ArchitectVisionCaptureProps {
   enforceBrightnessCheck?: boolean;
   /** Master Architect Initialization: first run uses Low sensitivity (0.4, no lighting block) so Creator is not blocked. */
   isMasterArchitectInit?: boolean;
+  /** When true, force Hash Status to COMPLETE after Liveness is Detected for 1.5s (no wait for background handshake). */
+  enableArchitectBypass?: boolean;
+  /** Called when Architect bypass fires: parent should set verificationSuccess so gold freeze + onComplete run. */
+  onForceCompleteRequest?: () => void;
+  /** Ms to wait after Liveness Detected before forcing complete. Default 1500. */
+  forceCompleteAfterLivenessMs?: number;
 }
 
 /** Front camera only, highest practical resolution. Force front camera immediately when entering registration/face capture. */
@@ -83,6 +89,9 @@ export function ArchitectVisionCapture({
   confidenceThreshold = 0.4,
   enforceBrightnessCheck = false,
   isMasterArchitectInit = false,
+  enableArchitectBypass = false,
+  onForceCompleteRequest,
+  forceCompleteAfterLivenessMs = 1500,
 }: ArchitectVisionCaptureProps) {
   const effectiveConfidence = isMasterArchitectInit ? 0.4 : confidenceThreshold;
   const effectiveBrightness = isMasterArchitectInit ? false : enforceBrightnessCheck;
@@ -204,6 +213,16 @@ export function ArchitectVisionCapture({
     }, 500);
     return () => clearTimeout(t);
   }, [isOpen, effectiveThresholdPercent]);
+
+  // Force COMPLETE after 1.5s when Liveness is Detected and Architect bypass enabled (end Calculating loop; no wait for background handshake).
+  useEffect(() => {
+    if (!isOpen || !enableArchitectBypass || liveness !== 'Detected' || meshGold) return;
+    const t = setTimeout(() => {
+      setHashStatus('Ready');
+      onForceCompleteRequest?.();
+    }, forceCompleteAfterLivenessMs);
+    return () => clearTimeout(t);
+  }, [isOpen, enableArchitectBypass, liveness, meshGold, forceCompleteAfterLivenessMs, onForceCompleteRequest]);
 
   // Draw loop: video → canvas, overlay mesh (placeholder 3D geometry)
   useEffect(() => {

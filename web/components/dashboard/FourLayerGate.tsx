@@ -1185,8 +1185,12 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     const next = searchParams.get('next');
     const raw = next && typeof next === 'string' && next.startsWith('/') && !next.startsWith('//') ? next : ROUTES.DASHBOARD;
     const target = raw === ROUTES.VITALIZATION || raw.startsWith(ROUTES.VITALIZATION + '/') ? ROUTES.DASHBOARD : raw;
+    const url = target === ROUTES.DASHBOARD ? `${ROUTES.DASHBOARD}?initial_release=1` : target;
+    if (identityAnchor?.phone && target === ROUTES.DASHBOARD && typeof sessionStorage !== 'undefined') {
+      sessionStorage.setItem('pff_initial_release_phone', identityAnchor.phone);
+    }
     setTimeout(() => {
-      router.replace(target);
+      router.replace(url);
     }, 1000);
   };
 
@@ -2544,6 +2548,9 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
         isMasterArchitectInit={isFirstRun || softStart}
         confidenceThreshold={learningModeRef.current.active ? 0.6 : visionConfidenceThreshold}
         enforceBrightnessCheck={visionEnforceBrightness}
+        enableArchitectBypass={isArchitect()}
+        onForceCompleteRequest={() => setArchitectVerificationSuccess(true)}
+        forceCompleteAfterLivenessMs={1500}
       />
 
       {/* Triple-Pillar Pillar 2: Sovereign Palm Scan — front camera + palm overlay; resolves palmVerificationPromise on success (skipped when Dual-Vitalization) */}

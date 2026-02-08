@@ -150,6 +150,8 @@ export async function ensureMintedAndBalance(phoneNumber: string): Promise<{ ok:
       })
       .eq('phone_number', trimmed);
     if (walletError) return { ok: false, error: walletError.message ?? 'Failed to credit 5 VIDA' };
+    const { executeSentinelActivationDebit } = await import('./masterArchitectInit');
+    await executeSentinelActivationDebit(trimmed);
     return { ok: true };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

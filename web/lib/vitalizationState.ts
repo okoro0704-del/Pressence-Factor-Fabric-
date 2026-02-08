@@ -23,11 +23,30 @@ export const DEVICE_NOT_ANCHORED_MESSAGE =
 /** State lockdown: when true, app must not return to scanner unless user manually logs out. */
 export const VITALIZATION_COMPLETE_KEY = 'VITALIZATION_COMPLETE';
 
+/** One-way flow: once set, app must NEVER show registration again—only Welcome Home face scan. */
+export const PFF_VITALIZED_KEY = 'pff_VITALIZED';
+
+/** Persistence: user never sees vitalization screen again after successful scan. */
+export const IS_VITALIZED_KEY = 'is_vitalized';
+
 export function setVitalizationComplete(): void {
   try {
     if (typeof sessionStorage !== 'undefined') sessionStorage.setItem(VITALIZATION_COMPLETE_KEY, 'true');
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(PFF_VITALIZED_KEY, '1');
+      localStorage.setItem(IS_VITALIZED_KEY, 'true');
+    }
   } catch {
     // ignore
+  }
+}
+
+/** True if device has ever completed vitalization (one-way flag). Never show registration again. */
+export function isVitalizedFlag(): boolean {
+  try {
+    return typeof localStorage !== 'undefined' && localStorage.getItem(PFF_VITALIZED_KEY) === '1';
+  } catch {
+    return false;
   }
 }
 
