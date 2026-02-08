@@ -5,8 +5,8 @@ import Link from 'next/link';
 import { SovereignPulseBar } from '@/components/dashboard/SovereignPulseBar';
 import { NationalReserveCharts } from '@/components/dashboard/NationalReserveCharts';
 import { NationalBlockCommand } from '@/components/dashboard/NationalBlockCommand';
-import { fetchLedgerStats } from '@/lib/ledgerStats';
-import { fetchNationalBlockReserves } from '@/lib/supabaseTelemetry';
+import { fetchLedgerStatsFromSupabase } from '@/lib/ledgerStats';
+import { fetchNationalBlockReserves, type NationalBlockReserves } from '@/lib/supabaseTelemetry';
 import { useUsdToNgnRate } from '@/lib/useUsdToNgnRate';
 import { getCountryDisplayName } from '@/lib/countryDisplayName';
 import { getCountryCodeForPhone } from '@/lib/userProfileCountry';
@@ -22,7 +22,7 @@ function formatNaira(n: number) {
   return `₦${n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 }
 
-/** Treasury = country only: national ledger with country name, minted, vitalized, reserve, liquidity, VIDA price in USD and Naira. */
+/** Treasury: all data from Supabase. 70% National Lock Block, 30% National Liquidity (VIDA CAP + Liquid Pool in Naira). */
 export function NationalTreasuryContent() {
   const { rate: usdToNgn } = useUsdToNgnRate();
   const [ledgerStats, setLedgerStats] = useState<{
@@ -31,11 +31,7 @@ export function NationalTreasuryContent() {
     totalMintedVida: number;
     nationalReserveUsd: number;
   } | null>(null);
-  const [nationalReserves, setNationalReserves] = useState<{
-    vida_cap_liquidity: number;
-    vida_price_usd: number;
-    naira_rate: number;
-  } | null>(null);
+  const [reserves, setReserves] = useState<NationalBlockReserves | null>(null);
   const [countryName, setCountryName] = useState<string>('Nigeria');
 
   useEffect(() => {
@@ -45,29 +41,18 @@ export function NationalTreasuryContent() {
   }, []);
 
   useEffect(() => {
-    fetchLedgerStats().then((s) => {
-      setLedgerStats({
-        totalReserveVida: s.totalReserveVida,
-        totalVitalizedCount: s.totalVitalizedCount,
-        totalMintedVida: s.totalMintedVida,
-        nationalReserveUsd: s.nationalReserveUsd,
-      });
+    fetchLedgerStatsFromSupabase().then((s) => {
+      if (s) setLedgerStats(s);
     });
   }, []);
 
   useEffect(() => {
     fetchNationalBlockReserves().then((r) => {
-      if (r) {
-        setNationalReserves({
-          vida_cap_liquidity: r.vida_cap_liquidity,
-          vida_price_usd: r.vida_price_usd,
-          naira_rate: r.naira_rate,
-        });
-      }
+      if (r) setReserves(r);
     });
   }, []);
 
-  const vidaPriceUsd = nationalReserves?.vida_price_usd ?? VIDA_USD_VALUE;
+  const vidaPriceUsd = reserves?.vida_price_usd ?? VIDA_USD_VALUE;
   const vidaPriceNaira = vidaPriceUsd * usdToNgn;
 
   return (
@@ -78,10 +63,10 @@ export function NationalTreasuryContent() {
           {countryName}&apos;s National Treasury
         </h2>
         <p className="text-xs text-[#6b6b70] mb-6">
-          Public view — collective wealth for Vitalized citizens. Amounts in VIDA, USD and Naira.
+          All figures from Supabase. 70% National Lock Block · 30% National Liquidity (VIDA CAP + Liquid Pool in Naira).
         </p>
 
-        {/* 1 VIDA price */}
+        {/* 1 VIDA price (from Supabase when available) */}
         <div className="rounded-xl border border-[#2a2a2e] bg-[#16161a]/60 p-4 mb-6">
           <h3 className="text-xs font-bold text-[#6b6b70] uppercase tracking-wider mb-2">Price of 1 VIDA</h3>
           <p className="text-lg font-bold font-mono" style={{ color: GOLD }}>
@@ -92,8 +77,16 @@ export function NationalTreasuryContent() {
           </p>
         </div>
 
+        {/* From Supabase ledger_stats */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
-          {/* Total minted VIDA for the country */}
+          <div className="rounded-xl border border-[#2a2a2e] p-4">
+            <span className="text-xs font-bold text-[#6b6b70] uppercase tracking-wider">Total Vitalized Citizens</span>
+            <p className="text-2xl font-bold font-mono mt-1" style={{ color: GOLD }}>
+              {ledgerStats != null ? ledgerStats.totalVitalizedCount.toLocaleString() : '—'}
+            </p>
+            <p className="text-[10px] text-[#6b6b70] mt-1">From Supabase ledger_stats</p>
+          </div>
+
           <div className="rounded-xl border border-[#2a2a2e] p-4">
             <span className="text-xs font-bold text-[#6b6b70] uppercase tracking-wider">Total Minted VIDA</span>
             <p className="text-xl font-bold font-mono mt-1" style={{ color: GOLD }}>
@@ -107,46 +100,62 @@ export function NationalTreasuryContent() {
                 <p className="text-sm text-[#a0a0a5]">{formatNaira(ledgerStats.totalMintedVida * vidaPriceNaira)} Naira</p>
               </>
             )}
+            <p className="text-[10px] text-[#6b6b70] mt-1">From Supabase ledger_stats</p>
           </div>
+        </div>
 
-          {/* Total Vitalized Citizens */}
-          <div className="rounded-xl border border-[#2a2a2e] p-4">
-            <span className="text-xs font-bold text-[#6b6b70] uppercase tracking-wider">Total Vitalized Citizens</span>
-            <p className="text-2xl font-bold font-mono mt-1" style={{ color: GOLD }}>
-              {ledgerStats != null ? ledgerStats.totalVitalizedCount.toLocaleString() : '—'}
-            </p>
-          </div>
+        {/* National Lock Block = 70% of the 5 minted (from Supabase national_block_reserves) */}
+        <div className="rounded-xl border border-[#2a2a2e] p-4 mb-6">
+          <h3 className="text-xs font-bold text-[#6b6b70] uppercase tracking-wider mb-2">National Lock Block (70%)</h3>
+          <p className="text-sm text-[#a0a0a5] mb-2">70% of minted VIDA per citizen. From Supabase national_block_reserves.</p>
+          <p className="text-xl font-bold font-mono" style={{ color: GOLD }}>
+            {reserves != null
+              ? `${reserves.national_vault_vida_cap.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VIDA`
+              : '—'}
+          </p>
+          {reserves != null && (
+            <>
+              <p className="text-sm text-[#a0a0a5]">{formatUsd(reserves.national_vault_value_usd)} USD</p>
+              <p className="text-sm text-[#a0a0a5]">{formatNaira(reserves.national_vault_value_naira)} Naira</p>
+            </>
+          )}
+        </div>
 
-          {/* National locked reserved VIDA CAP */}
-          <div className="rounded-xl border border-[#2a2a2e] p-4">
-            <span className="text-xs font-bold text-[#6b6b70] uppercase tracking-wider">National Locked Reserved VIDA CAP</span>
-            <p className="text-xl font-bold font-mono mt-1" style={{ color: GOLD }}>
-              {ledgerStats != null
-                ? `${ledgerStats.totalReserveVida.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VIDA`
-                : '—'}
-            </p>
-            {ledgerStats != null && (
-              <>
-                <p className="text-sm text-[#a0a0a5]">{formatUsd(ledgerStats.totalReserveVida * vidaPriceUsd)} USD</p>
-                <p className="text-sm text-[#a0a0a5]">{formatNaira(ledgerStats.totalReserveVida * vidaPriceNaira)} Naira</p>
-              </>
-            )}
-          </div>
+        {/* National Liquidity = 30%: VIDA CAP + Liquid Pool in Naira (from Supabase) */}
+        <div className="rounded-xl border border-[#2a2a2e] p-4 mb-6">
+          <h3 className="text-xs font-bold text-[#6b6b70] uppercase tracking-wider mb-3">National Liquidity (30%)</h3>
+          <p className="text-sm text-[#a0a0a5] mb-4">VIDA CAP and Liquid Pool in Naira. From Supabase national_block_reserves.</p>
 
-          {/* National Liquidity */}
-          <div className="rounded-xl border border-[#2a2a2e] p-4">
-            <span className="text-xs font-bold text-[#6b6b70] uppercase tracking-wider">National Liquidity</span>
-            <p className="text-xl font-bold font-mono mt-1" style={{ color: GOLD }}>
-              {nationalReserves != null
-                ? `${nationalReserves.vida_cap_liquidity.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VIDA`
-                : ledgerStats != null ? '—' : '—'}
-            </p>
-            {nationalReserves != null && (
-              <>
-                <p className="text-sm text-[#a0a0a5]">{formatUsd(nationalReserves.vida_cap_liquidity * nationalReserves.vida_price_usd)} USD</p>
-                <p className="text-sm text-[#a0a0a5]">{formatNaira(nationalReserves.vida_cap_liquidity * nationalReserves.vida_price_usd * usdToNgn)} Naira</p>
-              </>
-            )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="rounded-lg border border-[#2a2a2e] bg-[#16161a]/60 p-3">
+              <span className="text-[10px] font-bold text-[#6b6b70] uppercase tracking-wider">VIDA CAP</span>
+              <p className="text-lg font-bold font-mono mt-1" style={{ color: GOLD }}>
+                {reserves != null
+                  ? `${reserves.vida_cap_liquidity.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VIDA`
+                  : '—'}
+              </p>
+              {reserves != null && (
+                <>
+                  <p className="text-xs text-[#a0a0a5]">{formatUsd(reserves.vida_cap_liquidity * reserves.vida_price_usd)} USD</p>
+                  <p className="text-xs text-[#a0a0a5]">{formatNaira(reserves.vida_cap_liquidity_value_naira)} Naira</p>
+                </>
+              )}
+            </div>
+
+            <div className="rounded-lg border border-[#2a2a2e] bg-[#16161a]/60 p-3">
+              <span className="text-[10px] font-bold text-[#6b6b70] uppercase tracking-wider">Liquid Pool (Naira VIDA)</span>
+              <p className="text-lg font-bold font-mono mt-1" style={{ color: GOLD }}>
+                {reserves != null
+                  ? `${reserves.national_vida_pool_vida_cap.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VIDA`
+                  : '—'}
+              </p>
+              {reserves != null && (
+                <>
+                  <p className="text-xs text-[#a0a0a5]">{formatUsd(reserves.national_vida_pool_vida_cap * reserves.vida_price_usd)} USD</p>
+                  <p className="text-xs text-[#a0a0a5]">{formatNaira(reserves.national_vida_pool_value_naira)} Naira</p>
+                </>
+              )}
+            </div>
           </div>
         </div>
 
