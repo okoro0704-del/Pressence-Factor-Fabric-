@@ -64,7 +64,7 @@ export function LayerStatusBar({
   const device = useProps ? (deviceVerified ?? tripleAnchor.device) : tripleAnchor.device;
   const location = useProps ? locationVerified : false;
 
-  const showGps = ENABLE_GPS_AS_FOURTH_PILLAR;
+  const showGps = forceShow || ENABLE_GPS_AS_FOURTH_PILLAR;
   const totalPillars = showGps ? 4 : 3;
   const verifiedList = showGps ? [face, palm, device, location] : [face, palm, device];
   const count = verifiedList.filter(Boolean).length;
@@ -121,7 +121,7 @@ export function LayerStatusBar({
             </div>
           </div>
 
-          {/* Quad-Pillar icons: Face, Palm, Device, GPS — turn Gold when verified. Mobile: gap-x-2, subtle scaling */}
+          {/* Quad-Pillar icons: Face, Palm, Device, GPS — turn green when verified (sync with body). Mobile: gap-x-2, subtle scaling */}
           <div
             className="flex items-center gap-x-1 sm:gap-x-2 shrink-0"
             role="status"
@@ -132,14 +132,14 @@ export function LayerStatusBar({
                 key={key}
                 className="flex flex-col items-center justify-center w-9 h-9 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-lg border-2 transition-all duration-200"
                 style={{
-                  background: verified ? `linear-gradient(135deg, ${GOLD}20 0%, ${GOLD}10 100%)` : 'rgba(0, 0, 0, 0.5)',
-                  borderColor: verified ? GOLD : GRAY,
-                  boxShadow: verified ? `0 0 15px ${GOLD}40` : 'none',
+                  background: verified ? `linear-gradient(135deg, ${GREEN}20 0%, ${GREEN}10 100%)` : 'rgba(0, 0, 0, 0.5)',
+                  borderColor: verified ? GREEN : GRAY,
+                  boxShadow: verified ? `0 0 15px ${GREEN}40` : 'none',
                 }}
                 title={`${label}: ${verified ? 'Verified' : 'Pending'}`}
               >
-                <Icon size={20} className={`shrink-0 ${verified ? 'text-[#D4AF37]' : 'text-[#6b6b70]'}`} aria-hidden />
-                <span className="text-[9px] sm:text-[10px] mt-0.5 truncate max-w-full" style={{ color: verified ? GOLD : GRAY }}>
+                <Icon size={20} className={`shrink-0 ${verified ? 'text-[#22c55e]' : 'text-[#6b6b70]'}`} aria-hidden />
+                <span className="text-[9px] sm:text-[10px] mt-0.5 truncate max-w-full" style={{ color: verified ? GREEN : GRAY }}>
                   {label}
                 </span>
               </div>

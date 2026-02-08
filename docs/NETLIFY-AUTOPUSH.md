@@ -1,5 +1,7 @@
 # Netlify Auto-Deploy on Push
 
+**If your deploy log shows Building: Skipped / Deploying: Skipped** → see **[NETLIFY-FIX-SKIPPED-BUILD.md](./NETLIFY-FIX-SKIPPED-BUILD.md)** to fix empty deploys.
+
 Pushes to `main` can deploy the web app to Netlify in two ways. Use **one** of the following.
 
 ---

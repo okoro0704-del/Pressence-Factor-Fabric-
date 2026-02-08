@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useGlobalPresenceGateway } from '@/contexts/GlobalPresenceGateway';
 import { getIdentityAnchorPhone } from '@/lib/sentinelActivation';
-import { getMintStatusForPresence, MINT_STATUS_PENDING_HARDWARE, MINT_STATUS_MINTED } from '@/lib/mintStatus';
+import { getMintStatusForPresence, getMintStatus, MINT_STATUS_PENDING_HARDWARE, MINT_STATUS_MINTED } from '@/lib/mintStatus';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -49,8 +49,19 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
       }
       const phone = getIdentityAnchorPhone();
       if (phone) {
-        const res = await getMintStatusForPresence(phone);
-        if (!cancelled && res.ok && (res.mint_status === MINT_STATUS_PENDING_HARDWARE || res.mint_status === MINT_STATUS_MINTED || res.is_minted)) {
+        let allowed = pathname.startsWith('/dashboard');
+        if (!allowed) {
+          const res = await getMintStatusForPresence(phone);
+          if (res.ok && (res.mint_status === MINT_STATUS_PENDING_HARDWARE || res.mint_status === MINT_STATUS_MINTED || res.is_minted)) {
+            allowed = true;
+          } else {
+            const direct = await getMintStatus(phone);
+            if (direct.ok && (direct.mint_status === MINT_STATUS_PENDING_HARDWARE || direct.mint_status === MINT_STATUS_MINTED)) {
+              allowed = true;
+            }
+          }
+        }
+        if (!cancelled && allowed) {
           setPresenceVerified(true);
           setIsChecking(false);
           return;

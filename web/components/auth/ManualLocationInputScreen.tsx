@@ -5,11 +5,14 @@ import { useState } from 'react';
 interface ManualLocationInputScreenProps {
   onProceed: (city: string, country: string) => void;
   onCancel: () => void;
+  /** Button label when location is confirmed (e.g. "Complete" for one-way ticket to dashboard). */
+  submitLabel?: string;
 }
 
 export function ManualLocationInputScreen({
   onProceed,
   onCancel,
+  submitLabel = 'Proceed',
 }: ManualLocationInputScreenProps) {
   const [city, setCity] = useState('');
   const [country, setCountry] = useState('');
@@ -36,10 +39,10 @@ export function ManualLocationInputScreen({
         }}
       >
         <p className="text-center text-lg font-bold mb-2" style={{ color: '#D4AF37' }}>
-          GPS unavailable
+          Set up GPS to your location
         </p>
         <p className="text-center text-sm text-[#a0a0a5] mb-6">
-          Enter your city and country to proceed.
+          Location could not be detected. Enter your city and country to proceed.
         </p>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <input
@@ -72,7 +75,7 @@ export function ManualLocationInputScreen({
               className="flex-1 py-3 rounded-xl bg-[#D4AF37] text-black font-bold uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90"
               style={{ boxShadow: '0 0 20px rgba(212, 175, 55, 0.4)' }}
             >
-              Proceed
+              {submitLabel}
             </button>
           </div>
         </form>

@@ -403,8 +403,8 @@ const MAXIMUM_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
 /** Desktop: 5s GPS timeout, then IP fallback. */
 const GPS_TIMEOUT_MS = 5000;
-/** Mobile: 15s GPS timeout — enables enableHighAccuracy and gives GPS time to acquire. */
-const GPS_TIMEOUT_MOBILE_MS = 15000;
+/** Mobile: 10s GPS timeout then IP fallback so user isn't stuck on "Initializing Protocol...". */
+const GPS_TIMEOUT_MOBILE_MS = 10000;
 
 function isMobileUserAgent(): boolean {
   if (typeof navigator === 'undefined') return false;
@@ -430,6 +430,16 @@ function locationKey(identity?: string): string {
 }
 function locationTsKey(identity?: string): string {
   return identity ? `${PFF_PILLAR_LOCATION_TS}_${hashIdentityForStorage(identity)}` : PFF_PILLAR_LOCATION_TS;
+}
+
+/** Persist pillar location from manual city/country entry so dashboard and guards see 4/4. Call from GPS Manual Setup page on Complete. */
+export function setPillarLocationFromManualEntry(identityAnchor: string, _city: string, _country: string): void {
+  const locKey = locationKey(identityAnchor);
+  const locTsKey = locationTsKey(identityAnchor);
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem(locKey, JSON.stringify({ latitude: 0, longitude: 0, manual: true }));
+    localStorage.setItem(locTsKey, String(Date.now()));
+  }
 }
 
 export type LocationResult = {
@@ -1139,6 +1149,8 @@ export interface ResolveSovereignOptions {
   resumePillars123?: boolean;
   /** 9-Day Vitalization Ritual: use 60% confidence instead of 99%; collect data but allow pass. */
   learningMode?: boolean;
+  /** When true: do not request or verify GPS during the scan. Caller can try GPS after success and show a dedicated "Set up GPS" page only if it fails. */
+  skipGpsDuringScan?: boolean;
 }
 
 /** SOVEREIGN THRESHOLD: minimum layers that must pass to grant access (3-out-of-4 quorum) */
@@ -1164,7 +1176,8 @@ export async function resolveSovereignByPresence(
   const palmVerificationPromise = options?.palmVerificationPromise;
   const resumePillars123 = options?.resumePillars123 === true;
   const learningMode = options?.learningMode === true;
-  const useGpsPillar = ENABLE_GPS_AS_FOURTH_PILLAR;
+  const skipGpsDuringScan = options?.skipGpsDuringScan === true;
+  const useGpsPillar = ENABLE_GPS_AS_FOURTH_PILLAR && !skipGpsDuringScan;
 
   const fail = (layer: AuthLayer | null, message: string, timedOut?: boolean, twoPillarsOnly?: boolean): BiometricAuthResult => ({
     success: false,

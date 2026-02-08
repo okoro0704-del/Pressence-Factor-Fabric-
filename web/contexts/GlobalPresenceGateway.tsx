@@ -6,7 +6,7 @@ import { checkPresenceVerified, markPresenceVerified, clearPresenceVerification 
 import { getWorkPresenceStatus, clearWorkPresenceStatus, type WorkPresenceStatus } from '@/lib/workPresence';
 import { getIdentityAnchorPhone } from '@/lib/sentinelActivation';
 import { hasFaceAndSeed } from '@/lib/recoverySeedStorage';
-import { getMintStatusForPresence, MINT_STATUS_PENDING_HARDWARE, MINT_STATUS_MINTED } from '@/lib/mintStatus';
+import { getMintStatusForPresence, getMintStatus, MINT_STATUS_PENDING_HARDWARE, MINT_STATUS_MINTED } from '@/lib/mintStatus';
 import { hasActiveSentinelLicense } from '@/lib/sentinelLicensing';
 import { getCurrentUserRole, setRoleCookie } from '@/lib/roleAuth';
 import { checkSessionIsolation, setSessionIdentity } from '@/lib/sessionIsolation';
@@ -206,11 +206,24 @@ export function GlobalPresenceGatewayProvider({ children }: { children: ReactNod
           return;
         }
         if (phone) {
-          // Bypass first (RPC bypasses RLS): user passed the gate and has mint_status or is_minted — allow through so they stay on dashboard even before face_hash+recovery_seed are in DB. Single RPC avoids RLS-blocked direct reads that cause redirect back to language.
+          // On dashboard with identity anchor: let user stay, do not redirect back (post-vitalization).
+          if (pathname.startsWith('/dashboard')) {
+            if (!cancelled) {
+              setPresenceVerifiedHandler(true);
+            }
+            return;
+          }
+          // Bypass: user passed the gate and has mint_status or is_minted — allow through so they stay on dashboard.
+          let allowedByMint = false;
           const mintRes = await getMintStatusForPresence(phone);
-          const allowedByMint =
-            mintRes.ok &&
-            (mintRes.mint_status === MINT_STATUS_PENDING_HARDWARE || mintRes.mint_status === MINT_STATUS_MINTED || mintRes.is_minted);
+          if (mintRes.ok && (mintRes.mint_status === MINT_STATUS_PENDING_HARDWARE || mintRes.mint_status === MINT_STATUS_MINTED || mintRes.is_minted)) {
+            allowedByMint = true;
+          } else {
+            const directRes = await getMintStatus(phone);
+            if (directRes.ok && (directRes.mint_status === MINT_STATUS_PENDING_HARDWARE || directRes.mint_status === MINT_STATUS_MINTED)) {
+              allowedByMint = true;
+            }
+          }
           if (!cancelled && allowedByMint) {
             setPresenceVerifiedHandler(true);
             return;

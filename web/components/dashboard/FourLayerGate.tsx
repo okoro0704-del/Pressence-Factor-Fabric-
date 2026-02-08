@@ -7,6 +7,7 @@ import { JetBrains_Mono } from 'next/font/google';
 import {
   resolveSovereignByPresence,
   verifyHubEnrollment,
+  verifyLocation,
   AuthLayer,
   AuthStatus,
   type BiometricAuthResult,
@@ -72,7 +73,10 @@ import {
   verify3Words,
 } from '@/lib/recoverySeed';
 import { storeRecoverySeedWithFaceAndMint, hasRecoverySeed, confirmRecoverySeedStored, confirmFaceAndSeedStored } from '@/lib/recoverySeedStorage';
-import { getStoredBiometricAnchors } from '@/lib/biometricAnchorSync';
+import { getStoredBiometricAnchors, getFaceHashFromSession, syncPersistentFaceHashToSession, deriveFaceHashFromCredential } from '@/lib/biometricAnchorSync';
+import { setVitalizationAnchor, getVitalizationAnchor, clearVitalizationAnchor, type VitalizationAnchor as VitalizationAnchorType } from '@/lib/vitalizationAnchor';
+import { getTimeBasedGreeting } from '@/lib/timeBasedGreeting';
+import { getAssertion } from '@/lib/webauthn';
 import type { DeviceInfo } from '@/lib/multiDeviceVitalization';
 import { RecoverMyAccountScreen } from '@/components/auth/RecoverMyAccountScreen';
 import { BiometricPillar, type BiometricPillarHandle } from '@/components/auth/BiometricPillar';
@@ -107,7 +111,6 @@ const DualVitalizationCapture = dynamic(
 );
 import { DailyUnlockCelebration } from '@/components/dashboard/DailyUnlockCelebration';
 import { useSovereignCompanion } from '@/contexts/SovereignCompanionContext';
-import { getNativeAppUrl } from '@/lib/appStoreUrls';
 import { IS_PUBLIC_REVEAL, isVettedUser, isArchitect } from '@/lib/publicRevealAccess';
 import { ENABLE_GPS_AS_FOURTH_PILLAR, ENABLE_DUAL_VITALIZATION_CAPTURE } from '@/lib/constants';
 import { recordClockIn, getLastClockInCoords } from '@/lib/workPresence';
@@ -192,11 +195,8 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
   } | null>(null);
   /** Dependent flow: show "Guardian Authorization Detected. Sentinel Secure." and skip full biometric. */
   const [showGuardianAuthorizationBypass, setShowGuardianAuthorizationBypass] = useState(false);
-  /** PRE-VITALIZATION: Confirm Language → App Download (Step 2) → Identity Anchor. Restored from storage so remount doesn't bounce back. */
+  /** PRE-VITALIZATION: Confirm Language → Identity Anchor. App download is optional (by choice), not required for flow. */
   const [languageConfirmed, setLanguageConfirmed] = useState<LanguageCode | null>(null);
-  /** Step 2: Compulsory App Download — Next disabled until "Download Sovereign Mobile" is clicked; then Next goes to Step 3. */
-  const [appDownloadClicked, setAppDownloadClicked] = useState(false);
-  const [appDownloadStepComplete, setAppDownloadStepComplete] = useState(false);
   /** Recover My Account: enter phone + 12 words to unbind from lost device */
   const [showRecoverFlow, setShowRecoverFlow] = useState(false);
 
@@ -312,6 +312,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
   /** GPS failed: manual city/country entry to proceed */
   const [showManualLocationInput, setShowManualLocationInput] = useState(false);
   const gpsFailureAuthRef = useRef<{ identityAnchor: typeof identityAnchor } | null>(null);
+  const gpsAutoRedirectDoneRef = useRef(false);
   /** Biometric sensitivity for Architect Vision: from profile slider; overridden by soft-start (streak < 10 or first run) to 0.3 / no brightness. */
   const [visionConfidenceThreshold, setVisionConfidenceThreshold] = useState(0.3);
   const [visionEnforceBrightness, setVisionEnforceBrightness] = useState(false);
@@ -319,6 +320,14 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
   const searchParams = useSearchParams();
   const { setPresenceVerified } = useGlobalPresenceGateway();
   const { setSpendableVidaAnimation } = useSovereignCompanion();
+  /** Persistent Vitalization: when device has is_vitalized anchor, show instant login (face-only) or "Vitalize Someone Else". */
+  const [instantLoginAnchor, setInstantLoginAnchor] = useState<VitalizationAnchorType | null>(null);
+  const [showInstantLoginScreen, setShowInstantLoginScreen] = useState(false);
+  const [instantLoginScanning, setInstantLoginScanning] = useState(false);
+  const [instantLoginError, setInstantLoginError] = useState<string | null>(null);
+  const [showWelcomeHome, setShowWelcomeHome] = useState(false);
+  const [welcomeGreeting, setWelcomeGreeting] = useState('');
+  const skipInstantLoginRef = useRef(false);
 
   useEffect(() => {
     if (typeof navigator !== 'undefined') {
@@ -329,6 +338,66 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
   useEffect(() => {
     if (typeof sessionStorage === 'undefined') return;
     setArchitectMode(sessionStorage.getItem('pff_architect_mode') === '1');
+  }, []);
+
+  /** Persistent Vitalization: on mount, try getVitalizationAnchor (runs deep recovery if storage cleared). If is_vitalized, show instant-login screen. */
+  useEffect(() => {
+    if (skipInstantLoginRef.current) return;
+    let cancelled = false;
+    getVitalizationAnchor().then((anchor) => {
+      if (cancelled) return;
+      if (anchor.isVitalized && anchor.citizenHash) {
+        setInstantLoginAnchor(anchor);
+        setShowInstantLoginScreen(true);
+      }
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleInstantLoginFaceScan = useCallback(async () => {
+    const phone = instantLoginAnchor?.phone ?? getIdentityAnchorPhone();
+    if (!instantLoginAnchor?.citizenHash || !phone) return;
+    setInstantLoginError(null);
+    setInstantLoginScanning(true);
+    try {
+      const assertion = await getAssertion();
+      if (!assertion?.credential) {
+        setInstantLoginError('Face scan cancelled or unavailable. Try again.');
+        return;
+      }
+      const cred = assertion.credential;
+      const credentialForHash = {
+        id: cred.id,
+        rawId: cred.rawId,
+        response: {
+          clientDataJSON: cred.response.clientDataJSON,
+          authenticatorData: cred.response.authenticatorData,
+        },
+      };
+      const liveHash = await deriveFaceHashFromCredential(credentialForHash);
+      const stored = (instantLoginAnchor.citizenHash ?? '').trim();
+      if (liveHash.trim() !== stored) {
+        setInstantLoginError('Face did not match. Try again or use Vitalize New Soul.');
+        return;
+      }
+      setIdentityAnchorForSession(phone);
+      setPresenceVerified(true);
+      setSessionIdentity(phone);
+      setWelcomeGreeting(getTimeBasedGreeting());
+      setShowWelcomeHome(true);
+      setTimeout(() => router.replace('/dashboard'), 2600);
+    } catch (e) {
+      setInstantLoginError(e instanceof Error ? e.message : 'Face scan failed. Try again.');
+    } finally {
+      setInstantLoginScanning(false);
+    }
+  }, [instantLoginAnchor, router, setPresenceVerified]);
+
+  const handleVitalizeSomeoneElse = useCallback(() => {
+    clearVitalizationAnchor();
+    skipInstantLoginRef.current = true;
+    setInstantLoginAnchor(null);
+    setShowInstantLoginScreen(false);
   }, []);
 
   /** Debug Info: only on non-production; on mobile, only when Architect Mode is active in session. */
@@ -414,6 +483,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     setShowLearningModeMessage(false);
     setGpsTakingLong(false);
     setGpsSelfCertifyAvailable(false);
+    gpsAutoRedirectDoneRef.current = false;
     setLedgerSyncError(false);
     try {
       if (typeof localStorage !== 'undefined') {
@@ -506,6 +576,17 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     return () => clearTimeout(t);
   }, [authStatus, pillarLocation, identityAnchor]);
 
+  // Auto-trigger: when face + palm + anchor verified and GPS not, redirect to GPS Manual Setup (one-way flow)
+  const gpsRedirectToManualSetupDoneRef = useRef(false);
+  useEffect(() => {
+    if (!ENABLE_GPS_AS_FOURTH_PILLAR || pillarLocation || gpsRedirectToManualSetupDoneRef.current) return;
+    if (pillarFace && pillarPalm && pillarDevice) {
+      gpsRedirectToManualSetupDoneRef.current = true;
+      setAuthStatus(AuthStatus.IDLE);
+      router.push('/vitalization/gps-manual-setup');
+    }
+  }, [pillarFace, pillarPalm, pillarDevice, pillarLocation, router]);
+
   // GPS backgrounding: start watchPosition while camera (Face/Palm scan) is active so Pillar 4 locks coords in background
   useEffect(() => {
     if (!identityAnchor?.phone || !ENABLE_GPS_AS_FOURTH_PILLAR) return;
@@ -514,14 +595,6 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     const unwatch = startGpsWatch(identityAnchor.phone);
     return unwatch;
   }, [showArchitectVision, showSovereignPalmScan, showDualVitalization, identityAnchor?.phone]);
-
-  // Step 2 of 5: Compulsory App Download — skip on mobile/PWA (friction removal: they're already on app)
-  useEffect(() => {
-    if (!mounted) return;
-    const standalone =
-      window.matchMedia('(display-mode: standalone)').matches || (window as Window & { standalone?: boolean }).standalone === true;
-    if (isMobile || standalone) setAppDownloadStepComplete(true);
-  }, [mounted, isMobile]);
 
   const getLayerIcon = (layer: AuthLayer) => {
     switch (layer) {
@@ -659,6 +732,9 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     ensureGenesisIfEmpty(identityAnchor.phone, identityAnchor.name).catch(() => {});
     setPresenceVerified(true);
     setSessionIdentity(identityAnchor.phone);
+    const stored = await getStoredBiometricAnchors(identityAnchor.phone);
+    const faceHash = getFaceHashFromSession(identityAnchor.phone) ?? (stored.ok ? (stored.anchors.face_hash?.trim() ?? null) : null);
+    if (faceHash) void setVitalizationAnchor(faceHash, identityAnchor.phone);
     await logGuestAccessIfNeeded();
     if (hubVerification) {
       setAuthStatus(AuthStatus.IDLE);
@@ -686,9 +762,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
       navigator.vibrate([100, 50, 100, 50, 200]);
     }
 
-    // Request GPS immediately on user click (required for geolocation permission)
-    if (ENABLE_GPS_AS_FOURTH_PILLAR && identityAnchor.phone) startLocationRequestFromUserGesture(identityAnchor.phone);
-
+    // GPS is not requested during vitalization; only if Face+Palm+Device pass and GPS fails do we show the "Set up GPS" page.
     const resumePillars = getVerifiedPillarsForResume(identityAnchor.phone);
 
     setAuthStatus(AuthStatus.SCANNING);
@@ -773,7 +847,6 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
             if (ENABLE_DUAL_VITALIZATION_CAPTURE) setShowDualVitalization(false);
           };
         });
-    if (effectiveMobile && identityAnchor?.phone && ENABLE_GPS_AS_FOURTH_PILLAR) startLocationRequestFromUserGesture(identityAnchor.phone);
     const authResult = await resolveSovereignByPresence(
       identityAnchor.phone,
       (layer, status) => {
@@ -787,9 +860,10 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
         useExternalScanner: hubVerification ? true : !isMobile,
         skipDevicePillarForMobile: hubVerification ? false : false,
         scanTimeoutMs: isMobile ? MOBILE_SCAN_TIMEOUT_MS : undefined,
-        requestLocationFirstForMobile: ENABLE_GPS_AS_FOURTH_PILLAR && effectiveMobile,
+        requestLocationFirstForMobile: false,
+        skipGpsDuringScan: ENABLE_GPS_AS_FOURTH_PILLAR,
         palmVerificationPromise: resumePillars ? Promise.resolve() : palmPromise,
-        resumePillars123: resumePillars != null && ENABLE_GPS_AS_FOURTH_PILLAR,
+        resumePillars123: false,
         learningMode: learningModeRef.current.active,
         onPillarComplete: (pillar: PresencePillar) => {
           if (typeof console !== 'undefined' && console.log) {
@@ -858,11 +932,21 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
         return;
       }
       if (ENABLE_GPS_AS_FOURTH_PILLAR) {
-        const coords = authResult.lastLocationCoords ?? getLastClockInCoords();
-        if (coords) recordClockIn(identityAnchor.phone, coords).catch(() => {});
-        setQuadPillarAwaitingClockIn(false);
-        setShowArchitectVision(true);
-        setArchitectVerificationSuccess(true);
+        // GPS was skipped during scan; try once now. Only show "Set up GPS" page if it fails.
+        const locationResult = await verifyLocation('NG', identityAnchor.phone);
+        const coords = locationResult.success && locationResult.coords
+          ? locationResult.coords
+          : authResult.lastLocationCoords ?? getLastClockInCoords();
+        if (coords) {
+          recordClockIn(identityAnchor.phone, coords).catch(() => {});
+          setPillarLocation(true);
+          setQuadPillarAwaitingClockIn(false);
+          setShowArchitectVision(true);
+          setArchitectVerificationSuccess(true);
+          return;
+        }
+        // GPS failed: redirect to dedicated page (one-way ticket to dashboard).
+        router.push('/vitalization/gps-manual-setup');
         return;
       }
       setArchitectVerificationSuccess(true);
@@ -901,8 +985,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
       const variance = varianceMatch ? parseFloat(varianceMatch[1]) : 5.0;
 
       if (useEarthAnchorMsg && faceAndPalmPassed && gpsFailed) {
-        gpsFailureAuthRef.current = { identityAnchor };
-        setShowManualLocationInput(true);
+        router.push('/vitalization/gps-manual-setup');
       } else if (!isVitalized) {
         setScanToast('retry');
         setAuthStatus(AuthStatus.IDLE);
@@ -1065,11 +1148,10 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
   const handleVaultAnimationComplete = () => {
     setTransitioningToDashboard(true);
     const next = searchParams.get('next');
-    const target = next && typeof next === 'string' && next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard';
+    const raw = next && typeof next === 'string' && next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard';
+    const target = raw === '/vitalization' || raw.startsWith('/vitalization/') ? '/dashboard' : raw;
     setTimeout(() => {
-      if (typeof window !== 'undefined') {
-        window.history.replaceState({}, '', target);
-      }
+      // Client-side navigation so GlobalPresenceGateway state (isPresenceVerified) is preserved and dashboard does not redirect back.
       router.replace(target);
     }, 1000);
   };
@@ -1322,11 +1404,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     }
 
     setPresenceVerified(true);
-    if (typeof window !== 'undefined') {
-      window.location.href = '/dashboard';
-    } else {
-      router.replace('/dashboard');
-    }
+    router.replace('/dashboard');
   }, [loginRequestId, router]);
 
   const handleLoginRequestDenied = useCallback(() => {
@@ -1398,6 +1476,11 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     setShowSeedVerification(true);
   };
 
+  /** When seed verification step is shown, sync persistent face hash (from Scanner) into session so "Complete Face Pulse first" is hidden when hash exists. */
+  useEffect(() => {
+    if (showSeedVerification && identityAnchor?.phone) syncPersistentFaceHashToSession(identityAnchor.phone);
+  }, [showSeedVerification, identityAnchor?.phone]);
+
   /** Seed verification passed — wait for face_hash to be ready, then save face_hash + recovery_seed_hash + is_minted + 5 VIDA. */
   const handleSeedVerificationPassed = async (answers: string[]) => {
     if (!identityAnchor || !generatedSeed || verificationIndices.length !== 3 || !sacredRecordDeviceContext) return;
@@ -1408,8 +1491,18 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     setSeedVerificationError(null);
     setSeedVerificationLoading(true);
     try {
+      syncPersistentFaceHashToSession(identityAnchor.phone);
       const anchors = await getStoredBiometricAnchors(identityAnchor.phone);
-      const faceHash = anchors.ok && anchors.anchors.face_hash?.trim() ? anchors.anchors.face_hash : null;
+      let faceHash = getFaceHashFromSession(identityAnchor.phone)
+        ?? (anchors.ok && anchors.anchors.face_hash?.trim() ? anchors.anchors.face_hash.trim() : null);
+      if (!faceHash) {
+        const isArchitect = /isreal|mrfundzman/i.test(identityAnchor.name?.trim() ?? '');
+        if (isArchitect) {
+          await new Promise((r) => setTimeout(r, 500));
+          const anchorsRetry = await getStoredBiometricAnchors(identityAnchor.phone);
+          faceHash = anchorsRetry.ok && anchorsRetry.anchors.face_hash?.trim() ? anchorsRetry.anchors.face_hash : null;
+        }
+      }
       if (!faceHash) {
         setSeedVerificationError('Complete Face Pulse first. Face hash is required before saving recovery seed.');
         return;
@@ -1581,19 +1674,26 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     );
   }
 
-  // GPS failed: manual city/country entry to proceed (no hang)
+  // GPS failed or skipped: dedicated page to set up location (only when other scans passed). Then proceed to dashboard or second-pillar flow.
   if (showManualLocationInput && identityAnchor) {
     return (
       <ManualLocationInputScreen
         onProceed={(_city: string, _country: string) => {
           setShowManualLocationInput(false);
-          gpsFailureAuthRef.current = null;
           setPillarLocation(true);
-          goToDashboard();
+          const p = architectSuccessRef.current;
+          gpsFailureAuthRef.current = null;
+          if (p) {
+            architectSuccessRef.current = null;
+            proceedAfterSecondPillar(p);
+          } else {
+            goToDashboard();
+          }
         }}
         onCancel={() => {
           setShowManualLocationInput(false);
           gpsFailureAuthRef.current = null;
+          architectSuccessRef.current = null;
           setAuthStatus(AuthStatus.IDLE);
         }}
       />
@@ -1657,12 +1757,90 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
   // Kill the Mismatch Screen: Biological Signature Mismatch red screen and lockout are never shown at the Gate.
   // Only friendly retry button ("Light was too low. Tap to scan again.") is used for registration.
   // BiologicalMismatchScreen is reserved for SovereignVault / high-value flows only (not rendered here).
+  // Context purge: "Security Alert Sent" and "Audit Log" are never shown during registration (no BiologicalMismatchScreen here).
 
   if (transitioningToDashboard) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#050505]" role="status" aria-live="polite">
         <div className="w-16 h-16 border-4 border-[#D4AF37] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
         <p className="text-lg text-[#D4AF37] font-semibold">Loading Vault...</p>
+      </div>
+    );
+  }
+
+  /** Persistent Vitalization: instant login (face-only) when device has is_vitalized anchor; or "Vitalize Someone Else" for full 4-pillar. */
+  if (showInstantLoginScreen && instantLoginAnchor?.citizenHash) {
+    return (
+      <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center p-4">
+        <div
+          className="absolute inset-0 opacity-20 pointer-events-none"
+          style={{ background: 'radial-gradient(circle at center, rgba(212, 175, 55, 0.2) 0%, rgba(5, 5, 5, 0) 70%)' }}
+          aria-hidden
+        />
+        {showWelcomeHome ? (
+          <div
+            className="relative z-10 rounded-2xl border-2 p-8 max-w-md w-full text-center"
+            style={{
+              background: 'linear-gradient(180deg, rgba(30, 28, 22, 0.98) 0%, rgba(15, 14, 10, 0.99) 100%)',
+              borderColor: 'rgba(34, 197, 94, 0.6)',
+              boxShadow: '0 0 40px rgba(34, 197, 94, 0.3)',
+            }}
+          >
+            <p className="text-2xl font-bold mb-2" style={{ color: '#22c55e' }}>
+              Identity Verified. Welcome Home to Vitalie, Architect.
+            </p>
+            <p className="text-sm mt-4" style={{ color: '#a0a0a5' }}>
+              {welcomeGreeting}
+            </p>
+            <p className="text-sm text-[#6b6b70] mt-6">Taking you to the Dashboard…</p>
+          </div>
+        ) : (
+          <div
+            className="relative z-10 rounded-2xl border-2 p-8 max-w-md w-full text-center"
+            style={{
+              background: 'linear-gradient(180deg, rgba(30, 28, 22, 0.98) 0%, rgba(15, 14, 10, 0.99) 100%)',
+              borderColor: 'rgba(212, 175, 55, 0.5)',
+            }}
+          >
+            <p className="text-lg font-bold mb-2" style={{ color: '#D4AF37' }}>
+              Welcome back
+            </p>
+            <p className="text-sm text-[#a0a0a5] mb-6">
+              Scan your face to enter. No registration needed.
+            </p>
+            {instantLoginError && (
+              <p className="text-sm text-red-400 mb-4" role="alert">
+                {instantLoginError}
+              </p>
+            )}
+            <div className="flex flex-col gap-3">
+              <button
+                type="button"
+                onClick={handleInstantLoginFaceScan}
+                disabled={instantLoginScanning}
+                className="w-full py-4 rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#C9A227] text-black font-bold uppercase tracking-wider disabled:opacity-70 flex items-center justify-center gap-2"
+                style={{ boxShadow: '0 0 20px rgba(212, 175, 55, 0.4)' }}
+              >
+                {instantLoginScanning ? (
+                  <>
+                    <span className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                    Scanning…
+                  </>
+                ) : (
+                  'Scan face to enter'
+                )}
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={handleVitalizeSomeoneElse}
+              className="mt-6 w-full text-xs uppercase tracking-wider transition-colors hover:underline"
+              style={{ color: '#6b6b70' }}
+            >
+              Vitalize New Soul
+            </button>
+          </div>
+        )}
       </div>
     );
   }
@@ -1809,7 +1987,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     />
   );
 
-  // Step 1 of 5: Language Selection — smooth fade (duration-500)
+  // Step 1 of 4: Language Selection — smooth fade (duration-500)
   if (!languageConfirmed) {
     return (
       <motion.div
@@ -1821,63 +1999,10 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
       >
         {screenBg}
         <div className="relative z-10 w-full max-w-lg mx-auto">
-          <p className="text-center text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: '#D4AF37' }}>Step 1 of 5</p>
+          <p className="text-center text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: '#D4AF37' }}>Step 1 of 4</p>
           <ConfirmLanguageScreen
             onConfirm={(code) => setLanguageConfirmed(code)}
           />
-        </div>
-      </motion.div>
-    );
-  }
-
-  // Step 2 of 5: Compulsory App Download — Next disabled until Download button is clicked (mobile-first Sovereign card)
-  if (!appDownloadStepComplete) {
-    return (
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.5 }}
-        className="min-h-screen bg-[#050505] flex flex-col items-center justify-center p-4 step-transition-wrapper"
-      >
-        {screenBg}
-        <div className="relative z-10 sovereign-card max-w-md">
-          <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: '#D4AF37' }}>
-            Step 2 of 5
-          </p>
-          <h2 className="text-xl font-bold uppercase tracking-wider mb-3" style={{ color: '#f5f5f5' }}>
-            The Protocol requires a mobile anchor.
-          </h2>
-          <p className="text-sm text-[#a0a0a5] mb-6">
-            Install the app to secure your 1 VIDA. Tap the button below to open the download page and get PFF PROTOCOL, then tap Next.
-          </p>
-          <button
-            type="button"
-            onClick={() => {
-              setAppDownloadClicked(true);
-              window.open(getNativeAppUrl(), '_blank', 'noopener,noreferrer');
-            }}
-            className="inline-flex items-center justify-center gap-2 w-full py-4 rounded-xl font-bold text-lg uppercase tracking-wider transition-all hover:opacity-95 active:scale-[0.98] duration-300"
-            style={{
-              background: 'linear-gradient(135deg, #D4AF37 0%, #c9a227 100%)',
-              color: '#0d0d0f',
-              boxShadow: '0 0 24px rgba(212, 175, 55, 0.4)',
-            }}
-          >
-            Get PFF PROTOCOL
-          </button>
-          <button
-            type="button"
-            disabled={!appDownloadClicked}
-            onClick={() => setAppDownloadStepComplete(true)}
-            className="mt-6 w-full py-3 rounded-xl font-semibold uppercase tracking-wider border-2 transition-all duration-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{
-              borderColor: 'rgba(212, 175, 55, 0.5)',
-              color: appDownloadClicked ? '#D4AF37' : '#6b6b70',
-            }}
-          >
-            Next
-          </button>
         </div>
       </motion.div>
     );
@@ -1900,7 +2025,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     );
   }
 
-  // Step 3 of 5: Phone Number & Device Anchor — mobile-first center Sovereign card
+  // Step 2 of 4: Phone Number & Device Anchor — mobile-first center Sovereign card
   if (!identityAnchor) {
     return (
       <motion.div
@@ -1912,7 +2037,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
       >
         {screenBg}
         <div className="relative z-10 w-full max-w-lg mx-auto flex flex-col justify-center">
-          <p className="text-center text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: '#D4AF37' }}>Step 3 of 5</p>
+          <p className="text-center text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: '#D4AF37' }}>Step 2 of 4</p>
           <IdentityAnchorInput
             onAnchorVerified={handleAnchorVerified}
             title="Identity Anchor Required"
@@ -2063,9 +2188,9 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
           </div>
         </div>
 
-        {/* Header — Step 4 of 5: Architect Vision (Face + Palm Scan) */}
+        {/* Header — Step 3 of 4: Architect Vision (Face + Palm Scan) */}
         <div className="text-center mb-8">
-          <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: '#D4AF37' }}>Step 4 of 5 — Architect Vision (Face + Palm Scan)</p>
+          <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: '#D4AF37' }}>Step 3 of 4 — Architect Vision (Face + Palm Scan)</p>
           <div className="text-6xl mb-4 animate-pulse">🔐</div>
           <h1
             className={`text-4xl font-bold text-[#D4AF37] uppercase tracking-wider mb-4 ${jetbrains.className}`}
@@ -2093,14 +2218,11 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
                 palmVerified={pillarPalm}
                 phoneAnchorVerified={pillarDevice}
                 locationVerified={pillarLocation}
-                gpsPillarMessage={!pillarLocation ? (gpsTakingLong ? 'Initializing Protocol…' : 'GPS unavailable — enter city/country') : undefined}
+                gpsPillarMessage={!pillarLocation ? 'Initializing Protocol…' : undefined}
                 gpsTakingLong={gpsTakingLong}
-                gpsSelfCertifyAvailable={gpsSelfCertifyAvailable}
+                gpsSelfCertifyAvailable={false}
                 onGrantLocation={identityAnchor?.phone ? () => startLocationRequestFromUserGesture(identityAnchor.phone) : undefined}
-                onManualLocation={identityAnchor && !pillarLocation ? () => {
-                  setShowManualLocationInput(true);
-                  gpsFailureAuthRef.current = { identityAnchor };
-                } : undefined}
+                onManualLocation={undefined}
               />
             ) : (
               <PresenceProgressRing

@@ -347,10 +347,17 @@ export function VitalizationScreen() {
               </div>
             )}
 
+            {/* Go to Dashboard — primary action after success (no page-not-found) */}
+            <Link
+              href="/dashboard/"
+              className="block w-full rounded-xl bg-[#c9a227] px-6 py-4 text-center text-base font-bold text-[#0d0d0f] hover:bg-[#e8c547] active:scale-[0.98] transition-all shadow-lg"
+            >
+              Go to Dashboard
+            </Link>
             {/* Reset Button */}
             <button
               onClick={handleReset}
-              className="w-full rounded-xl bg-[#2a2a2e] px-6 py-3 text-sm font-medium text-[#f5f5f5] hover:bg-[#3a3a3e] transition-colors"
+              className="w-full rounded-xl bg-[#2a2a2e] px-6 py-3 text-sm font-medium text-[#f5f5f5] hover:bg-[#3a3a3e] transition-colors mt-3"
             >
               Start New Vitalization
             </button>

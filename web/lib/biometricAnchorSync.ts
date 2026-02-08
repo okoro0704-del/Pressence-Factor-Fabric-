@@ -5,6 +5,63 @@
 
 import { getSupabase } from './supabase';
 
+const FACE_HASH_SESSION_KEY = 'pff_face_hash';
+function faceHashSessionKey(phone: string): string {
+  let h = 5381;
+  for (let i = 0; i < phone.length; i++) h = ((h << 5) + h) ^ phone.charCodeAt(i);
+  return `${FACE_HASH_SESSION_KEY}_${(h >>> 0).toString(16).slice(0, 8)}`;
+}
+
+/** Read face hash from session (set when Face Pulse completes so Seed Verification can see it). */
+export function getFaceHashFromSession(phoneNumber: string): string | null {
+  if (typeof sessionStorage === 'undefined') return null;
+  const key = faceHashSessionKey(phoneNumber.trim());
+  const val = sessionStorage.getItem(key);
+  return val && val.trim() ? val.trim() : null;
+}
+
+/** Write face hash to session after successful persist (so next step sees it without DB delay). */
+export function setFaceHashInSession(phoneNumber: string, faceHash: string): void {
+  if (typeof sessionStorage === 'undefined') return;
+  const key = faceHashSessionKey(phoneNumber.trim());
+  sessionStorage.setItem(key, faceHash.trim());
+}
+
+/** Persistent face hash (survives page transition). Used by Scanner → master-key flow. */
+const FACE_HASH_PERSISTENT_KEY = 'pff_face_hash_persistent';
+const FACE_HASH_PHONE_KEY = 'pff_face_hash_phone';
+const FACE_HASH_COOKIE = 'pff_face_anchor';
+const FACE_HASH_COOKIE_MAX_AGE = 60 * 60; // 1 hour
+
+export function getPersistentFaceHash(): { faceHash: string; phone?: string } | null {
+  if (typeof localStorage === 'undefined') return null;
+  const faceHash = localStorage.getItem(FACE_HASH_PERSISTENT_KEY);
+  const phone = localStorage.getItem(FACE_HASH_PHONE_KEY);
+  if (!faceHash || !faceHash.trim()) return null;
+  return { faceHash: faceHash.trim(), phone: phone ?? undefined };
+}
+
+export function setPersistentFaceHash(faceHash: string, phone?: string): void {
+  if (typeof localStorage === 'undefined') return;
+  localStorage.setItem(FACE_HASH_PERSISTENT_KEY, faceHash.trim());
+  if (phone?.trim()) localStorage.setItem(FACE_HASH_PHONE_KEY, phone.trim());
+  try {
+    if (typeof document !== 'undefined') {
+      document.cookie = `${FACE_HASH_COOKIE}=${encodeURIComponent(faceHash.trim())};path=/;max-age=${FACE_HASH_COOKIE_MAX_AGE};SameSite=Strict;Secure`;
+    }
+  } catch {
+    // ignore
+  }
+}
+
+/** Sync persistent face hash into session for a given phone (so getFaceHashFromSession returns it). */
+export function syncPersistentFaceHashToSession(phoneNumber: string): boolean {
+  const persistent = getPersistentFaceHash();
+  if (!persistent?.faceHash) return false;
+  setFaceHashInSession(phoneNumber.trim(), persistent.faceHash);
+  return true;
+}
+
 // BIOMETRIC DATA IS HASHED AND ENCRYPTED. RAW IMAGES ARE NEVER PERSISTED.
 
 /** SHA-256 hash a string (e.g. face template or raw fingerprint from scanner). Returns hex. */
@@ -120,11 +177,16 @@ export async function persistFaceHash(
           });
           if (rpcError) return { ok: false, error: rpcError.message ?? 'RPC update_user_profile_face_hash failed' };
           const out = (rpcData ?? {}) as { ok?: boolean; error?: string };
-          if (out.ok === true) return { ok: true };
+          if (out.ok === true) {
+            setFaceHashInSession(trimmed, hash);
+            return { ok: true };
+          }
           return { ok: false, error: out.error ?? 'RPC update_user_profile_face_hash failed' };
         }
         return { ok: false, error: error.message ?? 'Failed to persist face_hash' };
       }
+      setFaceHashInSession(trimmed, hash);
+      return { ok: true };
     } else {
       const { error } = await (supabase as any)
         .from('user_profiles')
@@ -138,13 +200,17 @@ export async function persistFaceHash(
           });
           if (rpcError) return { ok: false, error: rpcError.message ?? 'RPC update_user_profile_face_hash failed' };
           const out = (rpcData ?? {}) as { ok?: boolean; error?: string };
-          if (out.ok === true) return { ok: true };
+          if (out.ok === true) {
+            setFaceHashInSession(trimmed, hash);
+            return { ok: true };
+          }
           return { ok: false, error: out.error ?? 'RPC update_user_profile_face_hash failed' };
         }
         return { ok: false, error: error.message ?? 'Failed to insert face_hash' };
       }
+      setFaceHashInSession(trimmed, hash);
+      return { ok: true };
     }
-    return { ok: true };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return { ok: false, error: msg };

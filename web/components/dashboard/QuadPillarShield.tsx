@@ -8,6 +8,9 @@
  * User may proceed when Core Mesh is verified; Pillar 4 (GPS) can remain Initializing or Self-Attested.
  * Lightweight for browser; native mobile GPS integration prepared for April 7th.
  *
+ * Registration: Biological Signature Mismatch red screen and 29s lockout are disabled for non-VITALIZED
+ * users (handled in FourLayerGate — only a simple "Retry Scan" button is shown on scan failure).
+ *
  * Biometric Scan Progress Bar: gold scanning line over the video feed, 0-100% progress over 3-5s,
  * smooth green Verified transition; thumb-friendly and centered on mobile.
  */

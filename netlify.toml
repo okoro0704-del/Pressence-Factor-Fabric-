@@ -1,19 +1,15 @@
-# PFF — Root redirect so Netlify builds the web app from web/
-# When this repo is connected to Netlify, use base directory "web" so build runs there.
+# PFF — Netlify must BUILD the web app (do not use "Deploy without building" or "Skip builds").
+# If deploy log shows Building: Skipped / Deploying: Skipped, see docs/NETLIFY-FIX-SKIPPED-BUILD.md
 #
-# DEPLOY TO BOTH URLS: One deploy serves BOTH the Netlify app URL (e.g. site-name.netlify.app)
-# and your custom domain. Add the custom domain in Netlify: Site → Domain management → Add custom domain.
-# No second deploy needed — the same build is served on all domains attached to this site.
-#
-# Sovereign Shield: Set NEXT_PUBLIC_PRODUCTION_DOMAIN only on the *custom domain* (e.g. app.purefreedomfoundation.org).
-# Do NOT set it on the default *.netlify.app site: that URL stays the Sandbox (Architect Mode, full search, dev panels).
-# Supabase: add both your custom domain and https://*.netlify.app to Auth URL / Redirect URLs so Sandbox and live both work.
+# When this repo is connected to Netlify, base directory must be "web" so build runs there.
+# DEPLOY TO BOTH URLS: One deploy serves BOTH the Netlify app URL and your custom domain.
+# Supabase: add both your custom domain and https://*.netlify.app to Auth URL / Redirect URLs.
 
 [build]
   base = "web"
   command = "npm run build"
-  # Publish dir is relative to base; Next.js static export outputs to web/out
   publish = "out"
+  # Ignore nothing; ensure build runs (Netlify UI must NOT have "Skip builds" enabled)
 
 [build.environment]
   NODE_VERSION = "20.10.0"
