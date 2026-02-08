@@ -76,7 +76,6 @@ import { storeRecoverySeedWithFaceAndMint, hasRecoverySeed, confirmRecoverySeedS
 import { getStoredBiometricAnchors, getFaceHashFromSession, syncPersistentFaceHashToSession, deriveFaceHashFromCredential } from '@/lib/biometricAnchorSync';
 import { setVitalizationAnchor, getVitalizationAnchor, clearVitalizationAnchor, type VitalizationAnchor as VitalizationAnchorType } from '@/lib/vitalizationAnchor';
 import { getTimeBasedGreeting } from '@/lib/timeBasedGreeting';
-import { getAssertion } from '@/lib/webauthn';
 import type { DeviceInfo } from '@/lib/multiDeviceVitalization';
 import { RecoverMyAccountScreen } from '@/components/auth/RecoverMyAccountScreen';
 import { BiometricPillar, type BiometricPillarHandle } from '@/components/auth/BiometricPillar';
