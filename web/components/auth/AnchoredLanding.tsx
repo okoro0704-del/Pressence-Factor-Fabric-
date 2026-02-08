@@ -10,10 +10,14 @@ import { setSessionIdentity } from '@/lib/sessionIsolation';
 import { useGlobalPresenceGateway } from '@/contexts/GlobalPresenceGateway';
 import { getIdentityAnchorPhone } from '@/lib/sentinelActivation';
 import { getTimeBasedGreeting } from '@/lib/timeBasedGreeting';
+import { getPalmHash } from '@/lib/palmHashProfile';
+import { verifyOrEnrollPalm } from '@/lib/palmHashProfile';
+import { setVitalizationComplete } from '@/lib/vitalizationState';
+import { PalmPulseCapture } from '@/components/auth/PalmPulseCapture';
 
 /**
- * Pre-flight anchored landing: single elegant Face Scan circle.
- * On success: overlay "Identity Verified. Welcome Home to Vitalie, Architect." + time greeting, then router.replace('/dashboard').
+ * Pre-flight: verify face and palm (if enrolled) to confirm user has vitalized.
+ * On success: log in to dashboard in under 3 seconds. If not vitalized, root sends to /vitalization.
  */
 export function AnchoredLanding() {
   const router = useRouter();
@@ -24,6 +28,9 @@ export function AnchoredLanding() {
   const [error, setError] = useState<string | null>(null);
   const [showOverlay, setShowOverlay] = useState(false);
   const [greeting, setGreeting] = useState('');
+  const [faceDone, setFaceDone] = useState(false);
+  const [needPalm, setNeedPalm] = useState(false);
+  const [showPalmCapture, setShowPalmCapture] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -66,15 +73,44 @@ export function AnchoredLanding() {
       setIdentityAnchorForSession(phone);
       setPresenceVerified(true);
       setSessionIdentity(phone);
-      setGreeting(getTimeBasedGreeting());
-      setShowOverlay(true);
-      setTimeout(() => router.replace('/dashboard'), 2600);
+      setFaceDone(true);
+      const hasPalm = await getPalmHash(phone);
+      if (hasPalm) {
+        setNeedPalm(true);
+        setShowPalmCapture(true);
+      } else {
+        setGreeting(getTimeBasedGreeting());
+        setVitalizationComplete();
+        setShowOverlay(true);
+        setTimeout(() => router.replace('/dashboard'), 1200);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Face scan failed. Try again.');
     } finally {
       setScanning(false);
     }
   }, [anchor, setPresenceVerified, router]);
+
+  const handlePalmSuccess = useCallback(
+    async (palmHash: string) => {
+      const phone = anchor?.phone ?? getIdentityAnchorPhone();
+      if (!phone) return;
+      setShowPalmCapture(false);
+      setError(null);
+      const result = await verifyOrEnrollPalm(phone, palmHash);
+      if (!result.ok) {
+        setError(result.error ?? 'Palm did not match. Try again.');
+        setNeedPalm(true);
+        return;
+      }
+      setNeedPalm(false);
+      setGreeting(getTimeBasedGreeting());
+      setVitalizationComplete();
+      setShowOverlay(true);
+      setTimeout(() => router.replace('/dashboard'), 1200);
+    },
+    [anchor?.phone, router]
+  );
 
   const handleVitalizeNewSoul = useCallback(() => {
     clearVitalizationAnchor();
@@ -105,7 +141,7 @@ export function AnchoredLanding() {
           type="button"
           onClick={() => {
             clearVitalizationAnchor();
-            router.replace('/');
+            router.replace('/vitalization');
           }}
           className="relative z-10 px-6 py-3 rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/50"
           style={{
@@ -159,7 +195,7 @@ export function AnchoredLanding() {
 
       <div className="relative z-10 flex flex-col items-center">
         <p className="text-sm uppercase tracking-widest mb-8" style={{ color: '#6b6b70' }}>
-          Verify your presence
+          Verify face and palm
         </p>
 
         <button
@@ -184,7 +220,7 @@ export function AnchoredLanding() {
         </button>
 
         <p className="mt-6 text-sm max-w-xs text-center" style={{ color: '#a0a0a5' }}>
-          {scanning ? 'Scanning…' : 'Tap the circle to scan your face'}
+          {scanning ? 'Verifying…' : 'Tap to scan your face (then palm if enrolled)'}
         </p>
 
         {error && (
@@ -202,6 +238,16 @@ export function AnchoredLanding() {
       >
         Vitalize New Soul
       </button>
+
+      <PalmPulseCapture
+        isOpen={showPalmCapture}
+        onClose={() => {
+          setShowPalmCapture(false);
+          setNeedPalm(false);
+        }}
+        onSuccess={handlePalmSuccess}
+        onError={(msg) => setError(msg)}
+      />
     </div>
   );
 }

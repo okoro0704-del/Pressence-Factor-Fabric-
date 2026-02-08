@@ -9,8 +9,6 @@ interface SovereignAuthGuardProps {
   children: ReactNode;
 }
 
-const REGISTRATION_PATHS = ['/', ROUTES.VITALIZATION, '/registration', '/vitalization'];
-
 /**
  * Global guard: when user is VITALIZED (vitalization_complete / is_vitalized), force-push to Dashboard.
  * Prevents any redirect back to registration or scan pages.
@@ -23,13 +21,13 @@ export function SovereignAuthGuard({ children }: SovereignAuthGuardProps) {
     if (typeof window === 'undefined') return;
     if (!shouldNeverRedirectBack()) return;
     const path = pathname ?? '';
-    const isRegistrationPath =
-      path === '/' ||
+    // Do NOT redirect from / — root page runs face+palm verification then sends to dashboard.
+    const isVitalizationOrRegistration =
       path === ROUTES.VITALIZATION ||
       path.startsWith(ROUTES.VITALIZATION + '/') ||
       path === '/registration' ||
       path.startsWith('/registration/');
-    if (isRegistrationPath) {
+    if (isVitalizationOrRegistration) {
       router.replace(ROUTES.DASHBOARD);
     }
   }, [pathname, router]);
