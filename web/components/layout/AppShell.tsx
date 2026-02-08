@@ -7,8 +7,11 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   ChevronLeft,
   LayoutDashboard,
+  Landmark,
+  Wallet,
+  SlidersHorizontal,
+  MessageCircle,
   Menu,
-  Vote,
 } from 'lucide-react';
 import { useTripleTapReset } from '@/lib/useTripleTapReset';
 import { TerminateSessionListener } from '@/components/dashboard/TerminateSessionListener';
@@ -16,13 +19,19 @@ import { getVitalizationStatus, DEVICE_NOT_ANCHORED_MESSAGE } from '@/lib/vitali
 import { getCitizenStatusForPhone } from '@/lib/supabaseTelemetry';
 import { getIdentityAnchorPhone } from '@/lib/sentinelActivation';
 
-/** Bottom bar: Elections / Voting (inside Treasury). */
+const SettingsNavIcon = SlidersHorizontal;
+
+/** Bottom bar: Dashboard, Treasury, Wallet, Settings, Companion (Elections removed). */
 const NAV = [
-  { href: '/treasury', label: 'Elections / Voting', icon: Vote },
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/treasury', label: 'Treasury', icon: Landmark },
+  { href: '/wallet', label: 'Wallet', icon: Wallet },
+  { href: '/settings', label: 'Settings', icon: SettingsNavIcon },
+  { href: '/companion', label: 'Companion', icon: MessageCircle },
 ];
 
 /** When user is on one of these pages, bottom tab always navigates to href (don't lock). */
-const PROTECTED_PATHS = ['/dashboard', '/treasury', '/wallet', '/settings', '/government/elections'];
+const PROTECTED_PATHS = ['/dashboard', '/treasury', '/wallet', '/settings', '/companion', '/government/elections'];
 function isOnProtectedPath(pathname: string) {
   return PROTECTED_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'));
 }
