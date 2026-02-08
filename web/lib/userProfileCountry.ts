@@ -5,6 +5,18 @@
 
 import { supabase, hasSupabase } from './supabase';
 
+/** Get country_code for a phone (E.164). Returns null if not found or no code. */
+export async function getCountryCodeForPhone(phoneE164: string | null): Promise<string | null> {
+  if (!hasSupabase() || !phoneE164?.trim()) return null;
+  const { data, error } = await supabase
+    .from('user_profiles')
+    .select('country_code')
+    .eq('phone_number', phoneE164.trim())
+    .maybeSingle();
+  if (error || !data?.country_code) return null;
+  return String(data.country_code).trim().toUpperCase();
+}
+
 export type CountryCode = string; // ISO 3166-1 alpha-2 (e.g. NG, US, GB)
 
 export interface SaveCountryCodeResult {
