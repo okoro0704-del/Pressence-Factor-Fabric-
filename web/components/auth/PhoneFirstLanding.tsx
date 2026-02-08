@@ -4,9 +4,10 @@ import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { JetBrains_Mono } from 'next/font/google';
 import {
-  DEFAULT_PHONE_COUNTRY,
+  PHONE_COUNTRIES,
   filterPhoneCountries,
   getNationalPlaceholder,
+  getCountryByCode,
   type PhoneCountry,
 } from '@/lib/phoneCountries';
 import { formatPhoneE164 } from '@/lib/supabaseClient';
@@ -18,9 +19,21 @@ import { setVitalizationComplete } from '@/lib/vitalizationState';
 import { useGlobalPresenceGateway } from '@/contexts/GlobalPresenceGateway';
 import { getSupabase } from '@/lib/supabase';
 import { setVitalizationPhone } from '@/lib/deviceId';
+import { getPalmHash, verifyOrEnrollPalm } from '@/lib/palmHashProfile';
+import { PalmPulseCapture } from '@/components/auth/PalmPulseCapture';
 import { ROUTES } from '@/lib/constants';
 
 const jetbrains = JetBrains_Mono({ weight: ['400', '600', '700'], subsets: ['latin'] });
+
+/** Initial country from browser locale only (no persistence). Universal: not stuck on one country. */
+function getInitialCountry(): PhoneCountry {
+  if (typeof navigator === 'undefined' || !navigator.language) return getCountryByCode('US') ?? PHONE_COUNTRIES[0];
+  const locale = navigator.language.trim();
+  const part = locale.split(/[-_]/)[1];
+  const code = part && part.length === 2 ? part.toUpperCase() : null;
+  const found = code ? getCountryByCode(code) : null;
+  return found ?? getCountryByCode('US') ?? PHONE_COUNTRIES[0];
+}
 
 /** Fetch user_profiles face_hash and full_name by phone. Returns null if no row or no face_hash. */
 async function fetchProfileFaceHash(phone: string): Promise<{ face_hash: string; full_name: string | null } | null> {
@@ -48,12 +61,14 @@ async function fetchProfileFaceHash(phone: string): Promise<{ face_hash: string;
 export function PhoneFirstLanding() {
   const router = useRouter();
   const { setPresenceVerified } = useGlobalPresenceGateway();
-  const [country, setCountry] = useState<PhoneCountry>(DEFAULT_PHONE_COUNTRY);
+  const [country, setCountry] = useState<PhoneCountry>(() => getInitialCountry());
   const [nationalNumber, setNationalNumber] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [error, setError] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
   const [countrySearch, setCountrySearch] = useState('');
+  const [showPalmCapture, setShowPalmCapture] = useState(false);
+  const [pendingPhone, setPendingPhone] = useState<string | null>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -104,15 +119,40 @@ export function PhoneFirstLanding() {
         setIsVerifying(false);
         return;
       }
+      const hasPalm = await getPalmHash(phone);
+      if (hasPalm) {
+        setPendingPhone(phone);
+        setShowPalmCapture(true);
+        setIsVerifying(false);
+        return;
+      }
       setIdentityAnchorForSession(phone);
       setPresenceVerified(true);
       setSessionIdentity(phone);
       setVitalizationComplete();
-      router.replace(ROUTES.DASHBOARD);
+      setTimeout(() => router.replace(ROUTES.DASHBOARD), 800);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Biometric check failed. Try again.');
       setIsVerifying(false);
     }
+  };
+
+  const handlePalmSuccess = async (palmHash: string) => {
+    const phone = pendingPhone;
+    if (!phone) return;
+    setShowPalmCapture(false);
+    setPendingPhone(null);
+    setError('');
+    const result = await verifyOrEnrollPalm(phone, palmHash);
+    if (!result.ok) {
+      setError(result.error ?? 'Palm did not match. Try again.');
+      return;
+    }
+    setIdentityAnchorForSession(phone);
+    setPresenceVerified(true);
+    setSessionIdentity(phone);
+    setVitalizationComplete();
+    setTimeout(() => router.replace(ROUTES.DASHBOARD), 800);
   };
 
   return (
@@ -133,7 +173,7 @@ export function PhoneFirstLanding() {
             Enter your phone number
           </h1>
           <p className="text-sm" style={{ color: '#6b6b70' }}>
-            Then continue to biometric scan. No camera — your device will verify your face.
+            Universal: choose any country. Then face + palm (under 3 seconds for returning users).
           </p>
         </div>
 
@@ -199,9 +239,19 @@ export function PhoneFirstLanding() {
             />
           </div>
           <p className="text-xs mt-2" style={{ color: '#6b6b70' }}>
-            Country code is not saved. Select each time you visit.
+            Any country — not saved. Select each visit.
           </p>
         </div>
+
+        <PalmPulseCapture
+          isOpen={showPalmCapture}
+          onClose={() => {
+            setShowPalmCapture(false);
+            setPendingPhone(null);
+          }}
+          onSuccess={handlePalmSuccess}
+          onError={(msg) => setError(msg)}
+        />
 
         {error && (
           <div
