@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
   Landmark,
@@ -38,11 +38,19 @@ const VITALIZATION_HREF = '/vitalization';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [vitalized, setVitalized] = useState<boolean | null>(null);
   const handleLogoClick = useTripleTapReset();
   /** On protected pages, tabs always go to their route (nav works). */
   const navUnlocked = isOnProtectedPath(pathname) || vitalized === true;
+
+  /** One-tap navigation: immediate client-side transition. */
+  const goTo = useCallback((href: string) => {
+    const target = navUnlocked ? href : VITALIZATION_HREF;
+    if (pathname === target || pathname.startsWith(target + '/')) return;
+    router.push(target);
+  }, [navUnlocked, pathname, router]);
 
   useEffect(() => {
     getCitizenStatusForPhone(getIdentityAnchorPhone()).then((status) => setVitalized(status === 'VITALIZED'));
@@ -125,33 +133,37 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {children}
       </main>
 
-      {/* Mobile: Sovereign Drawer — bottom bar, Era of Light aesthetic (gold border, slate bg); same nav as desktop sidebar */}
+      {/* Mobile: one-tap bottom bar — large touch targets, immediate router.push for smooth transition */}
       <nav
-        className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t-2 border-[#D4AF37]/40 bg-[#0a0a0c]/98 backdrop-blur-md safe-area-pb shadow-[0_-4px_24px_rgba(212,175,55,0.08)]"
-        style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 8px)' }}
+        className="md:hidden fixed bottom-0 left-0 right-0 z-[100] border-t-2 border-[#D4AF37]/40 bg-[#0a0a0c]/98 backdrop-blur-md safe-area-pb shadow-[0_-4px_24px_rgba(212,175,55,0.08)] select-none"
+        style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 12px)' }}
         aria-label="Sovereign navigation"
       >
-        <div className="flex items-center justify-around min-h-[56px] px-2">
+        <div className="flex items-stretch min-h-[64px]">
           {NAV.map(({ href, label, icon: Icon }) => {
             const active = pathname === href || pathname.startsWith(href + '/');
             const locked = !navUnlocked;
             return (
-              <Link
+              <button
                 key={href}
-                href={locked ? VITALIZATION_HREF : href}
-                prefetch={true}
+                type="button"
+                onClick={() => goTo(href)}
                 className={`
-                  min-h-[48px] min-w-[56px] flex flex-col items-center justify-center gap-0.5 rounded-lg touch-manipulation px-2 py-2
-                  transition-colors duration-200
+                  flex-1 flex flex-col items-center justify-center gap-0.5 rounded-none
+                  min-h-[64px] min-w-0 touch-manipulation cursor-pointer
+                  transition-colors duration-150 ease-out
+                  focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/50 focus-visible:ring-inset
+                  [-webkit-tap-highlight-color:transparent]
                   ${locked ? 'opacity-60 text-[#6b6b70]' : ''}
-                  ${active && !locked ? 'text-[#D4AF37] bg-[#D4AF37]/10' : !locked ? 'text-[#6b6b70] hover:text-[#a0a0a5] active:bg-[#16161a]' : ''}
+                  ${active && !locked ? 'text-[#D4AF37] bg-[#D4AF37]/10' : !locked ? 'text-[#6b6b70] hover:text-[#a0a0a5] active:bg-[#16161a] active:text-[#e8c547]' : ''}
                 `}
                 aria-current={active ? 'page' : undefined}
+                aria-label={locked ? DEVICE_NOT_ANCHORED_MESSAGE : label}
                 title={locked ? DEVICE_NOT_ANCHORED_MESSAGE : label}
               >
-                <Icon className="w-6 h-6 shrink-0" />
-                <span className="text-[10px] font-medium truncate max-w-[64px]">{label}</span>
-              </Link>
+                <Icon className="w-6 h-6 shrink-0 pointer-events-none" aria-hidden />
+                <span className="text-[10px] font-medium truncate max-w-[80px] pointer-events-none">{label}</span>
+              </button>
             );
           })}
         </div>
