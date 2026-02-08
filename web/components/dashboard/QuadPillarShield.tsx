@@ -185,6 +185,8 @@ export interface QuadPillarGridProps {
   onGrantLocation?: () => void;
   /** When GPS fails (manual verification required), allow manual city/country entry */
   onManualLocation?: () => void;
+  /** When true, GPS did not respond in 10s — show Self-Certify so user is not stuck */
+  gpsSelfCertifyAvailable?: boolean;
 }
 
 /** Core Mesh = Pillars 1 (Face), 2 (Palm), 3 (Identity Anchor) verified. Proceed allowed without GPS. */
@@ -202,6 +204,7 @@ export function QuadPillarGrid({
   gpsTakingLong = false,
   onGrantLocation,
   onManualLocation,
+  gpsSelfCertifyAvailable = false,
 }: QuadPillarGridProps) {
   const verified = [faceVerified, palmVerified, phoneAnchorVerified, locationVerified];
   const allVerified = verified.every(Boolean);
@@ -214,7 +217,8 @@ export function QuadPillarGrid({
           const v = verified[i];
           const isGpsPillar = pillar.id === 4;
           const showGrantButton = isGpsPillar && !v && gpsTakingLong && onGrantLocation;
-          const showManualEntry = isGpsPillar && !v && gpsPillarMessage && onManualLocation;
+          const showManualEntry = isGpsPillar && !v && (gpsPillarMessage || gpsSelfCertifyAvailable) && onManualLocation;
+          const showSelfCertify = isGpsPillar && !v && gpsSelfCertifyAvailable && onManualLocation;
           const pendingMsg = !v && isGpsPillar && gpsPillarMessage ? gpsPillarMessage : gpsTakingLong ? 'Initializing Protocol…' : '…';
           return (
             <div
@@ -246,7 +250,16 @@ export function QuadPillarGrid({
                   Grant Location
                 </button>
               )}
-              {showManualEntry && (
+              {showSelfCertify && (
+                <button
+                  type="button"
+                  onClick={onManualLocation}
+                  className="mt-2 px-3 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all border-2 border-[#D4AF37] bg-[#D4AF37]/20 text-[#D4AF37] hover:bg-[#D4AF37]/30 touch-manipulation min-h-[44px]"
+                >
+                  Self-Certify
+                </button>
+              )}
+              {showManualEntry && !showSelfCertify && (
                 <button
                   type="button"
                   onClick={onManualLocation}

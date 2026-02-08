@@ -4,10 +4,10 @@
 /api/identity-reset           /.netlify/functions/identity-reset          200
 /api/identity-reset/          /.netlify/functions/identity-reset           200
 
-# Unveiling Phase: lock vitalization and treasury to Sovereign Countdown
-/vitalization    /countdown/   302
-/vitalization/   /countdown/   302
-/treasury        /countdown/   302
-/treasury/       /countdown/   302
+# Unveiling Phase: lock vitalization and treasury to Sovereign Countdown (no trailing slash to avoid Page Not Found on mobile)
+/vitalization    /countdown   302
+/vitalization/   /countdown   302
+/treasury        /countdown   302
+/treasury/       /countdown   302
 
 /* /ArchitectCommandCenter  200

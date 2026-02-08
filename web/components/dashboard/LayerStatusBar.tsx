@@ -89,7 +89,7 @@ export function LayerStatusBar({
   const icons: { key: string; verified: boolean; Icon: React.ComponentType<IconProps>; label: string }[] = [
     { key: 'face', verified: face, Icon: ScanLine as React.ComponentType<IconProps>, label: 'Face' },
     { key: 'palm', verified: palm, Icon: Hand as React.ComponentType<IconProps>, label: 'Palm' },
-    { key: 'device', verified: device, Icon: Smartphone as React.ComponentType<IconProps>, label: 'Device' },
+    { key: 'anchor', verified: device, Icon: Smartphone as React.ComponentType<IconProps>, label: 'Anchor' },
     ...(showGps ? [{ key: 'gps', verified: location, Icon: MapPin as React.ComponentType<IconProps>, label: 'GPS' }] : []),
   ];
 

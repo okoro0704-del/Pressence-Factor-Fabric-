@@ -28,7 +28,6 @@ import { ConfirmLanguageScreen } from '@/components/auth/ConfirmLanguageScreen';
 import { VaultDoorAnimation } from './VaultDoorAnimation';
 import { useGlobalPresenceGateway } from '@/contexts/GlobalPresenceGateway';
 import { IdentityAnchorInput } from '@/components/auth/IdentityAnchorInput';
-import { BiologicalMismatchScreen } from '@/components/auth/BiologicalMismatchScreen';
 import { ManualLocationInputScreen } from '@/components/auth/ManualLocationInputScreen';
 import { MismatchEventType } from '@/lib/identityMismatchDetection';
 import {
@@ -243,6 +242,8 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
   const [showLocationPermissionPopup, setShowLocationPermissionPopup] = useState(false);
   /** GPS taking >3s — show "Initializing Protocol..." (indoor mode) */
   const [gpsTakingLong, setGpsTakingLong] = useState(false);
+  /** GPS no response after 10s — show Self-Certify so user is not stuck */
+  const [gpsSelfCertifyAvailable, setGpsSelfCertifyAvailable] = useState(false);
   /** New Device Authorization: device_fingerprint does not match primary_sentinel_device_id — require 5s Face Pulse then update binding */
   const [showNewDeviceAuthorization, setShowNewDeviceAuthorization] = useState(false);
   const [newDeviceMigrationScanning, setNewDeviceMigrationScanning] = useState(false);
@@ -412,6 +413,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     setMismatchData(null);
     setShowLearningModeMessage(false);
     setGpsTakingLong(false);
+    setGpsSelfCertifyAvailable(false);
     setLedgerSyncError(false);
     try {
       if (typeof localStorage !== 'undefined') {
@@ -496,6 +498,13 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     const t = setTimeout(() => setGpsTakingLong(true), 5000);
     return () => clearTimeout(t);
   }, [currentLayer, authStatus]);
+
+  // If GPS doesn't respond in 10s, allow Self-Certify so user is not stuck (Pillar 4)
+  useEffect(() => {
+    if (authStatus !== AuthStatus.SCANNING || pillarLocation || !identityAnchor || !ENABLE_GPS_AS_FOURTH_PILLAR) return;
+    const t = setTimeout(() => setGpsSelfCertifyAvailable(true), 10000);
+    return () => clearTimeout(t);
+  }, [authStatus, pillarLocation, identityAnchor]);
 
   // GPS backgrounding: start watchPosition while camera (Face/Palm scan) is active so Pillar 4 locks coords in background
   useEffect(() => {
@@ -895,19 +904,17 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
         gpsFailureAuthRef.current = { identityAnchor };
         setShowManualLocationInput(true);
       } else if (!isVitalized) {
-        setScanToast('Scan not clear. Please try again.');
+        setScanToast('retry');
         setAuthStatus(AuthStatus.IDLE);
         setShowArchitectVision(true);
-        setTimeout(() => setScanToast(null), 3500);
       } else if (learningModeRef.current.active) {
         setShowLearningModeMessage(true);
       } else {
         // Sentinel Lock: full Biological Signature Mismatch UI only in SovereignVault / high-value flows.
-        // At the Gate (Architect), never block with mismatch screen — use subtle toast and stay on scanner.
-        setScanToast('Scan not clear. Please try again.');
+        // At the Gate (Architect), never block with mismatch screen — use friendly retry button only.
+        setScanToast('retry');
         setAuthStatus(AuthStatus.IDLE);
         setShowArchitectVision(true);
-        setTimeout(() => setScanToast(null), 3500);
       }
     }
     } finally {
@@ -1647,28 +1654,9 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     );
   }
 
-  // Biological Signature Mismatch full UI only in SovereignVault / high-value flows (see gate handler above).
-  // Gate never shows this screen; scan failure at gate uses toast only.
-  if (showMismatchScreen && mismatchData) {
-    return (
-      <BiologicalMismatchScreen
-        mismatchType={mismatchData.type}
-        variance={mismatchData.variance}
-        similarityScore={mismatchData.similarity}
-        accountOwnerName={identityAnchor?.name}
-        useSoftMessage={mismatchData.useSoftMessage}
-        onDismiss={handleMismatchDismiss}
-        onRetry={() => {
-          handleMismatchDismiss();
-          resetVerification();
-          handleStartAuthentication();
-        }}
-        showSovereignManualBypass={faceFailCount >= 2 && isArchitect()}
-        onSovereignManualBypass={goToDashboard}
-        hideSecurityNotice
-      />
-    );
-  }
+  // Kill the Mismatch Screen: Biological Signature Mismatch red screen and lockout are never shown at the Gate.
+  // Only friendly retry button ("Light was too low. Tap to scan again.") is used for registration.
+  // BiologicalMismatchScreen is reserved for SovereignVault / high-value flows only (not rendered here).
 
   if (transitioningToDashboard) {
     return (
@@ -1994,18 +1982,28 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
         forceShow
       />
 
-      {/* Subtle toast during registration: "Scan not clear. Please try again." — no lockout */}
+      {/* Simple retry: friendly button instead of scary alert — no lockout for registration */}
       {scanToast && (
         <div
-          className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[60] px-6 py-3 rounded-xl border text-sm font-medium shadow-lg animate-in fade-in duration-300"
-          style={{
-            background: 'rgba(30, 28, 22, 0.98)',
-            borderColor: 'rgba(212, 175, 55, 0.5)',
-            color: '#e8c547',
-          }}
+          className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[60] max-w-[90vw]"
           role="status"
         >
-          {scanToast}
+          <button
+            type="button"
+            onClick={() => {
+              setScanToast(null);
+              resetVerification();
+              handleStartAuthentication();
+            }}
+            className="px-6 py-4 rounded-xl border-2 text-sm font-medium shadow-lg animate-in fade-in duration-300 min-h-[44px] touch-manipulation"
+            style={{
+              background: 'rgba(30, 28, 22, 0.98)',
+              borderColor: 'rgba(212, 175, 55, 0.5)',
+              color: '#e8c547',
+            }}
+          >
+            Light was too low. Tap to scan again.
+          </button>
         </div>
       )}
       {/* Ledger Sync Error: presence_handshakes write failed (e.g. add identity_mesh_hash column in Supabase) */}
@@ -2097,6 +2095,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
                 locationVerified={pillarLocation}
                 gpsPillarMessage={!pillarLocation ? (gpsTakingLong ? 'Initializing Protocol…' : 'GPS unavailable — enter city/country') : undefined}
                 gpsTakingLong={gpsTakingLong}
+                gpsSelfCertifyAvailable={gpsSelfCertifyAvailable}
                 onGrantLocation={identityAnchor?.phone ? () => startLocationRequestFromUserGesture(identityAnchor.phone) : undefined}
                 onManualLocation={identityAnchor && !pillarLocation ? () => {
                   setShowManualLocationInput(true);

@@ -17,7 +17,7 @@ interface BiologicalMismatchScreenProps {
   onRetry?: () => void;
   showSovereignManualBypass?: boolean;
   onSovereignManualBypass?: () => void;
-  /** When true, hide Security Alert Sent / Audit Log (e.g. gate flow, non-vault) */
+  /** When true, hide Security Alert Sent / Audit Log (e.g. gate flow, non-vault). Default true to remove friction for non-vitalized. */
   hideSecurityNotice?: boolean;
 }
 
@@ -31,7 +31,7 @@ export function BiologicalMismatchScreen({
   onRetry,
   showSovereignManualBypass = false,
   onSovereignManualBypass,
-  hideSecurityNotice = false,
+  hideSecurityNotice = true,
 }: BiologicalMismatchScreenProps) {
   const [countdown, setCountdown] = useState(60);
 
