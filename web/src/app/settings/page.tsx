@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { ProtectedRoute } from '@/components/dashboard/ProtectedRoute';
 import { BiometricStrictnessSlider } from '@/components/settings/BiometricStrictnessSlider';
 import { AppShell } from '@/components/layout/AppShell';
 import { SentinelDevicesManager } from '@/components/dashboard/SentinelDevicesManager';
@@ -55,16 +56,17 @@ export default function SettingsPage() {
   };
 
   return (
-    <AppShell>
-      <main className="p-4 md:p-6 sovereign-card w-full">
-        <h1 className="text-xl font-bold uppercase tracking-wider mb-2" style={{ color: GOLD }}>
-          Settings
-        </h1>
-        <p className="text-sm text-[#6b6b70] mb-6">
-          Your preferences are saved to your profile and apply on all devices.
-        </p>
+    <ProtectedRoute>
+      <AppShell>
+        <main className="min-h-screen bg-[#0d0d0f] pb-20 md:pb-8 p-4 md:p-6 max-w-2xl mx-auto w-full">
+          <h1 className="text-xl font-bold uppercase tracking-wider mb-2" style={{ color: GOLD }}>
+            Settings
+          </h1>
+          <p className="text-sm text-[#6b6b70] mb-6">
+            Your preferences are saved to your profile and apply on all devices.
+          </p>
 
-        <div className="space-y-6">
+          <div className="space-y-6">
           <BiometricStrictnessSlider />
 
           {shouldSuggestSovereignShield(trustLevel) && (
@@ -169,17 +171,18 @@ export default function SettingsPage() {
               Sign Out
             </button>
           </div>
-        </div>
+          </div>
 
-        <div className="mt-8">
-          <Link
-            href="/wallet/"
-            className="text-sm text-[#6b6b70] hover:text-[#e8c547] transition-colors"
-          >
-            ← Back to Wallet
-          </Link>
-        </div>
-      </main>
-    </AppShell>
+          <div className="mt-8">
+            <Link
+              href="/wallet"
+              className="text-sm text-[#6b6b70] hover:text-[#e8c547] transition-colors"
+            >
+              ← Back to Wallet
+            </Link>
+          </div>
+        </main>
+      </AppShell>
+    </ProtectedRoute>
   );
 }
