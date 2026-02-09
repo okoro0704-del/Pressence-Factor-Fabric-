@@ -185,16 +185,24 @@ export function PhoneFirstLanding() {
             <div className="relative" ref={pickerRef}>
               <button
                 type="button"
-                onClick={() => setPickerOpen((o) => !o)}
-                className="flex items-center gap-2 px-3 py-3 border-r min-w-[120px] hover:bg-neutral-800/50 transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setPickerOpen((o) => !o);
+                }}
+                aria-label={`Country code ${country.dialCode}. Click to change.`}
+                aria-expanded={pickerOpen}
+                aria-haspopup="listbox"
+                className="flex items-center gap-2 px-3 py-3 border-r min-w-[120px] cursor-pointer select-none hover:bg-[#D4AF37]/10 active:bg-[#D4AF37]/15 transition-colors touch-manipulation"
                 style={{ borderColor: 'rgba(212, 175, 55, 0.3)', background: '#0d0d0f', color: '#D4AF37' }}
               >
-                <span className="text-xl leading-none">{country.flag}</span>
+                <span className="text-xl leading-none" aria-hidden>{country.flag}</span>
                 <span className={`text-sm font-mono ${jetbrains.className}`}>{country.dialCode}</span>
-                <span className="ml-auto text-neutral-500">▾</span>
+                <span className="ml-auto text-neutral-500 text-xs" aria-hidden>▾</span>
               </button>
               {pickerOpen && (
                 <div
+                  role="listbox"
+                  aria-label="Select country"
                   className="absolute left-0 top-full z-50 mt-1 rounded-lg border shadow-xl flex flex-col w-full min-w-[260px] max-w-[min(320px,100vw)] max-h-[320px] bg-[#0d0d0f] border-[#D4AF37]/30"
                 >
                   <div className="p-2 border-b border-[#D4AF37]/20 sticky top-0 bg-[#0d0d0f]">
@@ -212,12 +220,15 @@ export function PhoneFirstLanding() {
                       <button
                         key={c.code}
                         type="button"
-                        onClick={() => {
+                        role="option"
+                        aria-selected={c.code === country.code}
+                        onClick={(e) => {
+                          e.stopPropagation();
                           setCountry(c);
                           setCountrySearch('');
                           setPickerOpen(false);
                         }}
-                        className="flex items-center gap-2 w-full px-3 py-2 text-left hover:bg-[#D4AF37]/10"
+                        className="flex items-center gap-2 w-full px-3 py-3 text-left cursor-pointer select-none hover:bg-[#D4AF37]/15 active:bg-[#D4AF37]/20 transition-colors touch-manipulation"
                         style={{ color: c.code === country.code ? '#D4AF37' : '#a0a0a5' }}
                       >
                         <span className="text-lg">{c.flag}</span>
