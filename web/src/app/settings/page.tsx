@@ -65,9 +65,9 @@ export default function SettingsPage() {
       // ignore
     }
     if (typeof window !== 'undefined') {
-      window.location.assign('/language');
+      window.location.assign('/vitalization');
     } else {
-      router.replace('/language');
+      router.replace('/vitalization');
     }
   };
 
@@ -305,7 +305,7 @@ export default function SettingsPage() {
                 Sign Out
               </h2>
               <p className="text-sm text-[#a0a0a5] mb-4">
-                Sign out on this device. Your local session will be cleared and you will be returned to the language screen.
+                Sign out on this device. Your local session will be cleared and you will be returned to Vitalization to start the process again.
               </p>
               <button
                 type="button"
