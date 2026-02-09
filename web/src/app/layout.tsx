@@ -8,6 +8,7 @@ import { AccessGateClient } from '@/components/access/AccessGateClient';
 import { SovereignCompanionProvider } from '@/contexts/SovereignCompanionContext';
 import { RegisterServiceWorker } from '@/components/RegisterServiceWorker';
 import { BiometricSessionProvider } from '@/contexts/BiometricSessionContext';
+import { TranslationProvider } from '@/lib/i18n/TranslationContext';
 
 /** Force static generation for all routes (consolidate to single static site). */
 export const dynamic = 'force-static';
@@ -65,20 +66,22 @@ export default function RootLayout({
       </head>
       <body className="bg-[#0d0d0f] text-[#f5f5f5] antialiased">
         <GlobalPresenceGatewayProvider>
-          <BiometricSessionProvider>
-            <SovereignSeedProvider>
-              <SovereignCompanionProvider>
-                <SovereignAuthGuard>
-                  <AccessGateClient />
-                  <FourPillarsGuard>
-                    <div id="app-root" className="relative z-0 min-h-screen">
-                      {children}
-                    </div>
-                  </FourPillarsGuard>
-                </SovereignAuthGuard>
-              </SovereignCompanionProvider>
-            </SovereignSeedProvider>
-          </BiometricSessionProvider>
+          <TranslationProvider>
+            <BiometricSessionProvider>
+              <SovereignSeedProvider>
+                <SovereignCompanionProvider>
+                  <SovereignAuthGuard>
+                    <AccessGateClient />
+                    <FourPillarsGuard>
+                      <div id="app-root" className="relative z-0 min-h-screen">
+                        {children}
+                      </div>
+                    </FourPillarsGuard>
+                  </SovereignAuthGuard>
+                </SovereignCompanionProvider>
+              </SovereignSeedProvider>
+            </BiometricSessionProvider>
+          </TranslationProvider>
           <RegisterServiceWorker />
         </GlobalPresenceGatewayProvider>
       </body>
