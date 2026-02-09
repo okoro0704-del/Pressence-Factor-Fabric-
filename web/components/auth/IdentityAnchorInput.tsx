@@ -1,13 +1,12 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { JetBrains_Mono } from 'next/font/google';
 import { fetchIdentityAnchor, type BiometricIdentityRecord } from '@/lib/universalIdentityComparison';
 import { formatPhoneE164 } from '@/lib/supabaseClient';
 import {
   PHONE_COUNTRIES,
-  DEFAULT_PHONE_COUNTRY,
+  getInitialCountry,
   filterPhoneCountries,
   getNationalPlaceholder,
   getCountryByCode,
@@ -55,7 +54,7 @@ export function IdentityAnchorInput({
   autoDetectCountry = true,
 }: IdentityAnchorInputProps) {
   const initialCountry = initialCountryCode ? getCountryByCode(initialCountryCode) : undefined;
-  const [country, setCountry] = useState<PhoneCountry>(initialCountry ?? DEFAULT_PHONE_COUNTRY);
+  const [country, setCountry] = useState<PhoneCountry>(() => initialCountry ?? getInitialCountry());
   const [nationalNumber, setNationalNumber] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [error, setError] = useState('');
@@ -70,7 +69,7 @@ export function IdentityAnchorInput({
     fullName: string;
     identity: BiometricIdentityRecord;
   } | null>(null);
-  const [guardianCountry, setGuardianCountry] = useState<PhoneCountry>(initialCountry ?? DEFAULT_PHONE_COUNTRY);
+  const [guardianCountry, setGuardianCountry] = useState<PhoneCountry>(() => initialCountry ?? getInitialCountry());
   const [guardianNationalNumber, setGuardianNationalNumber] = useState('');
   const [guardianVerifying, setGuardianVerifying] = useState(false);
   const [guardianPickerOpen, setGuardianPickerOpen] = useState(false);
@@ -79,7 +78,6 @@ export function IdentityAnchorInput({
   const [detectedCountryApplied, setDetectedCountryApplied] = useState(false);
   /** When Supabase returns no user (not yet vitalized), show high-status prompt instead of red error. */
   const [notYetVitalized, setNotYetVitalized] = useState<{ phone: string } | null>(null);
-  const router = useRouter();
 
   useEffect(() => {
     if (!autoDetectCountry || detectionDoneRef.current) return;
@@ -218,7 +216,10 @@ export function IdentityAnchorInput({
     if (!notYetVitalized?.phone) return;
     ensureDeviceId();
     setVitalizationPhone(notYetVitalized.phone);
-    router.push(`/vitalization?phone=${encodeURIComponent(notYetVitalized.phone)}`);
+    onAnchorVerified({
+      phoneNumber: notYetVitalized.phone,
+      fullName: 'Citizen',
+    });
   };
 
   // Citizen Not Yet Vitalized — high-status prompt and Begin Vitalization (no red error)

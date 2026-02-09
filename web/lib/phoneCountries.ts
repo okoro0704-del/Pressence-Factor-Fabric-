@@ -35,19 +35,19 @@ function getCountryName(code: string): string {
   return code;
 }
 
-/** Fallback when libphonenumber-js fails (e.g. SSR or unsupported env). */
+/** Fallback when libphonenumber-js fails (e.g. SSR or unsupported env). Alphabetical so no single country is default. */
 const FALLBACK_COUNTRIES: PhoneCountry[] = [
-  { code: 'NG', dialCode: '+234', name: 'Nigeria', flag: '🇳🇬' },
+  { code: 'AU', dialCode: '+61', name: 'Australia', flag: '🇦🇺' },
+  { code: 'CA', dialCode: '+1', name: 'Canada', flag: '🇨🇦' },
+  { code: 'FR', dialCode: '+33', name: 'France', flag: '🇫🇷' },
+  { code: 'DE', dialCode: '+49', name: 'Germany', flag: '🇩🇪' },
   { code: 'GH', dialCode: '+233', name: 'Ghana', flag: '🇬🇭' },
+  { code: 'IN', dialCode: '+91', name: 'India', flag: '🇮🇳' },
+  { code: 'KE', dialCode: '+254', name: 'Kenya', flag: '🇰🇪' },
+  { code: 'NG', dialCode: '+234', name: 'Nigeria', flag: '🇳🇬' },
+  { code: 'ZA', dialCode: '+27', name: 'South Africa', flag: '🇿🇦' },
   { code: 'GB', dialCode: '+44', name: 'United Kingdom', flag: '🇬🇧' },
   { code: 'US', dialCode: '+1', name: 'United States', flag: '🇺🇸' },
-  { code: 'KE', dialCode: '+254', name: 'Kenya', flag: '🇰🇪' },
-  { code: 'ZA', dialCode: '+27', name: 'South Africa', flag: '🇿🇦' },
-  { code: 'IN', dialCode: '+91', name: 'India', flag: '🇮🇳' },
-  { code: 'CA', dialCode: '+1', name: 'Canada', flag: '🇨🇦' },
-  { code: 'AU', dialCode: '+61', name: 'Australia', flag: '🇦🇺' },
-  { code: 'DE', dialCode: '+49', name: 'Germany', flag: '🇩🇪' },
-  { code: 'FR', dialCode: '+33', name: 'France', flag: '🇫🇷' },
 ];
 
 /** Build full list from libphonenumber-js (all supported countries). */
@@ -72,13 +72,7 @@ function buildPhoneCountries(): PhoneCountry[] {
     }
     if (list.length === 0) return FALLBACK_COUNTRIES;
     list.sort((a, b) => a.name.localeCompare(b.name));
-    const priority: CountryCode[] = ['NG', 'GH', 'GB', 'US', 'KE', 'ZA', 'IN', 'CA', 'AU'];
-    const prioritySet = new Set(priority);
-    const ordered = [
-      ...list.filter((c) => prioritySet.has(c.code)),
-      ...list.filter((c) => !prioritySet.has(c.code)),
-    ];
-    return ordered.length > 0 ? ordered : list;
+    return list;
   } catch {
     return FALLBACK_COUNTRIES;
   }
@@ -86,9 +80,18 @@ function buildPhoneCountries(): PhoneCountry[] {
 
 export const PHONE_COUNTRIES: PhoneCountry[] = buildPhoneCountries();
 
-/** Default selection: Nigeria (first in priority). */
-export const DEFAULT_PHONE_COUNTRY: PhoneCountry =
-  PHONE_COUNTRIES.find((c) => c.code === 'NG') ?? PHONE_COUNTRIES[0];
+/** Universal default: first in alphabetical list (no single country persisted). Use getInitialCountry() when you want browser/locale detection. */
+export const DEFAULT_PHONE_COUNTRY: PhoneCountry = PHONE_COUNTRIES[0];
+
+/** Initial country from browser locale (no persistence). Use for universal mobile country code. */
+export function getInitialCountry(): PhoneCountry {
+  if (typeof navigator === 'undefined' || !navigator.language) return DEFAULT_PHONE_COUNTRY;
+  const locale = (navigator.language || (navigator as { userLanguage?: string }).userLanguage || '').trim();
+  const part = locale.split(/[-_]/)[1];
+  const code = part && part.length === 2 ? part.toUpperCase() : null;
+  const found = code ? getCountryByCode(code) : null;
+  return found ?? DEFAULT_PHONE_COUNTRY;
+}
 
 /** Look up PhoneCountry by ISO 3166-1 alpha-2 (e.g. from GPS/IP detection). */
 export function getCountryByCode(code: string): PhoneCountry | undefined {

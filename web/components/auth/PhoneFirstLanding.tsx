@@ -5,10 +5,9 @@ import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { JetBrains_Mono } from 'next/font/google';
 import {
-  PHONE_COUNTRIES,
   filterPhoneCountries,
   getNationalPlaceholder,
-  getCountryByCode,
+  getInitialCountry,
   type PhoneCountry,
 } from '@/lib/phoneCountries';
 import { formatPhoneE164 } from '@/lib/supabaseClient';
@@ -16,16 +15,6 @@ import { setVitalizationPhone } from '@/lib/deviceId';
 import { ROUTES } from '@/lib/constants';
 
 const jetbrains = JetBrains_Mono({ weight: ['400', '600', '700'], subsets: ['latin'] });
-
-/** Initial country from browser locale only (no persistence). Universal: not stuck on one country. */
-function getInitialCountry(): PhoneCountry {
-  if (typeof navigator === 'undefined' || !navigator.language) return getCountryByCode('US') ?? PHONE_COUNTRIES[0];
-  const locale = navigator.language.trim();
-  const part = locale.split(/[-_]/)[1];
-  const code = part && part.length === 2 ? part.toUpperCase() : null;
-  const found = code ? getCountryByCode(code) : null;
-  return found ?? getCountryByCode('US') ?? PHONE_COUNTRIES[0];
-}
 
 /**
  * First page: phone number, then VITALIZE. Goes straight to vitalization — no passkey or password prompts.
