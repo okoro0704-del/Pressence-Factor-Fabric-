@@ -192,15 +192,15 @@ export function PhoneFirstLanding() {
                 aria-label={`Country code ${country.dialCode}. Click to choose country.`}
                 aria-expanded={pickerOpen}
                 aria-haspopup="listbox"
-                className="flex items-center gap-2 pl-3 pr-2 py-3 border-r min-w-[140px] cursor-pointer select-none hover:bg-[#D4AF37]/10 active:bg-[#D4AF37]/15 transition-colors touch-manipulation"
+                className="flex items-center gap-2 pl-3 pr-2 py-2 border-r min-w-[140px] min-h-[60px] cursor-pointer select-none hover:bg-[#D4AF37]/10 active:bg-[#D4AF37]/15 transition-colors touch-manipulation"
                 style={{ borderColor: 'rgba(212, 175, 55, 0.3)', background: '#0d0d0f', color: '#D4AF37' }}
               >
                 <span className="text-xl leading-none shrink-0" aria-hidden>{country.flag}</span>
                 <span className={`text-sm font-mono shrink-0 ${jetbrains.className}`}>{country.dialCode}</span>
                 <span
-                  className="ml-auto flex items-center justify-center w-10 h-10 rounded-md text-[#D4AF37] hover:bg-[#D4AF37]/20 active:bg-[#D4AF37]/30 text-2xl leading-none"
+                  className="ml-auto flex items-center justify-center w-[60px] h-[60px] rounded-lg text-[#D4AF37] hover:bg-[#D4AF37]/20 active:bg-[#D4AF37]/30 text-4xl leading-none"
                   aria-hidden
-                  title="Choose country"
+                  title="Choose country — view all country codes"
                 >
                   ▾
                 </span>
@@ -252,7 +252,7 @@ export function PhoneFirstLanding() {
               onChange={(e) => setNationalNumber(e.target.value)}
               placeholder={getNationalPlaceholder(country.code)}
               disabled={isVerifying}
-              className={`flex-1 px-4 py-3 font-mono text-lg bg-[#0d0d0f] text-[#D4AF37] placeholder-neutral-500 outline-none ${jetbrains.className}`}
+              className={`flex-1 px-4 py-3 min-h-[60px] font-mono text-lg bg-[#0d0d0f] text-[#D4AF37] placeholder-neutral-500 outline-none ${jetbrains.className}`}
             />
           </div>
           <p className="text-xs mt-2" style={{ color: '#6b6b70' }}>
