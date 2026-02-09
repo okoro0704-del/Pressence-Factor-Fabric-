@@ -20,7 +20,7 @@ interface NormalizedLandmark {
 const SCAN_CIRCLE_RADIUS = 0.22; // normalized (0-1) radius for "palm in circle"
 const SCAN_CENTER_X = 0.5;
 const SCAN_CENTER_Y = 0.5;
-const STABLE_FRAMES_REQUIRED = 30; // ~0.5s at 60fps
+const STABLE_FRAMES_REQUIRED = 72; // ~1.2s at 60fps — AI must study every detail before success
 const VEIN_GREEN = 'rgba(34, 197, 94, 0.85)';
 
 export interface PalmPulseCaptureProps {
@@ -274,7 +274,7 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
 
   return (
     <div
-      className="fixed inset-0 z-[300] flex flex-col items-center justify-center bg-black"
+      className="fixed inset-0 z-[300] flex flex-col bg-black"
       style={{
         paddingTop: 'env(safe-area-inset-top, 0)',
         paddingBottom: 'env(safe-area-inset-bottom, 0)',
@@ -282,7 +282,8 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
         paddingRight: 'env(safe-area-inset-right, 0)',
       }}
     >
-      <div className="relative w-full max-w-2xl aspect-[4/3] max-h-[80vh] overflow-hidden rounded-xl border-2 border-[#22c55e]/50 shadow-[0_0_40px_rgba(34,197,94,0.2)]">
+      {/* Full-screen camera — covers the whole phone */}
+      <div className="absolute inset-0">
         <video
           ref={videoRef}
           className="absolute inset-0 w-full h-full object-cover"
@@ -299,15 +300,15 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
         />
 
         {status === 'scanning' && (
-          <div className="absolute bottom-4 left-0 right-0 z-20 px-4 space-y-2">
+          <div className="absolute bottom-6 left-0 right-0 z-20 px-4 space-y-2">
             <p
               className="text-center font-mono tracking-wider"
               style={{ color: VEIN_GREEN, textShadow: '0 0 12px rgba(34,197,94,0.8)', fontSize: '0.95rem', fontWeight: 600 }}
             >
-              Scanning Veins…
+              Studying palm details…
             </p>
             <p className="text-center text-[10px] font-mono uppercase tracking-widest text-[#6b6b70]">
-              SOVRYN is analyzing depth and vitality
+              AI is analyzing every detail. Hold your palm close and steady. This page will not close until your palm has been read.
             </p>
             <div className="rounded-full h-2 bg-[#1a1a1e] overflow-hidden border border-[#22c55e]/40">
               <div
@@ -324,16 +325,16 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
           </div>
         )}
 
-        <div className="absolute top-3 left-0 right-0 z-20 flex flex-col items-center gap-1 px-4 text-center">
+        <div className="absolute top-4 left-0 right-0 z-20 flex flex-col items-center gap-2 px-4 text-center">
           <span className="text-sm font-bold text-[#22c55e]">
             Face verified. Now show your palm to complete vitalization.
           </span>
           <span className="text-xs font-mono uppercase tracking-widest opacity-90" style={{ color: '#22c55e' }}>
-            Scan Area · Sovereign Palm
+            Sovereign Palm
           </span>
-          <span className="text-xs font-mono" style={{ color: '#6b6b70' }}>
-            Hold your palm to the camera in the circle — required to continue
-          </span>
+          <p className="text-sm max-w-md" style={{ color: '#6b6b70' }}>
+            Hold your palm <strong style={{ color: '#22c55e' }}>close to the camera</strong> so the camera and AI can study every detail. Keep it in the circle. This page will not close until your palm has been read successfully.
+          </p>
         </div>
       </div>
 

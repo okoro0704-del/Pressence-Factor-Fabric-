@@ -4,6 +4,7 @@ import { GlobalPresenceGatewayProvider } from '@/contexts/GlobalPresenceGateway'
 import { SovereignSeedProvider } from '@/contexts/SovereignSeedContext';
 import { SovereignAuthGuard } from '@/components/dashboard/SovereignAuthGuard';
 import { FourPillarsGuard } from '@/components/dashboard/FourPillarsGuard';
+import { AccessGateClient } from '@/components/access/AccessGateClient';
 import { SovereignCompanionProvider } from '@/contexts/SovereignCompanionContext';
 import { RegisterServiceWorker } from '@/components/RegisterServiceWorker';
 import { BiometricSessionProvider } from '@/contexts/BiometricSessionContext';
@@ -68,6 +69,7 @@ export default function RootLayout({
             <SovereignSeedProvider>
               <SovereignCompanionProvider>
                 <SovereignAuthGuard>
+                  <AccessGateClient />
                   <FourPillarsGuard>
                     <div id="app-root" className="relative z-0 min-h-screen">
                       {children}

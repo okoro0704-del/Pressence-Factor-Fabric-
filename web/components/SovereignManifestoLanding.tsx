@@ -2,11 +2,18 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { getCountdownTarget, isArchitect } from '@/lib/manifestoUnveiling';
 import { insertWaitlistEntry } from '@/lib/waitlist';
 import { PublicSovereignCompanion } from '@/components/manifesto/PublicSovereignCompanion';
 import { SovereignAwakeningProvider, useSovereignAwakening } from '@/contexts/SovereignAwakeningContext';
 import { SCROLL_WISDOM } from '@/lib/sovereignAwakeningContent';
+import {
+  isBeforeAccessCutoff,
+  hasAccessGranted,
+  setAccessGranted,
+  validateAccessCode,
+} from '@/lib/accessCodeGate';
 
 const GOLD = '#D4AF37';
 const GOLD_DIM = 'rgba(212, 175, 55, 0.6)';
@@ -46,6 +53,8 @@ const RATE_LIMIT_MS = 10000;
 const AWAKENING_SECTION_IDS = ['vida-cap', 'ate', 'vlt', 'ecosystem-roadmap', 'vanguard'] as const;
 
 export function SovereignManifestoLanding() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [mounted, setMounted] = useState(false);
   const target = getCountdownTarget();
   const { days, hours, minutes, seconds } = useCountdown(target);
@@ -56,7 +65,39 @@ export function SovereignManifestoLanding() {
   const lastSubmitAt = useRef<number>(0);
   const awakening = useSovereignAwakening();
 
+  const needCode = mounted && (searchParams?.get('need_code') === '1' || false);
+  const beforeCutoff = mounted && isBeforeAccessCutoff();
+  const isOwner = mounted && isArchitect();
+  const accessGranted = mounted && hasAccessGranted();
+  const showCodeForm = beforeCutoff && !isOwner && (!accessGranted || needCode);
+
+  const [codePhone, setCodePhone] = useState('');
+  const [codeValue, setCodeValue] = useState('');
+  const [codeError, setCodeError] = useState<string | null>(null);
+  const [codeLoading, setCodeLoading] = useState(false);
+  const codeFormRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => setMounted(true), []);
+
+  const handleCodeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCodeError(null);
+    const phone = codePhone.trim();
+    const code = codeValue.trim();
+    if (!phone || !code) {
+      setCodeError('Enter your phone number and the code you received.');
+      return;
+    }
+    setCodeLoading(true);
+    const result = await validateAccessCode(phone, code);
+    setCodeLoading(false);
+    if (result.ok) {
+      setAccessGranted(result.phone_number);
+      router.replace('/vitalization');
+      return;
+    }
+    setCodeError(result.error ?? 'Invalid code. Try again or request a new code.');
+  };
 
   // Scroll-triggered wisdom: when a section enters view, set wisdom for the Companion
   useEffect(() => {
@@ -89,8 +130,6 @@ export function SovereignManifestoLanding() {
     }, 300);
     return () => clearTimeout(t);
   }, [mounted]);
-
-  const architect = mounted && isArchitect();
 
   const handleVanguardSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -126,6 +165,54 @@ export function SovereignManifestoLanding() {
 
   return (
     <main className="min-h-screen bg-[#050505] text-white">
+      {/* Access code bar — until April 7, non-owner users must enter phone + code to access the app */}
+      {showCodeForm && (
+        <div
+          ref={codeFormRef}
+          className="sticky top-0 z-50 border-b px-4 py-4"
+          style={{ borderColor: GOLD, background: 'rgba(5, 5, 5, 0.98)', boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }}
+        >
+          <div className="max-w-xl mx-auto">
+            <p className="text-sm font-semibold mb-3" style={{ color: GOLD }}>
+              Site access until April 7 requires a code. Enter your phone number and the code you received to log in.
+            </p>
+            <form onSubmit={handleCodeSubmit} className="flex flex-wrap items-end gap-3">
+              <input
+                type="tel"
+                value={codePhone}
+                onChange={(e) => setCodePhone(e.target.value)}
+                placeholder="Phone number"
+                className="flex-1 min-w-[140px] px-4 py-2.5 rounded-lg border-2 bg-[#0d0d0f] text-white placeholder-[#6b6b70]"
+                style={{ borderColor: BORDER }}
+              />
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                value={codeValue}
+                onChange={(e) => setCodeValue(e.target.value.replace(/\D/g, ''))}
+                placeholder="Code"
+                className="w-24 px-4 py-2.5 rounded-lg border-2 bg-[#0d0d0f] text-white placeholder-[#6b6b70]"
+                style={{ borderColor: BORDER }}
+              />
+              <button
+                type="submit"
+                disabled={codeLoading}
+                className="px-6 py-2.5 rounded-lg font-bold uppercase tracking-wider border-2 transition-colors disabled:opacity-60"
+                style={{ borderColor: GOLD, color: GOLD, boxShadow: '0 0 16px rgba(212, 175, 55, 0.3)' }}
+              >
+                {codeLoading ? 'Checking…' : 'Log in'}
+              </button>
+            </form>
+            {codeError && (
+              <p className="mt-2 text-sm" style={{ color: '#f87171' }}>
+                {codeError}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Hero */}
       <section
         className="relative min-h-[70vh] flex flex-col items-center justify-center px-6 py-20 border-b"
@@ -147,13 +234,32 @@ export function SovereignManifestoLanding() {
           Born in Lagos. Built for the World.
         </p>
         <div className="flex flex-wrap items-center justify-center gap-3">
-          <Link
-            href="/vitalization"
-            className="rounded-xl border-2 px-8 py-3 font-bold uppercase tracking-wider transition-colors hover:bg-[#D4AF37]/20"
-            style={{ borderColor: GOLD, color: GOLD, boxShadow: '0 0 20px rgba(212, 175, 55, 0.2)' }}
-          >
-            VITALIZE
-          </Link>
+          {(isOwner || accessGranted) ? (
+            <Link
+              href="/vitalization"
+              className="rounded-xl border-2 px-8 py-3 font-bold uppercase tracking-wider transition-colors hover:bg-[#D4AF37]/20"
+              style={{ borderColor: GOLD, color: GOLD, boxShadow: '0 0 20px rgba(212, 175, 55, 0.2)' }}
+            >
+              VITALIZE
+            </Link>
+          ) : showCodeForm ? (
+            <button
+              type="button"
+              onClick={() => codeFormRef.current?.scrollIntoView({ behavior: 'smooth' })}
+              className="rounded-xl border-2 px-8 py-3 font-bold uppercase tracking-wider transition-colors hover:bg-[#D4AF37]/20"
+              style={{ borderColor: GOLD, color: GOLD, boxShadow: '0 0 20px rgba(212, 175, 55, 0.2)' }}
+            >
+              VITALIZE — Enter code above
+            </button>
+          ) : (
+            <Link
+              href="/vitalization"
+              className="rounded-xl border-2 px-8 py-3 font-bold uppercase tracking-wider transition-colors hover:bg-[#D4AF37]/20"
+              style={{ borderColor: GOLD, color: GOLD, boxShadow: '0 0 20px rgba(212, 175, 55, 0.2)' }}
+            >
+              VITALIZE
+            </Link>
+          )}
           <Link
             href="/countdown/"
             className="rounded-xl border-2 px-8 py-3 font-semibold transition-colors hover:bg-[#16161a]"
@@ -916,7 +1022,7 @@ export function SovereignManifestoLanding() {
           <Link href="/countdown/" className="hover:underline" style={{ color: GOLD_DIM }}>
             Countdown
           </Link>
-          {architect && (
+          {isOwner && (
             <>
               <Link href="/dashboard/" className="hover:underline" style={{ color: GOLD_DIM }}>
                 Dashboard

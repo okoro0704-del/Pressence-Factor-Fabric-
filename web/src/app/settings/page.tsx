@@ -15,6 +15,8 @@ import { requestTerminateSession } from '@/lib/deviceTerminateSession';
 import { clearVitalizationComplete } from '@/lib/vitalizationState';
 import { resetBiometrics } from '@/lib/resetBiometrics';
 import { getSupabase } from '@/lib/supabase';
+import { isArchitect } from '@/lib/publicRevealAccess';
+import { generateAccessCode, isBeforeAccessCutoff } from '@/lib/accessCodeGate';
 
 const GOLD = '#D4AF37';
 
@@ -25,6 +27,11 @@ export default function SettingsPage() {
   const [trustLevel, setTrustLevel] = useState<number>(0);
   const [resettingBiometrics, setResettingBiometrics] = useState(false);
   const [resetBiometricsMessage, setResetBiometricsMessage] = useState<string | null>(null);
+
+  const [accessCodePhone, setAccessCodePhone] = useState('');
+  const [generatedCode, setGeneratedCode] = useState<string | null>(null);
+  const [generateCodeError, setGenerateCodeError] = useState<string | null>(null);
+  const [generatingCode, setGeneratingCode] = useState(false);
 
   useEffect(() => {
     setPhone(getIdentityAnchorPhone());
@@ -75,6 +82,57 @@ export default function SettingsPage() {
           </p>
 
           <div className="space-y-6">
+            {isArchitect() && isBeforeAccessCutoff() && (
+              <div className="rounded-xl border p-4" style={{ borderColor: 'rgba(212, 175, 55, 0.4)', background: 'rgba(212, 175, 55, 0.06)' }}>
+                <h2 className="text-sm font-semibold uppercase tracking-wider mb-2" style={{ color: GOLD }}>
+                  Generate access code (until April 7)
+                </h2>
+                <p className="text-sm text-[#a0a0a5] mb-3">
+                  Enter a user&apos;s phone number and generate a code. When they enter their number and this code on the landing page, they can access the site.
+                </p>
+                <div className="flex flex-wrap items-end gap-3 mb-3">
+                  <input
+                    type="tel"
+                    value={accessCodePhone}
+                    onChange={(e) => { setAccessCodePhone(e.target.value); setGeneratedCode(null); setGenerateCodeError(null); }}
+                    placeholder="User phone number"
+                    className="flex-1 min-w-[160px] px-4 py-2.5 rounded-lg border-2 bg-[#0d0d0f] text-white placeholder-[#6b6b70]"
+                    style={{ borderColor: 'rgba(212, 175, 55, 0.3)' }}
+                  />
+                  <button
+                    type="button"
+                    disabled={generatingCode || !accessCodePhone.trim()}
+                    onClick={async () => {
+                      setGenerateCodeError(null);
+                      setGeneratedCode(null);
+                      setGeneratingCode(true);
+                      const result = await generateAccessCode(accessCodePhone.trim(), phone ?? undefined);
+                      setGeneratingCode(false);
+                      if (result.ok) {
+                        setGeneratedCode(result.code);
+                      } else {
+                        setGenerateCodeError(result.error ?? 'Failed to generate');
+                      }
+                    }}
+                    className="px-5 py-2.5 rounded-lg font-bold uppercase tracking-wider border-2 transition-colors disabled:opacity-50"
+                    style={{ borderColor: GOLD, color: GOLD }}
+                  >
+                    {generatingCode ? 'Generating…' : 'Generate code'}
+                  </button>
+                </div>
+                {generatedCode && (
+                  <div className="p-3 rounded-lg border" style={{ borderColor: GOLD, background: 'rgba(212, 175, 55, 0.1)' }}>
+                    <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: GOLD }}>Code for {accessCodePhone.trim()}</p>
+                    <p className="text-2xl font-mono font-bold tracking-widest" style={{ color: GOLD }}>{generatedCode}</p>
+                    <p className="text-xs text-[#6b6b70] mt-2">Share this code with the user. They enter their phone number and this code on the first page to log in.</p>
+                  </div>
+                )}
+                {generateCodeError && (
+                  <p className="text-sm mt-2" style={{ color: '#f87171' }}>{generateCodeError}</p>
+                )}
+              </div>
+            )}
+
             <BiometricStrictnessSlider />
 
             {shouldSuggestSovereignShield(trustLevel) && (

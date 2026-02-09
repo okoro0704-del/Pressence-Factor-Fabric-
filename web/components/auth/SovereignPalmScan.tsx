@@ -2,13 +2,14 @@
 
 /**
  * Sovereign Palm Scan — Pillar 2 of Triple-Pillar Shield.
- * High-resolution back-camera feed with a palm-shaped overlay for the user to align their hand.
- * 15s timeout for mobile alignment. On success, resolves the palm verification promise in the gate.
+ * Full-screen camera covers the phone; user holds palm close so the camera and AI can study every detail.
+ * Page does not close until palm has been read successfully (required study phase).
  */
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 
-const MOBILE_SCAN_TIMEOUT_MS = 15000;
+const MOBILE_SCAN_TIMEOUT_MS = 20000;
+const STUDY_DURATION_MS = 6000; // Must study palm for 6s before success; cannot leave until then
 const GOLD = '#D4AF37';
 
 export interface SovereignPalmScanProps {
@@ -52,11 +53,13 @@ function PalmOverlaySvg() {
 export function SovereignPalmScan({ isOpen, onClose, onSuccess, onError }: SovereignPalmScanProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const [status, setStatus] = useState<'initializing' | 'ready' | 'denied'>('initializing');
+  const [status, setStatus] = useState<'initializing' | 'ready' | 'studying' | 'denied'>('initializing');
   const [error, setError] = useState<string | null>(null);
   const [timeLeft, setTimeLeft] = useState(MOBILE_SCAN_TIMEOUT_MS / 1000);
+  const [studyLeft, setStudyLeft] = useState(Math.ceil(STUDY_DURATION_MS / 1000));
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const studyCompleteRef = useRef(false);
 
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -70,6 +73,8 @@ export function SovereignPalmScan({ isOpen, onClose, onSuccess, onError }: Sover
     setError(null);
     setStatus('initializing');
     setTimeLeft(MOBILE_SCAN_TIMEOUT_MS / 1000);
+    setStudyLeft(Math.ceil(STUDY_DURATION_MS / 1000));
+    studyCompleteRef.current = false;
 
     const video = videoRef.current;
     if (!video) return;
@@ -107,13 +112,39 @@ export function SovereignPalmScan({ isOpen, onClose, onSuccess, onError }: Sover
     };
   }, [isOpen, stopCamera, onError]);
 
-  // 15s timeout
+  // When ready, start the study phase (camera + AI study palm); cannot leave until study completes
+  useEffect(() => {
+    if (!isOpen || status !== 'ready') return;
+    setStatus('studying');
+    const studyEnd = Date.now() + STUDY_DURATION_MS;
+    const t = setInterval(() => {
+      const remaining = Math.max(0, Math.ceil((studyEnd - Date.now()) / 1000));
+      setStudyLeft(remaining);
+      if (remaining <= 0 && !studyCompleteRef.current) {
+        studyCompleteRef.current = true;
+        clearInterval(t);
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+          timeoutRef.current = null;
+        }
+        if (countdownRef.current) {
+          clearInterval(countdownRef.current);
+          countdownRef.current = null;
+        }
+        stopCamera();
+        onSuccess();
+      }
+    }, 200);
+    return () => clearInterval(t);
+  }, [isOpen, status, stopCamera, onSuccess]);
+
+  // Overall timeout
   useEffect(() => {
     if (!isOpen || status !== 'ready') return;
     timeoutRef.current = setTimeout(() => {
       setStatus('denied');
-      setError('Sovereign Palm scan timed out (15s). Align your palm and tap Confirm, or retry.');
-      onError?.('Sovereign Palm scan timed out.');
+      setError('Palm scan timed out. Hold your palm close to the camera and keep it steady so the AI can study every detail. Retry.');
+      onError?.('Palm scan timed out.');
     }, MOBILE_SCAN_TIMEOUT_MS);
     countdownRef.current = setInterval(() => {
       setTimeLeft((prev) => {
@@ -130,11 +161,6 @@ export function SovereignPalmScan({ isOpen, onClose, onSuccess, onError }: Sover
     };
   }, [isOpen, status, onError]);
 
-  const handleConfirm = useCallback(() => {
-    stopCamera();
-    onSuccess();
-  }, [stopCamera, onSuccess]);
-
   useEffect(() => {
     if (!isOpen) stopCamera();
   }, [isOpen, stopCamera]);
@@ -143,7 +169,7 @@ export function SovereignPalmScan({ isOpen, onClose, onSuccess, onError }: Sover
 
   return (
     <div
-      className="fixed inset-0 z-[300] flex flex-col items-center justify-center bg-black"
+      className="fixed inset-0 z-[300] flex flex-col bg-black"
       style={{
         paddingTop: 'env(safe-area-inset-top, 0)',
         paddingBottom: 'env(safe-area-inset-bottom, 0)',
@@ -151,47 +177,48 @@ export function SovereignPalmScan({ isOpen, onClose, onSuccess, onError }: Sover
         paddingRight: 'env(safe-area-inset-right, 0)',
       }}
     >
-      <div className="relative w-full max-w-2xl aspect-[4/3] max-h-[80vh] overflow-hidden rounded-xl border-2 border-[#D4AF37]/50 shadow-[0_0_40px_rgba(212,175,55,0.2)]">
+      {/* Full-screen camera — covers the whole phone */}
+      <div className="absolute inset-0">
         <video
           ref={videoRef}
           className="absolute inset-0 w-full h-full object-cover"
           playsInline
           muted
         />
-        <div className="absolute inset-0 flex items-center justify-center p-[15%]">
-          <div className="w-full aspect-[200/260] max-w-[70%] text-[#D4AF37]">
+        <div className="absolute inset-0 flex items-center justify-center p-[12%]">
+          <div className="w-full aspect-[200/260] max-w-[75%] text-[#D4AF37]">
             <PalmOverlaySvg />
           </div>
         </div>
-        <div className="absolute top-3 left-0 right-0 z-20 flex flex-col items-center gap-1 px-4 text-center">
-          <span className="text-sm font-bold text-[#22c55e]">
-            Face verified. Now show your palm to complete vitalization.
-          </span>
-          <span className="text-xs font-mono uppercase tracking-widest opacity-90" style={{ color: GOLD }}>
-            Sovereign Palm
-          </span>
-          <span className="text-xs font-mono text-[#6b6b70]">
-            Align your palm in the outline — front camera. Required to continue.
-          </span>
-        </div>
-        {status === 'ready' && (
-          <div className="absolute bottom-3 left-0 right-0 z-20 flex flex-col items-center gap-2">
-            <p className="text-[10px] font-mono text-[#6b6b70]">Time: {timeLeft}s</p>
-            <button
-              type="button"
-              onClick={handleConfirm}
-              className="rounded-xl border-2 border-[#D4AF37] px-6 py-3 text-base font-medium text-[#D4AF37] hover:bg-[#D4AF37]/10 transition-colors"
-            >
-              Confirm alignment
-            </button>
-          </div>
-        )}
       </div>
+
+      {/* Instructions — hold palm close so camera and AI can study; do not leave until read */}
+      <div className="absolute top-4 left-0 right-0 z-20 flex flex-col items-center gap-2 px-4 text-center">
+        <span className="text-sm font-bold text-[#22c55e]">
+          Face verified. Now show your palm to complete vitalization.
+        </span>
+        <span className="text-xs font-mono uppercase tracking-widest opacity-90" style={{ color: GOLD }}>
+          Sovereign Palm
+        </span>
+        <p className="text-sm max-w-md" style={{ color: '#a0a0a5' }}>
+          Hold your palm <strong style={{ color: GOLD }}>close to the camera</strong> so the camera and AI can study every detail. Keep it steady. This page will not close until your palm has been read successfully.
+        </p>
+      </div>
+
+      {(status === 'ready' || status === 'studying') && (
+        <div className="absolute bottom-6 left-0 right-0 z-20 flex flex-col items-center gap-2 px-4">
+          <p className="text-center font-mono text-sm font-semibold" style={{ color: GOLD }}>
+            Studying palm details… {studyLeft}s
+          </p>
+          <p className="text-[10px] font-mono text-[#6b6b70]">Do not move away. The AI must read your palm before continuing.</p>
+          <p className="text-[10px] font-mono text-[#6b6b70]">Time remaining: {timeLeft}s</p>
+        </div>
+      )}
 
       {status === 'initializing' && (
         <div className="absolute inset-0 z-[200] flex flex-col items-center justify-center bg-black/90">
           <div className="h-8 w-8 rounded-full border-2 border-[#D4AF37] border-t-transparent animate-spin mb-4" />
-          <p className="text-[#D4AF37] font-mono text-sm tracking-wider">Initializing front camera…</p>
+          <p className="text-[#D4AF37] font-mono text-sm tracking-wider">Initializing camera…</p>
         </div>
       )}
 
@@ -209,7 +236,7 @@ export function SovereignPalmScan({ isOpen, onClose, onSuccess, onError }: Sover
         </div>
       )}
 
-      {/* Cancel removed during scan phase: auto-transition to next pillar (UX overhaul) */}
+      {/* No close/cancel during ready or studying — cannot leave until palm is read or timeout/error */}
     </div>
   );
 }

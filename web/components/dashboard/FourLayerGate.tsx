@@ -238,9 +238,11 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
   const [pillarPalm, setPillarPalm] = useState(false);
   const [pillarDevice, setPillarDevice] = useState(false);
   const [pillarLocation, setPillarLocation] = useState(false);
-  /** Sovereign Palm Scan (Pillar 2): back-camera + palm overlay; shown after Face completes. */
+  /** Sovereign Palm Scan (Pillar 2): optional fallback; primary is PalmPulseCapture for auto-capture + hash save. */
   const [showSovereignPalmScan, setShowSovereignPalmScan] = useState(false);
   const palmResolveRef = useRef<(() => void) | null>(null);
+  /** When true, PalmPulseCapture was opened from Face-complete (vitalization flow); on success save palm hash and resolve. */
+  const palmVitalizationFlowRef = useRef(false);
   /** Quad-Pillar: all 4 pillars passed; show Clock-In button before proceeding. */
   const [quadPillarAwaitingClockIn, setQuadPillarAwaitingClockIn] = useState(false);
   /** Location permission required — show gold popup to allow access */
@@ -507,6 +509,36 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
       // ignore
     }
   }, []);
+
+  /** Hydrate pillar state from backend so already-confirmed pillars stay; no going back to registration. */
+  const hydratePillarsDoneRef = useRef<string | null>(null);
+  useEffect(() => {
+    const phone = identityAnchor?.phone?.trim();
+    if (!phone || !mounted) return;
+    if (hydratePillarsDoneRef.current === phone) return;
+    hydratePillarsDoneRef.current = phone;
+    const supabase = getSupabase();
+    if (!supabase) return;
+    (async () => {
+      try {
+        const { data } = await (supabase as any)
+          .from('user_profiles')
+          .select('face_hash, palm_hash, anchor_device_id, anchor_geolocation')
+          .eq('phone_number', phone)
+          .maybeSingle();
+        if (!data) return;
+        setPillarFace((prev) => prev || !!(data.face_hash && String(data.face_hash).trim()));
+        setPillarPalm((prev) => prev || !!(data.palm_hash && String(data.palm_hash).trim()));
+        setPillarDevice((prev) => prev || !!(data.anchor_device_id && String(data.anchor_device_id).trim()));
+        const geo = data.anchor_geolocation;
+        if (geo && (typeof geo === 'object' ? (geo.latitude != null && geo.longitude != null) : false)) {
+          setPillarLocation((prev) => prev || true);
+        }
+      } catch {
+        // ignore
+      }
+    })();
+  }, [identityAnchor?.phone, mounted]);
 
   // Hydration sync + restore language/identity so redirect from architect (or any protected route) doesn't bounce back to language
   useEffect(() => {
@@ -881,9 +913,11 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     setPillarPalm(resumePillars?.palm ?? false);
     setPillarDevice(resumePillars?.device ?? false);
     setPillarLocation(false);
-    setShowSovereignPalmScan(resumePillars ? !identityAnchor.isMinor : false);
+    setShowSovereignPalmScan(false);
+    setShowPalmPulse(resumePillars ? false : false);
     setQuadPillarAwaitingClockIn(false);
     palmResolveRef.current = null;
+    palmVitalizationFlowRef.current = false;
 
     try {
       // DEPENDENT BYPASS: Guardian Authorization — skip Voice/Face resonance; inherit Sentinel from Guardian.
@@ -967,7 +1001,10 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
           if (pillar === 'face') {
             setPillarFace(true);
             saveVerifiedPillar(identityAnchor.phone, 'face');
-            if (!identityAnchor.isMinor && !ENABLE_DUAL_VITALIZATION_CAPTURE) setShowSovereignPalmScan(true);
+            if (!identityAnchor.isMinor && !ENABLE_DUAL_VITALIZATION_CAPTURE) {
+              palmVitalizationFlowRef.current = true;
+              setShowPalmPulse(true);
+            }
             biometricPillarRef.current?.triggerExternalCapture();
           }
           if (pillar === 'palm') {
@@ -1188,29 +1225,45 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
 
   const handlePalmSuccess = useCallback(
     async (palmHash: string) => {
-      const p = architectSuccessRef.current;
-      architectSuccessRef.current = null;
       setPalmPulseError(null);
-      if (!p) {
+      // Architect path: after Face+success, show Palm Pulse then proceed to second pillar.
+      const p = architectSuccessRef.current;
+      if (p) {
+        architectSuccessRef.current = null;
+        palmVitalizationFlowRef.current = false;
+        const verify = await verifyOrEnrollPalm(p.identityAnchor.phone, palmHash);
+        if (!verify.ok) {
+          setPalmPulseError(verify.error);
+          return;
+        }
+        setTripleAnchorVerified('fingerprint');
         setShowPalmPulse(false);
+        await proceedAfterSecondPillar(p);
         return;
       }
-      const verify = await verifyOrEnrollPalm(p.identityAnchor.phone, palmHash);
-      if (!verify.ok) {
-        setPalmPulseError(verify.error);
-        return;
+      // Vitalization path: Face completed → PalmPulseCapture opened; save palm hash to backend and resolve promise.
+      if (palmVitalizationFlowRef.current && identityAnchor) {
+        palmVitalizationFlowRef.current = false;
+        const verify = await verifyOrEnrollPalm(identityAnchor.phone, palmHash);
+        if (!verify.ok) {
+          setPalmPulseError(verify.error);
+          return;
+        }
+        saveVerifiedPillar(identityAnchor.phone, 'palm');
+        palmResolveRef.current?.();
+        palmResolveRef.current = null;
+        setPillarPalm(true);
+        setShowPalmPulse(false);
       }
-      setTripleAnchorVerified('fingerprint');
-      setShowPalmPulse(false);
-      await proceedAfterSecondPillar(p);
     },
-    [proceedAfterSecondPillar]
+    [proceedAfterSecondPillar, identityAnchor]
   );
 
   const handlePalmClose = useCallback(() => {
     const p = architectSuccessRef.current;
     setShowPalmPulse(false);
     setPalmPulseError(null);
+    palmVitalizationFlowRef.current = false;
     if (!p) return;
     if (isWebAuthnSupported()) {
       getAssertion()
@@ -2375,10 +2428,14 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
                       <h3 className={`font-bold ${jetbrains.className} ${
                         status === 'complete' ? 'text-green-500' : status === 'active' ? 'text-[#D4AF37]' : 'text-[#6b6b70]'
                       }`}>
-                        Pillar {index + 1}: {getLayerName(layer)}
+                        {layer === AuthLayer.BIOMETRIC_SIGNATURE && (status === 'complete' ? 'Face — Verified' : `Face — ${status === 'active' ? getLayerScanningLabel(layer) : 'Pending'}`)}
+                        {layer === AuthLayer.SOVEREIGN_PALM && (status === 'complete' ? 'Palm — Verified' : `Palm — ${status === 'active' ? getLayerScanningLabel(layer) : 'Pending'}`)}
+                        {(layer === AuthLayer.HARDWARE_TPM || layer === AuthLayer.GENESIS_HANDSHAKE) && (status === 'complete' ? 'Anchor — Confirmed' : `Anchor — ${status === 'active' ? getLayerScanningLabel(layer) : 'Pending'}`)}
+                        {layer === AuthLayer.GPS_LOCATION && (status === 'complete' ? 'GPS — Confirmed' : `GPS — ${status === 'active' ? getLayerScanningLabel(layer) : 'Pending'}`)}
+                        {![AuthLayer.BIOMETRIC_SIGNATURE, AuthLayer.SOVEREIGN_PALM, AuthLayer.HARDWARE_TPM, AuthLayer.GENESIS_HANDSHAKE, AuthLayer.GPS_LOCATION].includes(layer) && `Pillar ${index + 1}: ${getLayerName(layer)}`}
                       </h3>
                       <p className="text-xs text-[#6b6b70]">
-                        {status === 'complete' && '✅ Verified'}
+                        {status === 'complete' && '✅ Saved to backend'}
                         {status === 'active' && getLayerScanningLabel(layer)}
                         {status === 'pending' && '⏳ Waiting'}
                       </p>
