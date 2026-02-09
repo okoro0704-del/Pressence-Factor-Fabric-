@@ -40,6 +40,31 @@ git push
 
 Redeploy on Netlify; the clone will succeed and the build can proceed.
 
+## Build failing during "preparing repo" (clone / repo access)
+
+This stage only fails when **Netlify cannot clone the repository**. Netlify then has nothing to build. Common causes:
+
+- Repository was **renamed or moved** on GitHub
+- **Default branch** changed (e.g. `master` → `main`)
+- Netlify’s **GitHub access** (OAuth / deploy key) was **revoked** or expired
+- Repo is **private** or in an **org with SSO** and Netlify lost access
+
+### Solution
+
+1. **Check connected repo and branch**  
+   In Netlify: **Site settings** → **Build & deploy** → **Repository**.  
+   Confirm the connected repository and branch match your current GitHub repo and the branch you push to (e.g. `main`).  
+   If the repo was renamed or the branch changed, use **Edit settings** → **Link to a different repository** and reconnect the correct repo and branch.
+
+2. **Re-authorize GitHub (if repo is private or org/SSO)**  
+   **Netlify dashboard** → **User settings** (your profile) → **Applications** → find **GitHub** → **Re-authorize** so Netlify’s deploy key/integration has access again.
+
+3. **Trigger a new deploy**  
+   After fixing the link or re-auth, use **Trigger deploy** → **Deploy site**.  
+   In the deploy log, **“Cloning repository”** should succeed; the build can then run.
+
+---
+
 ## "Failed to prepare repo" / Wrong branch
 
 If the build fails during **"preparing repo"** and the repo **does not** use Git LFS, Netlify is likely set to deploy a **branch that doesn’t exist** in the connected repo (e.g. Netlify set to `main` but the repo only has `master`).
