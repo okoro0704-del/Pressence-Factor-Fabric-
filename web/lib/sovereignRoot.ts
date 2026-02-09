@@ -1,10 +1,13 @@
 /**
- * Master Identity Anchor: unify Pillar 1 (Face), Pillar 2 (Palm), Pillar 3 (Identity Anchor)
+ * Master Identity Anchor: unify Face and Device (or legacy Face + Palm + Identity Anchor)
  * into a single sovereign root hash via a Merkle tree. Once created, individual hashes must
- * be deleted from local memory; login only needs to verify that the current scan matches a portion of this root.
+ * be deleted from local memory.
+ *
+ * Face + Device pipeline (no palm): sovereignHash = MerkleRoot([FaceHash, DeviceHash]).
+ * DeviceHash = SHA-256(WebAuthn credential ID); deterministic, no raw keys stored.
  */
 
-import { generateMerkleRoot } from './merkleRoot';
+import { generateMerkleRoot, generateMerkleRootFaceDevice } from './merkleRoot';
 
 const SOVEREIGN_ROOT_SEPARATOR = '\u001f'; // unit separator for identity anchor hash input
 
@@ -37,6 +40,35 @@ export function generateSovereignRootSync(
   _identityAnchorHash: string
 ): string {
   throw new Error('Use generateSovereignRoot() (async) for Merkle root');
+}
+
+/**
+ * Sovereign hash from Face + Device only (no palm).
+ * MerkleRoot([FaceHash, DeviceHash]). Deterministic across sessions.
+ * DeviceHash must be SHA-256(credential ID) from WebAuthn.
+ */
+export async function generateSovereignRootFaceDevice(
+  faceHash: string,
+  deviceHash: string
+): Promise<string> {
+  return generateMerkleRootFaceDevice(
+    String(faceHash).trim(),
+    String(deviceHash).trim()
+  );
+}
+
+/**
+ * Derive DeviceHash = SHA-256(credentialId) for WebAuthn binding.
+ * Credential ID is browser-managed, non-exportable; we only hash it for the Merkle leaf.
+ * Same credential always yields same device hash (deterministic).
+ */
+export async function deriveDeviceHashFromCredentialId(credentialId: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(String(credentialId).trim());
+  const buf = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(buf))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 /**
