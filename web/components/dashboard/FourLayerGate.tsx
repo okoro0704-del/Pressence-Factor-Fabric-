@@ -96,7 +96,6 @@ import dynamic from 'next/dynamic';
 import { verifyOrEnrollPalm } from '@/lib/palmHashProfile';
 import { saveFourPillars, savePillarsAt75, getCurrentGeolocation } from '@/lib/fourPillars';
 import { getSupabase } from '@/lib/supabase';
-import { VitalizationPillarBoxes } from '@/components/dashboard/VitalizationPillarBoxes';
 
 /** Load only in browser to avoid MediaPipe/SSR issues during static export. */
 const PalmPulseCapture = dynamic(
@@ -2257,25 +2256,13 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
         aria-hidden="true"
       />
 
-      {/* Main Gate Container — mobile-first: center-aligned Sovereign card; laptop matches mobile (same width, vertical card) */}
+      {/* Main Gate Container — mobile-first: center-aligned Sovereign card; laptop matches mobile (same width, vertical card). 4 pillars shown in header (LayerStatusBar) only; not repeated in body. */}
       <div className="relative z-10 w-full max-w-lg mx-auto step-transition-wrapper">
-        {/* Four pillar boxes at top: always visible when identity is set; glow one-by-one as each is verified (75% or 100%). */}
-        {identityAnchor && (
-          <div className="mb-6 pt-2">
-            <VitalizationPillarBoxes
-              faceVerified={pillarFace}
-              palmVerified={pillarPalm}
-              gpsVerified={pillarLocation}
-              mobileIdVerified={pillarDevice}
-              vitalized={pillarFace && pillarPalm && pillarDevice && pillarLocation}
-            />
-            {authStatus === AuthStatus.SCANNING && (
-              <div className="text-sm text-center mt-3 px-4 space-y-1" style={{ color: '#a0a0a5' }}>
-                <p><strong className="text-[#D4AF37]">Step 1 — Face:</strong> Complete face verification first.</p>
-                <p><strong className="text-[#D4AF37]">Step 2 — Palm:</strong> Then show your palm (required; you must complete both).</p>
-                <p className="text-xs mt-2">We then merge Face + Palm with Device ID and GPS to complete vitalization and mint VIDA CAP.</p>
-              </div>
-            )}
+        {identityAnchor && authStatus === AuthStatus.SCANNING && (
+          <div className="text-sm text-center mb-4 px-4 space-y-1" style={{ color: '#a0a0a5' }}>
+            <p><strong className="text-[#D4AF37]">Step 1 — Face:</strong> Complete face verification first.</p>
+            <p><strong className="text-[#D4AF37]">Step 2 — Palm:</strong> Then show your palm (required; you must complete both).</p>
+            <p className="text-xs mt-2">We then merge Face + Palm with Device ID and GPS to complete vitalization and mint VIDA CAP.</p>
           </div>
         )}
         {/* Identity Anchor Display */}

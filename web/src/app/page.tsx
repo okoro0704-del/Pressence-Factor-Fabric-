@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { SovereignManifestoLanding } from '@/components/SovereignManifestoLanding';
 import { SovereignAwakeningProvider } from '@/contexts/SovereignAwakeningContext';
-import { PhoneFirstLanding } from '@/components/auth/PhoneFirstLanding';
 import { AppErrorBoundary } from '@/components/AppErrorBoundary';
 import {
   isPreviewUrl,
@@ -14,8 +13,7 @@ import {
 import { getCompositeDeviceFingerprint } from '@/lib/biometricAuth';
 
 /**
- * ROOT PAGE — Phone number first (country code not persistent), then "Continue to Biometric Scan".
- * Biometric runs without opening camera (device Face ID / Windows Hello). Has account → dashboard; no account → vitalization.
+ * ROOT PAGE — Single landing: Manifesto. Phone number is entered once in the vitalization flow (Identity Anchor step).
  */
 export default function Home() {
   const [mounted, setMounted] = useState(false);
@@ -61,7 +59,9 @@ export default function Home() {
   if (showFullProtocol) {
     return (
       <AppErrorBoundary>
-        <PhoneFirstLanding />
+        <SovereignAwakeningProvider>
+          <SovereignManifestoLanding />
+        </SovereignAwakeningProvider>
       </AppErrorBoundary>
     );
   }

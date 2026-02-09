@@ -301,28 +301,39 @@ export function IdentityAnchorInput({
               <button
                 type="button"
                 onClick={() => setGuardianPickerOpen((o) => !o)}
-                className="flex items-center gap-2 px-3 py-3 border-r min-w-[120px] hover:bg-neutral-800/50 transition-colors"
+                aria-label="Choose country — view all country codes"
+                aria-expanded={guardianPickerOpen}
+                className="flex items-center gap-2 px-3 py-3 border-r min-w-[140px] hover:bg-neutral-800/50 transition-colors"
                 style={{ borderColor: 'rgba(212, 175, 55, 0.3)', background: '#0d0d0f', color: '#D4AF37' }}
               >
                 <span className="text-xl leading-none">{guardianCountry.flag}</span>
                 <span className={`text-sm font-mono ${jetbrains.className}`}>{guardianCountry.dialCode}</span>
-                <span className="ml-auto text-neutral-500">▾</span>
+                <span
+                  className="ml-auto flex items-center justify-center w-10 h-10 shrink-0 rounded-lg text-[#D4AF37] hover:bg-[#D4AF37]/20 active:bg-[#D4AF37]/30 text-2xl leading-none"
+                  aria-hidden
+                  title="View all country codes"
+                >
+                  ▾
+                </span>
               </button>
               {guardianPickerOpen && (
                 <div
-                  className="absolute left-0 top-full z-50 mt-1 rounded-lg border shadow-xl flex flex-col w-full min-w-[260px] max-w-[min(320px,100vw)] max-h-[320px] bg-[#0d0d0f] border-[#D4AF37]/30"
+                  className="absolute left-0 top-full z-50 mt-1 rounded-lg border shadow-xl flex flex-col w-full min-w-[280px] max-w-[min(360px,100vw)] max-h-[400px] bg-[#0d0d0f] border-[#D4AF37]/30"
+                  role="listbox"
+                  aria-label="All country codes"
                 >
                   <div className="p-2 border-b border-[#D4AF37]/20 sticky top-0 bg-[#0d0d0f]">
                     <input
                       type="text"
                       value={guardianCountrySearch}
                       onChange={(e) => setGuardianCountrySearch(e.target.value)}
-                      placeholder="Search country (e.g. Ghana, UK, USA)"
+                      placeholder="Search (e.g. Ghana, UK, USA) — all countries listed below"
                       className="w-full px-3 py-2 rounded text-sm bg-[#16161a] border border-[#D4AF37]/30 text-[#f5f5f5] placeholder-[#6b6b70] outline-none"
                       onClick={(e) => e.stopPropagation()}
                     />
+                    <p className="text-[10px] text-[#6b6b70] mt-1">All country codes — scroll or search to find yours.</p>
                   </div>
-                  <div className="overflow-y-auto max-h-64">
+                  <div className="overflow-y-auto max-h-[320px]">
                     {filterPhoneCountries(guardianCountrySearch).map((c) => (
                       <button
                         key={c.code}
@@ -440,28 +451,39 @@ export function IdentityAnchorInput({
             <button
               type="button"
               onClick={() => setPickerOpen((o) => !o)}
-              className="flex items-center gap-2 px-3 py-3 border-r min-w-[120px] hover:bg-neutral-800/50 transition-colors"
+              aria-label="Choose country — view all country codes"
+              aria-expanded={pickerOpen}
+              className="flex items-center gap-2 px-3 py-3 border-r min-w-[140px] hover:bg-neutral-800/50 transition-colors"
               style={{ borderColor: 'rgba(212, 175, 55, 0.3)', background: '#0d0d0f', color: '#D4AF37' }}
             >
               <span className="text-xl leading-none">{country.flag}</span>
               <span className={`text-sm font-mono ${jetbrains.className}`}>{country.dialCode}</span>
-              <span className="ml-auto text-neutral-500">▾</span>
+              <span
+                className="ml-auto flex items-center justify-center w-10 h-10 shrink-0 rounded-lg text-[#D4AF37] hover:bg-[#D4AF37]/20 active:bg-[#D4AF37]/30 text-2xl leading-none"
+                aria-hidden
+                title="View all country codes"
+              >
+                ▾
+              </span>
             </button>
             {pickerOpen && (
               <div
-                className="absolute left-0 top-full z-50 mt-1 rounded-lg border shadow-xl flex flex-col w-full min-w-[260px] max-w-[min(320px,100vw)] max-h-[320px] bg-[#0d0d0f] border-[#D4AF37]/30"
+                className="absolute left-0 top-full z-50 mt-1 rounded-lg border shadow-xl flex flex-col w-full min-w-[280px] max-w-[min(360px,100vw)] max-h-[400px] bg-[#0d0d0f] border-[#D4AF37]/30"
+                role="listbox"
+                aria-label="All country codes"
               >
                 <div className="p-2 border-b border-[#D4AF37]/20 sticky top-0 bg-[#0d0d0f]">
                   <input
                     type="text"
                     value={countrySearch}
                     onChange={(e) => setCountrySearch(e.target.value)}
-                    placeholder="Search country (e.g. Ghana, UK, USA)"
+                    placeholder="Search (e.g. Ghana, UK, USA) — all countries listed below"
                     className="w-full px-3 py-2 rounded text-sm bg-[#16161a] border border-[#D4AF37]/30 text-[#f5f5f5] placeholder-[#6b6b70] outline-none"
                     onClick={(e) => e.stopPropagation()}
                   />
+                  <p className="text-[10px] text-[#6b6b70] mt-1">All country codes — scroll or search to find yours.</p>
                 </div>
-                <div className="overflow-y-auto max-h-64">
+                <div className="overflow-y-auto max-h-[320px]">
                   {filterPhoneCountries(countrySearch).map((c) => (
                     <button
                       key={c.code}

@@ -146,13 +146,22 @@ export function SovereignManifestoLanding() {
         <p className="text-lg max-w-xl text-center mb-12" style={{ color: MUTED }}>
           Born in Lagos. Built for the World.
         </p>
-        <Link
-          href="/countdown/"
-          className="rounded-xl border-2 px-8 py-3 font-semibold transition-colors hover:bg-[#16161a]"
-          style={{ borderColor: GOLD, color: GOLD }}
-        >
-          Sovereign Countdown → April 7, 2026
-        </Link>
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <Link
+            href="/vitalization"
+            className="rounded-xl border-2 px-8 py-3 font-bold uppercase tracking-wider transition-colors hover:bg-[#D4AF37]/20"
+            style={{ borderColor: GOLD, color: GOLD, boxShadow: '0 0 20px rgba(212, 175, 55, 0.2)' }}
+          >
+            VITALIZE
+          </Link>
+          <Link
+            href="/countdown/"
+            className="rounded-xl border-2 px-8 py-3 font-semibold transition-colors hover:bg-[#16161a]"
+            style={{ borderColor: GOLD, color: GOLD }}
+          >
+            Sovereign Countdown → April 7, 2026
+          </Link>
+        </div>
       </section>
 
       {/* The Mission */}
