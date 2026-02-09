@@ -12,7 +12,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { speakSovereignSuccess } from '@/lib/sovereignVoice';
 import { useSovereignCompanion } from '@/contexts/SovereignCompanionContext';
 import { BiometricScanProgressBar } from '@/components/dashboard/QuadPillarShield';
-import { getMediaPipeFaceMesh } from '@/lib/mediaPipeFaceMeshLoader';
+import { getMediaPipeFaceMesh, resetMediaPipeFaceMesh } from '@/lib/mediaPipeFaceMeshLoader';
 
 /** MediaPipe exposes FACEMESH_FACE_OVAL via UMD global (set when face_mesh is loaded by mediaPipeFaceMeshLoader). Read from globalThis only in browser so Turbopack/SSR don't fail. */
 function getFaceOvalContour(): Array<[number, number]> | undefined {
@@ -181,13 +181,32 @@ export function ArchitectVisionCapture({
     };
   }, []);
 
+  /** Hard teardown: release camera, GPU, and MediaPipe Face so Palm scan can run cleanly on mobile. */
   const stopCamera = useCallback(() => {
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    streamRef.current = null;
-    if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    faceMeshRef.current?.close?.().catch(() => {});
-    faceMeshRef.current = null;
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = 0;
+    }
+    const stream = streamRef.current;
+    if (stream) {
+      stream.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+    const video = videoRef.current;
+    if (video) {
+      video.srcObject = null;
+    }
+    const fm = faceMeshRef.current;
+    if (fm) {
+      try {
+        fm.close?.().catch(() => {});
+      } catch {
+        // ignore
+      }
+      faceMeshRef.current = null;
+    }
     lastFaceLandmarksRef.current = null;
+    resetMediaPipeFaceMesh();
   }, []);
 
   // Initialize camera and MediaPipe Face Mesh (runs on mount and on Retry)
@@ -255,6 +274,12 @@ export function ArchitectVisionCapture({
       stopCamera();
     };
   }, [isOpen, stopCamera, retryCount, facingMode]);
+
+  // Cleanup on unmount / isOpen false: ensure full teardown so Palm gets a clean slate
+  useEffect(() => {
+    if (isOpen) return;
+    stopCamera();
+  }, [isOpen, stopCamera]);
 
   // Send video frames to MediaPipe Face Mesh
   useEffect(() => {

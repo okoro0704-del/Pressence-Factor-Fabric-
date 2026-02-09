@@ -7,7 +7,7 @@
  */
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { getMediaPipeHands } from '@/lib/mediaPipeHandsLoader';
+import { getMediaPipeHands, resetMediaPipeHands } from '@/lib/mediaPipeHandsLoader';
 import { palmGeometryDescriptor } from '@/lib/palmGeometry';
 import {
   extractVascularDescriptor,
@@ -28,9 +28,12 @@ const LIVENESS_DURATION_MS = 1500;
 const STABLE_FRAMES_AFTER_LIVENESS = 48;
 const PROGRESS_THROTTLE_MS = 80;
 const INIT_TIMEOUT_MS = 20000;
+/** Fail fast if no palm ROI detected within this time after ready (mobile stability). */
+const PALM_DETECTION_TIMEOUT_MS = 20000;
 /** Run heavy work (getImageData, reflectance) only every N frames so draw stays responsive */
 const HEAVY_WORK_INTERVAL = 3;
 const MAX_LIVENESS_SAMPLES = 60;
+const DEBUG_PALM = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
 const GOLD = '#D4AF37';
 const GOLD_RING = 'rgba(212, 175, 55, 0.9)';
 const GOLD_BG = 'rgba(212, 175, 55, 0.25)';
@@ -86,15 +89,26 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
   const onSuccessRef = useRef(onSuccess);
   const onErrorRef = useRef(onError);
   const isOpenRef = useRef(isOpen);
+  const palmDetectionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const frameLogCounterRef = useRef(0);
   onSuccessRef.current = onSuccess;
   onErrorRef.current = onError;
   statusRef.current = status;
   isOpenRef.current = isOpen;
 
+  /** Hard teardown: release stream, clear video, cancel RAF. Do not reuse stream for next open. */
   const stopCamera = useCallback(() => {
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    streamRef.current = null;
-    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = 0;
+    }
+    const stream = streamRef.current;
+    if (stream) {
+      stream.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+    const video = videoRef.current;
+    if (video) video.srcObject = null;
     handsRef.current = null;
   }, []);
 
@@ -112,6 +126,9 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
   useEffect(() => {
     if (!isOpen || typeof window === 'undefined') return;
 
+    // Clean reinit after face scan: new MediaPipe Hands instance (no reuse)
+    resetMediaPipeHands();
+
     setError(null);
     setStatus('initializing');
     setCapturedImageDataUrl(null);
@@ -127,6 +144,10 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
     frameCountRef.current = 0;
     progressRingRef.current = 0;
     lastProgressUpdateRef.current = 0;
+    if (palmDetectionTimeoutRef.current) {
+      clearTimeout(palmDetectionTimeoutRef.current);
+      palmDetectionTimeoutRef.current = null;
+    }
 
     const video = videoRef.current;
     if (!video) return;
@@ -135,6 +156,10 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
 
     const timeoutId = setTimeout(() => {
       if (cancelled) return;
+      if (palmDetectionTimeoutRef.current) {
+        clearTimeout(palmDetectionTimeoutRef.current);
+        palmDetectionTimeoutRef.current = null;
+      }
       stopCamera();
       setError('Camera or hand detection is taking too long. Please allow camera access and try again.');
       setStatus('denied');
@@ -182,10 +207,23 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
             });
             clearTimeout(timeoutId);
             setStatus('ready');
+            // Fail fast if palm never detected
+            palmDetectionTimeoutRef.current = setTimeout(() => {
+              palmDetectionTimeoutRef.current = null;
+              if (statusRef.current !== 'captured' && statusRef.current !== 'denied' && statusRef.current !== 'success') {
+                setError('Palm not detected in time. Please show your palm to the camera.');
+                setStatus('denied');
+                onErrorRef.current?.('Palm detection timeout.');
+              }
+            }, PALM_DETECTION_TIMEOUT_MS);
           })
           .catch((e) => {
             if (cancelled) return;
             clearTimeout(timeoutId);
+            if (palmDetectionTimeoutRef.current) {
+              clearTimeout(palmDetectionTimeoutRef.current);
+              palmDetectionTimeoutRef.current = null;
+            }
             const msg = e instanceof Error ? e.message : String(e);
             setError(msg);
             setStatus('denied');
@@ -195,6 +233,10 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
       } catch (e) {
         if (cancelled) return;
         clearTimeout(timeoutId);
+        if (palmDetectionTimeoutRef.current) {
+          clearTimeout(palmDetectionTimeoutRef.current);
+          palmDetectionTimeoutRef.current = null;
+        }
         const msg = e instanceof Error ? e.message : String(e);
         setError(msg);
         setStatus('denied');
@@ -206,6 +248,10 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
     return () => {
       cancelled = true;
       clearTimeout(timeoutId);
+      if (palmDetectionTimeoutRef.current) {
+        clearTimeout(palmDetectionTimeoutRef.current);
+        palmDetectionTimeoutRef.current = null;
+      }
       stopCamera();
     };
   }, [isOpen, stopCamera, initRetry, facingMode]);
@@ -243,6 +289,14 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
       const landmarks = lastLandmarksRef.current;
 
       if (!ctx || video.readyState < 2 || video.videoWidth === 0) return;
+
+      // Frame debug (dev only): log every 60 frames
+      if (DEBUG_PALM) {
+        frameLogCounterRef.current++;
+        if (frameLogCounterRef.current % 60 === 0) {
+          console.log('[Palm]', 'frame', statusRef.current, 'landmarks', !!(landmarks && landmarks.length >= 21), 'video', video.readyState, video.videoWidth);
+        }
+      }
 
       const vw = video.videoWidth;
       const vh = video.videoHeight;
@@ -331,6 +385,10 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
               const result = reflectanceCheck(reflectData);
               if (!result.pass) {
                 reflectanceFailedRef.current = true;
+                if (palmDetectionTimeoutRef.current) {
+                  clearTimeout(palmDetectionTimeoutRef.current);
+                  palmDetectionTimeoutRef.current = null;
+                }
                 setError(result.reason ?? 'Fake Material Detected');
                 setStatus('denied');
                 onErrorRef.current?.(result.reason ?? 'Fake Material Detected');
@@ -370,6 +428,10 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
       }
 
       if (pendingCaptureHashRef.current) {
+        if (palmDetectionTimeoutRef.current) {
+          clearTimeout(palmDetectionTimeoutRef.current);
+          palmDetectionTimeoutRef.current = null;
+        }
         const c = canvasRef.current;
         if (c) {
           try {

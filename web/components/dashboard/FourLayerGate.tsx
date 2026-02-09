@@ -95,8 +95,17 @@ import { LEARNING_MODE_DAYS, getLearningModeMessage, LEDGER_SYNC_MESSAGE } from 
 import { getBiometricStrictness, strictnessToConfig } from '@/lib/biometricStrictness';
 import dynamic from 'next/dynamic';
 import { verifyOrEnrollPalm } from '@/lib/palmHashProfile';
+import { resetMediaPipeHands } from '@/lib/mediaPipeHandsLoader';
 import { saveFourPillars, savePillarsAt75, getCurrentGeolocation, generateAndSaveSovereignRoot } from '@/lib/fourPillars';
 import { getSupabase } from '@/lib/supabase';
+
+/** After face scan: wait for teardown, then one frame, then open palm with a fresh Hands instance. */
+function schedulePalmAfterFace(setShowPalmPulse: (v: boolean) => void): void {
+  setTimeout(() => {
+    resetMediaPipeHands();
+    requestAnimationFrame(() => setShowPalmPulse(true));
+  }, 200);
+}
 
 /** Load only in browser to avoid MediaPipe/SSR issues during static export. */
 const PalmPulseCapture = dynamic(
@@ -1072,7 +1081,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
             setShowArchitectVision(false);
             if (!identityAnchor.isMinor) {
               palmVitalizationFlowRef.current = true;
-              setTimeout(() => setShowPalmPulse(true), 1000);
+              schedulePalmAfterFace(setShowPalmPulse);
             }
             biometricPillarRef.current?.triggerExternalCapture();
           }
@@ -1282,8 +1291,8 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
       await proceedAfterSecondPillar(p);
       return;
     }
-    // Auto-transition to next pillar after 1s (no manual click)
-    setTimeout(() => setShowPalmPulse(true), 1000);
+    // Hard teardown of face scan then one frame: reinit camera + new MediaPipe Hands for palm
+    schedulePalmAfterFace(setShowPalmPulse);
   }, [setBiometricSessionVerified, proceedAfterSecondPillar]);
 
   const handlePalmSuccess = useCallback(
