@@ -28,6 +28,9 @@ const LIVENESS_DURATION_MS = 1500;
 const STABLE_FRAMES_AFTER_LIVENESS = 48;
 const PROGRESS_THROTTLE_MS = 80;
 const INIT_TIMEOUT_MS = 20000;
+/** Run heavy work (getImageData, reflectance) only every N frames so draw stays responsive */
+const HEAVY_WORK_INTERVAL = 3;
+const MAX_LIVENESS_SAMPLES = 60;
 const GOLD = '#D4AF37';
 const GOLD_RING = 'rgba(212, 175, 55, 0.9)';
 const GOLD_BG = 'rgba(212, 175, 55, 0.25)';
@@ -95,7 +98,9 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
   }, []);
 
   const setProgressThrottled = useCallback((value: number) => {
+    const prev = progressRingRef.current;
     progressRingRef.current = value;
+    if (prev === value) return;
     const now = Date.now();
     if (now - lastProgressUpdateRef.current >= PROGRESS_THROTTLE_MS || value === 0 || value === 100) {
       lastProgressUpdateRef.current = now;
@@ -289,45 +294,52 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
         if (reflectanceFailedRef.current) return;
 
         const elapsed = Date.now() - (livenessStartRef.current ?? 0);
-        const sampleRegion = 8;
-        const reflectRegion = 32;
-        const sx = Math.floor(Math.max(0, Math.min(w - sampleRegion, w - cx - sampleRegion / 2)));
-        const sy = Math.floor(Math.max(0, Math.min(h - sampleRegion, cy - sampleRegion / 2)));
-        const rx = Math.floor(Math.max(0, Math.min(w - reflectRegion, w - cx - reflectRegion / 2)));
-        const ry = Math.floor(Math.max(0, Math.min(h - reflectRegion, cy - reflectRegion / 2)));
-
-        if (sx >= 0 && sy >= 0 && sx + sampleRegion <= w && sy + sampleRegion <= h) {
-          try {
-            const imageData = ctx.getImageData(sx, sy, sampleRegion, sampleRegion);
-            let sum = 0;
-            const len = imageData.data.length;
-            for (let i = 0; i < len; i += 4)
-              sum += (imageData.data[i] + imageData.data[i + 1] + imageData.data[i + 2]) / 3;
-            livenessSamplesRef.current.push(sum / (len / 4));
-          } catch {
-            livenessSamplesRef.current.push(0);
-          }
-        }
-
-        frameCountRef.current++;
-        if (rx >= 0 && ry >= 0 && rx + reflectRegion <= w && ry + reflectRegion <= h && frameCountRef.current % 10 === 0) {
-          try {
-            const reflectData = ctx.getImageData(rx, ry, reflectRegion, reflectRegion);
-            const result = reflectanceCheck(reflectData);
-            if (!result.pass) {
-              reflectanceFailedRef.current = true;
-              setError(result.reason ?? 'Fake Material Detected');
-              setStatus('denied');
-              onErrorRef.current?.(result.reason ?? 'Fake Material Detected');
-              return;
-            }
-          } catch {
-            // ignore single-frame errors
-          }
-        }
-
         const pct = Math.min(100, (elapsed / LIVENESS_DURATION_MS) * 100);
         setProgressThrottled(Math.round(pct));
+
+        frameCountRef.current++;
+        const doHeavy = frameCountRef.current % HEAVY_WORK_INTERVAL === 0;
+        if (doHeavy) {
+          const sampleRegion = 8;
+          const reflectRegion = 32;
+          const sx = Math.floor(Math.max(0, Math.min(w - sampleRegion, w - cx - sampleRegion / 2)));
+          const sy = Math.floor(Math.max(0, Math.min(h - sampleRegion, cy - sampleRegion / 2)));
+          const rx = Math.floor(Math.max(0, Math.min(w - reflectRegion, w - cx - reflectRegion / 2)));
+          const ry = Math.floor(Math.max(0, Math.min(h - reflectRegion, cy - reflectRegion / 2)));
+
+          if (sx >= 0 && sy >= 0 && sx + sampleRegion <= w && sy + sampleRegion <= h) {
+            try {
+              const imageData = ctx.getImageData(sx, sy, sampleRegion, sampleRegion);
+              let sum = 0;
+              const len = imageData.data.length;
+              for (let i = 0; i < len; i += 4)
+                sum += (imageData.data[i] + imageData.data[i + 1] + imageData.data[i + 2]) / 3;
+              const arr = livenessSamplesRef.current;
+              arr.push(sum / (len / 4));
+              if (arr.length > MAX_LIVENESS_SAMPLES) arr.shift();
+            } catch {
+              const arr = livenessSamplesRef.current;
+              arr.push(0);
+              if (arr.length > MAX_LIVENESS_SAMPLES) arr.shift();
+            }
+          }
+
+          if (rx >= 0 && ry >= 0 && rx + reflectRegion <= w && ry + reflectRegion <= h && frameCountRef.current % 15 === 0) {
+            try {
+              const reflectData = ctx.getImageData(rx, ry, reflectRegion, reflectRegion);
+              const result = reflectanceCheck(reflectData);
+              if (!result.pass) {
+                reflectanceFailedRef.current = true;
+                setError(result.reason ?? 'Fake Material Detected');
+                setStatus('denied');
+                onErrorRef.current?.(result.reason ?? 'Fake Material Detected');
+                return;
+              }
+            } catch {
+              // ignore single-frame errors
+            }
+          }
+        }
 
         if (elapsed >= LIVENESS_DURATION_MS && !livenessPassedRef.current) {
           const samples = livenessSamplesRef.current;
@@ -393,14 +405,32 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
           setProgressThrottled(100);
           setProgressRing(100);
           const geometryDesc = palmGeometryDescriptor(landmarks.map((l) => ({ x: l.x, y: l.y })));
-          if (geometryDesc.length > 0) {
-            const reflectRegion = 32;
-            const rx = Math.floor(Math.max(0, Math.min(w - reflectRegion, w - cx - reflectRegion / 2)));
-            const ry = Math.floor(Math.max(0, Math.min(h - reflectRegion, cy - reflectRegion / 2)));
+          const samples = livenessSamplesRef.current;
+          const reflectRegion = 32;
+          const rx = Math.floor(Math.max(0, Math.min(w - reflectRegion, w - cx - reflectRegion / 2)));
+          const ry = Math.floor(Math.max(0, Math.min(h - reflectRegion, cy - reflectRegion / 2)));
+          let imgData: ImageData | null = null;
+          try {
+            imgData = ctx.getImageData(rx, ry, reflectRegion, reflectRegion);
+          } catch {
+            // fallback below
+          }
+          const runHash = () => {
+            if (geometryDesc.length === 0) {
+              capturedRef.current = false;
+              return;
+            }
             let vascularDesc;
             try {
-              const imgData = ctx.getImageData(rx, ry, reflectRegion, reflectRegion);
-              vascularDesc = extractVascularDescriptor(imgData, reflectRegion / 2, reflectRegion / 2, 24);
+              vascularDesc = imgData
+                ? extractVascularDescriptor(imgData, reflectRegion / 2, reflectRegion / 2, 24)
+                : {
+                    meanRed: 0.5,
+                    meanCyan: 0.5,
+                    varianceRed: 0.01,
+                    varianceCyan: 0.01,
+                    redGrid: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
+                  };
             } catch {
               vascularDesc = {
                 meanRed: 0.5,
@@ -410,7 +440,7 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
                 redGrid: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
               };
             }
-            const { pulseScore } = pulseFromTimeSeries(livenessSamplesRef.current, 60);
+            const { pulseScore } = pulseFromTimeSeries(samples, 60);
             vascularHash256(geometryDesc, vascularDesc, pulseScore)
               .then((hash) => {
                 if (hash) pendingCaptureHashRef.current = hash;
@@ -419,10 +449,12 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
                 capturedRef.current = false;
                 onErrorRef.current?.(err instanceof Error ? err.message : String(err));
               });
+          };
+          if (typeof requestIdleCallback !== 'undefined') {
+            requestIdleCallback(() => runHash(), { timeout: 100 });
           } else {
-            capturedRef.current = false;
+            setTimeout(runHash, 0);
           }
-          // Do not reset stableCountRef here so we keep progress at 100% while waiting for hash
         }
       }
     };
@@ -441,7 +473,7 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
     const sendFrame = () => {
       if (cancelled || !video || video.readyState < 2 || video.videoWidth === 0) return;
       hands.send({ image: video }).then(() => {
-        if (!cancelled) setTimeout(sendFrame, 100);
+        if (!cancelled) setTimeout(sendFrame, 150);
       }).catch(() => {});
     };
     const t = setTimeout(sendFrame, 300);
