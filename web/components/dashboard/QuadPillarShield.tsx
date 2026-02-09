@@ -13,8 +13,7 @@
  */
 
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import { QUAD_PILLAR_DEFINITIONS, ROUTES } from '@/lib/constants';
+import { QUAD_PILLAR_DEFINITIONS } from '@/lib/constants';
 
 const GOLD = '#D4AF37';
 const GREEN = '#22c55e';
@@ -210,7 +209,6 @@ export function QuadPillarGrid({
   gpsSelfCertifyAvailable = false,
   onAllVerified,
 }: QuadPillarGridProps) {
-  const router = useRouter();
   const verified = [faceVerified, palmVerified, phoneAnchorVerified, locationVerified];
   const allVerified = verified.every(Boolean);
   const coreMesh = coreMeshComplete(faceVerified, palmVerified, phoneAnchorVerified);
@@ -218,14 +216,13 @@ export function QuadPillarGrid({
   /** Kill the watcher: when true, no further redirects or state updates (stops redirect loop/flicker) */
   const isRedirectingRef = useRef(false);
 
-  // One-time hard redirect when all pillars verified; guard so we never double-fire
+  // One-time callback when all pillars verified; parent shows congratulations + "Proceed to Dashboard" and handles navigation
   useEffect(() => {
     if (!allVerified || allVerifiedFiredRef.current || isRedirectingRef.current) return;
     allVerifiedFiredRef.current = true;
     isRedirectingRef.current = true;
     onAllVerified?.();
-    router.replace(ROUTES.DASHBOARD);
-  }, [allVerified, onAllVerified, router]);
+  }, [allVerified, onAllVerified]);
 
   return (
     <div className="w-full">

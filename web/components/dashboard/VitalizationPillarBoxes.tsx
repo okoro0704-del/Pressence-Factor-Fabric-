@@ -1,9 +1,8 @@
 'use client';
 
 /**
- * Four boxes at the top of the camera/vitalization page: Face, Palm, GPS, Mobile ID.
- * Vitalization bar turns green and progresses 0→100% as each pillar is verified.
- * At 75% (3/4) the app may save hash, mint, and update status to Vitalized.
+ * Four boxes at the top of the vitalization page: Face, Palm, GPS, Mobile ID.
+ * Always visible when on vitalization; when each pillar is verified they glow up one after another (staggered) until 75% or 100%.
  */
 
 const PILLARS = [
@@ -15,6 +14,8 @@ const PILLARS = [
 
 const GRAY = '#6b6b70';
 const GREEN = '#22c55e';
+/** Stagger delay (ms) per pillar so they glow one after another */
+const GLOW_STAGGER_MS = 280;
 
 export interface VitalizationPillarBoxesProps {
   faceVerified: boolean;
@@ -39,18 +40,31 @@ export function VitalizationPillarBoxes({
 
   return (
     <div className="w-full mb-6">
-      {/* Four boxes in a row */}
+      <style dangerouslySetInnerHTML={{
+        __html: `
+          @keyframes pillar-glow-up {
+            0% { box-shadow: 0 0 0 ${GREEN}00; opacity: 0.92; }
+            50% { box-shadow: 0 0 20px ${GREEN}80, 0 0 40px ${GREEN}40; opacity: 1; }
+            100% { box-shadow: 0 0 12px ${GREEN}66, 0 0 24px ${GREEN}33; opacity: 1; }
+          }
+          .pillar-box-verified { animation: pillar-glow-up 0.5s ease-out forwards; }
+        `,
+      }} />
+      {/* Four boxes in a row — verified pillars glow one after another via animation-delay */}
       <div className="grid grid-cols-4 gap-2 mb-4">
         {PILLARS.map((pillar, i) => {
           const v = verified[i];
+          const staggerDelayMs = v ? i * GLOW_STAGGER_MS : 0;
           return (
             <div
               key={pillar.key}
-              className="flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all duration-200 min-h-[72px]"
+              className={`flex flex-col items-center justify-center p-3 rounded-xl border-2 min-h-[72px] ${v ? 'pillar-box-verified' : ''}`}
               style={{
                 background: v ? `rgba(34, 197, 94, 0.12)` : 'rgba(26, 26, 30, 0.9)',
                 borderColor: v ? GREEN : GRAY,
                 boxShadow: v ? `0 0 12px ${GREEN}40` : 'none',
+                transition: v ? 'none' : 'border-color 0.2s, background 0.2s',
+                animationDelay: v ? `${staggerDelayMs}ms` : undefined,
               }}
               role="status"
               aria-label={`${pillar.label}: ${v ? 'Verified' : 'Pending'}`}
@@ -99,11 +113,7 @@ export function VitalizationPillarBoxes({
         </span>
       </div>
       <p className="text-[10px] mt-1.5 text-center" style={{ color: GRAY }}>
-        {progressPct >= 75
-          ? vitalized
-            ? 'Vitalized — hash saved, mint complete'
-            : '75%+ — hash can be saved, minting enabled'
-          : 'Complete all pillars to save hash and mint'}
+        {progressPct >= 75 ? 'Hash saved to Supabase' : 'Complete all pillars to save hash'}
       </p>
     </div>
   );

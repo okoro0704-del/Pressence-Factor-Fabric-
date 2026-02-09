@@ -163,12 +163,15 @@ export function SovereignPalmScan({ isOpen, onClose, onSuccess, onError }: Sover
             <PalmOverlaySvg />
           </div>
         </div>
-        <div className="absolute top-3 left-0 right-0 z-20 flex flex-col items-center gap-1">
+        <div className="absolute top-3 left-0 right-0 z-20 flex flex-col items-center gap-1 px-4 text-center">
+          <span className="text-sm font-bold text-[#22c55e]">
+            Face verified. Now show your palm to complete vitalization.
+          </span>
           <span className="text-xs font-mono uppercase tracking-widest opacity-90" style={{ color: GOLD }}>
             Sovereign Palm
           </span>
           <span className="text-xs font-mono text-[#6b6b70]">
-            Align your palm in the outline — front camera
+            Align your palm in the outline — front camera. Required to continue.
           </span>
         </div>
         {status === 'ready' && (

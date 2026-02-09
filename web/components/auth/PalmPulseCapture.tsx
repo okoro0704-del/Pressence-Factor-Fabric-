@@ -324,12 +324,15 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
           </div>
         )}
 
-        <div className="absolute top-3 left-0 right-0 z-20 flex flex-col items-center gap-1">
+        <div className="absolute top-3 left-0 right-0 z-20 flex flex-col items-center gap-1 px-4 text-center">
+          <span className="text-sm font-bold text-[#22c55e]">
+            Face verified. Now show your palm to complete vitalization.
+          </span>
           <span className="text-xs font-mono uppercase tracking-widest opacity-90" style={{ color: '#22c55e' }}>
-            Scan Area
+            Scan Area · Sovereign Palm
           </span>
           <span className="text-xs font-mono" style={{ color: '#6b6b70' }}>
-            Hold your palm to the camera in the circle — Sovereign Palm
+            Hold your palm to the camera in the circle — required to continue
           </span>
         </div>
       </div>

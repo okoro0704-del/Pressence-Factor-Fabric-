@@ -2,14 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { VitalizationScreen } from '@/components/VitalizationScreen';
+import { FourLayerGate } from '@/components/dashboard/FourLayerGate';
 import { SovereignGuardRedirect } from '@/components/dashboard/SovereignGuardRedirect';
 import { getVitalizationStatus } from '@/lib/vitalizationState';
 import { ROUTES } from '@/lib/constants';
 
 /**
- * Block re-vitalization: if user (phone) already has citizen_hash (face_hash) in Supabase,
- * do NOT show registration flow. Force Device Handshake (link-device) instead.
+ * Vitalization page: full 4-pillar gate (Face, Palm, GPS, Mobile ID) with pillar boxes visible at top.
+ * Block re-vitalization: if user (phone) already has citizen_hash in Supabase, redirect to dashboard or link-device.
  */
 export function VitalizationPageClient() {
   const router = useRouter();
@@ -46,7 +46,7 @@ export function VitalizationPageClient() {
 
   return (
     <SovereignGuardRedirect>
-      <VitalizationScreen />
+      <FourLayerGate />
     </SovereignGuardRedirect>
   );
 }

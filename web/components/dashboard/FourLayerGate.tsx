@@ -2259,8 +2259,8 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
 
       {/* Main Gate Container — mobile-first: center-aligned Sovereign card; laptop matches mobile (same width, vertical card) */}
       <div className="relative z-10 w-full max-w-lg mx-auto step-transition-wrapper">
-        {/* Four boxes at top: Face, Palm, GPS, Mobile ID + vitalization bar (0–100%, green at 75%+). At 75% hash saved, minting done, status Vitalized. */}
-        {authStatus === AuthStatus.SCANNING && (
+        {/* Four pillar boxes at top: always visible when identity is set; glow one-by-one as each is verified (75% or 100%). */}
+        {identityAnchor && (
           <div className="mb-6 pt-2">
             <VitalizationPillarBoxes
               faceVerified={pillarFace}
@@ -2269,6 +2269,13 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
               mobileIdVerified={pillarDevice}
               vitalized={pillarFace && pillarPalm && pillarDevice && pillarLocation}
             />
+            {authStatus === AuthStatus.SCANNING && (
+              <div className="text-sm text-center mt-3 px-4 space-y-1" style={{ color: '#a0a0a5' }}>
+                <p><strong className="text-[#D4AF37]">Step 1 — Face:</strong> Complete face verification first.</p>
+                <p><strong className="text-[#D4AF37]">Step 2 — Palm:</strong> Then show your palm (required; you must complete both).</p>
+                <p className="text-xs mt-2">We then merge Face + Palm with Device ID and GPS to complete vitalization and mint VIDA CAP.</p>
+              </div>
+            )}
           </div>
         )}
         {/* Identity Anchor Display */}
@@ -2557,6 +2564,38 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
                 </button>
               )}
             </div>
+          </div>
+        )}
+
+        {/* After successful verification (3/4 criteria met): congratulations + Proceed to Dashboard */}
+        {authStatus === AuthStatus.SCANNING && pillarFace && pillarPalm && pillarDevice && (
+          <div
+            className="mt-8 p-6 rounded-xl border-2 text-center transition-all duration-300"
+            style={{
+              background: 'rgba(34, 197, 94, 0.08)',
+              borderColor: '#22c55e',
+              boxShadow: '0 0 20px rgba(34, 197, 94, 0.25)',
+            }}
+          >
+            <p className="text-lg font-bold text-[#22c55e] mb-2 uppercase tracking-wider">
+              Congratulations, You&apos;ve been Vitalized
+            </p>
+            <p className="text-sm text-[#6b6b70] mb-4">
+              Your identity has been verified and saved. You may proceed to your dashboard.
+            </p>
+            <button
+              type="button"
+              onClick={goToDashboard}
+              className="w-full min-h-[48px] py-3 px-6 rounded-lg border-2 font-bold text-sm uppercase tracking-wider transition-all duration-200 cursor-pointer touch-manipulation"
+              style={{
+                background: '#22c55e',
+                borderColor: '#22c55e',
+                color: '#fff',
+                boxShadow: '0 0 12px rgba(34, 197, 94, 0.5)',
+              }}
+            >
+              Proceed to Dashboard
+            </button>
           </div>
         )}
 
