@@ -97,9 +97,7 @@ import dynamic from 'next/dynamic';
 import { verifyOrEnrollPalm } from '@/lib/palmHashProfile';
 import { saveFourPillars, savePillarsAt75, getCurrentGeolocation, generateAndSaveSovereignRoot, generateAndSaveSovereignRootFaceDevice } from '@/lib/fourPillars';
 import { getSupabase } from '@/lib/supabase';
-import { createCredential, getAssertion, isWebAuthnSupported } from '@/lib/webauthn';
 import { deriveDeviceHashFromCredentialId } from '@/lib/sovereignRoot';
-import { getFaceHashFromSession } from '@/lib/biometricAnchorSync';
 import { IdentityState } from '@/lib/identityState';
 
 /**
