@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { JetBrains_Mono } from 'next/font/google';
 import {
@@ -67,18 +68,47 @@ export function PhoneFirstLanding() {
   const [error, setError] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
   const [countrySearch, setCountrySearch] = useState('');
+  const [dropdownRect, setDropdownRect] = useState<{ top: number; left: number; width: number } | null>(null);
   const [showPalmCapture, setShowPalmCapture] = useState(false);
   const [pendingPhone, setPendingPhone] = useState<string | null>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const updateDropdownRect = () => {
+    if (triggerRef.current) {
+      const r = triggerRef.current.getBoundingClientRect();
+      setDropdownRect({ top: r.bottom, left: r.left, width: Math.max(r.width, 260) });
+    } else {
+      setDropdownRect(null);
+    }
+  };
 
   useEffect(() => {
     const close = (e: MouseEvent) => {
       const target = e.target as Node;
-      if (pickerRef.current && !pickerRef.current.contains(target)) setPickerOpen(false);
+      const inPicker = pickerRef.current?.contains(target);
+      const inDropdown = dropdownRef.current?.contains(target);
+      if (!inPicker && !inDropdown) setPickerOpen(false);
     };
     document.addEventListener('click', close);
     return () => document.removeEventListener('click', close);
   }, []);
+
+  useLayoutEffect(() => {
+    if (!pickerOpen) {
+      setDropdownRect(null);
+      return;
+    }
+    updateDropdownRect();
+    const onScrollOrResize = () => updateDropdownRect();
+    window.addEventListener('scroll', onScrollOrResize, true);
+    window.addEventListener('resize', onScrollOrResize);
+    return () => {
+      window.removeEventListener('scroll', onScrollOrResize, true);
+      window.removeEventListener('resize', onScrollOrResize);
+    };
+  }, [pickerOpen]);
 
   const fullPhone = nationalNumber.trim() ? `${country.dialCode}${nationalNumber.trim().replace(/\D/g, '')}` : '';
 
@@ -184,19 +214,37 @@ export function PhoneFirstLanding() {
           <div className="flex rounded-lg border overflow-hidden" style={{ borderColor: 'rgba(212, 175, 55, 0.3)' }}>
             <div className="relative" ref={pickerRef}>
               <button
+                ref={triggerRef}
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setPickerOpen((o) => !o);
+                  const opening = !pickerOpen;
+                  if (opening && triggerRef.current) {
+                    const r = triggerRef.current.getBoundingClientRect();
+                    setDropdownRect({ top: r.bottom, left: r.left, width: Math.max(r.width, 260) });
+                  } else if (!opening) {
+                    setDropdownRect(null);
+                  }
+                  setPickerOpen(opening);
                 }}
                 aria-label={`Country code ${country.dialCode}. Click to choose country.`}
                 aria-expanded={pickerOpen}
                 aria-haspopup="listbox"
-                className="flex items-center gap-2 pl-3 pr-2 py-2 border-r min-w-[140px] min-h-[60px] cursor-pointer select-none hover:bg-[#D4AF37]/10 active:bg-[#D4AF37]/15 transition-colors touch-manipulation"
+                className="flex items-center gap-1 pl-1 pr-1 py-0 border-r min-w-[200px] min-h-[60px] cursor-pointer select-none hover:bg-[#D4AF37]/10 active:bg-[#D4AF37]/15 transition-colors touch-manipulation"
                 style={{ borderColor: 'rgba(212, 175, 55, 0.3)', background: '#0d0d0f', color: '#D4AF37' }}
               >
-                <span className="text-xl leading-none shrink-0" aria-hidden>{country.flag}</span>
-                <span className={`text-sm font-mono shrink-0 ${jetbrains.className}`}>{country.dialCode}</span>
+                <span
+                  className="flex items-center justify-center w-[60px] h-[60px] shrink-0 text-4xl leading-none rounded-lg"
+                  aria-hidden
+                >
+                  {country.flag}
+                </span>
+                <span
+                  className={`flex items-center justify-center min-w-[60px] h-[60px] shrink-0 font-mono text-2xl ${jetbrains.className}`}
+                  style={{ color: '#D4AF37' }}
+                >
+                  {country.dialCode}
+                </span>
                 <span
                   className="ml-auto flex items-center justify-center w-[60px] h-[60px] rounded-lg text-[#D4AF37] hover:bg-[#D4AF37]/20 active:bg-[#D4AF37]/30 text-4xl leading-none"
                   aria-hidden
@@ -205,46 +253,6 @@ export function PhoneFirstLanding() {
                   ▾
                 </span>
               </button>
-              {pickerOpen && (
-                <div
-                  role="listbox"
-                  aria-label="Select country"
-                  className="absolute left-0 top-full z-50 mt-1 rounded-lg border shadow-xl flex flex-col w-full min-w-[260px] max-w-[min(320px,100vw)] max-h-[320px] bg-[#0d0d0f] border-[#D4AF37]/30"
-                >
-                  <div className="p-2 border-b border-[#D4AF37]/20 sticky top-0 bg-[#0d0d0f]">
-                    <input
-                      type="text"
-                      value={countrySearch}
-                      onChange={(e) => setCountrySearch(e.target.value)}
-                      placeholder="Search country"
-                      className="w-full px-3 py-2 rounded text-sm bg-[#16161a] border border-[#D4AF37]/30 text-[#f5f5f5] placeholder-[#6b6b70] outline-none"
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                  </div>
-                  <div className="overflow-y-auto max-h-64">
-                    {filterPhoneCountries(countrySearch).map((c) => (
-                      <button
-                        key={c.code}
-                        type="button"
-                        role="option"
-                        aria-selected={c.code === country.code}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setCountry(c);
-                          setCountrySearch('');
-                          setPickerOpen(false);
-                        }}
-                        className="flex items-center gap-2 w-full px-3 py-3 text-left cursor-pointer select-none hover:bg-[#D4AF37]/15 active:bg-[#D4AF37]/20 transition-colors touch-manipulation"
-                        style={{ color: c.code === country.code ? '#D4AF37' : '#a0a0a5' }}
-                      >
-                        <span className="text-lg">{c.flag}</span>
-                        <span className="font-mono text-sm">{c.dialCode}</span>
-                        <span className="text-sm truncate">{c.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
             <input
               type="tel"
@@ -255,6 +263,58 @@ export function PhoneFirstLanding() {
               className={`flex-1 px-4 py-3 min-h-[60px] font-mono text-lg bg-[#0d0d0f] text-[#D4AF37] placeholder-neutral-500 outline-none ${jetbrains.className}`}
             />
           </div>
+          {typeof document !== 'undefined' &&
+            pickerOpen &&
+            dropdownRect &&
+            createPortal(
+              <div
+                ref={dropdownRef}
+                role="listbox"
+                aria-label="Select country"
+                className="rounded-lg border shadow-xl flex flex-col max-h-[320px] bg-[#0d0d0f] border-[#D4AF37]/30 z-[9999]"
+                style={{
+                  position: 'fixed',
+                  top: dropdownRect.top + 4,
+                  left: dropdownRect.left,
+                  width: Math.min(dropdownRect.width, typeof window !== 'undefined' ? window.innerWidth - dropdownRect.left - 16 : 320),
+                  minWidth: 260,
+                }}
+              >
+                <div className="p-2 border-b border-[#D4AF37]/20 sticky top-0 bg-[#0d0d0f] shrink-0">
+                  <input
+                    type="text"
+                    value={countrySearch}
+                    onChange={(e) => setCountrySearch(e.target.value)}
+                    placeholder="Search country"
+                    className="w-full px-3 py-2 rounded text-sm bg-[#16161a] border border-[#D4AF37]/30 text-[#f5f5f5] placeholder-[#6b6b70] outline-none"
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </div>
+                <div className="overflow-y-auto max-h-64 min-h-[120px]">
+                  {filterPhoneCountries(countrySearch).map((c) => (
+                    <button
+                      key={c.code}
+                      type="button"
+                      role="option"
+                      aria-selected={c.code === country.code}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCountry(c);
+                        setCountrySearch('');
+                        setPickerOpen(false);
+                      }}
+                      className="flex items-center gap-2 w-full px-3 py-3 text-left cursor-pointer select-none hover:bg-[#D4AF37]/15 active:bg-[#D4AF37]/20 transition-colors touch-manipulation"
+                      style={{ color: c.code === country.code ? '#D4AF37' : '#a0a0a5' }}
+                    >
+                      <span className="text-lg">{c.flag}</span>
+                      <span className={`font-mono text-sm ${jetbrains.className}`}>{c.dialCode}</span>
+                      <span className="text-sm truncate">{c.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>,
+              document.body
+            )}
           <p className="text-xs mt-2" style={{ color: '#6b6b70' }}>
             Any country — not saved. Select each visit.
           </p>
