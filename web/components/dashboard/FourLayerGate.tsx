@@ -1275,6 +1275,10 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
         palmResolveRef.current = null;
         setPillarPalm(true);
         setShowPalmPulse(false);
+        // Trigger actual VIDA CAP minting when vitalization (face + palm + hashes) completes.
+        mintFoundationSeigniorage(identityAnchor.phone).catch((err) => {
+          console.warn('[FourLayerGate] VIDA CAP mint on palm success:', err);
+        });
       }
     },
     [proceedAfterSecondPillar, identityAnchor]

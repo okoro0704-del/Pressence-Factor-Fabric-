@@ -159,10 +159,11 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
 
         if (cancelled) return;
 
-        // Don't await here — let the event loop run so the draw loop can keep the video live.
-        // When Hands is ready we'll set handsRef and status in the .then() callback.
-        getMediaPipeHands()
-          .then((hands) => {
+        // Defer to next macrotask so the current stack exits and the browser can paint; keeps video live.
+        setTimeout(() => {
+          if (cancelled) return;
+          getMediaPipeHands()
+            .then((hands) => {
             if (cancelled) {
               stream.getTracks().forEach((t) => t.stop());
               streamRef.current = null;
@@ -184,6 +185,7 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
             setStatus('denied');
             onErrorRef.current?.(msg);
           });
+        }, 0);
       } catch (e) {
         if (cancelled) return;
         clearTimeout(timeoutId);
@@ -504,31 +506,40 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
         )}
       </div>
 
-      {/* Captured: congratulatory Vitalization complete + Proceed to Dashboard */}
+      {/* Captured: same page — keep image visible, congratulatory message and button at bottom */}
       {status === 'captured' && (
-        <div className="absolute inset-0 z-[250] flex flex-col bg-black">
-          <div className="flex-1 relative min-h-0 flex flex-col items-center justify-center p-4">
-            <p className="text-center text-lg font-bold mb-2" style={{ color: GOLD }}>Congratulations</p>
-            <p className="text-center text-xl font-bold mb-4 text-[#22c55e]">Vitalization is complete</p>
-            <p className="text-center text-sm font-mono uppercase tracking-widest mb-4 opacity-90" style={{ color: GOLD }}>Face and palm verified</p>
-            <div className="relative w-full max-w-sm rounded-2xl overflow-hidden border-2 shadow-2xl" style={{ borderColor: GOLD, boxShadow: `0 0 24px ${GOLD}40` }}>
-              {capturedImageDataUrl ? (
+        <>
+          {/* Dimmed background: captured palm image or placeholder */}
+          <div className="absolute inset-0 z-[240] flex flex-col items-center justify-center p-4 bg-black/70">
+            {capturedImageDataUrl ? (
+              <div className="relative w-full max-w-xs rounded-2xl overflow-hidden border-2 shadow-2xl" style={{ borderColor: GOLD, boxShadow: `0 0 24px ${GOLD}40` }}>
                 <img
                   src={capturedImageDataUrl}
                   alt="Your palm scan"
                   className="w-full h-auto block"
                   style={{ transform: 'scaleX(-1)' }}
                 />
-              ) : (
-                <div className="aspect-video bg-[#1a1a1e] flex items-center justify-center" style={{ color: GOLD }}>
-                  <span className="font-mono text-sm">Palm verified</span>
-                </div>
-              )}
-              <div className="absolute inset-0 pointer-events-none bg-[#D4AF37]/15" aria-hidden />
-            </div>
-            <p className="mt-4 text-center text-sm font-mono text-[#6b6b70]">Your identity is anchored. You may proceed to your dashboard.</p>
+                <div className="absolute inset-0 pointer-events-none bg-[#D4AF37]/10" aria-hidden />
+              </div>
+            ) : (
+              <div className="w-full max-w-xs aspect-video rounded-2xl border-2 flex items-center justify-center bg-[#1a1a1e]" style={{ borderColor: GOLD }}>
+                <span className="font-mono text-sm" style={{ color: GOLD }}>Palm verified</span>
+              </div>
+            )}
           </div>
-          <div className="p-4" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))' }}>
+          {/* Bottom bar: congratulatory message + Go to Dashboard (same page) */}
+          <div
+            className="absolute bottom-0 left-0 right-0 z-[250] flex flex-col gap-3 p-4 rounded-t-2xl border-t border-[#2a2a2e]"
+            style={{
+              paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))',
+              background: 'linear-gradient(to top, rgba(13,13,15,0.98), rgba(13,13,15,0.95))',
+              boxShadow: `0 -4px 24px ${GOLD}20`,
+            }}
+          >
+            <p className="text-center text-lg font-bold" style={{ color: GOLD }}>Congratulations</p>
+            <p className="text-center text-base font-bold text-[#22c55e]">Vitalization is complete</p>
+            <p className="text-center text-xs font-mono uppercase tracking-widest opacity-90" style={{ color: GOLD }}>Face and palm verified</p>
+            <p className="text-center text-xs text-[#6b6b70]">Your identity is anchored. VIDA CAP minting is triggered.</p>
             <button
               type="button"
               onClick={() => {
@@ -541,13 +552,13 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
                 }
               }}
               disabled={!capturedHashRef.current}
-              className="w-full rounded-xl py-4 text-base font-bold text-[#0d0d0f] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full rounded-xl py-4 text-base font-bold text-[#0d0d0f] transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-1"
               style={{ background: GOLD }}
             >
-              Proceed to Dashboard
+              Go to Dashboard
             </button>
           </div>
-        </div>
+        </>
       )}
 
       {status === 'initializing' && (
