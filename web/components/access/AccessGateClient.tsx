@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { isBeforeAccessCutoff, hasAccessGranted } from '@/lib/accessCodeGate';
+import { isBeforeAccessCutoff, hasAccessGranted, hasMasterAccess } from '@/lib/accessCodeGate';
 import { isArchitect } from '@/lib/publicRevealAccess';
 
 const PUBLIC_PATHS = ['/', '/manifesto', '/countdown', '/education', '/get-app', '/partners', '/login', '/recover'];
@@ -31,6 +31,7 @@ export function AccessGateClient() {
     if (!isBeforeAccessCutoff()) return;
     if (isArchitect()) return;
     if (hasAccessGranted()) return;
+    if (hasMasterAccess()) return;
     router.replace('/?need_code=1');
   }, [mounted, pathname, router]);
 

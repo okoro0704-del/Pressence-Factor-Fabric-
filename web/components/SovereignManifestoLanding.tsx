@@ -11,8 +11,11 @@ import { SCROLL_WISDOM } from '@/lib/sovereignAwakeningContent';
 import {
   isBeforeAccessCutoff,
   hasAccessGranted,
+  hasMasterAccess,
   setAccessGranted,
+  setMasterAccess,
   validateAccessCode,
+  validateMasterPassword,
 } from '@/lib/accessCodeGate';
 
 const GOLD = '#D4AF37';
@@ -68,14 +71,20 @@ export function SovereignManifestoLanding() {
   const needCode = mounted && (searchParams?.get('need_code') === '1' || false);
   const beforeCutoff = mounted && isBeforeAccessCutoff();
   const isOwner = mounted && isArchitect();
+  const masterAccess = mounted && hasMasterAccess();
   const accessGranted = mounted && hasAccessGranted();
-  const showCodeForm = beforeCutoff && !isOwner && (!accessGranted || needCode);
+  const showCodeForm = beforeCutoff && !isOwner && !masterAccess && (!accessGranted || needCode);
 
   const [codePhone, setCodePhone] = useState('');
   const [codeValue, setCodeValue] = useState('');
   const [codeError, setCodeError] = useState<string | null>(null);
   const [codeLoading, setCodeLoading] = useState(false);
   const codeFormRef = useRef<HTMLDivElement>(null);
+
+  const [showMasterForm, setShowMasterForm] = useState(false);
+  const [masterPassword, setMasterPassword] = useState('');
+  const [masterError, setMasterError] = useState<string | null>(null);
+  const [masterLoading, setMasterLoading] = useState(false);
 
   useEffect(() => setMounted(true), []);
 
@@ -97,6 +106,26 @@ export function SovereignManifestoLanding() {
       return;
     }
     setCodeError(result.error ?? 'Invalid code. Try again or request a new code.');
+  };
+
+  const handleMasterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setMasterError(null);
+    if (!masterPassword.trim()) {
+      setMasterError('Enter your master password.');
+      return;
+    }
+    setMasterLoading(true);
+    const result = await validateMasterPassword(masterPassword);
+    setMasterLoading(false);
+    if (result.ok) {
+      setMasterAccess();
+      setShowMasterForm(false);
+      setMasterPassword('');
+      router.replace('/vitalization');
+      return;
+    }
+    setMasterError(result.error ?? 'Incorrect password.');
   };
 
   // Scroll-triggered wisdom: when a section enters view, set wisdom for the Companion
@@ -234,7 +263,7 @@ export function SovereignManifestoLanding() {
           Born in Lagos. Built for the World.
         </p>
         <div className="flex flex-wrap items-center justify-center gap-3">
-          {(isOwner || accessGranted) ? (
+          {(isOwner || masterAccess || accessGranted) ? (
             <Link
               href="/vitalization"
               className="rounded-xl border-2 px-8 py-3 font-bold uppercase tracking-wider transition-colors hover:bg-[#D4AF37]/20"
@@ -267,7 +296,40 @@ export function SovereignManifestoLanding() {
           >
             Sovereign Countdown → April 7, 2026
           </Link>
+          <button
+            type="button"
+            onClick={() => setShowMasterForm((v) => !v)}
+            className="rounded-xl border px-6 py-3 text-sm font-medium transition-colors hover:bg-[#16161a]"
+            style={{ borderColor: GOLD_DIM, color: GOLD_DIM }}
+          >
+            {showMasterForm ? 'Hide' : 'Log in with master password'}
+          </button>
         </div>
+        {showMasterForm && (
+          <form onSubmit={handleMasterSubmit} className="mt-6 max-w-sm mx-auto p-4 rounded-xl border-2" style={{ borderColor: BORDER, background: CARD_BG }}>
+            <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: GOLD }}>
+              Master password — access from any device, anytime
+            </p>
+            <input
+              type="password"
+              value={masterPassword}
+              onChange={(e) => { setMasterPassword(e.target.value); setMasterError(null); }}
+              placeholder="Master password"
+              autoComplete="current-password"
+              className="w-full px-4 py-2.5 rounded-lg border-2 bg-[#0d0d0f] text-white placeholder-[#6b6b70] mb-2"
+              style={{ borderColor: BORDER }}
+            />
+            <button
+              type="submit"
+              disabled={masterLoading}
+              className="w-full py-2.5 rounded-lg font-bold uppercase tracking-wider border-2 disabled:opacity-60"
+              style={{ borderColor: GOLD, color: GOLD }}
+            >
+              {masterLoading ? 'Checking…' : 'Log in'}
+            </button>
+            {masterError && <p className="mt-2 text-sm" style={{ color: '#f87171' }}>{masterError}</p>}
+          </form>
+        )}
       </section>
 
       {/* The Mission */}

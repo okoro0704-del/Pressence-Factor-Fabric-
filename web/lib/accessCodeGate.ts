@@ -7,15 +7,44 @@
 export const ACCESS_CUTOFF_DATE = new Date('2026-04-08T00:00:00.000Z');
 
 const STORAGE_KEY = 'pff_access_granted_phone';
+const MASTER_ACCESS_KEY = 'pff_master_access';
 
 export function isBeforeAccessCutoff(): boolean {
   return typeof window !== 'undefined' && new Date() < ACCESS_CUTOFF_DATE;
 }
 
+/** Permanent master password: one password for you to access the app from any device, anytime. */
+export function hasMasterAccess(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return localStorage.getItem(MASTER_ACCESS_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function setMasterAccess(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(MASTER_ACCESS_KEY, '1');
+  } catch {
+    // ignore
+  }
+}
+
+export function clearMasterAccess(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem(MASTER_ACCESS_KEY);
+  } catch {
+    // ignore
+  }
+}
+
 export function hasAccessGranted(): boolean {
   if (typeof window === 'undefined') return false;
   try {
-    return !!localStorage.getItem(STORAGE_KEY);
+    return !!localStorage.getItem(STORAGE_KEY) || hasMasterAccess();
   } catch {
     return false;
   }
@@ -45,6 +74,25 @@ export function clearAccessGranted(): void {
     localStorage.removeItem(STORAGE_KEY);
   } catch {
     // ignore
+  }
+}
+
+export async function validateMasterPassword(
+  password: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const res = await fetch('/api/v1/master-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: password.trim() }),
+    });
+    const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+    if (res.ok && json.ok === true) {
+      return { ok: true };
+    }
+    return { ok: false, error: json.error ?? 'Incorrect password' };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Request failed' };
   }
 }
 
