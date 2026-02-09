@@ -154,29 +154,43 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
 
         if (cancelled) return;
 
-        const hands = await getMediaPipeHands();
+        // Yield so the UI and draw loop can paint live video before we start loading Hands.
+        await new Promise<void>((r) => requestAnimationFrame(() => r()));
 
-        if (cancelled) {
-          stream.getTracks().forEach((t) => t.stop());
-          streamRef.current = null;
-          return;
-        }
+        if (cancelled) return;
 
-        handsRef.current = hands;
-        hands.onResults((results: { multiHandLandmarks: NormalizedLandmark[][] }) => {
-          const list = results.multiHandLandmarks?.[0];
-          lastLandmarksRef.current = list ?? null;
-        });
-
-        setStatus('ready');
+        // Don't await here — let the event loop run so the draw loop can keep the video live.
+        // When Hands is ready we'll set handsRef and status in the .then() callback.
+        getMediaPipeHands()
+          .then((hands) => {
+            if (cancelled) {
+              stream.getTracks().forEach((t) => t.stop());
+              streamRef.current = null;
+              return;
+            }
+            handsRef.current = hands;
+            hands.onResults((results: { multiHandLandmarks: NormalizedLandmark[][] }) => {
+              const list = results.multiHandLandmarks?.[0];
+              lastLandmarksRef.current = list ?? null;
+            });
+            clearTimeout(timeoutId);
+            setStatus('ready');
+          })
+          .catch((e) => {
+            if (cancelled) return;
+            clearTimeout(timeoutId);
+            const msg = e instanceof Error ? e.message : String(e);
+            setError(msg);
+            setStatus('denied');
+            onErrorRef.current?.(msg);
+          });
       } catch (e) {
         if (cancelled) return;
+        clearTimeout(timeoutId);
         const msg = e instanceof Error ? e.message : String(e);
         setError(msg);
         setStatus('denied');
         onErrorRef.current?.(msg);
-      } finally {
-        clearTimeout(timeoutId);
       }
     };
 
