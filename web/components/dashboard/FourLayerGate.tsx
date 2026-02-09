@@ -86,7 +86,7 @@ import { speakSovereignAlignmentFailed, speakDualVitalizationSuccess } from '@/l
 import { useBiometricSession } from '@/contexts/BiometricSessionContext';
 import { createLoginRequest, completeLoginBridge } from '@/lib/loginRequest';
 import { setTripleAnchorVerified } from '@/lib/tripleAnchor';
-import { getAssertion, isWebAuthnSupported } from '@/lib/webauthn';
+import { getAssertion, createCredential, isWebAuthnSupported } from '@/lib/webauthn';
 import { getLinkedMobileDeviceId } from '@/lib/phoneIdBridge';
 import { useSoftStart, incrementTrustLevel } from '@/lib/trustLevel';
 import { recordDailyScan, getVitalizationStatus, DAILY_UNLOCK_VIDA_AMOUNT } from '@/lib/vitalizationRitual';
@@ -640,13 +640,14 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     })();
   }, [identityAnchor?.phone, pillarFace, pillarPalm, pillarDevice]);
 
-  /** Architect Override: when all 4 pillars verified, save Face+Palm+Device+GPS to Supabase then set state before QuadPillarGrid redirects. */
+  /** Architect Override: when all 4 pillars verified, save Face+Palm+Device+GPS to Supabase, then save passkey to device, then set state before QuadPillarGrid redirects. */
   const handleAllPillarsVerified = useCallback(async () => {
     if (sessionStatusIntervalRef.current) {
       clearInterval(sessionStatusIntervalRef.current);
       sessionStatusIntervalRef.current = null;
     }
     const phone = identityAnchor?.phone?.trim();
+    const displayName = identityAnchor?.name?.trim() || phone || 'Sovereign';
     if (phone) {
       try {
         const supabase = getSupabase();
@@ -661,6 +662,12 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
         if (faceHash && palmHash && deviceId && geo) {
           await saveFourPillars(phone, faceHash, palmHash, deviceId, geo);
         }
+        // After successful vitalization: save passkey for the site to this device (no prompt before vitalization).
+        try {
+          await createCredential(phone, displayName);
+        } catch (_) {
+          // passkey registration optional; user can still use the site
+        }
       } catch (_) {
         // non-blocking; FourPillarsGuard will redirect back if not saved
       }
@@ -668,7 +675,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     setPresenceVerified(true);
     if (phone) setIdentityAnchorForSession(phone);
     setVitalizationComplete();
-  }, [identityAnchor?.phone, setPresenceVerified]);
+  }, [identityAnchor?.phone, identityAnchor?.name, setPresenceVerified]);
 
   const getLayerIcon = (layer: AuthLayer) => {
     switch (layer) {
