@@ -1,13 +1,13 @@
 /**
- * Four Pillars: Face ID, Palm Scan, Device ID, GPS — all tied to phone (anchor).
- * Must be saved in Supabase before user can access the site.
- * Both Face and Palm scans use front camera.
- * Master Identity Anchor: after pillars are verified, generate sovereign root and save to citizens.citizen_root.
+ * Four Pillars: Face + Device (primary) or legacy Face + Palm + Device + GPS.
+ * Face + Device pipeline: no palm scan; WebAuthn/Passkey provides device binding.
+ * Sovereign hash = MerkleRoot([FaceHash, DeviceHash]). Deterministic, stable on mobile PWA.
  */
 
 import { getSupabase } from './supabase';
 import {
   generateSovereignRoot,
+  generateSovereignRootFaceDevice,
   computeIdentityAnchorHash,
   saveCitizenRootToSupabase,
   saveSovereignRootToUserProfile,
@@ -165,6 +165,41 @@ export async function generateAndSaveSovereignRoot(
     return {
       ok: false,
       error: e instanceof Error ? e.message : 'Failed to generate sovereign root',
+    };
+  }
+}
+
+/**
+ * Face + Device only (no palm): generate sovereign hash and save to user_profiles.
+ * DeviceHash = SHA-256(WebAuthn credential ID). Second factor stored in palm_hash column for compatibility.
+ * Call after face scan verified and WebAuthn credential created/asserted.
+ */
+export async function generateAndSaveSovereignRootFaceDevice(
+  phone: string,
+  faceHash: string,
+  deviceHash: string,
+  deviceId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const f = String(faceHash).trim();
+  const d = String(deviceHash).trim();
+  if (!f || !d) {
+    return { ok: false, error: 'face_hash and device_hash are required' };
+  }
+  if (f.length !== 64 || !/^[0-9a-fA-F]+$/.test(f) || d.length !== 64 || !/^[0-9a-fA-F]+$/.test(d)) {
+    return { ok: false, error: 'face_hash and device_hash must be 64-char hex (SHA-256)' };
+  }
+  try {
+    const sovereignRoot = await generateSovereignRootFaceDevice(f, d);
+    const byPhone = await saveSovereignRootToUserProfile(phone.trim(), sovereignRoot);
+    if (!byPhone.ok) return { ok: false, error: byPhone.error ?? 'Failed to save sovereign root' };
+    // Persist face + device hashes (device hash in palm_hash column for API compatibility)
+    const saved = await savePillarsAt75(phone.trim(), f, d, deviceId.trim());
+    if (!saved.ok) return { ok: false, error: saved.error ?? 'Failed to save pillars' };
+    return { ok: true };
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : 'Failed to generate sovereign root (face+device)',
     };
   }
 }

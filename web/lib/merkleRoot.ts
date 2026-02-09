@@ -57,3 +57,17 @@ export async function generateMerkleRoot(
   }
   return merkleRootFromLeaves([f, p, i]);
 }
+
+/**
+ * Sovereign hash (Face + Device only): Merkle root of [FaceHash, DeviceHash].
+ * Deterministic. No palm. Used for Face + Device Binding pipeline.
+ */
+export async function generateMerkleRootFaceDevice(faceHash: string, deviceHash: string): Promise<string> {
+  const f = String(faceHash).trim().toLowerCase();
+  const d = String(deviceHash).trim().toLowerCase();
+  if (!f || !d) throw new Error('generateMerkleRootFaceDevice: face and device hashes are required');
+  if (f.length !== HASH_HEX_LENGTH || d.length !== HASH_HEX_LENGTH) {
+    throw new Error('generateMerkleRootFaceDevice: each hash must be 64 hex chars (SHA-256)');
+  }
+  return merkleRootFromLeaves([f, d]);
+}

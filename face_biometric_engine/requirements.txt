@@ -1,0 +1,29 @@
+# Face Biometric Engine — secure 3D face recognition with liveness & deep learning fusion
+# Python 3.9+
+
+# Core ML
+torch>=2.0.0
+torchvision>=0.15.0
+# tensorflow>=2.13.0  # optional; use PyTorch as primary
+
+# Vision & capture
+opencv-python-headless>=4.8.0
+numpy>=1.24.0
+scipy>=1.10.0
+Pillow>=9.5.0
+
+# Face detection / alignment (optional backends)
+# insightface  # ArcFace/MagFace; install separately if needed
+# onnxruntime  # for ONNX embedding models
+
+# API & async
+fastapi>=0.100.0
+uvicorn[standard]>=0.22.0
+pydantic>=2.0.0
+
+# Security & crypto
+cryptography>=41.0.0
+
+# Utils
+pyyaml>=6.0
+python-multipart>=0.0.6
