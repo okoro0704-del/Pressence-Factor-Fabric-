@@ -1,0 +1,2 @@
+# No Git LFS — ensures Netlify can clone and build without Large Media.
+# (Remove this file only if you enable Netlify Large Media and want LFS.)
