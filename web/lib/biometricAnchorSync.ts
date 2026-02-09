@@ -233,6 +233,7 @@ export async function confirmFaceHashStored(phoneNumber: string): Promise<boolea
 
 export interface StoredBiometricAnchors {
   face_hash: string | null;
+  palm_hash: string | null;
   recovery_seed_hash: string | null;
   external_fingerprint_hash: string | null;
 }
@@ -252,13 +253,14 @@ export async function getStoredBiometricAnchors(
   try {
     const { data, error } = await (supabase as any)
       .from('user_profiles')
-      .select('face_hash, recovery_seed_hash, external_fingerprint_hash')
+      .select('face_hash, palm_hash, recovery_seed_hash, external_fingerprint_hash')
       .eq('phone_number', trimmed)
       .maybeSingle();
     if (error) return { ok: false, error: error.message ?? 'Failed to fetch anchors' };
-    const row = data as { face_hash?: string | null; recovery_seed_hash?: string | null; external_fingerprint_hash?: string | null } | null;
+    const row = data as { face_hash?: string | null; palm_hash?: string | null; recovery_seed_hash?: string | null; external_fingerprint_hash?: string | null } | null;
     const anchors: StoredBiometricAnchors = {
       face_hash: row?.face_hash ?? null,
+      palm_hash: row?.palm_hash ?? null,
       recovery_seed_hash: row?.recovery_seed_hash ?? null,
       external_fingerprint_hash: row?.external_fingerprint_hash ?? null,
     };

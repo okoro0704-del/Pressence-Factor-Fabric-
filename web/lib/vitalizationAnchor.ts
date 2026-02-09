@@ -19,6 +19,8 @@ export interface VitalizationAnchor {
   isVitalized: boolean;
   citizenHash: string | null;
   phone?: string;
+  /** Palm hash stored on device so phone + face + palm confirmation opens the site from this device. */
+  palmHash?: string | null;
 }
 
 async function deriveKey(): Promise<CryptoKey> {
@@ -79,11 +81,12 @@ export async function getVitalizationAnchorFromStorage(): Promise<VitalizationAn
   const plain = await decrypt(raw);
   if (!plain) return { isVitalized: false, citizenHash: null };
   try {
-    const o = JSON.parse(plain) as { isVitalized?: boolean; citizenHash?: string | null; phone?: string };
+    const o = JSON.parse(plain) as { isVitalized?: boolean; citizenHash?: string | null; phone?: string; palmHash?: string | null };
     return {
       isVitalized: o.isVitalized === true,
       citizenHash: typeof o.citizenHash === 'string' ? o.citizenHash : null,
       phone: typeof o.phone === 'string' ? o.phone : undefined,
+      palmHash: typeof o.palmHash === 'string' ? o.palmHash : null,
     };
   } catch {
     return { isVitalized: false, citizenHash: null };
@@ -107,17 +110,27 @@ export function hasVitalizationAnchorStored(): boolean {
 }
 
 /**
- * Store is_vitalized and citizen_hash in Encrypted LocalStorage, IndexedDB (sovereign_identity_v1), and Secure HttpOnly Cookie.
+ * Store is_vitalized, citizen_hash (face), and optionally palm_hash on this device.
+ * When Supabase hashes are saved, call this so the site can confirm by phone / face / palm and open from this device.
  */
-export async function setVitalizationAnchor(citizenHash: string, phone?: string): Promise<void> {
+export async function setVitalizationAnchor(
+  citizenHash: string,
+  phone?: string,
+  palmHash?: string | null
+): Promise<void> {
   if (typeof localStorage === 'undefined') return;
-  const payload = { isVitalized: true, citizenHash: citizenHash.trim(), phone: phone?.trim() };
+  const payload = {
+    isVitalized: true,
+    citizenHash: citizenHash.trim(),
+    phone: phone?.trim(),
+    palmHash: palmHash?.trim() || null,
+  };
   const plain = JSON.stringify(payload);
   const cipher = await encrypt(plain);
   localStorage.setItem(STORAGE_KEY, cipher);
   try {
     const { setSovereignIdentity } = await import('./sovereignIdentityDB');
-    await setSovereignIdentity(citizenHash.trim(), phone?.trim());
+    await setSovereignIdentity(citizenHash.trim(), phone?.trim(), palmHash?.trim() || undefined);
   } catch {
     // IndexedDB best-effort
   }
@@ -125,7 +138,7 @@ export async function setVitalizationAnchor(citizenHash: string, phone?: string)
     await fetch('/api/vitalization-anchor/cookie', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ citizenHash: citizenHash.trim(), phone: phone?.trim() }),
+      body: JSON.stringify({ citizenHash: citizenHash.trim(), phone: phone?.trim(), palmHash: palmHash?.trim() || null }),
     });
   } catch {
     // cookie is best-effort; localStorage is source of truth for client
@@ -157,7 +170,7 @@ export async function deepRecoveryVitalizationAnchor(): Promise<boolean> {
 
     const { data: profile, error: profileError } = await supabase
       .from('user_profiles')
-      .select('phone_number, face_hash')
+      .select('phone_number, face_hash, palm_hash')
       .eq('primary_sentinel_device_id', deviceId)
       .not('face_hash', 'is', null)
       .limit(1)
@@ -166,7 +179,8 @@ export async function deepRecoveryVitalizationAnchor(): Promise<boolean> {
     if (!profileError && profile?.phone_number && profile?.face_hash) {
       const phone = (profile as { phone_number: string }).phone_number.trim();
       const faceHash = (profile as { face_hash: string }).face_hash.trim();
-      await setVitalizationAnchor(faceHash, phone);
+      const palmHash = (profile as { palm_hash?: string | null })?.palm_hash;
+      await setVitalizationAnchor(faceHash, phone, palmHash?.trim() || null);
       return true;
     }
 

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { getSupabase } from '@/lib/supabase';
 import type { LoginRequestRow } from '@/lib/loginRequest';
 import { LoginRequestNotification } from '@/components/auth/LoginRequestNotification';
+import { isCurrentDevicePrimary } from '@/lib/phoneIdBridge';
 
 interface LoginRequestListenerProps {
   phoneNumber: string;
@@ -11,14 +12,26 @@ interface LoginRequestListenerProps {
 
 /**
  * Listens for new login_requests for this user (phone). When a PENDING request appears,
- * shows notification: "Isreal, are you trying to log in on a new Computer?" with Approve/Deny.
+ * shows notification only on the MAIN device (primary) so the user can approve from the device they first used.
+ * Sub devices do not see the approval prompt — only the main device can approve.
  */
 export function LoginRequestListener({ phoneNumber }: LoginRequestListenerProps) {
   const [pendingRequest, setPendingRequest] = useState<LoginRequestRow | null>(null);
   const [showNotification, setShowNotification] = useState(false);
+  const [isPrimary, setIsPrimary] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (!phoneNumber?.trim()) return;
+
+    let cancelled = false;
+    isCurrentDevicePrimary(phoneNumber.trim()).then((primary) => {
+      if (!cancelled) setIsPrimary(primary);
+    });
+    return () => { cancelled = true; };
+  }, [phoneNumber]);
+
+  useEffect(() => {
+    if (!phoneNumber?.trim() || isPrimary !== true) return;
 
     const supabase = getSupabase();
     if (!supabase) return;
@@ -43,7 +56,7 @@ export function LoginRequestListener({ phoneNumber }: LoginRequestListenerProps)
       )
       .subscribe();
 
-    // Check for existing PENDING request on mount
+    // Check for existing PENDING request on mount (only when this device is primary)
     (async () => {
       const { data } = await (supabase as any)
         .from('login_requests')
@@ -62,7 +75,7 @@ export function LoginRequestListener({ phoneNumber }: LoginRequestListenerProps)
     return () => {
       channel.unsubscribe();
     };
-  }, [phoneNumber]);
+  }, [phoneNumber, isPrimary]);
 
   const handleClose = () => {
     setShowNotification(false);

@@ -2,9 +2,11 @@
  * Phone ID Bridge — On PC, "Phone ID" refers to the linked mobile device's unique identifier.
  * Fetched from user_profiles.primary_sentinel_device_id (and authorized_devices) so the PC app
  * can show "Linked device: XXX" and confirm identity.
+ * Main vs sub device: only one device is the main (primary); others must request approval from main.
  */
 
 import { getSupabase } from './supabase';
+import { getCompositeDeviceFingerprint } from './biometricAuth';
 
 export interface LinkedDeviceInfo {
   /** Primary sentinel device ID (full, for internal use). */
@@ -44,4 +46,26 @@ export async function getLinkedMobileDeviceId(
   } catch {
     return null;
   }
+}
+
+/**
+ * True if this phone number already has a main (primary) device and the current device is not it.
+ * When true, the site should ask for approval from the main device instead of starting vitalization.
+ */
+export async function isSubDevice(phoneNumber: string): Promise<boolean> {
+  const linked = await getLinkedMobileDeviceId(phoneNumber?.trim() ?? '');
+  if (!linked?.deviceId) return false;
+  const current = await getCompositeDeviceFingerprint();
+  return current !== linked.deviceId;
+}
+
+/**
+ * True if this phone has a primary device and the current device is that primary (main device).
+ * Only the main device should see "Approve login" notifications for this phone.
+ */
+export async function isCurrentDevicePrimary(phoneNumber: string): Promise<boolean> {
+  const linked = await getLinkedMobileDeviceId(phoneNumber?.trim() ?? '');
+  if (!linked?.deviceId) return false;
+  const current = await getCompositeDeviceFingerprint();
+  return current === linked.deviceId;
 }

@@ -12,6 +12,7 @@ export interface SovereignIdentityV1 {
   version: 'sovereign_identity_v1';
   citizen_hash: string;
   phone?: string;
+  palm_hash?: string;
   stored_at: string; // ISO
 }
 
@@ -30,8 +31,8 @@ function openDB(): Promise<IDBDatabase> {
   });
 }
 
-/** Store sovereign_identity_v1 (citizen_hash) in IndexedDB. Call on Complete Registration. */
-export async function setSovereignIdentity(citizenHash: string, phone?: string): Promise<void> {
+/** Store sovereign_identity_v1 (citizen_hash, palm_hash) in IndexedDB. Call when hashes are saved to Supabase so device has phone+face+palm confirmation. */
+export async function setSovereignIdentity(citizenHash: string, phone?: string, palmHash?: string): Promise<void> {
   const db = await openDB();
   return new Promise((resolve, reject) => {
     const payload: SovereignIdentityV1 & { id: string } = {
@@ -39,6 +40,7 @@ export async function setSovereignIdentity(citizenHash: string, phone?: string):
       version: 'sovereign_identity_v1',
       citizen_hash: citizenHash.trim(),
       phone: phone?.trim(),
+      palm_hash: palmHash?.trim(),
       stored_at: new Date().toISOString(),
     };
     const tx = db.transaction(STORE_NAME, 'readwrite');
@@ -65,6 +67,7 @@ export async function getSovereignIdentity(): Promise<SovereignIdentityV1 | null
             version: 'sovereign_identity_v1',
             citizen_hash: v.citizen_hash,
             phone: v.phone,
+            palm_hash: v.palm_hash,
             stored_at: v.stored_at ?? new Date(0).toISOString(),
           });
         } else {

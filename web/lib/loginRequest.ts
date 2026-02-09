@@ -21,6 +21,7 @@ export interface LoginRequestRow {
 
 /**
  * Create a login request (computer). Returns request id.
+ * Use this when no face verification is required (e.g. main device flow).
  */
 export async function createLoginRequest(
   phoneNumber: string,
@@ -46,6 +47,51 @@ export async function createLoginRequest(
     const id = data?.id;
     if (!id) return { ok: false, error: 'No id returned' };
     return { ok: true, requestId: id };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false, error: msg };
+  }
+}
+
+/**
+ * Verify face against stored identity, then create login request (sub-device flow).
+ * Backend enforces: only the same face as stored for this phone can create a request.
+ * Number + different face → 403, never gains access.
+ */
+export async function verifyFaceAndCreateLoginRequest(
+  phoneNumber: string,
+  liveFaceHash: string,
+  displayName?: string,
+  deviceInfo?: Record<string, unknown>
+): Promise<{ ok: true; requestId: string } | { ok: false; error: string; code?: string }> {
+  const trimmed = phoneNumber?.trim();
+  const faceHash = liveFaceHash?.trim();
+  if (!trimmed || !faceHash) return { ok: false, error: 'Phone number and face hash required.' };
+  try {
+    const res = await fetch('/api/v1/verify-face-create-login-request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        phone_number: trimmed,
+        face_hash: faceHash,
+        requested_display_name: displayName?.trim() || null,
+        device_info: deviceInfo ?? null,
+      }),
+    });
+    const json = (await res.json().catch(() => ({}))) as {
+      ok?: boolean;
+      error?: string;
+      requestId?: string;
+      code?: string;
+    };
+    if (res.ok && json.ok === true && json.requestId) {
+      return { ok: true, requestId: json.requestId };
+    }
+    return {
+      ok: false,
+      error: json.error ?? (res.status === 403 ? 'Face does not match. Access denied.' : 'Request failed'),
+      code: json.code,
+    };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return { ok: false, error: msg };

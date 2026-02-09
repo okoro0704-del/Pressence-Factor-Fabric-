@@ -85,10 +85,10 @@ import { LoginQRDisplay } from '@/components/auth/LoginQRDisplay';
 import { ArchitectVisionCapture } from '@/components/auth/ArchitectVisionCapture';
 import { speakSovereignAlignmentFailed, speakVitalizationSuccess } from '@/lib/sovereignVoice';
 import { useBiometricSession } from '@/contexts/BiometricSessionContext';
-import { createLoginRequest, completeLoginBridge } from '@/lib/loginRequest';
+import { createLoginRequest, verifyFaceAndCreateLoginRequest, completeLoginBridge } from '@/lib/loginRequest';
 import { setTripleAnchorVerified } from '@/lib/tripleAnchor';
 import { getAssertion, createCredential, isWebAuthnSupported } from '@/lib/webauthn';
-import { getLinkedMobileDeviceId } from '@/lib/phoneIdBridge';
+import { getLinkedMobileDeviceId, isSubDevice } from '@/lib/phoneIdBridge';
 import { useSoftStart, incrementTrustLevel } from '@/lib/trustLevel';
 import { recordDailyScan, getVitalizationStatus, DAILY_UNLOCK_VIDA_AMOUNT } from '@/lib/vitalizationRitual';
 import { LEARNING_MODE_DAYS, getLearningModeMessage, LEDGER_SYNC_MESSAGE } from '@/lib/learningMode';
@@ -358,6 +358,41 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     });
     return () => { cancelled = true; };
   }, []);
+
+  /** When user enters phone number: if this device already has confirmation for that phone (face + palm saved), show instant login so they can open with face scan. */
+  useEffect(() => {
+    const phone = identityAnchor?.phone?.trim();
+    if (!phone || skipInstantLoginRef.current || showInstantLoginScreen) return;
+    let cancelled = false;
+    getVitalizationAnchor().then((anchor) => {
+      if (cancelled) return;
+      if (anchor.isVitalized && anchor.citizenHash && (anchor.phone ?? '').trim() === phone) {
+        setInstantLoginAnchor(anchor);
+        setShowInstantLoginScreen(true);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [identityAnchor?.phone, showInstantLoginScreen]);
+
+  /** Sub device: when phone is entered on a different device, show face-verify screen. Only same face can request access; different face never gains access. */
+  const [showSubDeviceFaceVerify, setShowSubDeviceFaceVerify] = useState(false);
+  const [subDeviceFaceError, setSubDeviceFaceError] = useState<string | null>(null);
+  const subDeviceDetectedRef = useRef<string | null>(null);
+  useEffect(() => {
+    const phone = identityAnchor?.phone?.trim();
+    if (!phone || showInstantLoginScreen || showAwaitingLoginApproval || loginRequestId || showSubDeviceFaceVerify) return;
+    if (subDeviceDetectedRef.current === phone) return;
+    let cancelled = false;
+    isSubDevice(phone).then((sub) => {
+      if (cancelled) return;
+      if (sub) {
+        subDeviceDetectedRef.current = phone;
+        setSubDeviceFaceError(null);
+        setShowSubDeviceFaceVerify(true);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [identityAnchor?.phone, showInstantLoginScreen, showAwaitingLoginApproval, loginRequestId, showSubDeviceFaceVerify]);
 
   const handleInstantLoginFaceScan = useCallback(async () => {
     const phone = instantLoginAnchor?.phone ?? getIdentityAnchorPhone();
@@ -664,6 +699,9 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
             if (!rootResult.ok) {
               console.warn('Sovereign root (Merkle) save failed:', rootResult.error);
             }
+            // Confirm to this device: phone + face + palm saved so site can open when phone is entered or camera sees face/palm.
+            void setVitalizationAnchor(faceHash, phone, palmHash);
+            void anchorIdentityToDevice(faceHash, phone);
           }
         }
       } catch (_) {
@@ -698,6 +736,9 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
           if (!rootResult.ok) {
             console.warn('Sovereign root (Merkle) save failed:', rootResult.error);
           }
+          // Confirm to this device: phone + face + palm so site opens when phone is entered or camera sees face/palm.
+          void setVitalizationAnchor(faceHash, phone, palmHash);
+          void anchorIdentityToDevice(faceHash, phone);
         }
         // After successful vitalization: save passkey for the site to this device (no prompt before vitalization).
         try {
@@ -873,8 +914,9 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     setSessionIdentity(identityAnchor.phone);
     const stored = await getStoredBiometricAnchors(identityAnchor.phone);
     const faceHash = getFaceHashFromSession(identityAnchor.phone) ?? (stored.ok ? (stored.anchors.face_hash?.trim() ?? null) : null);
+    const palmHash = stored.ok ? (stored.anchors.palm_hash?.trim() ?? null) : null;
     if (faceHash) {
-      void setVitalizationAnchor(faceHash, identityAnchor.phone);
+      void setVitalizationAnchor(faceHash, identityAnchor.phone, palmHash ?? undefined);
       void anchorIdentityToDevice(faceHash, identityAnchor.phone);
     }
     await logGuestAccessIfNeeded();
@@ -1612,6 +1654,60 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     }
   }, [identityAnchor]);
 
+  /** Sub device: verify face with backend; only same face can create login request. Different face = access denied. */
+  const [subDeviceVerifyLoading, setSubDeviceVerifyLoading] = useState(false);
+  const handleSubDeviceVerifyFace = useCallback(async () => {
+    if (!identityAnchor?.phone) return;
+    setSubDeviceFaceError(null);
+    setSubDeviceVerifyLoading(true);
+    try {
+      const assertion = await getAssertion();
+      if (!assertion?.credential) {
+        setSubDeviceFaceError('Face scan cancelled or unavailable. Try again.');
+        return;
+      }
+      const cred = assertion.credential;
+      const credentialForHash = {
+        id: cred.id,
+        rawId: cred.rawId,
+        response: {
+          clientDataJSON: cred.response.clientDataJSON,
+          authenticatorData: cred.response.authenticatorData,
+        },
+      };
+      const liveHash = await deriveFaceHashFromCredential(credentialForHash);
+      if (!liveHash?.trim()) {
+        setSubDeviceFaceError('Could not verify face. Try again.');
+        return;
+      }
+      const deviceInfoObj = getCurrentDeviceInfo();
+      const compositeDeviceId = await getCompositeDeviceFingerprint();
+      const deviceInfo: Record<string, unknown> = {
+        userAgent: navigator.userAgent,
+        platform: navigator.platform,
+        laptop_device_id: compositeDeviceId,
+        laptop_device_name: deviceInfoObj.deviceName ?? 'New device',
+      };
+      const res = await verifyFaceAndCreateLoginRequest(
+        identityAnchor.phone,
+        liveHash.trim(),
+        identityAnchor.name ?? 'Sovereign',
+        deviceInfo
+      );
+      if (res.ok) {
+        setLoginRequestId(res.requestId);
+        setShowAwaitingLoginApproval(true);
+        setShowSubDeviceFaceVerify(false);
+      } else {
+        setSubDeviceFaceError(res.error ?? 'Access denied. This number is linked to another identity.');
+      }
+    } catch (e) {
+      setSubDeviceFaceError(e instanceof Error ? e.message : 'Face verification failed. Try again.');
+    } finally {
+      setSubDeviceVerifyLoading(false);
+    }
+  }, [identityAnchor]);
+
   /** Add this device by requesting approval from primary (phone). Creates vitalization request; mobile approves and laptop is added to authorized_devices. */
   const handleRequestAddFromPhone = async () => {
     if (!identityAnchor) return;
@@ -1984,8 +2080,11 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
             <p className="text-lg font-bold mb-2" style={{ color: '#D4AF37' }}>
               Welcome back
             </p>
-            <p className="text-sm text-[#a0a0a5] mb-6">
+            <p className="text-sm text-[#a0a0a5] mb-2">
               Scan your face to enter. No registration needed.
+            </p>
+            <p className="text-xs text-[#6b6b70] mb-6">
+              This device is linked to your phone, face, and palm. Confirmed by your phone — opens automatically when you verify.
             </p>
             {instantLoginError && (
               <p className="text-sm text-red-400 mb-4" role="alert">
@@ -2132,6 +2231,67 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
           loading={newDeviceMigrationScanning}
           error={newDeviceMigrationError}
         />
+      </div>
+    );
+  }
+
+  // Sub device: must verify face before requesting access. Only same face gets request; different face = never access.
+  if (showSubDeviceFaceVerify && identityAnchor) {
+    return (
+      <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center p-4">
+        <div
+          className="absolute inset-0 opacity-20 pointer-events-none"
+          style={{ background: 'radial-gradient(circle at center, rgba(212, 175, 55, 0.2) 0%, rgba(5, 5, 5, 0) 70%)' }}
+          aria-hidden
+        />
+        <div
+          className="relative z-10 rounded-2xl border-2 p-8 max-w-md w-full text-center"
+          style={{
+            background: 'linear-gradient(180deg, rgba(30, 28, 22, 0.98) 0%, rgba(15, 14, 10, 0.99) 100%)',
+            borderColor: 'rgba(212, 175, 55, 0.5)',
+          }}
+        >
+          <p className="text-lg font-bold mb-2" style={{ color: '#D4AF37' }}>
+            This number is linked to your main device
+          </p>
+          <p className="text-sm text-[#a0a0a5] mb-4">
+            Only your face can request access. Verify your face to send an approval request to your main device. A different face will never gain access.
+          </p>
+          {subDeviceFaceError && (
+            <p className="text-sm text-red-400 mb-4" role="alert">
+              {subDeviceFaceError}
+            </p>
+          )}
+          <div className="flex flex-col gap-3">
+            <button
+              type="button"
+              onClick={handleSubDeviceVerifyFace}
+              disabled={subDeviceVerifyLoading}
+              className="w-full py-4 rounded-xl font-bold uppercase tracking-wider disabled:opacity-70 flex items-center justify-center gap-2"
+              style={{
+                background: 'linear-gradient(135deg, #D4AF37 0%, #C9A227 100%)',
+                color: '#0d0d0f',
+                boxShadow: '0 0 20px rgba(212, 175, 55, 0.4)',
+              }}
+            >
+              {subDeviceVerifyLoading ? (
+                <>
+                  <span className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                  Verifying…
+                </>
+              ) : (
+                'Verify face to request access'
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setShowSubDeviceFaceVerify(false); setSubDeviceFaceError(null); subDeviceDetectedRef.current = null; }}
+              className="w-full py-3 rounded-xl border border-[#2a2a2e] text-[#a0a0a5] text-sm hover:bg-[#16161a]"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
