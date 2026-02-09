@@ -35,6 +35,7 @@ export const ROUTES = {
   DASHBOARD: '/dashboard',
   VITALIZATION: '/vitalization',
   VITALIZATION_GPS_MANUAL_SETUP: '/vitalization/gps-manual-setup',
+  VITALIZATION_SHARE_LOCATION: '/vitalization/share-location',
   VITALIZATION_MASTER_KEY: '/vitalization/master-key',
   VITALIZATION_RESTORE_IDENTITY: '/vitalization/restore-identity',
 } as const;

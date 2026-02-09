@@ -438,6 +438,16 @@ export function setPillarLocationFromManualEntry(identityAnchor: string, _city: 
   }
 }
 
+/** Persist pillar location from live GPS/Google location so dashboard and guards see 4/4. Call from Share Live Location page. */
+export function setPillarLocationFromLiveCoords(identityAnchor: string, latitude: number, longitude: number): void {
+  const locKey = locationKey(identityAnchor);
+  const locTsKey = locationTsKey(identityAnchor);
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem(locKey, JSON.stringify({ latitude, longitude }));
+    localStorage.setItem(locTsKey, String(Date.now()));
+  }
+}
+
 export type LocationResult = {
   success: boolean;
   coords?: { latitude: number; longitude: number };

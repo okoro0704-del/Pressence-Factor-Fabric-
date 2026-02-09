@@ -1,18 +1,25 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
+import { ROUTES } from '@/lib/constants';
 
 interface ManualLocationInputScreenProps {
   onProceed: (city: string, country: string) => void;
   onCancel: () => void;
   /** Button label when location is confirmed (e.g. "Complete" for one-way ticket to dashboard). */
   submitLabel?: string;
+  /** When true (e.g. on GPS manual setup page), show "Share live location" link. */
+  showShareLiveLocation?: boolean;
 }
+
+const GOLD = '#D4AF37';
 
 export function ManualLocationInputScreen({
   onProceed,
   onCancel,
   submitLabel = 'Proceed',
+  showShareLiveLocation = false,
 }: ManualLocationInputScreenProps) {
   const [city, setCity] = useState('');
   const [country, setCountry] = useState('');
@@ -38,11 +45,27 @@ export function ManualLocationInputScreen({
           borderColor: 'rgba(212, 175, 55, 0.5)',
         }}
       >
-        <p className="text-center text-lg font-bold mb-2" style={{ color: '#D4AF37' }}>
+        <p className="text-center text-lg font-bold mb-2" style={{ color: GOLD }}>
           Set up GPS to your location
         </p>
-        <p className="text-center text-sm text-[#a0a0a5] mb-6">
-          Location could not be detected. Enter your city and country to proceed.
+        <p className="text-center text-sm text-[#a0a0a5] mb-4">
+          Location could not be detected. Share live location or enter your city and country to proceed.
+        </p>
+        {showShareLiveLocation && (
+          <Link
+            href={ROUTES.VITALIZATION_SHARE_LOCATION}
+            className="block w-full py-4 rounded-xl font-bold text-base uppercase tracking-wider text-center mb-6 transition-all hover:opacity-95"
+            style={{
+              background: 'linear-gradient(135deg, #D4AF37 0%, #c9a227 100%)',
+              color: '#0d0d0f',
+              boxShadow: '0 0 24px rgba(212, 175, 55, 0.3)',
+            }}
+          >
+            Share live location
+          </Link>
+        )}
+        <p className="text-center text-xs text-[#6b6b70] mb-4">
+          {showShareLiveLocation ? 'Or enter city and country:' : 'Enter your city and country:'}
         </p>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <input

@@ -46,6 +46,7 @@ export default function GpsManualSetupPage() {
       onProceed={handleProceed}
       onCancel={handleCancel}
       submitLabel="Complete"
+      showShareLiveLocation
     />
   );
 }

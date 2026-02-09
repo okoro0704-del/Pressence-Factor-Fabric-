@@ -801,6 +801,26 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     guardianPhone?: string;
     isDependent?: boolean;
   }) => {
+    const isBeginVitalization = !payload.identity || payload.fullName === 'Citizen';
+    if (isBeginVitalization) {
+      setPillarFace(false);
+      setPillarPalm(false);
+      setPillarDevice(false);
+      setPillarLocation(false);
+      clearVerifiedPillars(payload.phoneNumber);
+      try {
+        if (typeof localStorage !== 'undefined') {
+          const keys: string[] = [];
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k?.startsWith('pff_pillar_')) keys.push(k);
+          }
+          keys.forEach((k) => localStorage.removeItem(k));
+        }
+      } catch {
+        // ignore
+      }
+    }
     const vocalExempt = payload.identity ? isVocalResonanceExempt(payload.identity) : false;
     const isMinor = payload.identity ? isIdentityMinor(payload.identity) : false;
     const anchor = {
@@ -896,6 +916,8 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
 
     setAuthStatus(AuthStatus.SCANNING);
     setResult(null);
+    setPalmPulseError(null);
+    setLedgerSyncError(false);
     setShowVerifyFromAuthorizedDevice(false);
     setShowTimeoutBypass(false);
     setShowMismatchScreen(false);
@@ -966,6 +988,8 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     }
 
     if (!resumePillars) {
+      setShowPalmPulse(false);
+      setShowSovereignPalmScan(false);
       if (ENABLE_DUAL_VITALIZATION_CAPTURE) setShowDualVitalization(true);
       else setShowArchitectVision(true);
     }
