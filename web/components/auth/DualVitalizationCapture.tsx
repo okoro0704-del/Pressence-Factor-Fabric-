@@ -372,7 +372,7 @@ export function DualVitalizationCapture({
         <video
           ref={videoRef}
           className="absolute inset-0 w-full h-full object-cover"
-          style={{ transform: 'scaleX(-1)' }}
+          style={{ transform: 'scaleX(-1) translateZ(0)', backfaceVisibility: 'hidden' }}
           playsInline
           muted
         />

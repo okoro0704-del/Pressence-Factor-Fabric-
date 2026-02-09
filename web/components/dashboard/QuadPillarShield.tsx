@@ -296,7 +296,7 @@ export function QuadPillarGrid({
             Core Mesh Active
           </p>
           <p className="relative z-10 text-center text-[#22c55e]/90 text-xs font-semibold mt-1">
-            Face · Palm · Identity Anchor verified. You may proceed. GPS optional for full Quad.
+            Face · Palm · Phone Anchor verified. You may proceed. GPS optional for full Quad.
           </p>
         </div>
       ) : null}

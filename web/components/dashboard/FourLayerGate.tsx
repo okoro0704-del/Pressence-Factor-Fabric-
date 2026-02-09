@@ -727,7 +727,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     }
   };
 
-  /** Triple-Pillar Shield labels: Sovereign Face → Sovereign Palm → Identity Anchor. Optional 4th: GPS. */
+  /** Triple-Pillar Shield labels: aligned with header (Face, Palm, Phone Anchor, GPS). */
   const getLayerName = (layer: AuthLayer) => {
     switch (layer) {
       case AuthLayer.BIOMETRIC_SIGNATURE:
@@ -737,9 +737,9 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
       case AuthLayer.VOICE_PRINT:
         return 'Sovereign Palm';
       case AuthLayer.HARDWARE_TPM:
-        return 'Identity Anchor';
+        return 'Phone Anchor';
       case AuthLayer.GENESIS_HANDSHAKE:
-        return 'Identity Anchor';
+        return 'Phone Anchor';
       case AuthLayer.GPS_LOCATION:
         return 'GPS Presence';
       default:
@@ -756,7 +756,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
       case AuthLayer.SOVEREIGN_PALM:
         return 'Align your palm in the frame...';
       case AuthLayer.HARDWARE_TPM:
-        return 'Verifying Identity Anchor (device on record)...';
+        return 'Verifying Phone Anchor (device on record)...';
       case AuthLayer.GPS_LOCATION:
         return 'Acquiring GPS Presence...';
       case AuthLayer.BIOMETRIC_SIGNATURE:
@@ -764,7 +764,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
       case AuthLayer.VOICE_PRINT:
         return 'Align your palm...';
       case AuthLayer.GENESIS_HANDSHAKE:
-        return 'Identity Anchor...';
+        return 'Phone Anchor...';
       default:
         return 'Verifying...';
     }
@@ -2194,7 +2194,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
           <p className="text-center text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: '#D4AF37' }}>Step 2 of 4</p>
           <IdentityAnchorInput
             onAnchorVerified={handleAnchorVerified}
-            title="Identity Anchor Required"
+            title="Phone Anchor Required"
             subtitle="Enter your phone number to proceed to hardware biometric scan. Verification occurs only after the scan."
           />
         </div>
@@ -2318,7 +2318,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
             <p className="text-xs mt-2">We then merge Face + Palm with Device ID and GPS to complete vitalization and mint VIDA CAP.</p>
           </div>
         )}
-        {/* Identity Anchor Display */}
+        {/* Phone Anchor Display */}
         <div
           className="rounded-lg border p-4 mb-6"
           style={{
@@ -2329,7 +2329,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-bold mb-1" style={{ color: '#6b6b70' }}>
-                Identity Anchor Locked
+                Phone Anchor Locked
               </p>
               <p className="text-sm font-bold" style={{ color: '#D4AF37' }}>
                 {identityAnchor.name}
@@ -2362,11 +2362,11 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
           <p className="text-lg text-[#6b6b70]">
             {authStatus === AuthStatus.SCANNING
               ? ENABLE_GPS_AS_FOURTH_PILLAR
-                ? 'Face → Palm → Identity Anchor → GPS (work-site). Then Clock-In.'
-                : 'Sovereign Face → Sovereign Palm → Identity Anchor (15s on mobile)'
+                ? 'Face → Palm → Phone Anchor → GPS (work-site). Then Clock-In.'
+                : 'Sovereign Face → Sovereign Palm → Phone Anchor (15s on mobile)'
               : ENABLE_GPS_AS_FOURTH_PILLAR
-              ? 'Sovereign Face · Sovereign Palm · Identity Anchor · GPS Presence'
-              : 'Sovereign Face · Sovereign Palm · Identity Anchor'}
+              ? 'Sovereign Face · Sovereign Palm · Phone Anchor · GPS Presence'
+              : 'Sovereign Face · Sovereign Palm · Phone Anchor'}
           </p>
         </div>
 

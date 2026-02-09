@@ -278,12 +278,12 @@ export function Scanner({
   const strokeOffset = circumference * (1 - progress / 100);
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black">
-      <div className="absolute inset-0 flex items-center justify-center">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black overflow-hidden">
+      <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
         <video
           ref={videoRef}
-          className="w-full h-full object-cover"
-          style={{ transform: 'scaleX(-1)' }}
+          className="absolute inset-0 w-full h-full object-cover"
+          style={{ transform: 'scaleX(-1) translateZ(0)', backfaceVisibility: 'hidden' }}
           playsInline
           muted
         />

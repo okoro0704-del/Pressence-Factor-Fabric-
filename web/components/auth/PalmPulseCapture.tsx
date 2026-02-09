@@ -282,19 +282,19 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
         paddingRight: 'env(safe-area-inset-right, 0)',
       }}
     >
-      {/* Full-screen camera — covers the whole phone */}
-      <div className="absolute inset-0">
+      {/* Full-screen camera — stable layer to prevent flicker */}
+      <div className="absolute inset-0 overflow-hidden">
         <video
           ref={videoRef}
           className="absolute inset-0 w-full h-full object-cover"
-          style={{ transform: 'scaleX(-1)' }}
+          style={{ transform: 'scaleX(-1) translateZ(0)', backfaceVisibility: 'hidden' }}
           playsInline
           muted
         />
         <canvas
           ref={canvasRef}
           className="absolute inset-0 w-full h-full object-cover pointer-events-none"
-          style={{ transform: 'scaleX(-1)' }}
+          style={{ transform: 'scaleX(-1) translateZ(0)', backfaceVisibility: 'hidden' }}
           width={640}
           height={480}
         />

@@ -98,6 +98,7 @@ export function ArchitectVisionCapture({
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const canvasSizeSetRef = useRef(false);
   const rafRef = useRef<number>(0);
   const [aiConfidence, setAiConfidence] = useState(0);
   const [liveness, setLiveness] = useState<'Scanning' | 'Detected'>('Scanning');
@@ -240,16 +241,16 @@ export function ArchitectVisionCapture({
 
       const cw = canvas.width;
       const ch = canvas.height;
-      // Flawless camera flow: show Blue AI Mesh immediately (even while camera warms). Set default size so mesh draws from first frame.
       if (cw === 0 || ch === 0) {
         canvas.width = 640;
         canvas.height = 480;
       }
 
       if (!frozen && video.readyState >= 2 && video.videoWidth > 0) {
-        if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+        if (!canvasSizeSetRef.current) {
           canvas.width = video.videoWidth;
           canvas.height = video.videoHeight;
+          canvasSizeSetRef.current = true;
         }
         ctx.drawImage(video, 0, 0);
       }
@@ -264,6 +265,7 @@ export function ArchitectVisionCapture({
     rafRef.current = requestAnimationFrame(draw);
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      canvasSizeSetRef.current = false;
     };
   }, [isOpen, meshGold, showAsFaceDetected]);
 
@@ -297,19 +299,19 @@ export function ArchitectVisionCapture({
         paddingBottom: 'env(safe-area-inset-bottom, 0)',
       }}
     >
-      {/* Full-screen camera feed — no center scan box; gold progress bar at bottom only */}
-      <div className="relative flex-1 w-full min-h-0 flex flex-col justify-end">
+      {/* Full-screen camera feed — stable layer to prevent flicker */}
+      <div className="relative flex-1 w-full min-h-0 flex flex-col justify-end overflow-hidden">
         <video
           ref={videoRef}
           className="absolute inset-0 w-full h-full object-cover"
-          style={{ transform: 'scaleX(-1)' }}
+          style={{ transform: 'scaleX(-1) translateZ(0)', backfaceVisibility: 'hidden' }}
           playsInline
           muted
         />
         <canvas
           ref={canvasRef}
           className="absolute inset-0 w-full h-full object-cover pointer-events-none"
-          style={{ transform: 'scaleX(-1)' }}
+          style={{ transform: 'scaleX(-1) translateZ(0)', backfaceVisibility: 'hidden' }}
         />
 
         {/* Gold progress bar at bottom only — fills as Face Pulse completes (no center scan box) */}

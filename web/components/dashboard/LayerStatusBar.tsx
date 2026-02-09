@@ -98,22 +98,22 @@ export function LayerStatusBar({
     ? (showGps ? 'QUAD ANCHOR VERIFIED' : 'TRIPLE ANCHOR VERIFIED')
     : coreMeshActive
     ? 'CORE MESH ACTIVE'
-    : `ANCHOR ${count}/${totalPillars}`;
+    : `${count}/${totalPillars} verified`;
   const subText = isVitalized
     ? '1 VIDA Unlocked'
     : allGold
     ? '1 VIDA Unlocked'
     : coreMeshActive
-    ? 'Face · Palm · Device verified (GPS optional)'
+    ? 'Face · Palm · Phone Anchor verified (GPS optional)'
     : showGps
-    ? 'Face → Palm → Device → GPS'
-    : 'Face → Palm → Device';
+    ? 'Face → Palm → Phone Anchor → GPS'
+    : 'Face → Palm → Phone Anchor';
 
   type IconProps = { size?: number; className?: string; 'aria-hidden'?: boolean };
   const icons: { key: string; verified: boolean; Icon: React.ComponentType<IconProps>; label: string }[] = [
     { key: 'face', verified: face, Icon: ScanLine as React.ComponentType<IconProps>, label: 'Face' },
     { key: 'palm', verified: palm, Icon: Hand as React.ComponentType<IconProps>, label: 'Palm' },
-    { key: 'anchor', verified: device, Icon: Smartphone as React.ComponentType<IconProps>, label: 'Anchor' },
+    { key: 'phoneAnchor', verified: device, Icon: Smartphone as React.ComponentType<IconProps>, label: 'Phone Anchor' },
     ...(showGps ? [{ key: 'gps', verified: location, Icon: MapPin as React.ComponentType<IconProps>, label: 'GPS' }] : []),
   ];
 
@@ -153,7 +153,7 @@ export function LayerStatusBar({
           <div
             className="flex items-center gap-x-1 sm:gap-x-2 shrink-0"
             role="status"
-            aria-label={showGps ? 'Security: Face, Palm, Device, GPS' : 'Security: Face, Palm, Device'}
+            aria-label={showGps ? 'Security: Face, Palm, Phone Anchor, GPS' : 'Security: Face, Palm, Phone Anchor'}
           >
             {icons.map(({ key, verified, Icon, label }) => (
               <div

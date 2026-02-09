@@ -177,11 +177,12 @@ export function SovereignPalmScan({ isOpen, onClose, onSuccess, onError }: Sover
         paddingRight: 'env(safe-area-inset-right, 0)',
       }}
     >
-      {/* Full-screen camera — covers the whole phone */}
-      <div className="absolute inset-0">
+      {/* Full-screen camera — stable layer to prevent flicker */}
+      <div className="absolute inset-0 overflow-hidden">
         <video
           ref={videoRef}
           className="absolute inset-0 w-full h-full object-cover"
+          style={{ transform: 'translateZ(0)', backfaceVisibility: 'hidden' }}
           playsInline
           muted
         />
