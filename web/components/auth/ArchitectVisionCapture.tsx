@@ -13,7 +13,12 @@ import { speakSovereignSuccess } from '@/lib/sovereignVoice';
 import { useSovereignCompanion } from '@/contexts/SovereignCompanionContext';
 import { BiometricScanProgressBar } from '@/components/dashboard/QuadPillarShield';
 import { getMediaPipeFaceMesh } from '@/lib/mediaPipeFaceMeshLoader';
-import { FACEMESH_FACE_OVAL } from '@mediapipe/face_mesh';
+
+/** MediaPipe exposes FACEMESH_FACE_OVAL via UMD global (set when face_mesh is loaded by mediaPipeFaceMeshLoader). Read from globalThis only in browser so Turbopack/SSR don't fail. */
+function getFaceOvalContour(): Array<[number, number]> | undefined {
+  if (typeof window === 'undefined') return undefined;
+  return (globalThis as unknown as { FACEMESH_FACE_OVAL?: Array<[number, number]> }).FACEMESH_FACE_OVAL;
+}
 
 const BLUE_LASER = 'rgba(59, 130, 246, 0.95)';
 const MESH_COLOR = 'rgba(212, 175, 55, 0.6)';
@@ -21,7 +26,7 @@ const MESH_SUCCESS_COLOR = '#D4AF37';
 const BLUE_MESH = 'rgba(59, 130, 246, 0.85)';
 const BLUE_MESH_DIM = 'rgba(59, 130, 246, 0.45)';
 
-/** Face mesh: draw oval contour from MediaPipe FACEMESH_FACE_OVAL (normalized 0–1). */
+/** Face mesh: draw oval contour from MediaPipe FACEMESH_FACE_OVAL (normalized 0–1). Runs only in browser. */
 function drawFaceMeshOval(
   ctx: CanvasRenderingContext2D,
   w: number,
@@ -30,14 +35,15 @@ function drawFaceMeshOval(
   gold: boolean,
   faceDetected: boolean
 ) {
-  if (!landmarks.length || !FACEMESH_FACE_OVAL?.length) return;
+  const faceOval = getFaceOvalContour();
+  if (!landmarks.length || !faceOval?.length) return;
   const stroke = gold ? MESH_SUCCESS_COLOR : faceDetected ? BLUE_MESH : BLUE_MESH_DIM;
   ctx.strokeStyle = stroke;
   ctx.lineWidth = gold ? 3 : 2;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   ctx.beginPath();
-  for (const [i, j] of FACEMESH_FACE_OVAL) {
+  for (const [i, j] of faceOval) {
     const a = landmarks[i];
     const b = landmarks[j];
     if (!a || !b) continue;
