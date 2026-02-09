@@ -14,7 +14,7 @@ const GOLD = '#D4AF37';
  */
 export default function LanguagePage() {
   const router = useRouter();
-  const { language: currentLanguage, setLanguage } = useTranslation();
+  const { language: currentLanguage, setLanguage, t } = useTranslation();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -41,10 +41,10 @@ export default function LanguagePage() {
         <div className="text-center mb-8">
           <div className="text-4xl mb-2" aria-hidden>🌐</div>
           <h1 className="text-xl font-bold uppercase tracking-wider mb-2" style={{ color: GOLD }}>
-            Choose your language
+            {t('language.chooseYourLanguage', 'Choose your language')}
           </h1>
           <p className="text-sm" style={{ color: '#6b6b70' }}>
-            The entire app will use this language. Tap one to continue to Vitalization.
+            {t('language.tapToContinue', 'The entire app will use this language. Tap one to continue to Vitalization.')}
           </p>
         </div>
 

@@ -25,6 +25,7 @@ import { resolvePhoneToIdentity } from '@/lib/phoneIdentity';
 import { isVocalResonanceExempt, isIdentityMinor, type BiometricIdentityRecord } from '@/lib/universalIdentityComparison';
 import type { LanguageCode } from '@/lib/i18n/config';
 import { getStoredLanguage } from '@/lib/i18n/config';
+import { useTranslation } from '@/lib/i18n/TranslationContext';
 import { ConfirmLanguageScreen } from '@/components/auth/ConfirmLanguageScreen';
 import { VaultDoorAnimation } from './VaultDoorAnimation';
 import { useGlobalPresenceGateway } from '@/contexts/GlobalPresenceGateway';
@@ -184,6 +185,7 @@ export interface FourLayerGateProps {
  * No access to any page without completing all 4 layers
  */
 export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = {}) {
+  const { t } = useTranslation();
   const { setVerified: setBiometricSessionVerified } = useBiometricSession();
   const [mounted, setMounted] = useState(false);
   const [authStatus, setAuthStatus] = useState<AuthStatus>(AuthStatus.IDLE);
@@ -2329,7 +2331,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-bold mb-1" style={{ color: '#6b6b70' }}>
-                Phone Anchor Locked
+                {t('vitalization.phoneAnchorLocked', 'Phone Anchor Locked')}
               </p>
               <p className="text-sm font-bold" style={{ color: '#D4AF37' }}>
                 {identityAnchor.name}
@@ -2351,7 +2353,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
 
         {/* Header — Step 3 of 4: Architect Vision (Face + Palm Scan) */}
         <div className="text-center mb-8">
-          <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: '#D4AF37' }}>Step 3 of 4 — Architect Vision (Face + Palm Scan)</p>
+          <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: '#D4AF37' }}>{t('vitalization.step3Of4', 'Step 3 of 4 — Architect Vision (Face + Palm Scan)')}</p>
           <div className="text-6xl mb-4 animate-pulse">🔐</div>
           <h1
             className={`text-4xl font-bold text-[#D4AF37] uppercase tracking-wider mb-4 ${jetbrains.className}`}

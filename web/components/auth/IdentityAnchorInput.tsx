@@ -300,7 +300,7 @@ export function IdentityAnchorInput({
             <div className="relative" ref={guardianPickerRef}>
               <button
                 type="button"
-                onClick={() => setGuardianPickerOpen((o) => !o)}
+                onClick={(e) => { e.stopPropagation(); setGuardianPickerOpen((o) => !o); }}
                 aria-label="Choose country — view all country codes"
                 aria-expanded={guardianPickerOpen}
                 className="flex items-center gap-2 px-3 py-3 border-r min-w-[140px] hover:bg-neutral-800/50 transition-colors"
@@ -318,9 +318,10 @@ export function IdentityAnchorInput({
               </button>
               {guardianPickerOpen && (
                 <div
-                  className="absolute left-0 top-full z-50 mt-1 rounded-lg border shadow-xl flex flex-col w-full min-w-[280px] max-w-[min(360px,100vw)] max-h-[400px] bg-[#0d0d0f] border-[#D4AF37]/30"
+                  className="absolute left-0 top-full z-[100] mt-1 rounded-lg border shadow-xl flex flex-col w-full min-w-[280px] max-w-[min(360px,100vw)] max-h-[400px] bg-[#0d0d0f] border-[#D4AF37]/30"
                   role="listbox"
                   aria-label="All country codes"
+                  onClick={(e) => e.stopPropagation()}
                 >
                   <div className="p-2 border-b border-[#D4AF37]/20 sticky top-0 bg-[#0d0d0f]">
                     <input
@@ -333,7 +334,7 @@ export function IdentityAnchorInput({
                     />
                     <p className="text-[10px] text-[#6b6b70] mt-1">All country codes — scroll or search to find yours.</p>
                   </div>
-                  <div className="overflow-y-auto max-h-[320px]">
+                  <div className="overflow-y-auto overflow-x-hidden min-h-[200px] max-h-[320px] flex flex-col">
                     {filterPhoneCountries(guardianCountrySearch).map((c) => (
                       <button
                         key={c.code}
@@ -450,7 +451,7 @@ export function IdentityAnchorInput({
           <div className="relative" ref={pickerRef}>
             <button
               type="button"
-              onClick={() => setPickerOpen((o) => !o)}
+              onClick={(e) => { e.stopPropagation(); setPickerOpen((o) => !o); }}
               aria-label="Choose country — view all country codes"
               aria-expanded={pickerOpen}
               className="flex items-center gap-2 px-3 py-3 border-r min-w-[140px] hover:bg-neutral-800/50 transition-colors"
@@ -468,9 +469,10 @@ export function IdentityAnchorInput({
             </button>
             {pickerOpen && (
               <div
-                className="absolute left-0 top-full z-50 mt-1 rounded-lg border shadow-xl flex flex-col w-full min-w-[280px] max-w-[min(360px,100vw)] max-h-[400px] bg-[#0d0d0f] border-[#D4AF37]/30"
+                className="absolute left-0 top-full z-[100] mt-1 rounded-lg border shadow-xl flex flex-col w-full min-w-[280px] max-w-[min(360px,100vw)] max-h-[400px] bg-[#0d0d0f] border-[#D4AF37]/30"
                 role="listbox"
                 aria-label="All country codes"
+                onClick={(e) => e.stopPropagation()}
               >
                 <div className="p-2 border-b border-[#D4AF37]/20 sticky top-0 bg-[#0d0d0f]">
                   <input
@@ -483,8 +485,8 @@ export function IdentityAnchorInput({
                   />
                   <p className="text-[10px] text-[#6b6b70] mt-1">All country codes — scroll or search to find yours.</p>
                 </div>
-                <div className="overflow-y-auto max-h-[320px]">
-                  {filterPhoneCountries(countrySearch).map((c) => (
+                <div className="overflow-y-auto overflow-x-hidden min-h-[200px] max-h-[320px] flex flex-col">
+                    {filterPhoneCountries(countrySearch).map((c) => (
                     <button
                       key={c.code}
                       type="button"

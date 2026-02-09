@@ -2,7 +2,16 @@
   "language": {
     "name": "Français",
     "code": "fr",
-    "direction": "ltr"
+    "direction": "ltr",
+    "chooseYourLanguage": "Choisissez votre langue",
+    "tapToContinue": "Toute l'application utilisera cette langue. Appuyez pour continuer vers la Vitalisation."
+  },
+  "vitalization": {
+    "checkingIdentity": "Vérification de l'identité…",
+    "phoneAnchorLocked": "Ancre téléphone verrouillée",
+    "quadPillarShield": "Bouclier à 4 piliers",
+    "triplePillarShield": "Bouclier à 3 piliers",
+    "step3Of4": "Étape 3 sur 4 — Vision de l'Architecte (Face + Paume)"
   },
   "common": {
     "loading": "Chargement...",

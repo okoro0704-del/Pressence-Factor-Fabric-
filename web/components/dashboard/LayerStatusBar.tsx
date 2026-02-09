@@ -77,11 +77,11 @@ export function LayerStatusBar({
     return null;
   }
 
-  const useProps = faceVerified !== undefined || palmVerified !== undefined || deviceVerified !== undefined;
-  const face = useProps ? (faceVerified ?? tripleAnchor.face) : tripleAnchor.face;
-  const palm = useProps ? (palmVerified ?? tripleAnchor.fingerprint) : tripleAnchor.fingerprint;
-  const device = useProps ? (deviceVerified ?? tripleAnchor.device) : tripleAnchor.device;
-  const location = useProps ? locationVerified : false;
+  const useProps = faceVerified !== undefined || palmVerified !== undefined || deviceVerified !== undefined || locationVerified !== undefined;
+  const face = faceVerified !== undefined ? faceVerified : tripleAnchor.face;
+  const palm = palmVerified !== undefined ? palmVerified : tripleAnchor.fingerprint;
+  const device = deviceVerified !== undefined ? deviceVerified : tripleAnchor.device;
+  const location = locationVerified !== undefined ? locationVerified : false;
 
   const showGps = forceShow || ENABLE_GPS_AS_FOURTH_PILLAR;
   const totalPillars = showGps ? 4 : 3;

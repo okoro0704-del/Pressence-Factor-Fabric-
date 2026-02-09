@@ -2,7 +2,16 @@
   "language": {
     "name": "English",
     "code": "en",
-    "direction": "ltr"
+    "direction": "ltr",
+    "chooseYourLanguage": "Choose your language",
+    "tapToContinue": "The entire app will use this language. Tap one to continue to Vitalization."
+  },
+  "vitalization": {
+    "checkingIdentity": "Checking identity…",
+    "phoneAnchorLocked": "Phone Anchor Locked",
+    "quadPillarShield": "Quad-Pillar Shield",
+    "triplePillarShield": "Triple-Pillar Shield",
+    "step3Of4": "Step 3 of 4 — Architect Vision (Face + Palm Scan)"
   },
   "common": {
     "loading": "Loading...",

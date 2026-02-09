@@ -6,6 +6,7 @@ import { FourLayerGate } from '@/components/dashboard/FourLayerGate';
 import { SovereignGuardRedirect } from '@/components/dashboard/SovereignGuardRedirect';
 import { getVitalizationStatus } from '@/lib/vitalizationState';
 import { ROUTES } from '@/lib/constants';
+import { useTranslation } from '@/lib/i18n/TranslationContext';
 
 /**
  * Vitalization page: full 4-pillar gate (Face, Palm, GPS, Mobile ID) with pillar boxes visible at top.
@@ -13,6 +14,7 @@ import { ROUTES } from '@/lib/constants';
  */
 export function VitalizationPageClient() {
   const router = useRouter();
+  const { t } = useTranslation();
   const [allowRegistration, setAllowRegistration] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -35,7 +37,7 @@ export function VitalizationPageClient() {
   if (allowRegistration === null) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#050505]" style={{ color: '#6b6b70' }}>
-        <p className="text-sm">Checking identity…</p>
+        <p className="text-sm">{t('vitalization.checkingIdentity', 'Checking identity…')}</p>
       </div>
     );
   }
