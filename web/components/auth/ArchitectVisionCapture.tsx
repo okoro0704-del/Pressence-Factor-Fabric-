@@ -2,10 +2,9 @@
 
 /**
  * Architect Vision — Face Pulse capture with real-time overlay.
- * - Camera at highest resolution for unique/permanent Face Hash
- * - Canvas overlay: face oval / landmark-style mesh (real mesh via MediaPipe when loaded from CDN)
+ * - MediaPipe Face Mesh: real 468-landmark face detection (AI confidence from detection).
+ * - Canvas overlay: face oval drawn from FACEMESH_FACE_OVAL when face detected.
  * - HUD: AI Confidence, Liveness, Hash Status
- * - Blue laser scan animation during processing
  * - On success: freeze frame 0.5s, mesh turns Gold
  */
 
@@ -13,27 +12,39 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { speakSovereignSuccess } from '@/lib/sovereignVoice';
 import { useSovereignCompanion } from '@/contexts/SovereignCompanionContext';
 import { BiometricScanProgressBar } from '@/components/dashboard/QuadPillarShield';
+import { getMediaPipeFaceMesh } from '@/lib/mediaPipeFaceMeshLoader';
+import { FACEMESH_FACE_OVAL } from '@mediapipe/face_mesh';
 
 const BLUE_LASER = 'rgba(59, 130, 246, 0.95)';
 const MESH_COLOR = 'rgba(212, 175, 55, 0.6)';
 const MESH_SUCCESS_COLOR = '#D4AF37';
-/** AI Mesh Overlay: blue dots always visible; brighter when face detected. */
 const BLUE_MESH = 'rgba(59, 130, 246, 0.85)';
 const BLUE_MESH_DIM = 'rgba(59, 130, 246, 0.45)';
 
-/** Face-mesh detection thresholds — reduced by 30% for standard indoor lighting (no "Increase Lighting" block). */
-const MIN_BRIGHTNESS_THRESHOLD = 70;   // was ~100; 30% lower
-const MIN_CONFIDENCE_THRESHOLD = 62;   // was ~88; 30% lower — scan proceeds even if not studio-perfect
-
-/** Architect Override: scan box overlay removed. Camera is full-screen with gold progress bar at bottom only. */
-function drawPlaceholderMesh(
-  _ctx: CanvasRenderingContext2D,
-  _w: number,
-  _h: number,
-  _gold: boolean,
-  _faceDetected: boolean
+/** Face mesh: draw oval contour from MediaPipe FACEMESH_FACE_OVAL (normalized 0–1). */
+function drawFaceMeshOval(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  landmarks: { x: number; y: number; z?: number }[],
+  gold: boolean,
+  faceDetected: boolean
 ) {
-  // No center scan box/oval — full-screen camera feed only; progress bar is in BiometricScanProgressBar at bottom.
+  if (!landmarks.length || !FACEMESH_FACE_OVAL?.length) return;
+  const stroke = gold ? MESH_SUCCESS_COLOR : faceDetected ? BLUE_MESH : BLUE_MESH_DIM;
+  ctx.strokeStyle = stroke;
+  ctx.lineWidth = gold ? 3 : 2;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  for (const [i, j] of FACEMESH_FACE_OVAL) {
+    const a = landmarks[i];
+    const b = landmarks[j];
+    if (!a || !b) continue;
+    ctx.moveTo(a.x * w, a.y * h);
+    ctx.lineTo(b.x * w, b.y * h);
+  }
+  ctx.stroke();
 }
 
 /** Bypass: when active, confidence drops to 0.3 and lighting warnings are ignored for 30s. */
@@ -98,6 +109,8 @@ export function ArchitectVisionCapture({
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const faceMeshRef = useRef<any>(null);
+  const lastFaceLandmarksRef = useRef<{ x: number; y: number; z?: number }[] | null>(null);
   const canvasSizeSetRef = useRef(false);
   const rafRef = useRef<number>(0);
   const [aiConfidence, setAiConfidence] = useState(0);
@@ -165,9 +178,12 @@ export function ArchitectVisionCapture({
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    faceMeshRef.current?.close?.().catch(() => {});
+    faceMeshRef.current = null;
+    lastFaceLandmarksRef.current = null;
   }, []);
 
-  // Initialize camera at highest resolution (runs on mount and on Retry)
+  // Initialize camera and MediaPipe Face Mesh (runs on mount and on Retry)
   useEffect(() => {
     if (!isOpen) return;
     setError(null);
@@ -179,6 +195,7 @@ export function ArchitectVisionCapture({
     setAiConfidence(0);
     setLiveness('Scanning');
     setHashStatus('Calculating...');
+    lastFaceLandmarksRef.current = null;
     stopCamera();
 
     const video = videoRef.current;
@@ -189,31 +206,67 @@ export function ArchitectVisionCapture({
       audio: false,
     };
 
-    navigator.mediaDevices
-      .getUserMedia(constraints)
-      .then((stream) => {
+    let cancelled = false;
+    Promise.all([
+      navigator.mediaDevices.getUserMedia(constraints),
+      getMediaPipeFaceMesh().catch(() => null),
+    ])
+      .then(([stream, faceMesh]) => {
+        if (cancelled) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
         streamRef.current = stream;
         video.srcObject = stream;
+        if (faceMesh) {
+          faceMeshRef.current = faceMesh;
+          faceMesh.onResults((results: { multiFaceLandmarks?: { x: number; y: number; z?: number }[][] }) => {
+            const landmarks = results.multiFaceLandmarks?.[0] ?? null;
+            lastFaceLandmarksRef.current = landmarks;
+            if (landmarks && landmarks.length > 0) {
+              setFaceDetected(true);
+              setLiveness('Detected');
+              setAiConfidence(100);
+            } else {
+              setFaceDetected(false);
+              setLiveness('Scanning');
+              setAiConfidence(0);
+            }
+          });
+        }
         video.play().then(() => setCameraStatus('ready')).catch(() => setCameraStatus('ready'));
       })
       .catch((err) => {
-        setCameraStatus('denied');
-        setError(err?.message || 'Camera access denied');
+        if (!cancelled) {
+          setCameraStatus('denied');
+          setError(err?.message || 'Camera access denied');
+        }
       });
 
-    return () => stopCamera();
+    return () => {
+      cancelled = true;
+      stopCamera();
+    };
   }, [isOpen, stopCamera, retryCount]);
 
-  // Face detection: ramp confidence; face passes when aiConfidence >= effective threshold (or bypass lowers threshold to 30%)
+  // Send video frames to MediaPipe Face Mesh
   useEffect(() => {
-    if (!isOpen) return;
-    const t = setTimeout(() => {
-      setFaceDetected(true);
-      setLiveness('Detected');
-      setAiConfidence(Math.max(MIN_CONFIDENCE_THRESHOLD, effectiveThresholdPercent));
-    }, 500);
-    return () => clearTimeout(t);
-  }, [isOpen, effectiveThresholdPercent]);
+    if (!isOpen || cameraStatus !== 'ready' || !faceMeshRef.current || !videoRef.current) return;
+    const video = videoRef.current;
+    const faceMesh = faceMeshRef.current;
+    let cancelled = false;
+    const sendFrame = () => {
+      if (cancelled || video.readyState < 2 || video.videoWidth === 0) return;
+      faceMesh.send({ image: video }).then(() => {
+        if (!cancelled) setTimeout(sendFrame, 80);
+      }).catch(() => {});
+    };
+    const t = setTimeout(sendFrame, 200);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [isOpen, cameraStatus]);
 
   // Force COMPLETE after 1.5s when Liveness is Detected and Architect bypass enabled (end Calculating loop; no wait for background handshake).
   useEffect(() => {
@@ -257,7 +310,10 @@ export function ArchitectVisionCapture({
 
       const w = canvas.width || 640;
       const h = canvas.height || 480;
-      drawPlaceholderMesh(ctx, w, h, meshGold, showAsFaceDetected);
+      const landmarks = lastFaceLandmarksRef.current;
+      if (landmarks && landmarks.length > 0) {
+        drawFaceMeshOval(ctx, w, h, landmarks, meshGold, showAsFaceDetected);
+      }
 
       if (frozen) frozenDrawnRef.current = true;
     };

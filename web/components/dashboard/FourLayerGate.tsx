@@ -83,7 +83,7 @@ import { BiometricPillar, type BiometricPillarHandle } from '@/components/auth/B
 import { AwaitingLoginApproval } from '@/components/auth/AwaitingLoginApproval';
 import { LoginQRDisplay } from '@/components/auth/LoginQRDisplay';
 import { ArchitectVisionCapture } from '@/components/auth/ArchitectVisionCapture';
-import { speakSovereignAlignmentFailed, speakDualVitalizationSuccess } from '@/lib/sovereignVoice';
+import { speakSovereignAlignmentFailed, speakVitalizationSuccess } from '@/lib/sovereignVoice';
 import { useBiometricSession } from '@/contexts/BiometricSessionContext';
 import { createLoginRequest, completeLoginBridge } from '@/lib/loginRequest';
 import { setTripleAnchorVerified } from '@/lib/tripleAnchor';
@@ -107,14 +107,10 @@ const SovereignPalmScan = dynamic(
   () => import('@/components/auth/SovereignPalmScan').then((m) => ({ default: m.SovereignPalmScan })),
   { ssr: false }
 );
-const DualVitalizationCapture = dynamic(
-  () => import('@/components/auth/DualVitalizationCapture').then((m) => ({ default: m.DualVitalizationCapture })),
-  { ssr: false }
-);
 import { DailyUnlockCelebration } from '@/components/dashboard/DailyUnlockCelebration';
 import { useSovereignCompanion } from '@/contexts/SovereignCompanionContext';
 import { IS_PUBLIC_REVEAL, isVettedUser, isArchitect } from '@/lib/publicRevealAccess';
-import { ENABLE_GPS_AS_FOURTH_PILLAR, ENABLE_DUAL_VITALIZATION_CAPTURE, ROUTES } from '@/lib/constants';
+import { ENABLE_GPS_AS_FOURTH_PILLAR, ROUTES } from '@/lib/constants';
 import { setVitalizationComplete } from '@/lib/vitalizationState';
 import { anchorIdentityToDevice } from '@/lib/sovereignSSO';
 import { recordClockIn, getLastClockInCoords } from '@/lib/workPresence';
@@ -274,8 +270,6 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
   const [lastExternalScannerSerial, setLastExternalScannerSerial] = useState<string | null>(null);
   /** Architect Vision: camera + face mesh overlay during Face Pulse; closes when face verified (gold freeze) or on cancel/fail */
   const [showArchitectVision, setShowArchitectVision] = useState(false);
-  /** Dual-Vitalization: Face Frame + Palm Frame simultaneously; replaces ArchitectVision + SovereignPalmScan when ENABLE_DUAL_VITALIZATION_CAPTURE */
-  const [showDualVitalization, setShowDualVitalization] = useState(false);
   /** When true, Architect Vision shows gold freeze then onComplete; when false/null, scanning or closed */
   const [architectVerificationSuccess, setArchitectVerificationSuccess] = useState<boolean | null>(null);
   const architectSuccessRef = useRef<{
@@ -637,11 +631,11 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
   // GPS backgrounding: start watchPosition while camera (Face/Palm scan) is active so Pillar 4 locks coords in background
   useEffect(() => {
     if (!identityAnchor?.phone || !ENABLE_GPS_AS_FOURTH_PILLAR) return;
-    const cameraActive = showArchitectVision || showSovereignPalmScan || showDualVitalization;
+    const cameraActive = showArchitectVision || showSovereignPalmScan;
     if (!cameraActive) return;
     const unwatch = startGpsWatch(identityAnchor.phone);
     return unwatch;
-  }, [showArchitectVision, showSovereignPalmScan, showDualVitalization, identityAnchor?.phone]);
+  }, [showArchitectVision, showSovereignPalmScan, identityAnchor?.phone]);
 
   /** At 75% (3/4 pillars): save hash to Supabase, then mint, then set verification status to Vitalized. Run once. */
   useEffect(() => {
@@ -998,17 +992,13 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     if (!resumePillars) {
       setShowPalmPulse(false);
       setShowSovereignPalmScan(false);
-      if (ENABLE_DUAL_VITALIZATION_CAPTURE) setShowDualVitalization(true);
-      else setShowArchitectVision(true);
+      setShowArchitectVision(true);
     }
 
     const palmPromise = identityAnchor.isMinor
       ? undefined
       : new Promise<void>((resolve) => {
-          palmResolveRef.current = () => {
-            resolve();
-            if (ENABLE_DUAL_VITALIZATION_CAPTURE) setShowDualVitalization(false);
-          };
+          palmResolveRef.current = () => resolve();
         });
     const authResult = await resolveSovereignByPresence(
       identityAnchor.phone,
@@ -1036,7 +1026,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
             setPillarFace(true);
             saveVerifiedPillar(identityAnchor.phone, 'face');
             setShowArchitectVision(false);
-            if (!identityAnchor.isMinor && !ENABLE_DUAL_VITALIZATION_CAPTURE) {
+            if (!identityAnchor.isMinor) {
               palmVitalizationFlowRef.current = true;
               setTimeout(() => setShowPalmPulse(true), 1000);
             }
@@ -1045,7 +1035,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
           if (pillar === 'palm') {
             setPillarPalm(true);
             saveVerifiedPillar(identityAnchor.phone, 'palm');
-            if (pillarFace) speakDualVitalizationSuccess();
+            if (pillarFace) speakVitalizationSuccess();
           }
           if (pillar === 'device') {
             setPillarDevice(true);
@@ -1092,12 +1082,6 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
         compositeDeviceId,
         effectiveMobile,
       };
-      if (ENABLE_DUAL_VITALIZATION_CAPTURE) {
-        // Dual-Vitalization: skip ArchitectVision gold freeze; proceed directly to Palm Pulse or dashboard
-        setShowDualVitalization(false);
-        await handleArchitectVisionComplete();
-        return;
-      }
       if (ENABLE_GPS_AS_FOURTH_PILLAR) {
         // GPS was skipped during scan; try once now. Only show "Set up GPS" page if it fails.
         const locationResult = await verifyLocation('NG', identityAnchor.phone);
@@ -2279,7 +2263,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     );
   }
 
-  // Step 4 & 5 of 5: Architect Vision (Face + Palm) → Vitalization Complete / Dashboard — mobile-first: same center card on laptop
+  // Step 4 & 5 of 5: Face (Architect Vision) then Palm → Vitalization Complete / Dashboard — mobile-first: same center card on laptop
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -2350,7 +2334,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
           <div className="text-sm text-center mb-4 px-4 space-y-1" style={{ color: '#a0a0a5' }}>
             <p><strong className="text-[#D4AF37]">Step 1 — Face:</strong> Complete face verification first.</p>
             <p><strong className="text-[#D4AF37]">Step 2 — Palm:</strong> Then show your palm (required; you must complete both).</p>
-            <p className="text-xs mt-2">We then merge Face + Palm with Device ID and GPS to complete vitalization and mint VIDA CAP.</p>
+            <p className="text-xs mt-2">Face scan first, then palm scan. We merge these with Device ID and GPS to complete vitalization and mint VIDA CAP.</p>
           </div>
         )}
         {/* Phone Anchor Display */}
@@ -2384,9 +2368,9 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
           </div>
         </div>
 
-        {/* Header — Step 3 of 4: Architect Vision (Face + Palm Scan) */}
+        {/* Header — Step 3 of 4: Face then Palm (AI face mesh, then palm verification) */}
         <div className="text-center mb-8">
-          <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: '#D4AF37' }}>{t('vitalization.step3Of4', 'Step 3 of 4 — Architect Vision (Face + Palm Scan)')}</p>
+          <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: '#D4AF37' }}>{t('vitalization.step3Of4', 'Step 3 of 4 — Face Scan, then Palm Scan')}</p>
           <div className="text-6xl mb-4 animate-pulse">🔐</div>
           <h1
             className={`text-4xl font-bold text-[#D4AF37] uppercase tracking-wider mb-4 ${jetbrains.className}`}
@@ -2710,26 +2694,9 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
         />
       )}
 
-      {/* Dual-Vitalization: Face Frame + Palm Frame simultaneously; replaces ArchitectVision + SovereignPalmScan */}
-      {showDualVitalization && identityAnchor && (
-        <DualVitalizationCapture
-          isOpen={showDualVitalization}
-          identityAnchorPhone={identityAnchor.phone}
-          onClose={() => {
-            setShowDualVitalization(false);
-            setAuthStatus(AuthStatus.IDLE);
-          }}
-          onSuccess={() => {
-            palmResolveRef.current?.();
-            palmResolveRef.current = null;
-            setShowDualVitalization(false);
-          }}
-        />
-      )}
-
-      {/* Architect Vision: Face Pulse camera + face mesh overlay, HUD, blue laser, gold freeze on success */}
+      {/* Vitalization: Face first (MediaPipe Face Mesh), then Palm (MediaPipe Hands + NIR). */}
       <ArchitectVisionCapture
-        isOpen={showArchitectVision && !ENABLE_DUAL_VITALIZATION_CAPTURE}
+        isOpen={showArchitectVision}
         onClose={() => {
           setShowArchitectVision(false);
           setArchitectVerificationSuccess(null);
@@ -2746,8 +2713,8 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
         forceCompleteAfterLivenessMs={1500}
       />
 
-      {/* Triple-Pillar Pillar 2: Sovereign Palm Scan — front camera + palm overlay; resolves palmVerificationPromise on success (skipped when Dual-Vitalization) */}
-      {showSovereignPalmScan && !ENABLE_DUAL_VITALIZATION_CAPTURE && (
+      {/* Sovereign Palm Scan — front camera + palm overlay; resolves palmVerificationPromise on success */}
+      {showSovereignPalmScan && (
         <SovereignPalmScan
           isOpen={showSovereignPalmScan}
           onClose={() => setShowSovereignPalmScan(false)}

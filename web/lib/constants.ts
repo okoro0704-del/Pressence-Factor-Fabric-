@@ -27,8 +27,7 @@ export const QUAD_PILLAR_DEFINITIONS = [
 /** One-sentence confirmation when each pillar clears (for brevity) */
 export const PILLAR_CONFIRMATIONS = QUAD_PILLAR_DEFINITIONS.map((p) => p.confirm);
 
-/** When true, use DualVitalizationCapture (Face + Palm simultaneously). When false, Face first then Palm (sequential); palm is required after face. */
-export const ENABLE_DUAL_VITALIZATION_CAPTURE = false;
+/** Vitalization is always Face first (MediaPipe Face Mesh), then Palm (MediaPipe Hands + NIR). No side-by-side capture. */
 
 /** Verified routes for Quad-Pillar / Vitalization flow. Use these constants to avoid 404s. */
 export const ROUTES = {

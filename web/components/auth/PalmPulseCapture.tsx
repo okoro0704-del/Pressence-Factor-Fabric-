@@ -2,26 +2,34 @@
 
 /**
  * Palm Pulse — Contactless palm verification (replaces fingerprint for Daily Ritual).
- * MediaPipe Hands: detect palm; scan area circle; when palm in circle show "Scanning Veins..."
- * with green animated lines (Palm-Pay style). Capture palm geometry → palm_hash.
+ * - Scanning UI aligned with face (progress bar, HUD-style labels).
+ * - On success: freeze-frame "photo" of scanned palm, approval message, Proceed to next page.
  */
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { palmGeometryDescriptor, palmDescriptorToHash } from '@/lib/palmGeometry';
+import { getMediaPipeHands } from '@/lib/mediaPipeHandsLoader';
+import { palmGeometryDescriptor } from '@/lib/palmGeometry';
+import {
+  extractVascularDescriptor,
+  reflectanceCheck,
+  pulseFromTimeSeries,
+  vascularHash256,
+} from '@/lib/nirPalmScan';
 import { useSovereignCompanion } from '@/contexts/SovereignCompanionContext';
+import { BiometricScanProgressBar } from '@/components/dashboard/QuadPillarShield';
 
-/** Local type for MediaPipe hand landmarks — avoids importing @mediapipe/hands at build (SSR/static export). */
 interface NormalizedLandmark {
   x: number;
   y: number;
   z?: number;
 }
 
-const SCAN_CIRCLE_RADIUS = 0.22; // normalized (0-1) radius for "palm in circle"
-const SCAN_CENTER_X = 0.5;
-const SCAN_CENTER_Y = 0.5;
-const STABLE_FRAMES_REQUIRED = 72; // ~1.2s at 60fps — AI must study every detail before success
-const VEIN_GREEN = 'rgba(34, 197, 94, 0.85)';
+const LIVENESS_DURATION_MS = 1500;
+const STABLE_FRAMES_AFTER_LIVENESS = 48;
+const PROGRESS_THROTTLE_MS = 80;
+const GOLD = '#D4AF37';
+const GOLD_RING = 'rgba(212, 175, 55, 0.9)';
+const GOLD_BG = 'rgba(212, 175, 55, 0.25)';
 
 export interface PalmPulseCaptureProps {
   isOpen: boolean;
@@ -30,7 +38,6 @@ export interface PalmPulseCaptureProps {
   onError?: (message: string) => void;
 }
 
-/** Palm center in normalized coords (wrist + middle MCP average). */
 function palmCenter(landmarks: NormalizedLandmark[]): { x: number; y: number } {
   if (landmarks.length < 10) return { x: 0.5, y: 0.5 };
   const w = landmarks[0];
@@ -38,8 +45,12 @@ function palmCenter(landmarks: NormalizedLandmark[]): { x: number; y: number } {
   return { x: (w.x + m.x) / 2, y: (w.y + m.y) / 2 };
 }
 
-function inCircle(cx: number, cy: number, x: number, y: number, r: number): boolean {
-  return Math.hypot(x - cx, y - cy) <= r;
+/** Palm radius (for ring) from center to middle fingertip. */
+function palmRadius(landmarks: NormalizedLandmark[]): number {
+  if (landmarks.length < 13) return 0.15;
+  const c = palmCenter(landmarks);
+  const mTip = landmarks[12];
+  return Math.hypot(mTip.x - c.x, mTip.y - c.y);
 }
 
 export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPulseCaptureProps) {
@@ -49,31 +60,65 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
   const streamRef = useRef<MediaStream | null>(null);
   const handsRef = useRef<any>(null);
   const rafRef = useRef<number>(0);
-  const [status, setStatus] = useState<'initializing' | 'ready' | 'scanning' | 'success' | 'denied'>('initializing');
+  const [status, setStatus] = useState<'initializing' | 'ready' | 'liveness' | 'scanning' | 'captured' | 'success' | 'denied'>('initializing');
   const [error, setError] = useState<string | null>(null);
-  const stableCountRef = useRef(0);
+  const [progressRing, setProgressRing] = useState(0);
+  const [capturedImageDataUrl, setCapturedImageDataUrl] = useState<string | null>(null);
+  const capturedHashRef = useRef<string | null>(null);
+  const pendingCaptureHashRef = useRef<string | null>(null);
   const lastLandmarksRef = useRef<NormalizedLandmark[] | null>(null);
   const capturedRef = useRef(false);
-  const [veinOffset, setVeinOffset] = useState(0);
-  const [confidenceScore, setConfidenceScore] = useState(0);
-  const confidenceStartRef = useRef<number | null>(null);
+  const stableCountRef = useRef(0);
+  const livenessStartRef = useRef<number | null>(null);
+  const livenessSamplesRef = useRef<number[]>([]);
+  const livenessPassedRef = useRef(false);
+  const reflectanceFailedRef = useRef(false);
+  const frameCountRef = useRef(0);
+  const progressRingRef = useRef(0);
+  const lastProgressUpdateRef = useRef(0);
+  const statusRef = useRef(status);
+  const onSuccessRef = useRef(onSuccess);
+  const onErrorRef = useRef(onError);
+  const isOpenRef = useRef(isOpen);
+  onSuccessRef.current = onSuccess;
+  onErrorRef.current = onError;
+  statusRef.current = status;
+  isOpenRef.current = isOpen;
 
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    handsRef.current?.close?.().catch(() => {});
     handsRef.current = null;
   }, []);
 
-  // Load MediaPipe Hands and start camera (browser-only; never run during static build)
+  const setProgressThrottled = useCallback((value: number) => {
+    progressRingRef.current = value;
+    const now = Date.now();
+    if (now - lastProgressUpdateRef.current >= PROGRESS_THROTTLE_MS || value === 0 || value === 100) {
+      lastProgressUpdateRef.current = now;
+      setProgressRing(value);
+    }
+  }, []);
+
   useEffect(() => {
     if (!isOpen || typeof window === 'undefined') return;
 
     setError(null);
     setStatus('initializing');
-    stableCountRef.current = 0;
+    setCapturedImageDataUrl(null);
+    capturedHashRef.current = null;
+    pendingCaptureHashRef.current = null;
     lastLandmarksRef.current = null;
+    capturedRef.current = false;
+    stableCountRef.current = 0;
+    livenessStartRef.current = null;
+    livenessSamplesRef.current = [];
+    livenessPassedRef.current = false;
+    reflectanceFailedRef.current = false;
+    frameCountRef.current = 0;
+    progressRingRef.current = 0;
+    lastProgressUpdateRef.current = 0;
 
     const video = videoRef.current;
     if (!video) return;
@@ -82,9 +127,12 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
 
     const init = async () => {
       try {
-        const [{ Hands }, stream] = await Promise.all([
-          import('@mediapipe/hands').then((m) => m),
-          navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }, audio: false }),
+        const [hands, stream] = await Promise.all([
+          getMediaPipeHands(),
+          navigator.mediaDevices.getUserMedia({
+            video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
+            audio: false,
+          }),
         ]);
 
         if (cancelled) {
@@ -96,15 +144,7 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
         video.srcObject = stream;
         await video.play();
 
-        const hands = new Hands({
-          locateFile: (file: string) =>
-            `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${file}`,
-        });
-
-        await hands.initialize();
-        if (cancelled) return;
         handsRef.current = hands;
-
         hands.onResults((results: { multiHandLandmarks: NormalizedLandmark[][] }) => {
           const list = results.multiHandLandmarks?.[0];
           lastLandmarksRef.current = list ?? null;
@@ -115,7 +155,7 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
         const msg = e instanceof Error ? e.message : String(e);
         setError(msg);
         setStatus('denied');
-        onError?.(msg);
+        onErrorRef.current?.(msg);
       }
     };
 
@@ -124,122 +164,209 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
       cancelled = true;
       stopCamera();
     };
-  }, [isOpen, stopCamera, onError]);
+  }, [isOpen, stopCamera]);
 
-  /** Companion Eyes: guide during Palm Scan */
   useEffect(() => {
     if (!isOpen) {
       setScanCue('');
       return;
     }
-    if (status === 'scanning') setScanCue('Hold still');
-    else if (status === 'ready') setScanCue('Hold your palm in the circle');
-    else if (status === 'success' || status === 'denied') setScanCue('');
+    if (status === 'liveness') setScanCue('Hold still — verifying liveness');
+    else if (status === 'scanning') setScanCue('Identifying markers…');
+    else if (status === 'ready') setScanCue('Show your palm');
+    else if (status === 'captured') setScanCue('Palm captured — proceed when ready');
     else setScanCue('');
   }, [isOpen, status, setScanCue]);
 
-  /** Biometric-Enhanced Liveness: Confidence Score (depth & vitality) — ramps 0→100 while scanning */
   useEffect(() => {
-    if (!isOpen || status !== 'scanning') {
-      setConfidenceScore(0);
-      confidenceStartRef.current = null;
-      return;
-    }
-    setConfidenceScore(0);
-    confidenceStartRef.current = Date.now();
-    const start = Date.now();
-    const durationMs = 1200;
-    const id = setInterval(() => {
-      const elapsed = Date.now() - start;
-      const pct = Math.min(100, Math.round((elapsed / durationMs) * 100));
-      setConfidenceScore(pct);
-      if (pct >= 100) clearInterval(id);
-    }, 50);
-    return () => clearInterval(id);
-  }, [isOpen, status]);
-
-  // Animation: vein lines + process hand
-  useEffect(() => {
-    if (!isOpen || status !== 'ready' || !videoRef.current || !canvasRef.current || !handsRef.current) return;
+    if (!isOpen) return;
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    const hands = handsRef.current;
-    if (!ctx) return;
-
-    let frameCount = 0;
+    if (!video || !canvas) return;
 
     const draw = () => {
       rafRef.current = requestAnimationFrame(draw);
-      frameCount++;
 
-      const cw = canvas.width || 640;
-      const ch = canvas.height || 480;
+      if (!isOpenRef.current) return;
+      const s = statusRef.current;
+      if (s !== 'ready' && s !== 'liveness' && s !== 'scanning') return;
+      if (!handsRef.current) return;
 
-      if (video.readyState >= 2 && video.videoWidth > 0) {
-        if (canvas.width !== video.videoWidth) {
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-        }
-        ctx.save();
-        ctx.scale(-1, 1);
-        ctx.drawImage(video, -video.videoWidth, 0, video.videoWidth, video.videoHeight);
-        ctx.restore();
+      const ctx = canvas.getContext('2d');
+      const landmarks = lastLandmarksRef.current;
+
+      if (!ctx || video.readyState < 2 || video.videoWidth === 0) return;
+
+      const vw = video.videoWidth;
+      const vh = video.videoHeight;
+      if (canvas.width !== vw || canvas.height !== vh) {
+        canvas.width = vw;
+        canvas.height = vh;
       }
 
-      const w = canvas.width || 640;
-      const h = canvas.height || 480;
+      const w = canvas.width;
+      const h = canvas.height;
 
-      // Scan area circle (center)
-      const cx = w * SCAN_CENTER_X;
-      const cy = h * SCAN_CENTER_Y;
-      const r = Math.min(w, h) * SCAN_CIRCLE_RADIUS;
-      ctx.strokeStyle = 'rgba(34, 197, 94, 0.6)';
-      ctx.lineWidth = 3;
-      ctx.setLineDash([8, 8]);
-      ctx.beginPath();
-      ctx.arc(cx, cy, r, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.setLineDash([]);
+      ctx.save();
+      ctx.scale(-1, 1);
+      ctx.drawImage(video, -vw, 0, vw, vh);
+      ctx.restore();
 
-      const landmarks = lastLandmarksRef.current;
-      const inScanArea = landmarks && landmarks.length >= 21 && inCircle(SCAN_CENTER_X, SCAN_CENTER_Y, palmCenter(landmarks).x, palmCenter(landmarks).y, SCAN_CIRCLE_RADIUS);
+      const hasPalm = landmarks && landmarks.length >= 21;
+      const c = hasPalm ? palmCenter(landmarks) : { x: 0.5, y: 0.5 };
+      const cx = w * c.x;
+      const cy = h * c.y;
+      const radiusPx = hasPalm ? Math.min(w, h) * (palmRadius(landmarks) * 1.4) : Math.min(w, h) * 0.2;
+      const pendingCapture = pendingCaptureHashRef.current;
+      const currentProgress = pendingCapture ? 100 : progressRingRef.current;
 
-      if (inScanArea) {
-        setStatus((s) => (s === 'ready' ? 'scanning' : s));
-        setVeinOffset((v) => (v + 2) % 100);
+      if (!hasPalm) {
+        setProgressThrottled(0);
+        stableCountRef.current = 0;
+        if (statusRef.current === 'scanning') setStatus('liveness');
+        return;
+      }
 
-        // "Scanning Veins..." green lines across hand (horizontal moving lines)
-        ctx.strokeStyle = VEIN_GREEN;
-        ctx.lineWidth = 2;
-        for (let i = 0; i < 8; i++) {
-          const y = (h * (0.2 + (i / 8) * 0.6) + veinOffset) % (h + 40) - 20;
-          ctx.beginPath();
-          ctx.moveTo(0, y);
-          ctx.lineTo(w, y);
-          ctx.stroke();
+      if (statusRef.current === 'ready') {
+        setStatus('liveness');
+        livenessStartRef.current = Date.now();
+        livenessSamplesRef.current = [];
+      }
+
+      if (statusRef.current === 'liveness') {
+        if (reflectanceFailedRef.current) return;
+
+        const elapsed = Date.now() - (livenessStartRef.current ?? 0);
+        const sampleRegion = 8;
+        const reflectRegion = 32;
+        const sx = Math.floor(Math.max(0, Math.min(w - sampleRegion, w - cx - sampleRegion / 2)));
+        const sy = Math.floor(Math.max(0, Math.min(h - sampleRegion, cy - sampleRegion / 2)));
+        const rx = Math.floor(Math.max(0, Math.min(w - reflectRegion, w - cx - reflectRegion / 2)));
+        const ry = Math.floor(Math.max(0, Math.min(h - reflectRegion, cy - reflectRegion / 2)));
+
+        if (sx >= 0 && sy >= 0 && sx + sampleRegion <= w && sy + sampleRegion <= h) {
+          try {
+            const imageData = ctx.getImageData(sx, sy, sampleRegion, sampleRegion);
+            let sum = 0;
+            const len = imageData.data.length;
+            for (let i = 0; i < len; i += 4)
+              sum += (imageData.data[i] + imageData.data[i + 1] + imageData.data[i + 2]) / 3;
+            livenessSamplesRef.current.push(sum / (len / 4));
+          } catch {
+            livenessSamplesRef.current.push(0);
+          }
         }
 
+        frameCountRef.current++;
+        if (rx >= 0 && ry >= 0 && rx + reflectRegion <= w && ry + reflectRegion <= h && frameCountRef.current % 10 === 0) {
+          try {
+            const reflectData = ctx.getImageData(rx, ry, reflectRegion, reflectRegion);
+            const result = reflectanceCheck(reflectData);
+            if (!result.pass) {
+              reflectanceFailedRef.current = true;
+              setError(result.reason ?? 'Fake Material Detected');
+              setStatus('denied');
+              onErrorRef.current?.(result.reason ?? 'Fake Material Detected');
+              return;
+            }
+          } catch {
+            // ignore single-frame errors
+          }
+        }
+
+        const pct = Math.min(100, (elapsed / LIVENESS_DURATION_MS) * 100);
+        setProgressThrottled(Math.round(pct));
+
+        if (elapsed >= LIVENESS_DURATION_MS && !livenessPassedRef.current) {
+          const samples = livenessSamplesRef.current;
+          if (samples.length >= 5) {
+            const mean = samples.reduce((a, b) => a + b, 0) / samples.length;
+            const variance = samples.reduce((a, b) => a + (b - mean) ** 2, 0) / samples.length;
+            livenessPassedRef.current = variance > 2;
+          } else {
+            livenessPassedRef.current = true;
+          }
+          setStatus('scanning');
+          stableCountRef.current = 0;
+        }
+      }
+
+      if (hasPalm) {
+        ctx.strokeStyle = GOLD_BG;
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(cx, cy, radiusPx, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.strokeStyle = GOLD_RING;
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(cx, cy, radiusPx, -Math.PI / 2, -Math.PI / 2 + (currentProgress / 100) * Math.PI * 2);
+        ctx.stroke();
+      }
+
+      if (pendingCaptureHashRef.current) {
+        const c = canvasRef.current;
+        if (c) {
+          try {
+            setCapturedImageDataUrl(c.toDataURL('image/jpeg', 0.92));
+          } catch {
+            setCapturedImageDataUrl(null);
+          }
+        }
+        capturedHashRef.current = pendingCaptureHashRef.current;
+        pendingCaptureHashRef.current = null;
+        setStatus('captured');
+        stopCamera();
+        return;
+      }
+
+      if (statusRef.current === 'scanning') {
+        const pct = 33 + Math.min(33, (stableCountRef.current / STABLE_FRAMES_AFTER_LIVENESS) * 33);
+        setProgressThrottled(Math.round(pct));
         stableCountRef.current++;
-        if (!capturedRef.current && stableCountRef.current >= STABLE_FRAMES_REQUIRED && landmarks && landmarks.length >= 21) {
+
+        if (
+          !capturedRef.current &&
+          livenessPassedRef.current &&
+          stableCountRef.current >= STABLE_FRAMES_AFTER_LIVENESS &&
+          landmarks &&
+          landmarks.length >= 21
+        ) {
           capturedRef.current = true;
-          const desc = palmGeometryDescriptor(landmarks.map((l) => ({ x: l.x, y: l.y })));
-          if (desc.length > 0) {
-            palmDescriptorToHash(desc).then((hash) => {
-              if (hash) {
-                setStatus('success');
-                stopCamera();
-                onSuccess(hash);
-              }
-            });
+          setProgressRing(100);
+          const geometryDesc = palmGeometryDescriptor(landmarks.map((l) => ({ x: l.x, y: l.y })));
+          if (geometryDesc.length > 0) {
+            const reflectRegion = 32;
+            const rx = Math.floor(Math.max(0, Math.min(w - reflectRegion, w - cx - reflectRegion / 2)));
+            const ry = Math.floor(Math.max(0, Math.min(h - reflectRegion, cy - reflectRegion / 2)));
+            let vascularDesc;
+            try {
+              const imgData = ctx.getImageData(rx, ry, reflectRegion, reflectRegion);
+              vascularDesc = extractVascularDescriptor(imgData, reflectRegion / 2, reflectRegion / 2, 24);
+            } catch {
+              vascularDesc = {
+                meanRed: 0.5,
+                meanCyan: 0.5,
+                varianceRed: 0.01,
+                varianceCyan: 0.01,
+                redGrid: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
+              };
+            }
+            const { pulseScore } = pulseFromTimeSeries(livenessSamplesRef.current, 60);
+            vascularHash256(geometryDesc, vascularDesc, pulseScore)
+              .then((hash) => {
+                if (hash) pendingCaptureHashRef.current = hash;
+              })
+              .catch((err) => {
+                capturedRef.current = false;
+                onErrorRef.current?.(err instanceof Error ? err.message : String(err));
+              });
           } else {
             capturedRef.current = false;
           }
           stableCountRef.current = 0;
         }
-      } else {
-        stableCountRef.current = 0;
       }
     };
 
@@ -247,18 +374,15 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, [isOpen, status, veinOffset, onSuccess, stopCamera]);
+  }, [isOpen, setProgressThrottled, stopCamera]);
 
-  // Send video frames to Hands (poll every 100ms)
   useEffect(() => {
-    if (!isOpen || (status !== 'ready' && status !== 'scanning') || !handsRef.current || !videoRef.current) return;
-
+    if (!isOpen || (status !== 'ready' && status !== 'liveness' && status !== 'scanning') || !handsRef.current || !videoRef.current) return;
     const video = videoRef.current;
     const hands = handsRef.current;
     let cancelled = false;
-
     const sendFrame = () => {
-      if (cancelled || video.readyState < 2 || video.videoWidth === 0) return;
+      if (cancelled || !video || video.readyState < 2 || video.videoWidth === 0) return;
       hands.send({ image: video }).then(() => {
         if (!cancelled) setTimeout(sendFrame, 100);
       }).catch(() => {});
@@ -282,72 +406,116 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
         paddingRight: 'env(safe-area-inset-right, 0)',
       }}
     >
-      {/* Full-screen camera — stable layer to prevent flicker */}
-      <div className="absolute inset-0 overflow-hidden">
+      <div className="absolute inset-0 overflow-hidden" style={{ contain: 'layout paint' }}>
         <video
           ref={videoRef}
           className="absolute inset-0 w-full h-full object-cover"
-          style={{ transform: 'scaleX(-1) translateZ(0)', backfaceVisibility: 'hidden' }}
+          style={{ transform: 'scaleX(-1) translateZ(0)', backfaceVisibility: 'hidden', willChange: 'transform' }}
           playsInline
           muted
         />
         <canvas
           ref={canvasRef}
           className="absolute inset-0 w-full h-full object-cover pointer-events-none"
-          style={{ transform: 'scaleX(-1) translateZ(0)', backfaceVisibility: 'hidden' }}
+          style={{ transform: 'scaleX(-1) translateZ(0)', backfaceVisibility: 'hidden', willChange: 'transform' }}
           width={640}
           height={480}
         />
 
-        {status === 'scanning' && (
-          <div className="absolute bottom-6 left-0 right-0 z-20 px-4 space-y-2">
-            <p
-              className="text-center font-mono tracking-wider"
-              style={{ color: VEIN_GREEN, textShadow: '0 0 12px rgba(34,197,94,0.8)', fontSize: '0.95rem', fontWeight: 600 }}
-            >
-              Studying palm details…
-            </p>
-            <p className="text-center text-[10px] font-mono uppercase tracking-widest text-[#6b6b70]">
-              AI is analyzing every detail. Hold your palm close and steady. This page will not close until your palm has been read.
-            </p>
-            <div className="rounded-full h-2 bg-[#1a1a1e] overflow-hidden border border-[#22c55e]/40">
-              <div
-                className="h-full rounded-full transition-all duration-150 ease-out"
-                style={{
-                  width: `${confidenceScore}%`,
-                  background: 'linear-gradient(90deg, rgba(34,197,94,0.7), rgba(34,197,94,0.95))',
-                }}
-              />
-            </div>
-            <p className="text-center text-[10px] font-mono text-[#22c55e]">
-              Confidence: {confidenceScore}%
+        {/* Same scanning style as face: gold progress bar at bottom */}
+        {(status === 'ready' || status === 'liveness' || status === 'scanning') && (
+          <BiometricScanProgressBar
+            isActive={true}
+            durationMs={Math.max(4000, LIVENESS_DURATION_MS + 2500)}
+            overlay
+          />
+        )}
+
+        {/* HUD — same style as face (AI Confidence / Liveness / Hash Status) */}
+        {(status === 'ready' || status === 'liveness' || status === 'scanning') && (
+          <div
+            className="absolute top-3 left-3 right-3 z-20 flex flex-wrap gap-3 text-xs font-mono"
+            style={{ color: '#e8c547', textShadow: '0 0 8px rgba(0,0,0,0.9)' }}
+          >
+            <span>Scanning: {status === 'ready' ? 'Position palm' : status === 'liveness' ? 'Liveness…' : 'Markers…'}</span>
+            <span>Progress: {progressRing}%</span>
+          </div>
+        )}
+
+        {(status === 'liveness' || status === 'scanning') && (
+          <div className="absolute bottom-16 left-0 right-0 z-20 px-4">
+            <p className="text-center font-mono tracking-wider" style={{ color: GOLD, textShadow: `0 0 12px ${GOLD}80`, fontSize: '0.9rem', fontWeight: 600 }}>
+              {status === 'liveness' ? 'Hold still — verifying liveness' : 'Identifying palm markers…'}
             </p>
           </div>
         )}
 
-        <div className="absolute top-4 left-0 right-0 z-20 flex flex-col items-center gap-2 px-4 text-center">
-          <span className="text-sm font-bold text-[#22c55e]">
-            Face verified. Now show your palm to complete vitalization.
-          </span>
-          <span className="text-xs font-mono uppercase tracking-widest opacity-90" style={{ color: '#22c55e' }}>
-            Sovereign Palm
-          </span>
-          <p className="text-sm max-w-md" style={{ color: '#6b6b70' }}>
-            Hold your palm <strong style={{ color: '#22c55e' }}>close to the camera</strong> so the camera and AI can study every detail. Keep it in the circle. This page will not close until your palm has been read successfully.
-          </p>
-        </div>
+        {(status === 'ready' || status === 'liveness' || status === 'scanning') && (
+          <div className="absolute top-14 left-0 right-0 z-20 flex flex-col items-center gap-2 px-4 text-center">
+            <span className="text-sm font-bold text-[#22c55e]">Face verified. Now show your palm to complete vitalization.</span>
+            <span className="text-xs font-mono uppercase tracking-widest opacity-90" style={{ color: GOLD }}>Sovereign Palm</span>
+            <p className="text-sm max-w-md" style={{ color: '#6b6b70' }}>
+              Hold your palm <strong style={{ color: GOLD }}>close to the camera</strong>. A gold ring will fill as the AI verifies liveness and identifies your palm markers.
+            </p>
+          </div>
+        )}
       </div>
+
+      {/* Captured: show "photo" of scanned palm + approval + Proceed */}
+      {status === 'captured' && (
+        <div className="absolute inset-0 z-[250] flex flex-col bg-black">
+          <div className="flex-1 relative min-h-0 flex flex-col items-center justify-center p-4">
+            <p className="text-center text-sm font-mono uppercase tracking-widest mb-3" style={{ color: GOLD }}>Palm captured</p>
+            <div className="relative w-full max-w-sm rounded-2xl overflow-hidden border-2 shadow-2xl" style={{ borderColor: GOLD, boxShadow: `0 0 24px ${GOLD}40` }}>
+              {capturedImageDataUrl ? (
+                <img
+                  src={capturedImageDataUrl}
+                  alt="Your palm scan"
+                  className="w-full h-auto block"
+                  style={{ transform: 'scaleX(-1)' }}
+                />
+              ) : (
+                <div className="aspect-video bg-[#1a1a1e] flex items-center justify-center" style={{ color: GOLD }}>
+                  <span className="font-mono text-sm">Palm verified</span>
+                </div>
+              )}
+              <div className="absolute inset-0 pointer-events-none bg-[#D4AF37]/15" aria-hidden />
+            </div>
+            <p className="mt-4 text-center text-base font-semibold text-[#22c55e]">Approved</p>
+            <p className="mt-1 text-center text-xs font-mono text-[#6b6b70]">Your palm has been verified. Proceed to complete vitalization.</p>
+          </div>
+          <div className="p-4" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))' }}>
+            <button
+              type="button"
+              onClick={() => {
+                const hash = capturedHashRef.current;
+                if (hash) {
+                  capturedHashRef.current = null;
+                  setCapturedImageDataUrl(null);
+                  setStatus('success');
+                  onSuccess(hash);
+                }
+              }}
+              disabled={!capturedHashRef.current}
+              className="w-full rounded-xl py-4 text-base font-bold text-[#0d0d0f] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ background: GOLD }}
+            >
+              Proceed to next page
+            </button>
+          </div>
+        </div>
+      )}
 
       {status === 'initializing' && (
         <div className="absolute inset-0 z-[200] flex flex-col items-center justify-center bg-black/90">
-          <div className="h-8 w-8 rounded-full border-2 border-[#22c55e] border-t-transparent animate-spin mb-4" />
-          <p className="text-[#22c55e] font-mono text-sm tracking-wider">Initializing Palm Pulse…</p>
+          <div className="h-8 w-8 rounded-full border-2 border-amber-500 border-t-transparent animate-spin mb-4" />
+          <p className="text-amber-400 font-mono text-sm tracking-wider">Initializing Palm Pulse…</p>
         </div>
       )}
 
       {status === 'denied' && (
         <div className="absolute inset-0 z-[200] flex flex-col items-center justify-center bg-[#0d0d0f] px-6 text-center">
-          <p className="text-[#22c55e] text-lg font-semibold mb-2">Camera required for Palm Pulse</p>
+          <p className="text-amber-400 text-lg font-semibold mb-2">Camera required for Palm Pulse</p>
           <p className="text-[#6b6b70] text-sm mb-6 max-w-sm">{error ?? 'Camera access denied.'}</p>
           <button
             type="button"
@@ -358,8 +526,6 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
           </button>
         </div>
       )}
-
-      {/* Cancel removed during scan phase: auto-transition (UX overhaul) */}
     </div>
   );
 }

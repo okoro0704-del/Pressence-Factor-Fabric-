@@ -1,6 +1,8 @@
 /**
  * Palm geometry from MediaPipe Hands — unique descriptor for palm verification.
- * Captures distances between key landmarks and normalized ratios; hashed as palm_hash.
+ * AI detection parameters:
+ * - Dermatoglyphic mapping: Life, Head, Heart flexure-line proxies from landmarks.
+ * - Minutiae-like: ridge-intersection and delta proxies (angles, cross points).
  * 21 landmarks: 0 wrist, 1-4 thumb, 5-8 index, 9-12 middle, 13-16 ring, 17-20 pinky.
  */
 
@@ -13,6 +15,15 @@ export interface Landmark2D {
 /** Distance between two points. */
 function dist(a: Landmark2D, b: Landmark2D): number {
   return Math.hypot(b.x - a.x, b.y - a.y);
+}
+
+/** Angle at b (radians) from a->b->c. */
+function angleAt(a: Landmark2D, b: Landmark2D, c: Landmark2D): number {
+  const ux = a.x - b.x, uy = a.y - b.y;
+  const vx = c.x - b.x, vy = c.y - b.y;
+  const dot = ux * vx + uy * vy;
+  const mag = Math.hypot(ux, uy) * Math.hypot(vx, vy) || 1e-10;
+  return Math.acos(Math.max(-1, Math.min(1, dot / mag)));
 }
 
 /** Line-line intersection in 2D (parametric). Returns null if parallel. */
@@ -33,24 +44,29 @@ function lineIntersection(
 
 /**
  * Build a stable geometry descriptor from 21 hand landmarks (MediaPipe Hands order).
- * - Normalize scale by wrist-to-middle-MCP distance.
- * - Include: key distances (wrist to finger bases, between finger tips, finger lengths).
- * - Include: one intersection (e.g. line wrist–middle_tip × index_base–pinky_base) for extra uniqueness.
+ * - Scale normalized by wrist-to-middle-MCP.
+ * - Dermatoglyphic: Life (wrist–thumb path), Head (MCP line), Heart (above MCP) proxies.
+ * - Minutiae-like: angles at MCPs (ridge-intersection proxies), delta (cross point).
  * Returns array of numbers suitable for hashing.
  */
 export function palmGeometryDescriptor(landmarks: Landmark2D[]): number[] {
   if (landmarks.length < 21) return [];
 
   const w = landmarks[0];   // wrist
-  const tTip = landmarks[4];   // thumb tip
-  const iMcp = landmarks[5];  // index MCP
-  const iTip = landmarks[8];  // index tip
-  const mMcp = landmarks[9]; // middle MCP
-  const mTip = landmarks[12]; // middle tip
-  const rMcp = landmarks[13]; // ring MCP
-  const rTip = landmarks[16]; // ring tip
-  const pMcp = landmarks[17]; // pinky MCP
-  const pTip = landmarks[20]; // pinky tip
+  const tIp = landmarks[3];   // thumb IP
+  const tTip = landmarks[4];  // thumb tip
+  const iMcp = landmarks[5];
+  const iPip = landmarks[6];
+  const iTip = landmarks[8];
+  const mMcp = landmarks[9];
+  const mPip = landmarks[10];
+  const mTip = landmarks[12];
+  const rMcp = landmarks[13];
+  const rPip = landmarks[14];
+  const rTip = landmarks[16];
+  const pMcp = landmarks[17];
+  const pPip = landmarks[18];
+  const pTip = landmarks[20];
 
   const scale = dist(w, mMcp) || 1;
   const d = (a: Landmark2D, b: Landmark2D) => dist(a, b) / scale;
@@ -74,11 +90,22 @@ export function palmGeometryDescriptor(landmarks: Landmark2D[]): number[] {
   ];
 
   const cross = lineIntersection(w, mTip, iMcp, pMcp);
-  const crossNorm = cross
-    ? [cross.x / scale, cross.y / scale]
-    : [0, 0];
+  const crossNorm = cross ? [cross.x / scale, cross.y / scale] : [0, 0];
 
-  return [...distances, ...crossNorm];
+  // Dermatoglyphic: Life (wrist→thumb base path), Head (index MCP–pinky MCP), Heart (PIP line)
+  const lifeRatio = d(w, tIp) / (d(w, mMcp) || 1);
+  const headLine = dist(iMcp, pMcp) / scale;
+  const heartLine = dist(iPip, pPip) / scale;
+  const dermatoglyphic = [lifeRatio, headLine, heartLine];
+
+  // Minutiae-like: angles at index/middle/ring MCP (ridge-intersection proxies), one delta
+  const angleIndex = angleAt(w, iMcp, iTip);
+  const angleMiddle = angleAt(iMcp, mMcp, mTip);
+  const angleRing = angleAt(mMcp, rMcp, rTip);
+  const deltaNorm = cross ? (dist({ x: mMcp.x, y: mMcp.y }, cross) / scale) : 0;
+  const minutiae = [angleIndex, angleMiddle, angleRing, deltaNorm];
+
+  return [...distances, ...crossNorm, ...dermatoglyphic, ...minutiae];
 }
 
 /**

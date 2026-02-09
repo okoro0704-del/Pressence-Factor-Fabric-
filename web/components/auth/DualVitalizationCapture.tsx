@@ -224,8 +224,8 @@ export function DualVitalizationCapture({
 
     const init = async () => {
       try {
-        const [handsModule, stream] = await Promise.all([
-          import('@mediapipe/hands').then((m) => m).catch(() => null),
+        const [hands, stream] = await Promise.all([
+          import('@/lib/mediaPipeHandsLoader').then((m) => m.getMediaPipeHands()).catch(() => null),
           navigator.mediaDevices.getUserMedia({
             video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
             audio: false,
@@ -241,13 +241,7 @@ export function DualVitalizationCapture({
         await video.play();
         setStatus('ready');
 
-        if (handsModule?.Hands) {
-          const hands = new handsModule.Hands({
-            locateFile: (file: string) =>
-              `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${file}`,
-          });
-          await hands.initialize();
-          if (cancelled) return;
+        if (hands) {
           handsRef.current = hands;
           hands.onResults((results: { multiHandLandmarks: NormalizedLandmark[][] }) => {
             lastHandLandmarksRef.current = results.multiHandLandmarks?.[0] ?? null;
