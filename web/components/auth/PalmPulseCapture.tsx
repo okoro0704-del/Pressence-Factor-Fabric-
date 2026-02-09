@@ -267,9 +267,15 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
       const currentProgress = pendingCapture ? 100 : progressRingRef.current;
 
       if (!hasPalm) {
-        setProgressThrottled(0);
         stableCountRef.current = 0;
         if (statusRef.current === 'scanning') setStatus('liveness');
+        // While waiting for palm, show a slow 0–15% pulse so the bar isn’t frozen
+        if (statusRef.current === 'ready') {
+          const pulse = Math.floor(5 + 10 * Math.sin(Date.now() / 800));
+          setProgressThrottled(Math.max(0, Math.min(15, pulse)));
+        } else {
+          setProgressThrottled(0);
+        }
         return;
       }
 
@@ -473,7 +479,7 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
           height={480}
         />
 
-        {/* Progress bar driven by actual palm verification so it stays in sync with body/congratulations */}
+        {/* Progress bar driven by actual palm verification; show Failed when denied */}
         {(status === 'ready' || status === 'liveness' || status === 'scanning') && (
           <BiometricScanProgressBar
             isActive={true}
@@ -583,8 +589,11 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
 
       {status === 'denied' && (
         <div className="absolute inset-0 z-[200] flex flex-col items-center justify-center bg-[#0d0d0f] px-6 text-center">
-          <p className="text-amber-400 text-lg font-semibold mb-2">Camera required for Palm Pulse</p>
-          <p className="text-[#6b6b70] text-sm mb-6 max-w-sm">{error ?? 'Camera access denied.'}</p>
+          <p className="text-red-400 text-xl font-black uppercase tracking-wider mb-2" style={{ textShadow: '0 0 16px rgba(248,113,113,0.5)' }}>
+            Failed
+          </p>
+          <p className="text-amber-400 text-lg font-semibold mb-1">Palm verification did not succeed</p>
+          <p className="text-[#6b6b70] text-sm mb-6 max-w-sm">{error ?? 'Camera access denied or verification failed.'}</p>
           <div className="flex flex-col sm:flex-row gap-3">
             <button
               type="button"

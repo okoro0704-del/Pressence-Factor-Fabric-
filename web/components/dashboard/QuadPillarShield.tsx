@@ -87,10 +87,21 @@ export function BiometricScanProgressBar({
     };
   }, [isActive, tick]);
 
-  // Controlled mode: parent drives progress (e.g. palm scan). Bar and Verified stay in sync with actual verification.
+  // Controlled mode: parent drives progress (e.g. palm scan). When stuck at 0, show indeterminate so bar isn’t frozen.
   const isControlled = typeof controlledProgress === 'number';
-  const displayProgress = isControlled ? Math.min(100, Math.max(0, controlledProgress)) : progress;
-  const displayVerified = isControlled ? controlledProgress >= 100 : verified;
+  const [indeterminatePct, setIndeterminatePct] = useState(0);
+  useEffect(() => {
+    if (!isActive || !isControlled) return;
+    const id = setInterval(() => {
+      setIndeterminatePct((p) => (p >= 18 ? 0 : p + 2));
+    }, 120);
+    return () => clearInterval(id);
+  }, [isActive, isControlled]);
+  const controlledVal = Math.min(100, Math.max(0, controlledProgress ?? 0));
+  const displayProgress = isControlled
+    ? (controlledVal > 0 ? controlledVal : indeterminatePct)
+    : progress;
+  const displayVerified = isControlled ? controlledVal >= 100 : verified;
 
   if (!isActive && !displayVerified) return null;
 
