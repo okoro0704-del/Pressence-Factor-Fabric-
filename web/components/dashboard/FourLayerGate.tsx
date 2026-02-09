@@ -95,7 +95,7 @@ import { LEARNING_MODE_DAYS, getLearningModeMessage, LEDGER_SYNC_MESSAGE } from 
 import { getBiometricStrictness, strictnessToConfig } from '@/lib/biometricStrictness';
 import dynamic from 'next/dynamic';
 import { verifyOrEnrollPalm } from '@/lib/palmHashProfile';
-import { saveFourPillars, savePillarsAt75, getCurrentGeolocation } from '@/lib/fourPillars';
+import { saveFourPillars, savePillarsAt75, getCurrentGeolocation, generateAndSaveSovereignRoot } from '@/lib/fourPillars';
 import { getSupabase } from '@/lib/supabase';
 
 /** Load only in browser to avoid MediaPipe/SSR issues during static export. */
@@ -665,6 +665,10 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
           if (save.ok) {
             await mintFoundationSeigniorage(phone);
             setVitalizationComplete();
+            const rootResult = await generateAndSaveSovereignRoot(faceHash, palmHash, phone, deviceId, 'default');
+            if (!rootResult.ok) {
+              console.warn('Master Identity Anchor (citizen_root) save failed:', rootResult.error);
+            }
           }
         }
       } catch (_) {
@@ -694,6 +698,10 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
         const geo = await getCurrentGeolocation();
         if (faceHash && palmHash && deviceId && geo) {
           await saveFourPillars(phone, faceHash, palmHash, deviceId, geo);
+          const rootResult = await generateAndSaveSovereignRoot(faceHash, palmHash, phone, deviceId, 'default');
+          if (!rootResult.ok) {
+            console.warn('Master Identity Anchor (citizen_root) save failed:', rootResult.error);
+          }
         }
         // After successful vitalization: save passkey for the site to this device (no prompt before vitalization).
         try {
@@ -1027,9 +1035,10 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
           if (pillar === 'face') {
             setPillarFace(true);
             saveVerifiedPillar(identityAnchor.phone, 'face');
+            setShowArchitectVision(false);
             if (!identityAnchor.isMinor && !ENABLE_DUAL_VITALIZATION_CAPTURE) {
               palmVitalizationFlowRef.current = true;
-              setShowPalmPulse(true);
+              setTimeout(() => setShowPalmPulse(true), 1000);
             }
             biometricPillarRef.current?.triggerExternalCapture();
           }

@@ -2,9 +2,15 @@
  * Four Pillars: Face ID, Palm Scan, Device ID, GPS — all tied to phone (anchor).
  * Must be saved in Supabase before user can access the site.
  * Both Face and Palm scans use front camera.
+ * Master Identity Anchor: after pillars are verified, generate sovereign root and save to citizens.citizen_root.
  */
 
 import { getSupabase } from './supabase';
+import {
+  generateSovereignRoot,
+  computeIdentityAnchorHash,
+  saveCitizenRootToSupabase,
+} from './sovereignRoot';
 
 export interface GeolocationPillar {
   latitude: number;
@@ -92,6 +98,49 @@ export async function savePillarsAt75(
     return { ok: false, error: json.error ?? 'Failed to save pillars at 75%' };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'Failed to save pillars at 75%' };
+  }
+}
+
+/**
+ * Generate Master Identity Anchor from the three pillar hashes and save to citizens.citizen_root.
+ * Individual hashes are cleared from the holder object on success (security: one-way recognition).
+ * Call after pillars are saved (e.g. after savePillarsAt75 or saveFourPillars).
+ *
+ * @param faceHash - Verified Pillar 1 (Face) hash
+ * @param palmHash - Verified Pillar 2 (Palm) hash
+ * @param phone - Identity anchor phone (Pillar 3)
+ * @param deviceId - Device ID (Pillar 3)
+ * @param keyId - Citizen key_id (from vitalize/register); use 'default' if not available
+ * @returns { ok: true } or { ok: false, error: string }. On success, do not retain faceHash/palmHash in memory.
+ */
+export async function generateAndSaveSovereignRoot(
+  faceHash: string,
+  palmHash: string,
+  phone: string,
+  deviceId: string,
+  keyId: string = 'default'
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const holder = { faceHash, palmHash, identityAnchorHash: '' };
+  try {
+    const identityAnchorHash = await computeIdentityAnchorHash(phone.trim(), deviceId.trim());
+    holder.identityAnchorHash = identityAnchorHash;
+    const citizenRoot = await generateSovereignRoot(
+      holder.faceHash!,
+      holder.palmHash!,
+      holder.identityAnchorHash
+    );
+    const result = await saveCitizenRootToSupabase(
+      citizenRoot,
+      deviceId.trim(),
+      keyId.trim() || 'default',
+      holder
+    );
+    return result;
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : 'Failed to generate sovereign root',
+    };
   }
 }
 

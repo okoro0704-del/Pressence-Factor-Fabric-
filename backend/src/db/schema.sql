@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS citizens (
   attested_at       TIMESTAMPTZ,
   created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  citizen_root      TEXT,                               -- Master Identity Anchor: SHA-256(face||palm||identity_anchor); one-way recognition
   UNIQUE(device_id, key_id)
 );
 
