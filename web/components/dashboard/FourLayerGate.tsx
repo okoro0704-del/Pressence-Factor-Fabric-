@@ -94,6 +94,9 @@ import { LEARNING_MODE_DAYS, getLearningModeMessage, LEDGER_SYNC_MESSAGE } from 
 import { getBiometricStrictness, strictnessToConfig } from '@/lib/biometricStrictness';
 import dynamic from 'next/dynamic';
 import { verifyOrEnrollPalm } from '@/lib/palmHashProfile';
+import { saveFourPillars, savePillarsAt75, getCurrentGeolocation } from '@/lib/fourPillars';
+import { getSupabase } from '@/lib/supabase';
+import { VitalizationPillarBoxes } from '@/components/dashboard/VitalizationPillarBoxes';
 
 /** Load only in browser to avoid MediaPipe/SSR issues during static export. */
 const PalmPulseCapture = dynamic(
@@ -316,6 +319,8 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
   const [showManualLocationInput, setShowManualLocationInput] = useState(false);
   const gpsFailureAuthRef = useRef<{ identityAnchor: typeof identityAnchor } | null>(null);
   const gpsAutoRedirectDoneRef = useRef(false);
+  /** At 75% (3 pillars): save hash, mint, set Vitalized — run once per scan; reset on resetVerification. */
+  const at75FiredRef = useRef(false);
   /** Biometric sensitivity for Architect Vision: from profile slider; overridden by soft-start (streak < 10 or first run) to 0.3 / no brightness. */
   const [visionConfidenceThreshold, setVisionConfidenceThreshold] = useState(0.3);
   const [visionEnforceBrightness, setVisionEnforceBrightness] = useState(false);
@@ -472,6 +477,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
 
   /** Reset all Approved statuses so user must do a fresh scan every time (e.g. on exit). */
   const resetVerification = useCallback(() => {
+    at75FiredRef.current = false;
     setPillarFace(false);
     setPillarPalm(false);
     setPillarDevice(false);
@@ -604,14 +610,63 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     return unwatch;
   }, [showArchitectVision, showSovereignPalmScan, showDualVitalization, identityAnchor?.phone]);
 
-  /** Architect Override: when all 4 pillars verified, clear timers and set state before QuadPillarGrid redirects. */
-  const handleAllPillarsVerified = useCallback(() => {
+  /** At 75% (3/4 pillars): save hash to Supabase, then mint, then set verification status to Vitalized. Run once. */
+  useEffect(() => {
+    if (!identityAnchor?.phone || at75FiredRef.current) return;
+    const threePillars = pillarFace && pillarPalm && pillarDevice;
+    if (!threePillars) return;
+    at75FiredRef.current = true;
+    (async () => {
+      try {
+        const phone = identityAnchor.phone.trim();
+        const supabase = getSupabase();
+        const { data: profile } = supabase
+          ? await (supabase as any).from('user_profiles').select('face_hash, palm_hash').eq('phone_number', phone).maybeSingle()
+          : { data: null };
+        const faceHash = (profile?.face_hash ?? getFaceHashFromSession(phone) ?? '').trim();
+        const palmHash = (profile?.palm_hash ?? '').trim();
+        const deviceInfo = getCurrentDeviceInfo();
+        const deviceId = deviceInfo?.deviceId ?? '';
+        if (faceHash && palmHash && deviceId) {
+          const save = await savePillarsAt75(phone, faceHash, palmHash, deviceId);
+          if (save.ok) {
+            await mintFoundationSeigniorage(phone);
+            setVitalizationComplete();
+          }
+        }
+      } catch (_) {
+        at75FiredRef.current = false;
+      }
+    })();
+  }, [identityAnchor?.phone, pillarFace, pillarPalm, pillarDevice]);
+
+  /** Architect Override: when all 4 pillars verified, save Face+Palm+Device+GPS to Supabase then set state before QuadPillarGrid redirects. */
+  const handleAllPillarsVerified = useCallback(async () => {
     if (sessionStatusIntervalRef.current) {
       clearInterval(sessionStatusIntervalRef.current);
       sessionStatusIntervalRef.current = null;
     }
+    const phone = identityAnchor?.phone?.trim();
+    if (phone) {
+      try {
+        const supabase = getSupabase();
+        const { data: profile } = supabase
+          ? await (supabase as any).from('user_profiles').select('face_hash, palm_hash').eq('phone_number', phone).maybeSingle()
+          : { data: null };
+        const faceHash = (profile?.face_hash ?? getFaceHashFromSession(phone) ?? '').trim();
+        const palmHash = (profile?.palm_hash ?? '').trim();
+        const deviceInfo = getCurrentDeviceInfo();
+        const deviceId = deviceInfo?.deviceId ?? '';
+        const geo = await getCurrentGeolocation();
+        if (faceHash && palmHash && deviceId && geo) {
+          await saveFourPillars(phone, faceHash, palmHash, deviceId, geo);
+        }
+      } catch (_) {
+        // non-blocking; FourPillarsGuard will redirect back if not saved
+      }
+    }
     setPresenceVerified(true);
-    if (identityAnchor?.phone) setIdentityAnchorForSession(identityAnchor.phone);
+    if (phone) setIdentityAnchorForSession(phone);
     setVitalizationComplete();
   }, [identityAnchor?.phone, setPresenceVerified]);
 
@@ -2197,6 +2252,18 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
 
       {/* Main Gate Container — mobile-first: center-aligned Sovereign card; laptop matches mobile (same width, vertical card) */}
       <div className="relative z-10 w-full max-w-lg mx-auto step-transition-wrapper">
+        {/* Four boxes at top: Face, Palm, GPS, Mobile ID + vitalization bar (0–100%, green at 75%+). At 75% hash saved, minting done, status Vitalized. */}
+        {authStatus === AuthStatus.SCANNING && (
+          <div className="mb-6 pt-2">
+            <VitalizationPillarBoxes
+              faceVerified={pillarFace}
+              palmVerified={pillarPalm}
+              gpsVerified={pillarLocation}
+              mobileIdVerified={pillarDevice}
+              vitalized={pillarFace && pillarPalm && pillarDevice && pillarLocation}
+            />
+          </div>
+        )}
         {/* Identity Anchor Display */}
         <div
           className="rounded-lg border p-4 mb-6"

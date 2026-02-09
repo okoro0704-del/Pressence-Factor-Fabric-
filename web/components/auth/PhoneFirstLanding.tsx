@@ -22,6 +22,8 @@ import { getSupabase } from '@/lib/supabase';
 import { setVitalizationPhone } from '@/lib/deviceId';
 import { getPalmHash, verifyOrEnrollPalm } from '@/lib/palmHashProfile';
 import { PalmPulseCapture } from '@/components/auth/PalmPulseCapture';
+import { checkFourPillarsComplete, saveFourPillars, getCurrentGeolocation } from '@/lib/fourPillars';
+import { getCurrentDeviceInfo } from '@/lib/multiDeviceVitalization';
 import { ROUTES } from '@/lib/constants';
 
 /** Credential shape passed from getAssertion for face hash derivation */
@@ -287,11 +289,8 @@ export function PhoneFirstLanding() {
           setIsVerifying(false);
           return;
         }
-        setIdentityAnchorForSession(phone);
-        setPresenceVerified(true);
-        setSessionIdentity(phone);
-        setVitalizationComplete();
-        setTimeout(() => router.replace(ROUTES.DASHBOARD), 800);
+        setVitalizationPhone(phone);
+        router.replace(`${ROUTES.VITALIZATION}?phone=${encodeURIComponent(phone)}`);
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Biometric check failed. Try again.');
         setIsVerifying(false);
@@ -322,6 +321,33 @@ export function PhoneFirstLanding() {
     const result = await verifyOrEnrollPalm(phone, palmHash);
     if (!result.ok) {
       setError(result.error ?? 'Palm did not match. Try again.');
+      return;
+    }
+    const complete = await checkFourPillarsComplete(phone);
+    if (complete) {
+      setIdentityAnchorForSession(phone);
+      setPresenceVerified(true);
+      setSessionIdentity(phone);
+      setVitalizationComplete();
+      setTimeout(() => router.replace(ROUTES.DASHBOARD), 800);
+      return;
+    }
+    const profile = await fetchProfileFaceHash(phone);
+    const faceHash = profile?.face_hash ?? '';
+    if (!faceHash) {
+      setError('Could not load profile. Try again.');
+      return;
+    }
+    const deviceInfo = typeof window !== 'undefined' ? getCurrentDeviceInfo() : null;
+    const deviceId = deviceInfo?.deviceId ?? '';
+    const geo = await getCurrentGeolocation();
+    if (!geo) {
+      setError('GPS location is required. Enable location and try again.');
+      return;
+    }
+    const save = await saveFourPillars(phone, faceHash, palmHash, deviceId, geo);
+    if (!save.ok) {
+      setError(save.error ?? 'Could not save verification. Try again.');
       return;
     }
     setIdentityAnchorForSession(phone);
