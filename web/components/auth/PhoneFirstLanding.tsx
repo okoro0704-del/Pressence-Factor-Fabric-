@@ -189,15 +189,21 @@ export function PhoneFirstLanding() {
                   e.stopPropagation();
                   setPickerOpen((o) => !o);
                 }}
-                aria-label={`Country code ${country.dialCode}. Click to change.`}
+                aria-label={`Country code ${country.dialCode}. Click to choose country.`}
                 aria-expanded={pickerOpen}
                 aria-haspopup="listbox"
-                className="flex items-center gap-2 px-3 py-3 border-r min-w-[120px] cursor-pointer select-none hover:bg-[#D4AF37]/10 active:bg-[#D4AF37]/15 transition-colors touch-manipulation"
+                className="flex items-center gap-2 pl-3 pr-2 py-3 border-r min-w-[140px] cursor-pointer select-none hover:bg-[#D4AF37]/10 active:bg-[#D4AF37]/15 transition-colors touch-manipulation"
                 style={{ borderColor: 'rgba(212, 175, 55, 0.3)', background: '#0d0d0f', color: '#D4AF37' }}
               >
-                <span className="text-xl leading-none" aria-hidden>{country.flag}</span>
-                <span className={`text-sm font-mono ${jetbrains.className}`}>{country.dialCode}</span>
-                <span className="ml-auto text-neutral-500 text-xs" aria-hidden>▾</span>
+                <span className="text-xl leading-none shrink-0" aria-hidden>{country.flag}</span>
+                <span className={`text-sm font-mono shrink-0 ${jetbrains.className}`}>{country.dialCode}</span>
+                <span
+                  className="ml-auto flex items-center justify-center w-10 h-10 rounded-md text-[#D4AF37] hover:bg-[#D4AF37]/20 active:bg-[#D4AF37]/30 text-2xl leading-none"
+                  aria-hidden
+                  title="Choose country"
+                >
+                  ▾
+                </span>
               </button>
               {pickerOpen && (
                 <div
