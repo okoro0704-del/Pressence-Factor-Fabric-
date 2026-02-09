@@ -63,7 +63,7 @@ export function SovereignConstitution({
         CURRENT_CONSTITUTION_VERSION
       );
       if (!result.ok) {
-        setError(result.error ?? 'Biometric verification failed. Complete face or palm scan.');
+        setError(result.error ?? 'Biometric verification failed. Complete face scan and device binding.');
         return;
       }
       setBiometricVerified(true);
@@ -143,7 +143,7 @@ export function SovereignConstitution({
             </label>
           )}
           <p className="text-xs text-center" style={{ color: '#5c4d3a' }}>
-            Accept is disabled until biometric (face or palm) returns success. Your signature and device ID are stored in the legal ledger.
+            Accept is disabled until biometric (face) and device are verified. Your signature and device ID are stored in the legal ledger.
           </p>
           {error && (
             <div
@@ -176,7 +176,7 @@ export function SovereignConstitution({
               ) : (
                 <>
                   <FileSignature className="w-5 h-5" />
-                  Verify with Biometric (Face or Palm)
+                  Verify with Biometric (Face + Device)
                 </>
               )}
             </motion.button>

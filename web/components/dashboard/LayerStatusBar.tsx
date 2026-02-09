@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { JetBrains_Mono } from 'next/font/google';
-import { ScanLine, Hand, Smartphone, MapPin } from 'lucide-react';
+import { ScanLine, KeyRound, Smartphone, MapPin } from 'lucide-react';
 import { getSessionStatus, SessionStatus } from '@/lib/sessionManagement';
 import { getTripleAnchorState } from '@/lib/tripleAnchor';
 import { ENABLE_GPS_AS_FOURTH_PILLAR } from '@/lib/constants';
@@ -30,7 +30,7 @@ export interface LayerStatusBarProps {
 
 /**
  * Quad-Pillar Security Status Bar
- * Face → Palm → Device → GPS. 3/4 Priority: Core Mesh (1,2,3) turns Sovereign Green; header stays 0/4 until pillars verified.
+ * Face → Device → Phone Anchor → GPS. Identity = Face + Device; Core Mesh (1,2,3) turns Sovereign Green.
  * Real-time sync with QuadPillarShield when pillar props provided.
  */
 export function LayerStatusBar({
@@ -104,15 +104,15 @@ export function LayerStatusBar({
     : allGold
     ? '1 VIDA Unlocked'
     : coreMeshActive
-    ? 'Face · Palm · Phone Anchor verified (GPS optional)'
+    ? 'Face · Device · Phone Anchor verified (GPS optional)'
     : showGps
-    ? 'Face → Palm → Phone Anchor → GPS'
-    : 'Face → Palm → Phone Anchor';
+    ? 'Face → Device → Phone Anchor → GPS'
+    : 'Face → Device → Phone Anchor';
 
   type IconProps = { size?: number; className?: string; 'aria-hidden'?: boolean };
   const icons: { key: string; verified: boolean; Icon: React.ComponentType<IconProps>; label: string }[] = [
     { key: 'face', verified: face, Icon: ScanLine as React.ComponentType<IconProps>, label: 'Face' },
-    { key: 'palm', verified: palm, Icon: Hand as React.ComponentType<IconProps>, label: 'Palm' },
+    { key: 'device', verified: palm, Icon: KeyRound as React.ComponentType<IconProps>, label: 'Device' },
     { key: 'phoneAnchor', verified: device, Icon: Smartphone as React.ComponentType<IconProps>, label: 'Phone Anchor' },
     ...(showGps ? [{ key: 'gps', verified: location, Icon: MapPin as React.ComponentType<IconProps>, label: 'GPS' }] : []),
   ];
@@ -149,11 +149,11 @@ export function LayerStatusBar({
             </div>
           </div>
 
-          {/* Quad-Pillar icons: Face, Palm, Device, GPS — turn green when verified (sync with body). Mobile: gap-x-2, subtle scaling */}
+          {/* Quad-Pillar icons: Face, Device, Phone Anchor, GPS — turn green when verified (sync with body). */}
           <div
             className="flex items-center gap-x-1 sm:gap-x-2 shrink-0"
             role="status"
-            aria-label={showGps ? 'Security: Face, Palm, Phone Anchor, GPS' : 'Security: Face, Palm, Phone Anchor'}
+            aria-label={showGps ? 'Security: Face, Device, Phone Anchor, GPS' : 'Security: Face, Device, Phone Anchor'}
           >
             {icons.map(({ key, verified, Icon, label }) => (
               <div

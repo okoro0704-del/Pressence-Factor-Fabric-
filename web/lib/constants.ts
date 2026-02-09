@@ -1,6 +1,6 @@
 /**
  * Sovereign Pillar & feature toggles.
- * Core Triple-Pillar: Face → Sovereign Palm → Identity Anchor (Phone).
+ * Core Triple-Pillar: Face → Device (WebAuthn/Passkey) → Identity Anchor (Phone). No palm scan.
  * Quad-Pillar Shield (Ghost Economy): + GPS with work-site geofencing.
  */
 
@@ -12,14 +12,15 @@ export const WORK_SITE_RADIUS_METERS = 100;
 
 /** Pillar labels for Progress Ring and LayerStatusBar */
 export const PILLAR_LABEL_FACE = 'Sovereign Face';
-export const PILLAR_LABEL_PALM = 'Sovereign Palm';
+/** Second pillar: Device binding (WebAuthn). Legacy label kept for compatibility. */
+export const PILLAR_LABEL_PALM = 'Device';
 export const PILLAR_LABEL_IDENTITY_ANCHOR = 'Identity Anchor';
 export const PILLAR_LABEL_GPS = 'GPS Presence';
 
-/** Quad-Pillar Shield: four active sensors. Labels aligned with header (LayerStatusBar). */
+/** Quad-Pillar Shield: Face → Device → Phone Anchor → GPS. Identity = Face + Device; one face = one mint. */
 export const QUAD_PILLAR_DEFINITIONS = [
   { id: 1, label: 'Face', sensor: 'Biometric', confirm: 'I see you.' },
-  { id: 2, label: 'Palm', sensor: 'Physical Pattern', confirm: 'Your hand is true.' },
+  { id: 2, label: 'Device', sensor: 'Passkey', confirm: 'This device is bound.' },
   { id: 3, label: 'Phone Anchor', sensor: 'Hardware Anchor', confirm: 'Phone Anchor verified.' },
   { id: 4, label: 'GPS', sensor: 'Geofenced Work-Site', confirm: 'You are at your post.' },
 ] as const;
@@ -27,7 +28,7 @@ export const QUAD_PILLAR_DEFINITIONS = [
 /** One-sentence confirmation when each pillar clears (for brevity) */
 export const PILLAR_CONFIRMATIONS = QUAD_PILLAR_DEFINITIONS.map((p) => p.confirm);
 
-/** Vitalization is always Face first (MediaPipe Face Mesh), then Palm (MediaPipe Hands + NIR). No side-by-side capture. */
+/** Vitalization: Face first (MediaPipe Face Mesh), then Device binding (WebAuthn/Passkey). No palm scan; sovereign hash = Merkle(FaceHash, DeviceHash). */
 
 /** Verified routes for Quad-Pillar / Vitalization flow. Use these constants to avoid 404s. */
 export const ROUTES = {

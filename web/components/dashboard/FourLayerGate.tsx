@@ -95,21 +95,45 @@ import { LEARNING_MODE_DAYS, getLearningModeMessage, LEDGER_SYNC_MESSAGE } from 
 import { getBiometricStrictness, strictnessToConfig } from '@/lib/biometricStrictness';
 import dynamic from 'next/dynamic';
 import { verifyOrEnrollPalm } from '@/lib/palmHashProfile';
-import { resetMediaPipeHands } from '@/lib/mediaPipeHandsLoader';
-import { saveFourPillars, savePillarsAt75, getCurrentGeolocation, generateAndSaveSovereignRoot } from '@/lib/fourPillars';
+import { saveFourPillars, savePillarsAt75, getCurrentGeolocation, generateAndSaveSovereignRoot, generateAndSaveSovereignRootFaceDevice } from '@/lib/fourPillars';
 import { getSupabase } from '@/lib/supabase';
+import { createCredential, getAssertion, isWebAuthnSupported } from '@/lib/webauthn';
+import { deriveDeviceHashFromCredentialId } from '@/lib/sovereignRoot';
+import { getFaceHashFromSession } from '@/lib/biometricAnchorSync';
+import { IdentityState } from '@/lib/identityState';
 
 /**
- * Render-frame barrier + Palm reinit: after Face scan closes, wait for teardown, then one rAF, then open Palm.
- * - 200ms allows Face teardown (tracks, srcObject, Face Mesh close) to complete on mobile.
- * - resetMediaPipeHands() ensures a new Hands instance (no reuse).
- * - requestAnimationFrame ensures at least one paint cycle before Palm gets camera.
+ * Face + Device pipeline (no palm): bind WebAuthn credential and generate sovereign hash.
+ * Registration: createCredential; Authentication: getAssertion. DeviceHash = SHA-256(credentialId).
+ * Fail gracefully if WebAuthn unavailable (show error, do not proceed).
  */
-function schedulePalmAfterFace(setShowPalmPulse: (v: boolean) => void): void {
-  setTimeout(() => {
-    resetMediaPipeHands();
-    requestAnimationFrame(() => setShowPalmPulse(true));
-  }, 200);
+async function runDeviceBindingAndSovereignHash(
+  phone: string,
+  faceHash: string,
+  deviceId: string,
+  displayName: string
+): Promise<{ ok: true; deviceHash: string } | { ok: false; error: string }> {
+  if (!isWebAuthnSupported()) {
+    return { ok: false, error: 'Device binding requires WebAuthn/Passkeys. Please use a supported browser.' };
+  }
+  let credentialId: string;
+  try {
+    const existing = await getAssertion();
+    if (existing?.credential?.id) {
+      credentialId = existing.credential.id;
+    } else {
+      const created = await createCredential(phone, displayName);
+      if (!created?.id) return { ok: false, error: 'Passkey creation was cancelled or failed.' };
+      credentialId = created.id;
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false, error: msg || 'Device binding failed.' };
+  }
+  const deviceHash = await deriveDeviceHashFromCredentialId(credentialId);
+  const saved = await generateAndSaveSovereignRootFaceDevice(phone, faceHash, deviceHash, deviceId);
+  if (!saved.ok) return saved;
+  return { ok: true, deviceHash };
 }
 
 /** Load only in browser to avoid MediaPipe/SSR issues during static export. */
@@ -245,7 +269,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
   /** Debug Info: show current user UUID for manual SQL promotion */
   const [showDebugModal, setShowDebugModal] = useState(false);
   const [debugUuid, setDebugUuid] = useState<string>('');
-  /** Progress Ring: Sovereign Face → Sovereign Palm → Identity Anchor (Triple-Pillar). Optional 4th: GPS. */
+  /** Progress Ring: Sovereign Face → Device (Passkey) → Identity Anchor (Triple-Pillar). Optional 4th: GPS. */
   const [pillarFace, setPillarFace] = useState(false);
   const [pillarPalm, setPillarPalm] = useState(false);
   const [pillarDevice, setPillarDevice] = useState(false);
@@ -666,7 +690,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     return () => clearTimeout(t);
   }, [authStatus, pillarLocation, identityAnchor]);
 
-  // Auto-trigger: when face + palm + anchor verified and GPS not, redirect to GPS Manual Setup (one-way flow)
+  // Auto-trigger: when face + device + anchor verified and GPS not, redirect to GPS Manual Setup (one-way flow)
   const gpsRedirectToManualSetupDoneRef = useRef(false);
   useEffect(() => {
     if (!ENABLE_GPS_AS_FOURTH_PILLAR || pillarLocation || gpsRedirectToManualSetupDoneRef.current) return;
@@ -677,7 +701,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     }
   }, [pillarFace, pillarPalm, pillarDevice, pillarLocation, router]);
 
-  // GPS backgrounding: start watchPosition while camera (Face/Palm scan) is active so Pillar 4 locks coords in background
+  // GPS backgrounding: start watchPosition while camera (Face scan) is active so Pillar 4 locks coords in background
   useEffect(() => {
     if (!identityAnchor?.phone || !ENABLE_GPS_AS_FOURTH_PILLAR) return;
     const cameraActive = showArchitectVision || showSovereignPalmScan;
@@ -707,7 +731,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
         if (hashesValid && deviceId) {
           const save = await savePillarsAt75(phone, faceHash, palmHash, deviceId);
           if (save.ok) {
-            await mintFoundationSeigniorage(phone);
+            await mintFoundationSeigniorage(phone, { faceHash });
             setVitalizationComplete();
             const rootResult = await generateAndSaveSovereignRoot(faceHash, palmHash, phone, deviceId, 'default');
             if (!rootResult.ok) {
@@ -724,7 +748,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     })();
   }, [identityAnchor?.phone, pillarFace, pillarPalm, pillarDevice]);
 
-  /** Architect Override: when all 4 pillars verified, save Face+Palm+Device+GPS to Supabase, then save passkey to device, then set state before QuadPillarGrid redirects. */
+  /** Architect Override: when all 4 pillars verified, save Face+Device+GPS to Supabase, then save passkey to device, then set state before QuadPillarGrid redirects. */
   const handleAllPillarsVerified = useCallback(async () => {
     if (sessionStatusIntervalRef.current) {
       clearInterval(sessionStatusIntervalRef.current);
@@ -774,9 +798,8 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
       case AuthLayer.BIOMETRIC_SIGNATURE:
         return '👤';
       case AuthLayer.SOVEREIGN_PALM:
-        return '🖐️';
       case AuthLayer.VOICE_PRINT:
-        return '🔐';
+        return '🔑';
       case AuthLayer.HARDWARE_TPM:
         return '📱';
       case AuthLayer.GENESIS_HANDSHAKE:
@@ -788,15 +811,15 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     }
   };
 
-  /** Triple-Pillar Shield labels: aligned with header (Face, Palm, Phone Anchor, GPS). */
+  /** Triple-Pillar Shield labels: Face → Device → Phone Anchor → GPS. Identity = Face + Device. */
   const getLayerName = (layer: AuthLayer) => {
     switch (layer) {
       case AuthLayer.BIOMETRIC_SIGNATURE:
         return 'Sovereign Face';
       case AuthLayer.SOVEREIGN_PALM:
-        return 'Sovereign Palm';
+        return 'Device';
       case AuthLayer.VOICE_PRINT:
-        return 'Sovereign Palm';
+        return 'Device';
       case AuthLayer.HARDWARE_TPM:
         return 'Phone Anchor';
       case AuthLayer.GENESIS_HANDSHAKE:
@@ -808,14 +831,14 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     }
   };
 
-  /** Scanning-state copy for Triple-Pillar sequence; GPS >3s shows indoor mode. */
+  /** Scanning-state copy for Face → Device → Identity Anchor; GPS >3s shows indoor mode. */
   const getLayerScanningLabel = (layer: AuthLayer) => {
     if (layer === AuthLayer.GPS_LOCATION && gpsTakingLong) {
       return 'Initializing Protocol...';
     }
     switch (layer) {
       case AuthLayer.SOVEREIGN_PALM:
-        return 'Align your palm in the frame...';
+        return 'Binding this device (Passkey)...';
       case AuthLayer.HARDWARE_TPM:
         return 'Verifying Phone Anchor (device on record)...';
       case AuthLayer.GPS_LOCATION:
@@ -823,7 +846,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
       case AuthLayer.BIOMETRIC_SIGNATURE:
         return 'Resolving Sovereign Face...';
       case AuthLayer.VOICE_PRINT:
-        return 'Align your palm...';
+        return 'Binding this device...';
       case AuthLayer.GENESIS_HANDSHAKE:
         return 'Phone Anchor...';
       default:
@@ -831,7 +854,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     }
   };
 
-  /** Triple-Pillar: Face → Sovereign Palm → Identity Anchor (Phone). Optional 4th: GPS. Minors: Face + Identity Anchor. */
+  /** Face → Device → Identity Anchor (Phone). Optional 4th: GPS. Minors: Face + Identity Anchor. One face = one mint. */
   const effectiveMobile = isMobile && !hubVerification;
   const requiredLayers = identityAnchor?.isMinor
     ? [AuthLayer.BIOMETRIC_SIGNATURE, AuthLayer.HARDWARE_TPM]
@@ -904,7 +927,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
   const biometricPendingRef = useRef(false);
   const biometricPillarRef = useRef<BiometricPillarHandle>(null);
 
-  /** Triple-Pillar success: Device + GPS + Face verified (no Voice). Transition to Success/Dashboard. Mobile: skip mint when PENDING_HARDWARE. Hub: always set MINTED and mint, then redirect. */
+  /** Triple-Pillar success: Device + GPS + Face verified (no Voice). Transition to Success/Dashboard. Mobile: skip mint when PENDING_HARDWARE. Hub: always set MINTED and mint, then redirect. Mint authority = face (one face = one mint). */
   const goToDashboard = useCallback(async () => {
     if (!identityAnchor) return;
     const signed = await hasSignedConstitution(identityAnchor.phone);
@@ -912,13 +935,16 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
       setShowConstitutionGate(true);
       return;
     }
+    const stored = await getStoredBiometricAnchors(identityAnchor.phone);
+    const faceHashForMint = getFaceHashFromSession(identityAnchor.phone) ?? (stored.ok ? (stored.anchors.face_hash?.trim() ?? null) : null);
+    const mintOpts = faceHashForMint && faceHashForMint.length === 64 ? { faceHash: faceHashForMint } : undefined;
     if (hubVerification) {
       await setMintStatus(identityAnchor.phone, MINT_STATUS_MINTED);
-      await mintFoundationSeigniorage(identityAnchor.phone);
+      await mintFoundationSeigniorage(identityAnchor.phone, mintOpts);
     } else {
       const mintRes = await getMintStatus(identityAnchor.phone);
       if (!(mintRes.ok && mintRes.mint_status === MINT_STATUS_PENDING_HARDWARE)) {
-        await mintFoundationSeigniorage(identityAnchor.phone);
+        await mintFoundationSeigniorage(identityAnchor.phone, mintOpts);
       }
     }
     await ensureMintedAndBalance(identityAnchor.phone);
@@ -926,8 +952,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     ensureGenesisIfEmpty(identityAnchor.phone, identityAnchor.name).catch(() => {});
     setPresenceVerified(true);
     setSessionIdentity(identityAnchor.phone);
-    const stored = await getStoredBiometricAnchors(identityAnchor.phone);
-    const faceHash = getFaceHashFromSession(identityAnchor.phone) ?? (stored.ok ? (stored.anchors.face_hash?.trim() ?? null) : null);
+    const faceHash = faceHashForMint ?? (stored.ok ? (stored.anchors.face_hash?.trim() ?? null) : null);
     const palmHash = stored.ok ? (stored.anchors.palm_hash?.trim() ?? null) : null;
     if (faceHash) {
       void setVitalizationAnchor(faceHash, identityAnchor.phone, palmHash ?? undefined);
@@ -971,7 +996,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
       navigator.vibrate([100, 50, 100, 50, 200]);
     }
 
-    // GPS is not requested during vitalization; only if Face+Palm+Device pass and GPS fails do we show the "Set up GPS" page.
+    // GPS is not requested during vitalization; only if Face+Device pass and GPS fails do we show the "Set up GPS" page.
     const resumePillars = getVerifiedPillarsForResume(identityAnchor.phone);
 
     setAuthStatus(AuthStatus.SCANNING);
@@ -1076,7 +1101,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
         palmVerificationPromise: resumePillars ? Promise.resolve() : palmPromise,
         resumePillars123: false,
         learningMode: learningModeRef.current.active,
-        onPillarComplete: (pillar: PresencePillar) => {
+        onPillarComplete: async (pillar: PresencePillar) => {
           if (typeof console !== 'undefined' && console.log) {
             console.log(`[QuadPillar] Pillar verified: ${pillar}`);
           }
@@ -1086,7 +1111,22 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
             setShowArchitectVision(false);
             if (!identityAnchor.isMinor) {
               palmVitalizationFlowRef.current = true;
-              schedulePalmAfterFace(setShowPalmPulse);
+              // Face + Device: run device binding (no palm scan)
+              const faceHash = getFaceHashFromSession(identityAnchor.phone)?.trim() ?? '';
+              const deviceId = await getCompositeDeviceFingerprint();
+              if (faceHash && faceHash.length === 64 && deviceId) {
+                const res = await runDeviceBindingAndSovereignHash(
+                  identityAnchor.phone,
+                  faceHash,
+                  deviceId,
+                  identityAnchor.name || `PFF — ${identityAnchor.phone.slice(-4)}`
+                );
+                if (res.ok) {
+                  setPillarPalm(true);
+                  saveVerifiedPillar(identityAnchor.phone, 'palm');
+                  speakVitalizationSuccess();
+                }
+              }
             }
             biometricPillarRef.current?.triggerExternalCapture();
           }
@@ -1239,6 +1279,12 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
             await creditArchitectVidaGrant(anchor.phone);
           }
           if (mobile) await setMintStatus(anchor.phone, MINT_STATUS_PENDING_HARDWARE);
+          // Mint Vida Cap ONLY on Root Identity creation. Authority = face (one face = one mint).
+          const faceHashForMint = getFaceHashFromSession(anchor.phone)?.trim() ?? '';
+          const mintRes = await mintFoundationSeigniorage(anchor.phone, faceHashForMint.length === 64 ? { faceHash: faceHashForMint } : undefined);
+          if (!mintRes.ok && !mintRes.error?.includes('already minted')) {
+            console.warn('[FourLayerGate] Root identity mint:', mintRes.error);
+          }
           const ritual = await recordDailyScan(anchor.phone);
           if (ritual.ok && (ritual.unlockedToday || ritual.justUnlocked)) {
             setCelebrationData({ streak: ritual.streak, newSpendableVida: ritual.newSpendableVida, isDay9: ritual.justUnlocked ?? false });
@@ -1276,14 +1322,14 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     [goToDashboard, isFirstRun, setSpendableVidaAnimation]
   );
 
-  /** Dual-Pillar: Scan 1 Face Pulse (done), auto-advance to Palm after 1s. When IS_PUBLIC_REVEAL && !vetted, skip Palm. All pillars complete → dashboard without click. */
+  /** Face + Device (no palm): after face verified, bind WebAuthn and generate sovereign hash. */
   const handleArchitectVisionComplete = useCallback(async () => {
     setBiometricSessionVerified();
     setShowArchitectVision(false);
     setArchitectVerificationSuccess(null);
     const p = architectSuccessRef.current;
     if (!p) return;
-    const { authResult, identityAnchor: anchor } = p;
+    const { authResult, identityAnchor: anchor, compositeDeviceId } = p;
     if (authResult.externalScannerSerialNumber != null) {
       setLastExternalScannerSerial(authResult.externalScannerSerialNumber);
       setLastExternalFingerprintHash(authResult.externalFingerprintHash ?? null);
@@ -1296,8 +1342,30 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
       await proceedAfterSecondPillar(p);
       return;
     }
-    // Hard teardown of face scan then one frame: reinit camera + new MediaPipe Hands for palm
-    schedulePalmAfterFace(setShowPalmPulse);
+    // Device binding (WebAuthn): no palm scan
+    const faceHash = getFaceHashFromSession(anchor.phone)?.trim() ?? '';
+    if (!faceHash || faceHash.length !== 64) {
+      setPalmPulseError('Face hash not ready. Please try again.');
+      return;
+    }
+    const deviceId = compositeDeviceId ?? '';
+    const result = await runDeviceBindingAndSovereignHash(
+      anchor.phone,
+      faceHash,
+      deviceId,
+      anchor.name || `PFF — ${anchor.phone.slice(-4)}`
+    );
+    if (!result.ok) {
+      setPalmPulseError(result.error);
+      return;
+    }
+    setTripleAnchorVerified('fingerprint');
+    setPillarPalm(true);
+    palmResolveRef.current?.();
+    palmResolveRef.current = null;
+    void setVitalizationAnchor(faceHash, anchor.phone, result.deviceHash);
+    void anchorIdentityToDevice(faceHash, anchor.phone);
+    await proceedAfterSecondPillar(p);
   }, [setBiometricSessionVerified, proceedAfterSecondPillar]);
 
   const handlePalmSuccess = useCallback(
@@ -1331,10 +1399,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
         palmResolveRef.current = null;
         setPillarPalm(true);
         setShowPalmPulse(false);
-        // Trigger actual VIDA CAP minting when vitalization (face + palm + hashes) completes.
-        mintFoundationSeigniorage(identityAnchor.phone).catch((err) => {
-          console.warn('[FourLayerGate] VIDA CAP mint on palm success:', err);
-        });
+        // Legacy palm path: mint only on root identity (guard enforces single mint); prefer Face+Device flow.
       }
     },
     [proceedAfterSecondPillar, identityAnchor]
@@ -1405,6 +1470,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     }
   };
 
+  /** When primary device approves new device: link only, do NOT mint (Vida Cap once per human). */
   const handleVitalizationApproved = async () => {
     setShowAwaitingAuth(false);
     if (!identityAnchor) return;
@@ -1413,7 +1479,6 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
       setShowConstitutionGate(true);
       return;
     }
-    await mintFoundationSeigniorage(identityAnchor.phone);
     setIdentityAnchorForSession(identityAnchor.phone);
     setPresenceVerified(true);
     setSessionIdentity(identityAnchor.phone);
@@ -1525,7 +1590,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
       setShowConstitutionGate(true);
       return;
     }
-    await mintFoundationSeigniorage(identityAnchor.phone);
+    // Device linking / recovery: do NOT mint (Vida Cap only on root identity creation).
     setIdentityAnchorForSession(identityAnchor.phone);
     ensureGenesisIfEmpty(identityAnchor.phone, identityAnchor.name).catch(() => {});
     setPresenceVerified(true);
@@ -1598,7 +1663,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
         setShowConstitutionGate(true);
         return;
       }
-      await mintFoundationSeigniorage(identityAnchor.phone);
+      // New device linking: do NOT mint (Vida Cap only once per human on first device).
       setIdentityAnchorForSession(identityAnchor.phone);
       ensureGenesisIfEmpty(identityAnchor.phone, identityAnchor.name).catch(() => {});
       setPresenceVerified(true);
@@ -1852,7 +1917,9 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
       setShowConstitutionGate(true);
       return;
     }
-    await mintFoundationSeigniorage(identityAnchor.phone);
+    const storedForMint = await getStoredBiometricAnchors(identityAnchor.phone);
+    const faceHashForMint = getFaceHashFromSession(identityAnchor.phone) ?? (storedForMint.ok ? (storedForMint.anchors.face_hash?.trim() ?? null) : null);
+    await mintFoundationSeigniorage(identityAnchor.phone, faceHashForMint && faceHashForMint.length === 64 ? { faceHash: faceHashForMint } : undefined);
     setIdentityAnchorForSession(identityAnchor.phone);
     ensureGenesisIfEmpty(identityAnchor.phone, identityAnchor.name).catch(() => {});
     setPresenceVerified(true);
@@ -1870,7 +1937,9 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
       setShowConstitutionGate(true);
       return;
     }
-    await mintFoundationSeigniorage(identityAnchor.phone);
+    const storedG = await getStoredBiometricAnchors(identityAnchor.phone);
+    const faceHashG = getFaceHashFromSession(identityAnchor.phone) ?? (storedG.ok ? (storedG.anchors.face_hash?.trim() ?? null) : null);
+    await mintFoundationSeigniorage(identityAnchor.phone, faceHashG && faceHashG.length === 64 ? { faceHash: faceHashG } : undefined);
     setIdentityAnchorForSession(identityAnchor.phone);
     ensureGenesisIfEmpty(identityAnchor.phone, identityAnchor.name).catch(() => {});
     setPresenceVerified(true);
@@ -1882,7 +1951,9 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
   const handleConstitutionAccepted = async () => {
     if (!identityAnchor) return;
     setShowConstitutionGate(false);
-    await mintFoundationSeigniorage(identityAnchor.phone);
+    const storedC = await getStoredBiometricAnchors(identityAnchor.phone);
+    const faceHashC = getFaceHashFromSession(identityAnchor.phone) ?? (storedC.ok ? (storedC.anchors.face_hash?.trim() ?? null) : null);
+    await mintFoundationSeigniorage(identityAnchor.phone, faceHashC && faceHashC.length === 64 ? { faceHash: faceHashC } : undefined);
     setIdentityAnchorForSession(identityAnchor.phone);
     ensureGenesisIfEmpty(identityAnchor.phone, identityAnchor.name).catch(() => {});
     setPresenceVerified(true);
@@ -1921,7 +1992,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
             Guardian Authorization Detected. Sentinel Secure.
           </h2>
           <p className="text-sm text-[#a0a0a5] mb-6">
-            Your guardian&apos;s Sentinel is active. Sovereign Palm check bypassed. Proceeding with secure access.
+            Your guardian&apos;s Sentinel is active. Device check bypassed. Proceeding with secure access.
           </p>
           <button
             type="button"
@@ -2098,7 +2169,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
               Scan your face to enter. No registration needed.
             </p>
             <p className="text-xs text-[#6b6b70] mb-6">
-              This device is linked to your phone, face, and palm. Confirmed by your phone — opens automatically when you verify.
+              This device is linked to your phone and face. Confirmed by your phone — opens automatically when you verify.
             </p>
             {instantLoginError && (
               <p className="text-sm text-red-400 mb-4" role="alert">
@@ -2443,7 +2514,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     );
   }
 
-  // Step 4 & 5 of 5: Face (Architect Vision) then Palm → Vitalization Complete / Dashboard — mobile-first: same center card on laptop
+  // Step 4 & 5 of 5: Face (Architect Vision) then Device (Passkey) → Vitalization Complete / Dashboard — mobile-first: same center card on laptop
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -2513,8 +2584,8 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
         {identityAnchor && authStatus === AuthStatus.SCANNING && (
           <div className="text-sm text-center mb-4 px-4 space-y-1" style={{ color: '#a0a0a5' }}>
             <p><strong className="text-[#D4AF37]">Step 1 — Face:</strong> Complete face verification first.</p>
-            <p><strong className="text-[#D4AF37]">Step 2 — Palm:</strong> Then show your palm (required; you must complete both).</p>
-            <p className="text-xs mt-2">Face scan first, then palm scan. We merge these with Device ID and GPS to complete vitalization and mint VIDA CAP.</p>
+            <p><strong className="text-[#D4AF37]">Step 2 — Device:</strong> Then bind this device with a Passkey (required; you must complete both).</p>
+            <p className="text-xs mt-2">Face scan first, then device binding. Identity = Face + Device; we merge these with Phone Anchor and GPS to complete vitalization and mint VIDA CAP.</p>
           </div>
         )}
         {/* Phone Anchor Display */}
@@ -2548,9 +2619,9 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
           </div>
         </div>
 
-        {/* Header — Step 3 of 4: Face then Palm (AI face mesh, then palm verification) */}
+        {/* Header — Step 3 of 4: Face + Device (no palm). Face scan then WebAuthn/Passkey binding. */}
         <div className="text-center mb-8">
-          <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: '#D4AF37' }}>{t('vitalization.step3Of4', 'Step 3 of 4 — Face Scan, then Palm Scan')}</p>
+          <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: '#D4AF37' }}>{t('vitalization.step3Of4', 'Step 3 of 4 — Face Scan, then Device Binding')}</p>
           <div className="text-6xl mb-4 animate-pulse">🔐</div>
           <h1
             className={`text-4xl font-bold text-[#D4AF37] uppercase tracking-wider mb-4 ${jetbrains.className}`}
@@ -2561,11 +2632,11 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
           <p className="text-lg text-[#6b6b70]">
             {authStatus === AuthStatus.SCANNING
               ? ENABLE_GPS_AS_FOURTH_PILLAR
-                ? 'Face → Palm → Phone Anchor → GPS (work-site). Then Clock-In.'
-                : 'Sovereign Face → Sovereign Palm → Phone Anchor (15s on mobile)'
+                ? 'Face → Device (Passkey) → Phone Anchor → GPS (work-site). Then Clock-In.'
+                : 'Sovereign Face → Device Binding (Passkey) → Phone Anchor'
               : ENABLE_GPS_AS_FOURTH_PILLAR
-              ? 'Sovereign Face · Sovereign Palm · Phone Anchor · GPS Presence'
-              : 'Sovereign Face · Sovereign Palm · Phone Anchor'}
+              ? 'Sovereign Face · Device · Phone Anchor · GPS Presence'
+              : 'Sovereign Face · Device · Phone Anchor'}
           </p>
         </div>
 
@@ -2593,7 +2664,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
                 locationVerified={pillarLocation}
               />
             )}
-            {/* Sovereign Palm: Hold palm to camera (webcam) or connect Hub scanner. Mobile: Palm Pulse via camera. */}
+            {/* Device (Passkey): Face verified then WebAuthn/Passkey binding. Optional: Hub scanner for palm in other flows. */}
             {identityAnchor && !effectiveMobile && (
               <div className="mt-6">
                 <BiometricPillar ref={biometricPillarRef} phoneNumber={identityAnchor.phone} />
@@ -2628,7 +2699,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
                         status === 'complete' ? 'text-green-500' : status === 'active' ? 'text-[#D4AF37]' : 'text-[#6b6b70]'
                       }`}>
                         {layer === AuthLayer.BIOMETRIC_SIGNATURE && (status === 'complete' ? 'Face — Verified' : `Face — ${status === 'active' ? getLayerScanningLabel(layer) : 'Pending'}`)}
-                        {layer === AuthLayer.SOVEREIGN_PALM && (status === 'complete' ? 'Palm — Verified' : `Palm — ${status === 'active' ? getLayerScanningLabel(layer) : 'Pending'}`)}
+                        {layer === AuthLayer.SOVEREIGN_PALM && (status === 'complete' ? 'Device — Verified' : `Device — ${status === 'active' ? getLayerScanningLabel(layer) : 'Pending'}`)}
                         {(layer === AuthLayer.HARDWARE_TPM || layer === AuthLayer.GENESIS_HANDSHAKE) && (status === 'complete' ? 'Anchor — Confirmed' : `Anchor — ${status === 'active' ? getLayerScanningLabel(layer) : 'Pending'}`)}
                         {layer === AuthLayer.GPS_LOCATION && (status === 'complete' ? 'GPS — Confirmed' : `GPS — ${status === 'active' ? getLayerScanningLabel(layer) : 'Pending'}`)}
                         {![AuthLayer.BIOMETRIC_SIGNATURE, AuthLayer.SOVEREIGN_PALM, AuthLayer.HARDWARE_TPM, AuthLayer.GENESIS_HANDSHAKE, AuthLayer.GPS_LOCATION].includes(layer) && `Pillar ${index + 1}: ${getLayerName(layer)}`}
@@ -2874,7 +2945,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
         />
       )}
 
-      {/* Vitalization: Face first (MediaPipe Face Mesh), then Palm (MediaPipe Hands + NIR). */}
+      {/* Vitalization: Face only (MediaPipe Face Mesh). Then device binding (WebAuthn); no palm scan. */}
       <ArchitectVisionCapture
         isOpen={showArchitectVision}
         onClose={() => {

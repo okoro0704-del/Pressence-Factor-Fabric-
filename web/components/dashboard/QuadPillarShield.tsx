@@ -2,11 +2,9 @@
 
 /**
  * Quad-Pillar Shield (Ghost Economy Protocol)
- * Defines the four active sensors: Face (Biometric), Palm (Physical Pattern),
- * Phone (Hardware Anchor), GPS (Geofenced Work-Site).
- * 3/4 Priority Mesh: Pillars 1 (Face), 2 (Palm), 3 (Identity Anchor) = Core Mesh complete.
+ * Face → Device (Passkey) → Phone Anchor → GPS. Identity = Face + Device; one face = one mint.
+ * Core Mesh: Pillars 1 (Face), 2 (Device), 3 (Identity Anchor) = Core Mesh complete.
  * User may proceed when Core Mesh is verified; Pillar 4 (GPS) can remain Initializing or Self-Attested.
- * Lightweight for browser; native mobile GPS integration prepared for April 7th.
  *
  * Architect Override: when allPillarsVerified is true, onAllVerified is called once and parent
  * performs one-time redirect (router.replace('/dashboard')) and clears verification interval timers.
@@ -210,9 +208,9 @@ export interface QuadPillarGridProps {
   onAllVerified?: () => void;
 }
 
-/** Core Mesh = Pillars 1 (Face), 2 (Palm), 3 (Identity Anchor) verified. Proceed allowed without GPS. */
-function coreMeshComplete(face: boolean, palm: boolean, phone: boolean): boolean {
-  return face && palm && phone;
+/** Core Mesh = Pillars 1 (Face), 2 (Device), 3 (Identity Anchor) verified. Proceed allowed without GPS. */
+function coreMeshComplete(face: boolean, device: boolean, phone: boolean): boolean {
+  return face && device && phone;
 }
 
 /** Four pillars in a compact 2x2 grid — no scrolling on mobile. 3/4 mesh: proceed when 1,2,3 done. */
@@ -263,7 +261,7 @@ export function QuadPillarGrid({
             >
               <span className="text-lg" aria-hidden>
                 {pillar.id === 1 && '👤'}
-                {pillar.id === 2 && '🖐️'}
+                {pillar.id === 2 && '🔑'}
                 {pillar.id === 3 && '📱'}
                 {pillar.id === 4 && '📍'}
               </span>

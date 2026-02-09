@@ -1,14 +1,15 @@
 /**
- * Foundation Seigniorage Protocol — Dual-Minting on 3-of-4 Biometric Gate Clear.
- * Per new identity verified: 10 VIDA CAP to user wallet, 1 VIDA to PFF_FOUNDATION_VAULT (foundation_vault_ledger).
- * Grant trigger: 10 VIDA minting only begins AFTER the Sovereign Constitution is signed and recorded in legal_approvals.
- * Anti-Bot: Mint only executes if humanity_score is 1.0 and biometric_anchor is from an external device.
+ * Foundation Seigniorage Protocol — Dual-Minting on Root Identity creation only.
+ * Per new identity (first device): 10 VIDA CAP to user wallet, 1 VIDA to PFF_FOUNDATION_VAULT.
+ * Grant trigger: Constitution signed + humanity check. Single-mint guard: if (vidaCapMinted) rejectMint().
+ * Device linking MUST NOT mint again.
  */
 
 import { supabase } from './supabase';
 import { getOrCreateSovereignWallet } from './sovereignInternalWallet';
 import { hasSignedConstitution } from './legalApprovals';
 import { getHumanityCheck, isEligibleForMint } from './humanityScore';
+import { rejectMintIfAlreadyMinted } from './sovereignIdentityGuard';
 
 /** VIDA CAP minted to user when 3-of-4 gate clears. */
 export const USER_VIDA_ON_VERIFY = 10;
@@ -16,22 +17,37 @@ export const USER_VIDA_ON_VERIFY = 10;
 /** VIDA minted to PFF Foundation Vault per verification (audit in foundation_vault_ledger). */
 export const FOUNDATION_VIDA_ON_VERIFY = 1;
 
+/** Options for mint: faceHash is the sole criterion for "already minted" (one face = one mint). */
+export type MintFoundationSeigniorageOptions = {
+  citizenId?: string;
+  /** When provided, mint authority is the face; guard and ledger use face_hash. One face = one mint. */
+  faceHash?: string;
+};
+
 /**
- * Execute dual-mint when vitalization succeeds (3-of-4 gate clears).
- * Mints 10 VIDA to user's sovereign_internal_wallets and 1 VIDA to foundation (foundation_vault_ledger).
- * Only mints once per citizen_id (phone) — idempotent.
+ * Execute dual-mint ONLY on Root Identity creation. Minting authority is the Face (one face = one mint).
+ * Rejects if this face has already minted, regardless of device or phone. Pass faceHash when available.
  */
 export async function mintFoundationSeigniorage(
   phoneNumber: string,
-  citizenId?: string
+  options?: MintFoundationSeigniorageOptions | string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const citizenIdForAudit = citizenId ?? phoneNumber;
+  const opts = typeof options === 'string' ? { citizenId: options } : (options ?? {});
+  const citizenIdForAudit = opts.citizenId ?? phoneNumber;
+  const faceHash = typeof opts.faceHash === 'string' ? opts.faceHash.trim() : undefined;
+  const faceHashNormalized = faceHash && faceHash.length === 64 && /^[0-9a-fA-F]+$/.test(faceHash) ? faceHash.toLowerCase() : undefined;
 
   if (!supabase) {
     return { ok: false, error: 'Supabase not available' };
   }
 
   try {
+    // Single-mint guard: by face when faceHash provided (authority = face); else fallback to phone for backward compat.
+    const guard = faceHashNormalized
+      ? await rejectMintIfAlreadyMinted(faceHashNormalized, { byFace: true })
+      : await rejectMintIfAlreadyMinted(phoneNumber);
+    if (!guard.ok) return guard;
+
     // Grant trigger: Constitution must be signed and recorded before any mint.
     const signed = await hasSignedConstitution(phoneNumber);
     if (!signed) {
@@ -50,16 +66,24 @@ export async function mintFoundationSeigniorage(
       };
     }
 
-    // Idempotent: already minted for this citizen?
-    const { data: existing } = await (supabase as any)
-      .from('foundation_vault_ledger')
-      .select('id')
-      .eq('citizen_id', citizenIdForAudit)
-      .limit(1)
-      .maybeSingle();
-
-    if (existing) {
-      return { ok: true }; // already minted
+    // Idempotent: already minted for this face (or citizen when no faceHash)?
+    if (faceHashNormalized) {
+      const { data: existingByFace } = await (supabase as any)
+        .from('foundation_vault_ledger')
+        .select('id')
+        .eq('source_type', 'seigniorage')
+        .eq('face_hash', faceHashNormalized)
+        .limit(1)
+        .maybeSingle();
+      if (existingByFace) return { ok: true };
+    } else {
+      const { data: existing } = await (supabase as any)
+        .from('foundation_vault_ledger')
+        .select('id')
+        .eq('citizen_id', citizenIdForAudit)
+        .limit(1)
+        .maybeSingle();
+      if (existing) return { ok: true };
     }
 
     const wallet = await getOrCreateSovereignWallet(phoneNumber);
@@ -81,11 +105,12 @@ export async function mintFoundationSeigniorage(
       return { ok: false, error: updateError.message ?? 'User mint failed' };
     }
 
-    // 2) Record 1 VIDA to foundation_vault_ledger (PFF_FOUNDATION_VAULT)
+    // 2) Record 1 VIDA to foundation_vault_ledger (PFF_FOUNDATION_VAULT). face_hash = who minted (one face = one mint).
     const { error: ledgerError } = await (supabase as any)
       .from('foundation_vault_ledger')
       .insert({
         citizen_id: citizenIdForAudit,
+        face_hash: faceHashNormalized ?? null,
         vida_amount: FOUNDATION_VIDA_ON_VERIFY,
         corporate_royalty_inflow: 0,
         national_levy_inflow: 0,
