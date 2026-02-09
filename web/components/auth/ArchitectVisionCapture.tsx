@@ -130,6 +130,7 @@ export function ArchitectVisionCapture({
   type CameraStatus = 'initializing' | 'ready' | 'denied';
   const [cameraStatus, setCameraStatus] = useState<CameraStatus>('initializing');
   const [retryCount, setRetryCount] = useState(0);
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
 
   /** 30-second Low Light Mode bypass: drop confidence to 0.3, ignore lighting warnings. */
   const [isSensitivityBypassed, setSensitivityBypassed] = useState(false);
@@ -208,7 +209,7 @@ export function ArchitectVisionCapture({
     if (!video) return;
 
     const constraints: MediaStreamConstraints = {
-      video: getMaxResolutionConstraints(),
+      video: { ...getMaxResolutionConstraints(), facingMode },
       audio: false,
     };
 
@@ -253,7 +254,7 @@ export function ArchitectVisionCapture({
       cancelled = true;
       stopCamera();
     };
-  }, [isOpen, stopCamera, retryCount]);
+  }, [isOpen, stopCamera, retryCount, facingMode]);
 
   // Send video frames to MediaPipe Face Mesh
   useEffect(() => {
@@ -366,14 +367,20 @@ export function ArchitectVisionCapture({
         <video
           ref={videoRef}
           className="absolute inset-0 w-full h-full object-cover"
-          style={{ transform: 'scaleX(-1) translateZ(0)', backfaceVisibility: 'hidden' }}
+          style={{
+            transform: facingMode === 'user' ? 'scaleX(-1) translateZ(0)' : 'translateZ(0)',
+            backfaceVisibility: 'hidden',
+          }}
           playsInline
           muted
         />
         <canvas
           ref={canvasRef}
           className="absolute inset-0 w-full h-full object-cover pointer-events-none"
-          style={{ transform: 'scaleX(-1) translateZ(0)', backfaceVisibility: 'hidden' }}
+          style={{
+            transform: facingMode === 'user' ? 'scaleX(-1) translateZ(0)' : 'translateZ(0)',
+            backfaceVisibility: 'hidden',
+          }}
         />
 
         {/* Gold progress bar at bottom only — fills as Face Pulse completes (no center scan box) */}
@@ -393,9 +400,22 @@ export function ArchitectVisionCapture({
           <span>Hash Status: {hashStatus}</span>
         </div>
 
-        {/* Low Light Mode: discreet half-moon icon — 30s bypass (confidence 0.3, no lighting warning) */}
+        {/* Flip camera + Low Light Mode */}
         {cameraStatus === 'ready' && !meshGold && (
           <div className="absolute top-3 right-3 z-20 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                stopCamera();
+                setFacingMode((prev) => (prev === 'user' ? 'environment' : 'user'));
+                setCameraStatus('initializing');
+              }}
+              className="rounded-lg border border-[#e8c547]/60 bg-black/50 px-3 py-2 text-xs font-mono transition-colors hover:bg-[#e8c547]/20"
+              style={{ color: '#e8c547', textShadow: '0 0 8px rgba(0,0,0,0.9)' }}
+              aria-label={facingMode === 'user' ? 'Switch to back camera' : 'Switch to front camera'}
+            >
+              {facingMode === 'user' ? 'Back camera' : 'Front camera'}
+            </button>
             {bypassSecondsLeft > 0 && (
               <span className="text-xs font-mono text-[#e8c547] bg-black/60 px-2 py-1 rounded" aria-live="polite">
                 {bypassSecondsLeft}s

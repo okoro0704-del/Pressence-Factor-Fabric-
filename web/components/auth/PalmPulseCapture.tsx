@@ -69,6 +69,7 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
   const [initRetry, setInitRetry] = useState(0);
   const [progressRing, setProgressRing] = useState(0);
   const [capturedImageDataUrl, setCapturedImageDataUrl] = useState<string | null>(null);
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
   const capturedHashRef = useRef<string | null>(null);
   const pendingCaptureHashRef = useRef<string | null>(null);
   const lastLandmarksRef = useRef<NormalizedLandmark[] | null>(null);
@@ -143,7 +144,7 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
     const init = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
+          video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode },
           audio: false,
         });
 
@@ -207,7 +208,7 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
       clearTimeout(timeoutId);
       stopCamera();
     };
-  }, [isOpen, stopCamera, initRetry]);
+  }, [isOpen, stopCamera, initRetry, facingMode]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -499,14 +500,22 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
         <video
           ref={videoRef}
           className="absolute inset-0 w-full h-full object-cover"
-          style={{ transform: 'scaleX(-1) translateZ(0)', backfaceVisibility: 'hidden', willChange: 'transform' }}
+          style={{
+            transform: facingMode === 'user' ? 'scaleX(-1) translateZ(0)' : 'translateZ(0)',
+            backfaceVisibility: 'hidden',
+            willChange: 'transform',
+          }}
           playsInline
           muted
         />
         <canvas
           ref={canvasRef}
           className="absolute inset-0 w-full h-full object-cover pointer-events-none"
-          style={{ transform: 'scaleX(-1) translateZ(0)', backfaceVisibility: 'hidden', willChange: 'transform' }}
+          style={{
+            transform: facingMode === 'user' ? 'scaleX(-1) translateZ(0)' : 'translateZ(0)',
+            backfaceVisibility: 'hidden',
+            willChange: 'transform',
+          }}
           width={640}
           height={480}
         />
@@ -521,10 +530,26 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
           />
         )}
 
+        {/* Flip camera — use back camera to register someone else */}
+        {(status === 'ready' || status === 'liveness' || status === 'scanning') && (
+          <button
+            type="button"
+            onClick={() => {
+              stopCamera();
+              setFacingMode((prev) => (prev === 'user' ? 'environment' : 'user'));
+              setStatus('initializing');
+            }}
+            className="absolute top-3 right-3 z-20 rounded-lg border border-[#D4AF37]/60 bg-black/50 px-3 py-2 text-xs font-mono transition-colors hover:bg-[#D4AF37]/20"
+            style={{ color: GOLD, textShadow: '0 0 8px rgba(0,0,0,0.9)' }}
+            aria-label={facingMode === 'user' ? 'Switch to back camera' : 'Switch to front camera'}
+          >
+            {facingMode === 'user' ? 'Back camera' : 'Front camera'}
+          </button>
+        )}
         {/* HUD — same style as face (AI Confidence / Liveness / Hash Status) */}
         {(status === 'ready' || status === 'liveness' || status === 'scanning') && (
           <div
-            className="absolute top-3 left-3 right-3 z-20 flex flex-wrap gap-3 text-xs font-mono"
+            className="absolute top-3 left-3 z-20 flex flex-wrap gap-3 text-xs font-mono max-w-[60%]"
             style={{ color: '#e8c547', textShadow: '0 0 8px rgba(0,0,0,0.9)' }}
           >
             <span>Scanning: {status === 'ready' ? 'Position palm' : status === 'liveness' ? 'Liveness…' : 'Markers…'}</span>
@@ -562,7 +587,7 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
                   src={capturedImageDataUrl}
                   alt="Your palm scan"
                   className="w-full h-auto block"
-                  style={{ transform: 'scaleX(-1)' }}
+                  style={{ transform: facingMode === 'user' ? 'scaleX(-1)' : 'none' }}
                 />
                 <div className="absolute inset-0 pointer-events-none bg-[#D4AF37]/10" aria-hidden />
               </div>

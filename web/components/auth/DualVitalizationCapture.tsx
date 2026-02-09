@@ -154,6 +154,7 @@ export function DualVitalizationCapture({
   const [error, setError] = useState<string | null>(null);
   const [faceDetected, setFaceDetected] = useState(false);
   const [palmDetected, setPalmDetected] = useState(false);
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
 
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -227,7 +228,7 @@ export function DualVitalizationCapture({
         const [hands, stream] = await Promise.all([
           import('@/lib/mediaPipeHandsLoader').then((m) => m.getMediaPipeHands()).catch(() => null),
           navigator.mediaDevices.getUserMedia({
-            video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
+            video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode },
             audio: false,
           }),
         ]);
@@ -259,7 +260,7 @@ export function DualVitalizationCapture({
       cancelled = true;
       stopCamera();
     };
-  }, [isOpen, stopCamera, onError]);
+  }, [isOpen, stopCamera, onError, facingMode]);
 
   /** Send video frames to MediaPipe Hands */
   useEffect(() => {
@@ -366,7 +367,10 @@ export function DualVitalizationCapture({
         <video
           ref={videoRef}
           className="absolute inset-0 w-full h-full object-cover"
-          style={{ transform: 'scaleX(-1) translateZ(0)', backfaceVisibility: 'hidden' }}
+          style={{
+            transform: facingMode === 'user' ? 'scaleX(-1) translateZ(0)' : 'translateZ(0)',
+            backfaceVisibility: 'hidden',
+          }}
           playsInline
           muted
         />
@@ -379,6 +383,22 @@ export function DualVitalizationCapture({
           overlay
         />
 
+        {/* Flip camera — use back camera to register someone else */}
+        {status === 'ready' && (
+          <button
+            type="button"
+            onClick={() => {
+              stopCamera();
+              setFacingMode((prev) => (prev === 'user' ? 'environment' : 'user'));
+              setStatus('initializing');
+            }}
+            className="absolute top-3 right-3 z-20 rounded-lg border border-[#D4AF37]/60 bg-black/50 px-3 py-2 text-xs font-mono transition-colors hover:bg-[#D4AF37]/20"
+            style={{ color: GOLD, textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}
+            aria-label={facingMode === 'user' ? 'Switch to back camera' : 'Switch to front camera'}
+          >
+            {facingMode === 'user' ? 'Back camera' : 'Front camera'}
+          </button>
+        )}
         {/* Instructional text */}
         <p
           className="absolute top-3 left-0 right-0 z-20 text-center text-sm font-medium tracking-wide"
@@ -461,7 +481,7 @@ export function DualVitalizationCapture({
       {status === 'initializing' && (
         <div className="absolute inset-0 z-[200] flex flex-col items-center justify-center bg-black/90">
           <div className="h-8 w-8 rounded-full border-2 border-[#D4AF37] border-t-transparent animate-spin mb-4" />
-          <p className="text-[#D4AF37] font-mono text-sm tracking-wider">Initializing front camera…</p>
+          <p className="text-[#D4AF37] font-mono text-sm tracking-wider">Initializing camera…</p>
         </div>
       )}
 
