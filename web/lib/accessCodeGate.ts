@@ -9,7 +9,11 @@ export const ACCESS_CUTOFF_DATE = new Date('2026-04-08T00:00:00.000Z');
 const STORAGE_KEY = 'pff_access_granted_phone';
 const MASTER_ACCESS_KEY = 'pff_master_access';
 
+/** When true, access gate is active (code/master required). Set to false to open site to everyone. */
+const ACCESS_GATE_ENABLED = false;
+
 export function isBeforeAccessCutoff(): boolean {
+  if (!ACCESS_GATE_ENABLED) return false;
   return typeof window !== 'undefined' && new Date() < ACCESS_CUTOFF_DATE;
 }
 

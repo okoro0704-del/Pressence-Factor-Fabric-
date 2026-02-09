@@ -1,33 +1,21 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { SovereignManifestoLanding } from '@/components/SovereignManifestoLanding';
-import { SovereignAwakeningProvider } from '@/contexts/SovereignAwakeningContext';
-import { AppErrorBoundary } from '@/components/AppErrorBoundary';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 /**
- * ROOT PAGE — Full Manifesto and VITALIZE. Owner can log in from their devices; others need a code until April 7.
+ * ROOT PAGE — Redirects straight to the app. Manifesto and access gate hidden for now.
  */
 export default function Home() {
-  const [mounted, setMounted] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#050505]" style={{ color: '#6b6b70' }} aria-busy="true">
-        <p className="text-sm">Loading…</p>
-      </div>
-    );
-  }
+    router.replace('/dashboard');
+  }, [router]);
 
   return (
-    <AppErrorBoundary>
-      <SovereignAwakeningProvider>
-        <SovereignManifestoLanding />
-      </SovereignAwakeningProvider>
-    </AppErrorBoundary>
+    <div className="min-h-screen flex items-center justify-center bg-[#050505]" style={{ color: '#6b6b70' }} aria-busy="true">
+      <p className="text-sm">Loading…</p>
+    </div>
   );
 }
