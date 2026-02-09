@@ -4,7 +4,7 @@ import { getSupabase } from '@/lib/supabase';
 /**
  * POST body: { password: string }
  * Validates against the permanent master password. If correct, returns { ok: true }.
- * Client then sets master access in localStorage so the user can access the app from any device.
+ * Checks PFF_MASTER_PASSWORD env first (set in Netlify); else uses Supabase validate_master_password.
  */
 export async function POST(request: Request) {
   let body: { password?: string };
@@ -13,9 +13,14 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json({ ok: false, error: 'Invalid JSON' }, { status: 400 });
   }
-  const password = typeof body?.password === 'string' ? body.password : '';
-  if (!password.trim()) {
+  const password = typeof body?.password === 'string' ? body.password.trim() : '';
+  if (!password) {
     return NextResponse.json({ ok: false, error: 'Password required' }, { status: 400 });
+  }
+
+  const envPassword = process.env.PFF_MASTER_PASSWORD?.trim();
+  if (envPassword && password === envPassword) {
+    return NextResponse.json({ ok: true });
   }
 
   const supabase = getSupabase();
@@ -24,7 +29,7 @@ export async function POST(request: Request) {
   }
 
   const { data, error } = await (supabase as any).rpc('validate_master_password', {
-    p_password: password.trim(),
+    p_password: password,
   });
   if (error) {
     return NextResponse.json({ ok: false, error: error.message ?? 'Validation failed' }, { status: 500 });

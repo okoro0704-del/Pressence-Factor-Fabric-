@@ -4,7 +4,8 @@
 
 - **Password:** `202604070001` (numbers only; the UI accepts digits only)
 - It never expires. Save it somewhere safe.
-- On the first page, click **"Log in with master password"**, enter this password (digits only), then tap **Log in**. You will be taken to the app and can use it from that device until you clear site data.
+- **To make it work in production:** In Netlify → Site settings → Environment variables, add `PFF_MASTER_PASSWORD` = `202604070001` (or your chosen numeric password). Then redeploy. The API checks this first, so the password works even before running Supabase migrations.
+- On the first page, scroll to the **bottom** to the **Sign in** section. Enter your master password (numbers only) and tap **Log in**. You will be taken to the app.
 
 To change the password later (use numbers only): run in Supabase SQL Editor (replace `NEW_NUMERIC_PASSWORD` with your new numeric password):
 

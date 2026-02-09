@@ -81,7 +81,6 @@ export function SovereignManifestoLanding() {
   const [codeLoading, setCodeLoading] = useState(false);
   const codeFormRef = useRef<HTMLDivElement>(null);
 
-  const [showMasterForm, setShowMasterForm] = useState(false);
   const [masterPassword, setMasterPassword] = useState('');
   const [masterError, setMasterError] = useState<string | null>(null);
   const [masterLoading, setMasterLoading] = useState(false);
@@ -120,7 +119,6 @@ export function SovereignManifestoLanding() {
     setMasterLoading(false);
     if (result.ok) {
       setMasterAccess();
-      setShowMasterForm(false);
       setMasterPassword('');
       router.replace('/vitalization');
       return;
@@ -248,47 +246,7 @@ export function SovereignManifestoLanding() {
           >
             Sovereign Countdown → April 7, 2026
           </Link>
-          <button
-            type="button"
-            onClick={() => setShowMasterForm((v) => !v)}
-            className="rounded-xl border px-6 py-3 text-sm font-medium transition-colors hover:bg-[#16161a]"
-            style={{ borderColor: GOLD_DIM, color: GOLD_DIM }}
-          >
-            {showMasterForm ? 'Hide' : 'Log in with master password'}
-          </button>
         </div>
-        {showMasterForm && (
-          <form onSubmit={handleMasterSubmit} className="mt-6 max-w-sm mx-auto p-4 rounded-xl border-2" style={{ borderColor: BORDER, background: CARD_BG }}>
-            <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: GOLD }}>
-              Master password — access from any device, anytime
-            </p>
-            <input
-              type="password"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              maxLength={64}
-              value={masterPassword}
-              onChange={(e) => {
-                const v = e.target.value.replace(/\D/g, '');
-                setMasterPassword(v);
-                setMasterError(null);
-              }}
-              placeholder="Numbers only (e.g. 202604070001)"
-              autoComplete="one-time-code"
-              className="w-full px-4 py-2.5 rounded-lg border-2 bg-[#0d0d0f] text-white placeholder-[#6b6b70] mb-2"
-              style={{ borderColor: BORDER }}
-            />
-            <button
-              type="submit"
-              disabled={masterLoading}
-              className="w-full py-2.5 rounded-lg font-bold uppercase tracking-wider border-2 disabled:opacity-60"
-              style={{ borderColor: GOLD, color: GOLD }}
-            >
-              {masterLoading ? 'Checking…' : 'Log in'}
-            </button>
-            {masterError && <p className="mt-2 text-sm" style={{ color: '#f87171' }}>{masterError}</p>}
-          </form>
-        )}
       </section>
 
       {/* The Mission */}
@@ -1025,53 +983,56 @@ export function SovereignManifestoLanding() {
         </div>
       </section>
 
-      {/* Site access — until April 7, non-owner users enter phone + code at bottom of page */}
-      {showCodeForm && (
+      {/* Sign in at bottom only — until April 7: phone+code or master password */}
+      {beforeCutoff && (
         <section
           ref={codeFormRef}
           className="px-6 py-10 border-t"
           style={{ borderColor: GOLD, background: 'rgba(5, 5, 5, 0.98)' }}
         >
-          <div className="max-w-xl mx-auto">
-            <h2 className="text-sm font-semibold uppercase tracking-wider mb-2" style={{ color: GOLD }}>
-              Site access until April 7
+          <div className="max-w-xl mx-auto space-y-8">
+            <h2 className="text-sm font-semibold uppercase tracking-wider mb-4" style={{ color: GOLD }}>
+              Sign in — until April 7
             </h2>
-            <p className="text-sm mb-4" style={{ color: MUTED }}>
-              Enter your phone number and the code you received to log in.
-            </p>
-            <form onSubmit={handleCodeSubmit} className="flex flex-wrap items-end gap-3">
-              <input
-                type="tel"
-                value={codePhone}
-                onChange={(e) => setCodePhone(e.target.value)}
-                placeholder="Phone number"
-                className="flex-1 min-w-[140px] px-4 py-2.5 rounded-lg border-2 bg-[#0d0d0f] text-white placeholder-[#6b6b70]"
-                style={{ borderColor: BORDER }}
-              />
-              <input
-                type="text"
-                inputMode="numeric"
-                maxLength={6}
-                value={codeValue}
-                onChange={(e) => setCodeValue(e.target.value.replace(/\D/g, ''))}
-                placeholder="Code"
-                className="w-24 px-4 py-2.5 rounded-lg border-2 bg-[#0d0d0f] text-white placeholder-[#6b6b70]"
-                style={{ borderColor: BORDER }}
-              />
-              <button
-                type="submit"
-                disabled={codeLoading}
-                className="px-6 py-2.5 rounded-lg font-bold uppercase tracking-wider border-2 transition-colors disabled:opacity-60"
-                style={{ borderColor: GOLD, color: GOLD, boxShadow: '0 0 16px rgba(212, 175, 55, 0.3)' }}
-              >
-                {codeLoading ? 'Checking…' : 'Log in'}
-              </button>
-            </form>
-            {codeError && (
-              <p className="mt-2 text-sm" style={{ color: '#f87171' }}>
-                {codeError}
+
+            {/* Phone + code (for users with an access code) */}
+            <div>
+              <p className="text-sm mb-3" style={{ color: MUTED }}>
+                Enter your phone number and the code you received to log in.
               </p>
-            )}
+              <form onSubmit={handleCodeSubmit} className="flex flex-wrap items-end gap-3">
+                <input
+                  type="tel"
+                  value={codePhone}
+                  onChange={(e) => setCodePhone(e.target.value)}
+                  placeholder="Phone number"
+                  className="flex-1 min-w-[140px] px-4 py-2.5 rounded-lg border-2 bg-[#0d0d0f] text-white placeholder-[#6b6b70]"
+                  style={{ borderColor: BORDER }}
+                />
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={codeValue}
+                  onChange={(e) => setCodeValue(e.target.value.replace(/\D/g, ''))}
+                  placeholder="Code"
+                  className="w-24 px-4 py-2.5 rounded-lg border-2 bg-[#0d0d0f] text-white placeholder-[#6b6b70]"
+                  style={{ borderColor: BORDER }}
+                />
+                <button
+                  type="submit"
+                  disabled={codeLoading}
+                  className="px-6 py-2.5 rounded-lg font-bold uppercase tracking-wider border-2 transition-colors disabled:opacity-60"
+                  style={{ borderColor: GOLD, color: GOLD, boxShadow: '0 0 16px rgba(212, 175, 55, 0.3)' }}
+                >
+                  {codeLoading ? 'Checking…' : 'Log in'}
+                </button>
+              </form>
+              {codeError && (
+                <p className="mt-2 text-sm" style={{ color: '#f87171' }}>{codeError}</p>
+              )}
+            </div>
+
           </div>
         </section>
       )}
@@ -1109,6 +1070,48 @@ export function SovereignManifestoLanding() {
           )}
         </div>
       </footer>
+
+      {/* Master password — at very bottom of page, until April 7 */}
+      {beforeCutoff && (
+        <section className="px-6 py-8 border-t" style={{ borderColor: BORDER, background: 'rgba(5, 5, 5, 0.98)' }}>
+          <div className="max-w-xl mx-auto">
+            <h2 className="text-sm font-semibold uppercase tracking-wider mb-2" style={{ color: GOLD }}>
+              Log in with master password
+            </h2>
+            <p className="text-sm mb-3" style={{ color: MUTED }}>
+              Numbers only. Access from any device.
+            </p>
+            <form onSubmit={handleMasterSubmit} className="flex flex-wrap items-end gap-3">
+              <input
+                type="password"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={64}
+                value={masterPassword}
+                onChange={(e) => {
+                  setMasterPassword(e.target.value.replace(/\D/g, ''));
+                  setMasterError(null);
+                }}
+                placeholder="Master password (numbers only)"
+                autoComplete="one-time-code"
+                className="flex-1 min-w-[180px] px-4 py-2.5 rounded-lg border-2 bg-[#0d0d0f] text-white placeholder-[#6b6b70]"
+                style={{ borderColor: BORDER }}
+              />
+              <button
+                type="submit"
+                disabled={masterLoading}
+                className="px-6 py-2.5 rounded-lg font-bold uppercase tracking-wider border-2 disabled:opacity-60"
+                style={{ borderColor: GOLD, color: GOLD, boxShadow: '0 0 16px rgba(212, 175, 55, 0.3)' }}
+              >
+                {masterLoading ? 'Checking…' : 'Log in'}
+              </button>
+            </form>
+            {masterError && (
+              <p className="mt-2 text-sm" style={{ color: '#f87171' }}>{masterError}</p>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* Public Sovereign Companion — visible to all (including un-vitalized). Ask the Protocol. */}
       <PublicSovereignCompanion />
