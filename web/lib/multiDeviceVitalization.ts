@@ -170,7 +170,9 @@ export async function getPrimaryDevice(phoneNumber: string): Promise<{ device_id
 }
 
 /**
- * Assign Primary Sentinel Device (First Device).
+ * Assign Primary Sentinel Device = Master Device (first device that captured face for this mobile number).
+ * This device is locked to the mobile number; when the same number is used on another device,
+ * sign-in requires verification/approval from the master device (login_request flow).
  * Uses compositeDeviceId (Canvas Fingerprint | Hardware UUID) when provided — this is the Device ID, not thumbprint.
  * Industrial-only: optional external_scanner_serial_number and external_fingerprint_hash for Sentinel ID tagging.
  */

@@ -1,11 +1,12 @@
 /**
- * PFF — WebAuthn (navigator.credentials) for Sovereign Web.
- * Hooks into device biometrics (Face ID / Touch ID / fingerprint) for Presence Proof.
- * No raw biometric data leaves the device. Works offline (assertion stored locally).
- * All logic runs only in a secure context (HTTPS or localhost).
- *
- * Fortress Security: userVerification MUST be 'required' (hard biometric check).
- * Never use 'preferred'—defends against 2026-level identity theft / deepfake.
+ * PFF — WebAuthn (Passkey) for Sovereign Web.
+ * - createCredential: register a Passkey using the device's native biometric (Face ID / Touch ID / fingerprint).
+ * - getAssertion: sign-in with one tap (native biometric prompt; no email/password).
+ * Device credential ID is hashed and stored as device_hash; with face_hash it forms the sovereign identity.
+ * Hardware lock: device_id is mapped to citizen_hash in Supabase (anchor_device_id, primary_sentinel_device_id)
+ * so the account is locked to the registered device. If user tries from a new device with no passkey,
+ * the app triggers a Request Handshake (login_request) to the registered phone instead of a generic error.
+ * All logic runs only in a secure context (HTTPS or localhost). userVerification: required (hard biometric).
  */
 
 const RP_NAME = 'PFF — Vitalization | mrfundzman';
@@ -27,6 +28,20 @@ export function isWebAuthnSupported(): boolean {
   if (typeof window === 'undefined') return false;
   if (!isSecureContext()) return false;
   return typeof window.PublicKeyCredential !== 'undefined' && typeof navigator?.credentials?.get === 'function';
+}
+
+/**
+ * Native Authenticator Bridge: detect if the device has Face ID (iOS), Fingerprint/Face (Android), or Windows Hello.
+ * Use this to trigger the system's native biometric prompt and to enforce Sovereign-Only (no password) when true.
+ */
+export async function isUserVerifyingPlatformAuthenticatorAvailable(): Promise<boolean> {
+  if (typeof window === 'undefined') return false;
+  if (!isSecureContext() || !isWebAuthnSupported()) return false;
+  try {
+    return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+  } catch {
+    return false;
+  }
 }
 
 /** Generate a random challenge (base64url). Used when offline; server should supply when online. */

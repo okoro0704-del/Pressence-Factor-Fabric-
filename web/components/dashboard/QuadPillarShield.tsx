@@ -29,13 +29,13 @@ export interface BiometricScanProgressBarProps {
   onComplete?: () => void;
   /** Optional: when true, overlay fills parent (absolute); otherwise standalone block for below grid */
   overlay?: boolean;
-  /** When set, progress is driven by parent (e.g. palm scan real progress). Bar and "Verified" stay in sync with actual verification. */
+  /** When set, progress is driven by parent (e.g. device binding). Bar and "Verified" stay in sync with actual verification. */
   controlledProgress?: number;
 }
 
 /**
  * Biometric Scan Progress Bar
- * - Gold horizontal scanning line moving up/down over the Face/Palm video feed
+ * - Gold horizontal scanning line moving up/down over the Face video feed
  * - Progress 0–100% over durationMs to simulate deep analysis
  * - On 100%: smooth green fade, "Verified", then onComplete
  * - Thumb-friendly, centered on mobile (max-width, safe area)
@@ -85,7 +85,7 @@ export function BiometricScanProgressBar({
     };
   }, [isActive, tick]);
 
-  // Controlled mode: parent drives progress (e.g. palm scan). When stuck at 0, show indeterminate so bar isn’t frozen.
+  // Controlled mode: parent drives progress (e.g. device binding). When stuck at 0, show indeterminate so bar isn’t frozen.
   const isControlled = typeof controlledProgress === 'number';
   const [indeterminatePct, setIndeterminatePct] = useState(0);
   useEffect(() => {
@@ -313,7 +313,7 @@ export function QuadPillarGrid({
             Core Mesh Active
           </p>
           <p className="relative z-10 text-center text-[#22c55e]/90 text-xs font-semibold mt-1">
-            Face · Palm · Phone Anchor verified. You may proceed. GPS optional for full Quad.
+            Face · Device · Phone Anchor verified. You may proceed. GPS optional for full Quad.
           </p>
         </div>
       ) : null}

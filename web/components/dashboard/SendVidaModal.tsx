@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { sendVidaToPhone, validatePhoneNumber, resolvePhoneToIdentity } from '@/lib/phoneIdentity';
+import { getAssertion, isUserVerifyingPlatformAuthenticatorAvailable } from '@/lib/webauthn';
 import { BiometricReceipt } from './BiometricReceipt';
 
 interface SendVidaModalProps {
@@ -60,6 +61,23 @@ export function SendVidaModal({ isOpen, onClose, senderPhone, maxAmount }: SendV
       setError(`Asset Locked: Requires 1B User Milestone for Release. Maximum transfer: ${maxAmount.toFixed(2)} VIDA CAP`);
       setLoading(false);
       return;
+    }
+
+    // Transaction Shield: require native biometric (Face ID / Fingerprint) before Send
+    const hasNative = await isUserVerifyingPlatformAuthenticatorAvailable();
+    if (hasNative) {
+      try {
+        const assertion = await getAssertion();
+        if (!assertion?.credential) {
+          setError('Verification cancelled or failed. Complete Face ID or Fingerprint to send.');
+          setLoading(false);
+          return;
+        }
+      } catch {
+        setError('Verification required. Complete Face ID or Fingerprint to send VIDA.');
+        setLoading(false);
+        return;
+      }
     }
 
     // Send VIDA

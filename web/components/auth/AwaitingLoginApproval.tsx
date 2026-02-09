@@ -77,10 +77,10 @@ export function AwaitingLoginApproval({ requestId, onApproved, onDenied }: Await
               WebkitTextFillColor: 'transparent',
             }}
           >
-            Waiting for approval from your main device
+            Waiting for approval from your master device
           </h1>
           <p className="text-center text-[#a0a0a5] text-sm mb-6">
-            This number is already linked to a main device. Open PFF on that device — you&apos;ll see a prompt to approve this login. When you approve, you&apos;ll be logged in here.
+            This number is linked to your master device (the one that captured your face first). Open PFF on that device — you&apos;ll see a verification request to approve. When you approve, you&apos;ll be logged in here.
           </p>
           <div className="flex justify-center gap-2">
             <div className="w-2 h-2 rounded-full bg-[#D4AF37] animate-pulse" />

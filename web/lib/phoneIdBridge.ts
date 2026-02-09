@@ -1,8 +1,8 @@
 /**
- * Phone ID Bridge — On PC, "Phone ID" refers to the linked mobile device's unique identifier.
- * Fetched from user_profiles.primary_sentinel_device_id (and authorized_devices) so the PC app
- * can show "Linked device: XXX" and confirm identity.
- * Main vs sub device: only one device is the main (primary); others must request approval from main.
+ * Phone ID Bridge — Master device = first device that captured face for this mobile number (stored in primary_sentinel_device_id).
+ * That device is locked to the mobile number. When the number is used on another device, sign-in must send
+ * a verification request to the master device and wait for approval (login_requests flow).
+ * Fetched from user_profiles.primary_sentinel_device_id (and authorized_devices).
  */
 
 import { getSupabase } from './supabase';
@@ -49,8 +49,8 @@ export async function getLinkedMobileDeviceId(
 }
 
 /**
- * True if this phone number already has a main (primary) device and the current device is not it.
- * When true, the site should ask for approval from the main device instead of starting vitalization.
+ * True if this phone has a master device and the current device is not it.
+ * When true, sign-in on this device requires sending a verification request to the master device for approval.
  */
 export async function isSubDevice(phoneNumber: string): Promise<boolean> {
   const linked = await getLinkedMobileDeviceId(phoneNumber?.trim() ?? '');
@@ -60,8 +60,8 @@ export async function isSubDevice(phoneNumber: string): Promise<boolean> {
 }
 
 /**
- * True if this phone has a primary device and the current device is that primary (main device).
- * Only the main device should see "Approve login" notifications for this phone.
+ * True if this phone has a master device and the current device is that master (first face-capture device).
+ * Only the master device should see "Approve login" / verification notifications for this phone.
  */
 export async function isCurrentDevicePrimary(phoneNumber: string): Promise<boolean> {
   const linked = await getLinkedMobileDeviceId(phoneNumber?.trim() ?? '');

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { executeSovereignSwap, calculateDLLROutput } from '@/lib/sovryn/sovereignSwap';
 import { useSovereignSeed } from '@/contexts/SovereignSeedContext';
 import { VIDA_USD_VALUE } from '@/lib/economic';
+import { getAssertion, isUserVerifyingPlatformAuthenticatorAvailable } from '@/lib/webauthn';
 import { IdentityReLinkModal } from './IdentityReLinkModal';
 
 interface VIDASwapModalProps {
@@ -98,6 +99,23 @@ export function VIDASwapModal({
         setError(`Insufficient spendable balance. Max: ${maxAmount.toFixed(4)} VIDA CAP`);
         setSwapping(false);
         return;
+      }
+
+      // Transaction Shield: require native biometric before Convert/Swap
+      const hasNative = await isUserVerifyingPlatformAuthenticatorAvailable();
+      if (hasNative) {
+        try {
+          const assertion = await getAssertion();
+          if (!assertion?.credential) {
+            setError('Verification cancelled or failed. Complete Face ID or Fingerprint to convert.');
+            setSwapping(false);
+            return;
+          }
+        } catch {
+          setError('Verification required. Complete Face ID or Fingerprint to convert VIDA.');
+          setSwapping(false);
+          return;
+        }
       }
 
       // Execute swap (internal signer when phoneNumber set — no window.ethereum)

@@ -17,6 +17,7 @@ import {
   validateAccessCode,
   validateMasterPassword,
 } from '@/lib/accessCodeGate';
+import { isUserVerifyingPlatformAuthenticatorAvailable } from '@/lib/webauthn';
 
 const GOLD = '#D4AF37';
 const GOLD_DIM = 'rgba(212, 175, 55, 0.6)';
@@ -84,8 +85,14 @@ export function SovereignManifestoLanding() {
   const [masterPassword, setMasterPassword] = useState('');
   const [masterError, setMasterError] = useState<string | null>(null);
   const [masterLoading, setMasterLoading] = useState(false);
+  /** Native Authenticator Bridge: when true, device has Face ID / Fingerprint — Sovereign-Only; hide password. */
+  const [hasNativeBiometrics, setHasNativeBiometrics] = useState(false);
 
   useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    if (!mounted) return;
+    isUserVerifyingPlatformAuthenticatorAvailable().then(setHasNativeBiometrics);
+  }, [mounted]);
 
   const handleCodeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -310,7 +317,7 @@ export function SovereignManifestoLanding() {
             <h4 className="text-sm font-bold uppercase tracking-wider mb-2" style={{ color: GOLD }}>Proof of Personhood</h4>
             <p className="text-xs uppercase tracking-wider mb-2" style={{ color: MUTED }}>Altman</p>
             <p className="text-sm leading-relaxed flex-1" style={{ color: '#e0e0e0' }}>
-              The <strong style={{ color: GOLD }}>Palm Scan</strong> provides the Proof of Personhood needed for VIDA CAP and Universal High Income—without Altman&apos;s Orb. One human, one hand, one share. No custom hardware; everyday devices.
+              <strong style={{ color: GOLD }}>Face + Device</strong> verification provides the Proof of Personhood needed for VIDA CAP and Universal High Income—without Altman&apos;s Orb. One human, one identity, one share. No custom hardware; everyday devices.
             </p>
           </div>
         </div>
@@ -373,7 +380,7 @@ export function SovereignManifestoLanding() {
                 <tr className="border-t" style={{ borderColor: BORDER }}>
                   <td className="p-3 font-medium">Foundation</td>
                   <td className="p-3" style={{ color: MUTED }}>Speculation, hype, anonymous wallets</td>
-                  <td className="p-3">Proof of Personhood; Face + Palm + Device</td>
+                  <td className="p-3">Proof of Personhood; Face + Device</td>
                 </tr>
                 <tr className="border-t" style={{ borderColor: BORDER }}>
                   <td className="p-3 font-medium">Value</td>
@@ -406,7 +413,7 @@ export function SovereignManifestoLanding() {
               The Truth Mechanism
             </h4>
             <p className="text-sm leading-relaxed" style={{ color: '#e0e0e0' }}>
-              Every daily <strong style={{ color: GOLD }}>Palm Pulse</strong> is a <strong style={{ color: GOLD }}>Declaration of Truth</strong>. You are present; you are verified; you are sovereign. That declaration fuels the appreciation of the asset. The more the Protocol is used in truth—Face + Palm + Device, day after day—the stronger the covenant. VIDA CAP is not mined by machines. It is minted by humans who show up. Immutable. Authoritative. Biblical in its simplicity, futuristic in its execution.
+              Every daily <strong style={{ color: GOLD }}>Face + Device</strong> verification is a <strong style={{ color: GOLD }}>Declaration of Truth</strong>. You are present; you are verified; you are sovereign. That declaration fuels the appreciation of the asset. The more the Protocol is used in truth—Face + Device, day after day—the stronger the covenant. VIDA CAP is not mined by machines. It is minted by humans who show up. Immutable. Authoritative. Biblical in its simplicity, futuristic in its execution.
             </p>
           </div>
 
@@ -1071,8 +1078,8 @@ export function SovereignManifestoLanding() {
         </div>
       </footer>
 
-      {/* Master password — at very bottom of page, until April 7 */}
-      {beforeCutoff && (
+      {/* Master password — hidden when device has native biometrics (Sovereign-Only). Until April 7 otherwise. */}
+      {beforeCutoff && !hasNativeBiometrics && (
         <section className="px-6 py-8 border-t" style={{ borderColor: BORDER, background: 'rgba(5, 5, 5, 0.98)' }}>
           <div className="max-w-xl mx-auto">
             <h2 className="text-sm font-semibold uppercase tracking-wider mb-2" style={{ color: GOLD }}>

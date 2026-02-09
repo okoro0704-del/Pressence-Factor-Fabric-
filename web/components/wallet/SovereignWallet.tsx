@@ -24,6 +24,7 @@ import { getSentinelTokenVerified } from '@/lib/sentinelSecurityToken';
 import { getMintStatus, getSpendingUnlocked, getBiometricSpendingActive, MINT_STATUS_MINTED } from '@/lib/mintStatus';
 import { SpendingLockModal } from '@/components/dashboard/SpendingLockModal';
 import { SpendQRModal } from '@/components/dashboard/SpendQRModal';
+import { getAssertion, isUserVerifyingPlatformAuthenticatorAvailable } from '@/lib/webauthn';
 import { BETA_LIQUIDITY_TEST, SOVRYN_AMM_SWAP_URL } from '@/lib/betaLiquidityTest';
 import { useNativeBalances } from '@/lib/sovryn/useNativeBalances';
 import { MIN_RBTC_FOR_GAS } from '@/lib/sovryn/internalSigner';
@@ -131,6 +132,22 @@ export function SovereignWallet({ phoneNumber, layerResults }: SovereignWalletPr
       setBiometricError('Complete biometric scan (Sovereign Face + Sovereign Palm + Device) before converting.');
       setConvertStatus('error');
       return;
+    }
+    // Transaction Shield: require native biometric (Face ID / Fingerprint) before Convert
+    const hasNative = await isUserVerifyingPlatformAuthenticatorAvailable();
+    if (hasNative) {
+      try {
+        const assertion = await getAssertion();
+        if (!assertion?.credential) {
+          setBiometricError('Verification cancelled or failed. Complete Face ID or Fingerprint to convert.');
+          setConvertStatus('error');
+          return;
+        }
+      } catch {
+        setBiometricError('Verification required. Complete Face ID or Fingerprint to convert VIDA.');
+        setConvertStatus('error');
+        return;
+      }
     }
     setConvertError(null);
     setBiometricError(null);

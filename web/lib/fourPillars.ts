@@ -172,6 +172,8 @@ export async function generateAndSaveSovereignRoot(
 /**
  * Face + Device only (no palm): generate sovereign hash and save to user_profiles.
  * DeviceHash = SHA-256(WebAuthn credential ID). Second factor stored in palm_hash column for compatibility.
+ * Hardware lock: device_id is persisted (anchor_device_id via save_pillars_at_75; primary_sentinel_device_id
+ * via assignPrimarySentinel on root identity) so the account is locked to this specific device.
  * Call after face scan verified and WebAuthn credential created/asserted.
  */
 export async function generateAndSaveSovereignRootFaceDevice(
