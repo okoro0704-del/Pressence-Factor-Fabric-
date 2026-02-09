@@ -194,54 +194,6 @@ export function SovereignManifestoLanding() {
 
   return (
     <main className="min-h-screen bg-[#050505] text-white">
-      {/* Access code bar — until April 7, non-owner users must enter phone + code to access the app */}
-      {showCodeForm && (
-        <div
-          ref={codeFormRef}
-          className="sticky top-0 z-50 border-b px-4 py-4"
-          style={{ borderColor: GOLD, background: 'rgba(5, 5, 5, 0.98)', boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }}
-        >
-          <div className="max-w-xl mx-auto">
-            <p className="text-sm font-semibold mb-3" style={{ color: GOLD }}>
-              Site access until April 7 requires a code. Enter your phone number and the code you received to log in.
-            </p>
-            <form onSubmit={handleCodeSubmit} className="flex flex-wrap items-end gap-3">
-              <input
-                type="tel"
-                value={codePhone}
-                onChange={(e) => setCodePhone(e.target.value)}
-                placeholder="Phone number"
-                className="flex-1 min-w-[140px] px-4 py-2.5 rounded-lg border-2 bg-[#0d0d0f] text-white placeholder-[#6b6b70]"
-                style={{ borderColor: BORDER }}
-              />
-              <input
-                type="text"
-                inputMode="numeric"
-                maxLength={6}
-                value={codeValue}
-                onChange={(e) => setCodeValue(e.target.value.replace(/\D/g, ''))}
-                placeholder="Code"
-                className="w-24 px-4 py-2.5 rounded-lg border-2 bg-[#0d0d0f] text-white placeholder-[#6b6b70]"
-                style={{ borderColor: BORDER }}
-              />
-              <button
-                type="submit"
-                disabled={codeLoading}
-                className="px-6 py-2.5 rounded-lg font-bold uppercase tracking-wider border-2 transition-colors disabled:opacity-60"
-                style={{ borderColor: GOLD, color: GOLD, boxShadow: '0 0 16px rgba(212, 175, 55, 0.3)' }}
-              >
-                {codeLoading ? 'Checking…' : 'Log in'}
-              </button>
-            </form>
-            {codeError && (
-              <p className="mt-2 text-sm" style={{ color: '#f87171' }}>
-                {codeError}
-              </p>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Hero */}
       <section
         className="relative min-h-[70vh] flex flex-col items-center justify-center px-6 py-20 border-b"
@@ -278,7 +230,7 @@ export function SovereignManifestoLanding() {
               className="rounded-xl border-2 px-8 py-3 font-bold uppercase tracking-wider transition-colors hover:bg-[#D4AF37]/20"
               style={{ borderColor: GOLD, color: GOLD, boxShadow: '0 0 20px rgba(212, 175, 55, 0.2)' }}
             >
-              VITALIZE — Enter code above
+              VITALIZE — Enter code below
             </button>
           ) : (
             <Link
@@ -312,10 +264,17 @@ export function SovereignManifestoLanding() {
             </p>
             <input
               type="password"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={64}
               value={masterPassword}
-              onChange={(e) => { setMasterPassword(e.target.value); setMasterError(null); }}
-              placeholder="Master password"
-              autoComplete="current-password"
+              onChange={(e) => {
+                const v = e.target.value.replace(/\D/g, '');
+                setMasterPassword(v);
+                setMasterError(null);
+              }}
+              placeholder="Numbers only (e.g. 202604070001)"
+              autoComplete="one-time-code"
               className="w-full px-4 py-2.5 rounded-lg border-2 bg-[#0d0d0f] text-white placeholder-[#6b6b70] mb-2"
               style={{ borderColor: BORDER }}
             />
@@ -1065,6 +1024,57 @@ export function SovereignManifestoLanding() {
           )}
         </div>
       </section>
+
+      {/* Site access — until April 7, non-owner users enter phone + code at bottom of page */}
+      {showCodeForm && (
+        <section
+          ref={codeFormRef}
+          className="px-6 py-10 border-t"
+          style={{ borderColor: GOLD, background: 'rgba(5, 5, 5, 0.98)' }}
+        >
+          <div className="max-w-xl mx-auto">
+            <h2 className="text-sm font-semibold uppercase tracking-wider mb-2" style={{ color: GOLD }}>
+              Site access until April 7
+            </h2>
+            <p className="text-sm mb-4" style={{ color: MUTED }}>
+              Enter your phone number and the code you received to log in.
+            </p>
+            <form onSubmit={handleCodeSubmit} className="flex flex-wrap items-end gap-3">
+              <input
+                type="tel"
+                value={codePhone}
+                onChange={(e) => setCodePhone(e.target.value)}
+                placeholder="Phone number"
+                className="flex-1 min-w-[140px] px-4 py-2.5 rounded-lg border-2 bg-[#0d0d0f] text-white placeholder-[#6b6b70]"
+                style={{ borderColor: BORDER }}
+              />
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                value={codeValue}
+                onChange={(e) => setCodeValue(e.target.value.replace(/\D/g, ''))}
+                placeholder="Code"
+                className="w-24 px-4 py-2.5 rounded-lg border-2 bg-[#0d0d0f] text-white placeholder-[#6b6b70]"
+                style={{ borderColor: BORDER }}
+              />
+              <button
+                type="submit"
+                disabled={codeLoading}
+                className="px-6 py-2.5 rounded-lg font-bold uppercase tracking-wider border-2 transition-colors disabled:opacity-60"
+                style={{ borderColor: GOLD, color: GOLD, boxShadow: '0 0 16px rgba(212, 175, 55, 0.3)' }}
+              >
+                {codeLoading ? 'Checking…' : 'Log in'}
+              </button>
+            </form>
+            {codeError && (
+              <p className="mt-2 text-sm" style={{ color: '#f87171' }}>
+                {codeError}
+              </p>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* Footer — sensitive links only for architects */}
       <footer className="px-6 py-8 border-t text-center" style={{ borderColor: BORDER }}>

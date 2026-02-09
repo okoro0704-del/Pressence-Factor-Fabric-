@@ -1,5 +1,5 @@
--- Master password: one permanent password for the architect to access the app from any device.
--- Password (save this; it never changes):  PFF-Master-7Apr2026-K9xL2nQ
+-- Master password: one permanent numeric-only password for the architect to access the app from any device.
+-- Password (save this; numbers only, it never changes):  202604070001
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
@@ -9,10 +9,10 @@ CREATE TABLE IF NOT EXISTS public.master_access (
   constraint single_row check (id = 1)
 );
 
--- Insert the SHA-256 hash of the master password. Password: PFF-Master-7Apr2026-K9xL2nQ
+-- Insert the SHA-256 hash of the master password. Password: 202604070001 (numbers only)
 INSERT INTO public.master_access (id, password_hash)
-VALUES (1, encode(digest('PFF-Master-7Apr2026-K9xL2nQ', 'sha256'), 'hex'))
-ON CONFLICT (id) DO NOTHING;
+VALUES (1, encode(digest('202604070001', 'sha256'), 'hex'))
+ON CONFLICT (id) DO UPDATE SET password_hash = EXCLUDED.password_hash;
 
 COMMENT ON TABLE public.master_access IS 'Single row: hash of the permanent master password for app access from any device.';
 

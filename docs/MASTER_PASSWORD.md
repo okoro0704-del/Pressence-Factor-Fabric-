@@ -1,16 +1,16 @@
 # Master password (Architect only)
 
-**One permanent password to access the app from any device, anytime.**
+**One permanent numeric-only password to access the app from any device, anytime.**
 
-- **Password:** `PFF-Master-7Apr2026-K9xL2nQ`
-- It never expires. Save it somewhere safe (e.g. password manager).
-- On the first page, click **"Log in with master password"**, enter this password, then tap **Log in**. You will be taken to the app and can use it from that device until you clear site data.
+- **Password:** `202604070001` (numbers only; the UI accepts digits only)
+- It never expires. Save it somewhere safe.
+- On the first page, click **"Log in with master password"**, enter this password (digits only), then tap **Log in**. You will be taken to the app and can use it from that device until you clear site data.
 
-To change the password later: run in Supabase SQL Editor (replace `NEW_PASSWORD` with your new password):
+To change the password later (use numbers only): run in Supabase SQL Editor (replace `NEW_NUMERIC_PASSWORD` with your new numeric password):
 
 ```sql
 UPDATE public.master_access
-SET password_hash = encode(digest('NEW_PASSWORD', 'sha256'), 'hex')
+SET password_hash = encode(digest('NEW_NUMERIC_PASSWORD', 'sha256'), 'hex')
 WHERE id = 1;
 ```
 
