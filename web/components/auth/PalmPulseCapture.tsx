@@ -367,9 +367,14 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
       }
 
       if (statusRef.current === 'scanning') {
-        const pct = 33 + Math.min(33, (stableCountRef.current / STABLE_FRAMES_AFTER_LIVENESS) * 33);
-        setProgressThrottled(Math.round(pct));
-        stableCountRef.current++;
+        // Once capture is triggered, keep progress at 100% so bar and "Verified" stay in sync with capture/congratulations
+        if (capturedRef.current) {
+          setProgressThrottled(100);
+        } else {
+          const pct = 33 + Math.min(33, (stableCountRef.current / STABLE_FRAMES_AFTER_LIVENESS) * 33);
+          setProgressThrottled(Math.round(pct));
+          stableCountRef.current++;
+        }
 
         if (
           !capturedRef.current &&
@@ -379,6 +384,7 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
           landmarks.length >= 21
         ) {
           capturedRef.current = true;
+          setProgressThrottled(100);
           setProgressRing(100);
           const geometryDesc = palmGeometryDescriptor(landmarks.map((l) => ({ x: l.x, y: l.y })));
           if (geometryDesc.length > 0) {
@@ -410,7 +416,7 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
           } else {
             capturedRef.current = false;
           }
-          stableCountRef.current = 0;
+          // Do not reset stableCountRef here so we keep progress at 100% while waiting for hash
         }
       }
     };
@@ -467,12 +473,13 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
           height={480}
         />
 
-        {/* Same scanning style as face: gold progress bar at bottom */}
+        {/* Progress bar driven by actual palm verification so it stays in sync with body/congratulations */}
         {(status === 'ready' || status === 'liveness' || status === 'scanning') && (
           <BiometricScanProgressBar
             isActive={true}
             durationMs={Math.max(4000, LIVENESS_DURATION_MS + 2500)}
             overlay
+            controlledProgress={progressRing}
           />
         )}
 

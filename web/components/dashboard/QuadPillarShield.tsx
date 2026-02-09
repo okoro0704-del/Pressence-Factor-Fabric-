@@ -25,12 +25,14 @@ const DEFAULT_SCAN_DURATION_MS = 4000;
 export interface BiometricScanProgressBarProps {
   /** When true, show scanning line and run progress 0→100 */
   isActive: boolean;
-  /** Duration in ms for progress to reach 100% (3–5s typical) */
+  /** Duration in ms for progress to reach 100% (3–5s typical). Ignored when controlledProgress is provided. */
   durationMs?: number;
   /** Called when progress reaches 100%; then show Verified and optional hash send is handled by parent/auth flow */
   onComplete?: () => void;
   /** Optional: when true, overlay fills parent (absolute); otherwise standalone block for below grid */
   overlay?: boolean;
+  /** When set, progress is driven by parent (e.g. palm scan real progress). Bar and "Verified" stay in sync with actual verification. */
+  controlledProgress?: number;
 }
 
 /**
@@ -45,6 +47,7 @@ export function BiometricScanProgressBar({
   durationMs = DEFAULT_SCAN_DURATION_MS,
   onComplete,
   overlay = true,
+  controlledProgress,
 }: BiometricScanProgressBarProps) {
   const [progress, setProgress] = useState(0);
   const [verified, setVerified] = useState(false);
@@ -84,12 +87,17 @@ export function BiometricScanProgressBar({
     };
   }, [isActive, tick]);
 
-  if (!isActive && !verified) return null;
+  // Controlled mode: parent drives progress (e.g. palm scan). Bar and Verified stay in sync with actual verification.
+  const isControlled = typeof controlledProgress === 'number';
+  const displayProgress = isControlled ? Math.min(100, Math.max(0, controlledProgress)) : progress;
+  const displayVerified = isControlled ? controlledProgress >= 100 : verified;
+
+  if (!isActive && !displayVerified) return null;
 
   const content = (
     <>
       {/* Gold scanning line: moves up and down while scanning */}
-      {!verified && (
+      {!displayVerified && (
         <div
           className="biometric-scan-line absolute left-0 right-0 h-1 pointer-events-none z-10"
           style={{
@@ -104,7 +112,7 @@ export function BiometricScanProgressBar({
         className="absolute left-0 right-0 bottom-0 h-2 sm:h-2.5 overflow-hidden rounded-b-xl pointer-events-none z-10"
         style={{ background: 'rgba(0,0,0,0.5)' }}
         role="progressbar"
-        aria-valuenow={Math.round(progress)}
+        aria-valuenow={Math.round(displayProgress)}
         aria-valuemin={0}
         aria-valuemax={100}
         aria-label="Biometric scan progress"
@@ -112,16 +120,16 @@ export function BiometricScanProgressBar({
         <div
           className="h-full transition-all duration-300 ease-out rounded-b-xl"
           style={{
-            width: `${progress}%`,
-            background: verified
+            width: `${displayProgress}%`,
+            background: displayVerified
               ? `linear-gradient(90deg, ${GREEN}, ${GREEN}dd)`
               : `linear-gradient(90deg, ${GOLD}, ${GOLD}dd)`,
-            boxShadow: verified ? `0 0 12px ${GREEN}80` : `0 0 12px ${GOLD}80`,
+            boxShadow: displayVerified ? `0 0 12px ${GREEN}80` : `0 0 12px ${GOLD}80`,
           }}
         />
       </div>
       {/* Verified overlay: smooth green fade */}
-      {verified && (
+      {displayVerified && (
         <div
           className="absolute inset-0 z-20 flex flex-col items-center justify-center pointer-events-none rounded-xl bg-[#22c55e]/25 transition-opacity duration-500"
           style={{ boxShadow: `inset 0 0 60px ${GREEN}40` }}
