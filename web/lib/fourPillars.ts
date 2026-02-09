@@ -10,6 +10,7 @@ import {
   generateSovereignRoot,
   computeIdentityAnchorHash,
   saveCitizenRootToSupabase,
+  saveSovereignRootToUserProfile,
 } from './sovereignRoot';
 
 export interface GeolocationPillar {
@@ -101,13 +102,19 @@ export async function savePillarsAt75(
   }
 }
 
+function isValidHash(h: string): boolean {
+  const t = String(h).trim();
+  return t.length === 64 && /^[0-9a-fA-F]+$/.test(t);
+}
+
 /**
- * Generate Master Identity Anchor from the three pillar hashes and save to citizens.citizen_root.
+ * Generate Master Identity Anchor (Merkle root) from the three pillar hashes and save to Supabase.
+ * Saves to user_profiles.sovereign_root (by phone) and citizens.citizen_root (by device_id/key_id).
  * Individual hashes are cleared from the holder object on success (security: one-way recognition).
  * Call after pillars are saved (e.g. after savePillarsAt75 or saveFourPillars).
  *
- * @param faceHash - Verified Pillar 1 (Face) hash
- * @param palmHash - Verified Pillar 2 (Palm) hash
+ * @param faceHash - Verified Pillar 1 (Face) hash — must be non-empty and hex
+ * @param palmHash - Verified Pillar 2 (Palm) hash — must be non-empty and hex
  * @param phone - Identity anchor phone (Pillar 3)
  * @param deviceId - Device ID (Pillar 3)
  * @param keyId - Citizen key_id (from vitalize/register); use 'default' if not available
@@ -120,22 +127,40 @@ export async function generateAndSaveSovereignRoot(
   deviceId: string,
   keyId: string = 'default'
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const holder = { faceHash, palmHash, identityAnchorHash: '' };
+  const f = String(faceHash).trim();
+  const p = String(palmHash).trim();
+  if (!f || !p) {
+    return { ok: false, error: 'face_hash and palm_hash are required to generate sovereign root' };
+  }
+  if (!isValidHash(f) || !isValidHash(p)) {
+    return { ok: false, error: 'face_hash and palm_hash must be valid hex hashes' };
+  }
+
+  const holder = { faceHash: f, palmHash: p, identityAnchorHash: '' };
   try {
     const identityAnchorHash = await computeIdentityAnchorHash(phone.trim(), deviceId.trim());
     holder.identityAnchorHash = identityAnchorHash;
-    const citizenRoot = await generateSovereignRoot(
+    const sovereignRoot = await generateSovereignRoot(
       holder.faceHash!,
       holder.palmHash!,
       holder.identityAnchorHash
     );
-    const result = await saveCitizenRootToSupabase(
-      citizenRoot,
+
+    const byPhone = await saveSovereignRootToUserProfile(phone.trim(), sovereignRoot);
+    if (!byPhone.ok) {
+      return { ok: false, error: byPhone.error ?? 'Failed to save sovereign root to user_profiles' };
+    }
+
+    const byCitizen = await saveCitizenRootToSupabase(
+      sovereignRoot,
       deviceId.trim(),
       keyId.trim() || 'default',
       holder
     );
-    return result;
+    if (!byCitizen.ok) {
+      console.warn('citizen_root (citizens table) save failed:', byCitizen.error, '- sovereign_root stored in user_profiles');
+    }
+    return { ok: true };
   } catch (e) {
     return {
       ok: false,

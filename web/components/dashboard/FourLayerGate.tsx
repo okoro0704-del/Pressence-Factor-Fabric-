@@ -654,14 +654,15 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
         const palmHash = (profile?.palm_hash ?? '').trim();
         const deviceInfo = getCurrentDeviceInfo();
         const deviceId = deviceInfo?.deviceId ?? '';
-        if (faceHash && palmHash && deviceId) {
+        const hashesValid = faceHash.length === 64 && palmHash.length === 64 && /^[0-9a-fA-F]+$/.test(faceHash) && /^[0-9a-fA-F]+$/.test(palmHash);
+        if (hashesValid && deviceId) {
           const save = await savePillarsAt75(phone, faceHash, palmHash, deviceId);
           if (save.ok) {
             await mintFoundationSeigniorage(phone);
             setVitalizationComplete();
             const rootResult = await generateAndSaveSovereignRoot(faceHash, palmHash, phone, deviceId, 'default');
             if (!rootResult.ok) {
-              console.warn('Master Identity Anchor (citizen_root) save failed:', rootResult.error);
+              console.warn('Sovereign root (Merkle) save failed:', rootResult.error);
             }
           }
         }
@@ -690,11 +691,12 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
         const deviceInfo = getCurrentDeviceInfo();
         const deviceId = deviceInfo?.deviceId ?? '';
         const geo = await getCurrentGeolocation();
-        if (faceHash && palmHash && deviceId && geo) {
+        const hashesValid = faceHash.length === 64 && palmHash.length === 64 && /^[0-9a-fA-F]+$/.test(faceHash) && /^[0-9a-fA-F]+$/.test(palmHash);
+        if (hashesValid && deviceId && geo) {
           await saveFourPillars(phone, faceHash, palmHash, deviceId, geo);
           const rootResult = await generateAndSaveSovereignRoot(faceHash, palmHash, phone, deviceId, 'default');
           if (!rootResult.ok) {
-            console.warn('Master Identity Anchor (citizen_root) save failed:', rootResult.error);
+            console.warn('Sovereign root (Merkle) save failed:', rootResult.error);
           }
         }
         // After successful vitalization: save passkey for the site to this device (no prompt before vitalization).

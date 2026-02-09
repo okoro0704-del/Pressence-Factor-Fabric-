@@ -27,6 +27,7 @@ interface NormalizedLandmark {
 const LIVENESS_DURATION_MS = 1500;
 const STABLE_FRAMES_AFTER_LIVENESS = 48;
 const PROGRESS_THROTTLE_MS = 80;
+const INIT_TIMEOUT_MS = 20000;
 const GOLD = '#D4AF37';
 const GOLD_RING = 'rgba(212, 175, 55, 0.9)';
 const GOLD_BG = 'rgba(212, 175, 55, 0.25)';
@@ -60,8 +61,9 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
   const streamRef = useRef<MediaStream | null>(null);
   const handsRef = useRef<any>(null);
   const rafRef = useRef<number>(0);
-  const [status, setStatus] = useState<'initializing' | 'ready' | 'liveness' | 'scanning' | 'captured' | 'success' | 'denied'>('initializing');
+  const [status, setStatus] = useState<'initializing' | 'loading_hands' | 'ready' | 'liveness' | 'scanning' | 'captured' | 'success' | 'denied'>('initializing');
   const [error, setError] = useState<string | null>(null);
+  const [initRetry, setInitRetry] = useState(0);
   const [progressRing, setProgressRing] = useState(0);
   const [capturedImageDataUrl, setCapturedImageDataUrl] = useState<string | null>(null);
   const capturedHashRef = useRef<string | null>(null);
@@ -125,15 +127,20 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
 
     let cancelled = false;
 
+    const timeoutId = setTimeout(() => {
+      if (cancelled) return;
+      stopCamera();
+      setError('Camera or hand detection is taking too long. Please allow camera access and try again.');
+      setStatus('denied');
+      onErrorRef.current?.('Initialization timed out.');
+    }, INIT_TIMEOUT_MS);
+
     const init = async () => {
       try {
-        const [hands, stream] = await Promise.all([
-          getMediaPipeHands(),
-          navigator.mediaDevices.getUserMedia({
-            video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
-            audio: false,
-          }),
-        ]);
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
+          audio: false,
+        });
 
         if (cancelled) {
           stream.getTracks().forEach((t) => t.stop());
@@ -143,6 +150,17 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
         streamRef.current = stream;
         video.srcObject = stream;
         await video.play();
+        setStatus('loading_hands');
+
+        if (cancelled) return;
+
+        const hands = await getMediaPipeHands();
+
+        if (cancelled) {
+          stream.getTracks().forEach((t) => t.stop());
+          streamRef.current = null;
+          return;
+        }
 
         handsRef.current = hands;
         hands.onResults((results: { multiHandLandmarks: NormalizedLandmark[][] }) => {
@@ -152,26 +170,31 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
 
         setStatus('ready');
       } catch (e) {
+        if (cancelled) return;
         const msg = e instanceof Error ? e.message : String(e);
         setError(msg);
         setStatus('denied');
         onErrorRef.current?.(msg);
+      } finally {
+        clearTimeout(timeoutId);
       }
     };
 
     init();
     return () => {
       cancelled = true;
+      clearTimeout(timeoutId);
       stopCamera();
     };
-  }, [isOpen, stopCamera]);
+  }, [isOpen, stopCamera, initRetry]);
 
   useEffect(() => {
     if (!isOpen) {
       setScanCue('');
       return;
     }
-    if (status === 'liveness') setScanCue('Hold still — verifying liveness');
+    if (status === 'loading_hands') setScanCue('Loading hand detection…');
+    else if (status === 'liveness') setScanCue('Hold still — verifying liveness');
     else if (status === 'scanning') setScanCue('Identifying markers…');
     else if (status === 'ready') setScanCue('Show your palm');
     else if (status === 'captured') setScanCue('Palm captured — proceed when ready');
@@ -190,8 +213,9 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
 
       if (!isOpenRef.current) return;
       const s = statusRef.current;
-      if (s !== 'ready' && s !== 'liveness' && s !== 'scanning') return;
-      if (!handsRef.current) return;
+      if (s !== 'loading_hands' && s !== 'ready' && s !== 'liveness' && s !== 'scanning') return;
+      const loadingOnly = s === 'loading_hands';
+      if (!loadingOnly && !handsRef.current) return;
 
       const ctx = canvas.getContext('2d');
       const landmarks = lastLandmarksRef.current;
@@ -212,6 +236,11 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
       ctx.scale(-1, 1);
       ctx.drawImage(video, -vw, 0, vw, vh);
       ctx.restore();
+
+      if (loadingOnly) {
+        rafRef.current = requestAnimationFrame(draw);
+        return;
+      }
 
       const hasPalm = landmarks && landmarks.length >= 21;
       const c = hasPalm ? palmCenter(landmarks) : { x: 0.5, y: 0.5 };
@@ -461,11 +490,13 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
         )}
       </div>
 
-      {/* Captured: show "photo" of scanned palm + approval + Proceed */}
+      {/* Captured: congratulatory Vitalization complete + Proceed to Dashboard */}
       {status === 'captured' && (
         <div className="absolute inset-0 z-[250] flex flex-col bg-black">
           <div className="flex-1 relative min-h-0 flex flex-col items-center justify-center p-4">
-            <p className="text-center text-sm font-mono uppercase tracking-widest mb-3" style={{ color: GOLD }}>Palm captured</p>
+            <p className="text-center text-lg font-bold mb-2" style={{ color: GOLD }}>Congratulations</p>
+            <p className="text-center text-xl font-bold mb-4 text-[#22c55e]">Vitalization is complete</p>
+            <p className="text-center text-sm font-mono uppercase tracking-widest mb-4 opacity-90" style={{ color: GOLD }}>Face and palm verified</p>
             <div className="relative w-full max-w-sm rounded-2xl overflow-hidden border-2 shadow-2xl" style={{ borderColor: GOLD, boxShadow: `0 0 24px ${GOLD}40` }}>
               {capturedImageDataUrl ? (
                 <img
@@ -481,8 +512,7 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
               )}
               <div className="absolute inset-0 pointer-events-none bg-[#D4AF37]/15" aria-hidden />
             </div>
-            <p className="mt-4 text-center text-base font-semibold text-[#22c55e]">Approved</p>
-            <p className="mt-1 text-center text-xs font-mono text-[#6b6b70]">Your palm has been verified. Proceed to complete vitalization.</p>
+            <p className="mt-4 text-center text-sm font-mono text-[#6b6b70]">Your identity is anchored. You may proceed to your dashboard.</p>
           </div>
           <div className="p-4" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))' }}>
             <button
@@ -500,7 +530,7 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
               className="w-full rounded-xl py-4 text-base font-bold text-[#0d0d0f] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ background: GOLD }}
             >
-              Proceed to next page
+              Proceed to Dashboard
             </button>
           </div>
         </div>
@@ -513,17 +543,36 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
         </div>
       )}
 
+      {status === 'loading_hands' && (
+        <div className="absolute bottom-4 left-0 right-0 z-[200] text-center">
+          <p className="text-amber-400 font-mono text-sm tracking-wider">Loading hand detection…</p>
+        </div>
+      )}
+
       {status === 'denied' && (
         <div className="absolute inset-0 z-[200] flex flex-col items-center justify-center bg-[#0d0d0f] px-6 text-center">
           <p className="text-amber-400 text-lg font-semibold mb-2">Camera required for Palm Pulse</p>
           <p className="text-[#6b6b70] text-sm mb-6 max-w-sm">{error ?? 'Camera access denied.'}</p>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-xl border-2 border-[#2a2a2e] px-6 py-3 text-base font-medium text-[#a0a0a5] hover:bg-[#16161a]"
-          >
-            Cancel
-          </button>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setError(null);
+                setStatus('initializing');
+                setInitRetry((r) => r + 1);
+              }}
+              className="rounded-xl bg-amber-500/20 border border-amber-500/50 px-6 py-3 text-base font-medium text-amber-400 hover:bg-amber-500/30"
+            >
+              Try again
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-xl border-2 border-[#2a2a2e] px-6 py-3 text-base font-medium text-[#a0a0a5] hover:bg-[#16161a]"
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       )}
     </div>

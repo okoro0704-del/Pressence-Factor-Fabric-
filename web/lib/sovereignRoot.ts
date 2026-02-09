@@ -1,66 +1,42 @@
 /**
  * Master Identity Anchor: unify Pillar 1 (Face), Pillar 2 (Palm), Pillar 3 (Identity Anchor)
- * into a single sovereign root hash. Once created, individual hashes must be deleted from
- * local memory; login only needs to verify that the current scan matches a portion of this root.
+ * into a single sovereign root hash via a Merkle tree. Once created, individual hashes must
+ * be deleted from local memory; login only needs to verify that the current scan matches a portion of this root.
  */
 
-const SOVEREIGN_ROOT_SEPARATOR = '\u001f'; // unit separator to avoid collision with hash content
+import { generateMerkleRoot } from './merkleRoot';
+
+const SOVEREIGN_ROOT_SEPARATOR = '\u001f'; // unit separator for identity anchor hash input
 
 /**
- * Combine three verified pillar hashes into a single Master Root Hash using SHA-256.
- * Uses deterministic concatenation so the same inputs always produce the same root.
- * Alternative: use keccak256 (e.g. from js-sha3) for EVM compatibility; here we use SHA-256 for Web Crypto availability.
+ * Combine three verified pillar hashes into a single Master Root Hash using a Merkle tree.
+ * Leaves: [face_hash, palm_hash, identity_anchor_hash]; root = Merkle root (SHA-256 at each level).
+ * Same inputs always produce the same root. Stored in Supabase as citizen_root / sovereign_root.
  *
- * @param faceHash - Verified hash from Pillar 1 (Face)
- * @param palmHash - Verified hash from Pillar 2 (Palm)
+ * @param faceHash - Verified hash from Pillar 1 (Face) — 64 hex chars
+ * @param palmHash - Verified hash from Pillar 2 (Palm) — 64 hex chars
  * @param identityAnchorHash - Verified hash from Pillar 3 (Identity Anchor), e.g. SHA-256(phone + '|' + device_id)
- * @returns The master root hex string (64 chars). Caller must clear faceHash, palmHash, identityAnchorHash from memory after storing.
+ * @returns The Merkle root hex string (64 chars). Caller must clear faceHash, palmHash, identityAnchorHash from memory after storing.
  */
 export async function generateSovereignRoot(
   faceHash: string,
   palmHash: string,
   identityAnchorHash: string
 ): Promise<string> {
-  const normalized = [
+  return generateMerkleRoot(
     String(faceHash).trim(),
     String(palmHash).trim(),
-    String(identityAnchorHash).trim(),
-  ];
-  if (normalized[0] === '' || normalized[1] === '' || normalized[2] === '') {
-    throw new Error('generateSovereignRoot: face, palm, and identity anchor hashes are required');
-  }
-  const payload = normalized.join(SOVEREIGN_ROOT_SEPARATOR);
-  const encoder = new TextEncoder();
-  const data = encoder.encode(payload);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = new Uint8Array(hashBuffer);
-  const hex = Array.from(hashArray)
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
-  return hex;
+    String(identityAnchorHash).trim()
+  );
 }
 
-/**
- * Synchronous SHA-256 using Web Crypto (for environments where async is not desired).
- * Prefer generateSovereignRoot() for consistency.
- */
+/** Sync version not supported; use generateSovereignRoot() (async). */
 export function generateSovereignRootSync(
-  faceHash: string,
-  palmHash: string,
-  identityAnchorHash: string
+  _faceHash: string,
+  _palmHash: string,
+  _identityAnchorHash: string
 ): string {
-  const normalized = [
-    String(faceHash).trim(),
-    String(palmHash).trim(),
-    String(identityAnchorHash).trim(),
-  ];
-  if (normalized[0] === '' || normalized[1] === '' || normalized[2] === '') {
-    throw new Error('generateSovereignRootSync: face, palm, and identity anchor hashes are required');
-  }
-  const payload = normalized.join(SOVEREIGN_ROOT_SEPARATOR);
-  // Use crypto.subtle is async-only in browser; so sync version requires a small digest lib or we leave it async-only.
-  // For Node/crypto: require('crypto').createHash('sha256').update(payload).digest('hex');
-  throw new Error('Use generateSovereignRoot() (async) for browser; sync requires Node crypto');
+  throw new Error('Use generateSovereignRoot() (async) for Merkle root');
 }
 
 /**
@@ -95,14 +71,39 @@ export function clearPillarHashesFromObject(holder: {
 }
 
 /**
+ * Save the sovereign (Merkle) root to user_profiles by phone. Call after generateSovereignRoot.
+ * Ensures the combined hash is stored in Supabase even if citizens table has no row.
+ */
+export async function saveSovereignRootToUserProfile(
+  phone: string,
+  sovereignRoot: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const res = await fetch('/api/v1/save-sovereign-root', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        phone_number: phone.trim(),
+        sovereign_root: sovereignRoot.trim(),
+      }),
+    });
+    const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+    if (res.ok && json.ok === true) return { ok: true };
+    return { ok: false, error: json.error ?? 'Failed to save sovereign root to profile' };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Failed to save sovereign root' };
+  }
+}
+
+/**
  * Save the Master Root to Supabase (citizens.citizen_root) and then clear the provided hashes.
  * Call this after generateSovereignRoot. On success, the individual hashes are cleared from the holder object.
  *
- * @param citizenRoot - The master root from generateSovereignRoot()
+ * @param citizenRoot - The Merkle root from generateSovereignRoot()
  * @param deviceId - Citizen's device_id
  * @param keyId - Citizen's key_id
  * @param holder - Object holding faceHash, palmHash, identityAnchorHash; will be cleared on success
- * @returns { ok: true } or { ok: false, error: string }
+ * @returns { ok: true } or { ok: false; error: string }
  */
 export async function saveCitizenRootToSupabase(
   citizenRoot: string,
