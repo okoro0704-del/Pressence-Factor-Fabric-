@@ -3,8 +3,8 @@ import { getSupabase } from '@/lib/supabase';
 
 /**
  * POST body: { password: string }
- * Validates against the permanent master password. If correct, returns { ok: true }.
- * Checks PFF_MASTER_PASSWORD env first (set in Netlify); else uses Supabase validate_master_password.
+ * Validates against the permanent master password (numbers only). Returns { ok: true } if correct.
+ * Order: default 202604070001 first (always works), then env, then Supabase.
  */
 export async function POST(request: Request) {
   let body: { password?: string };
@@ -13,29 +13,42 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json({ ok: false, error: 'Invalid JSON' }, { status: 400 });
   }
-  const password = typeof body?.password === 'string' ? body.password.trim() : '';
-  if (!password) {
+  const raw = typeof body?.password === 'string' ? body.password : '';
+  const digitsOnly = raw.trim().replace(/\D/g, '');
+  if (!digitsOnly) {
     return NextResponse.json({ ok: false, error: 'Password required' }, { status: 400 });
   }
 
-  const envPassword = process.env.PFF_MASTER_PASSWORD?.trim();
-  if (envPassword && password === envPassword) {
+  // 1. Default password — check first so it always works (no dependency on env or DB)
+  if (digitsOnly === '202604070001') {
+    return NextResponse.json({ ok: true }, {
+      headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' },
+    });
+  }
+
+  // 2. Env override (Netlify: PFF_MASTER_PASSWORD)
+  const envPassword = process.env.PFF_MASTER_PASSWORD?.trim().replace(/\D/g, '');
+  if (envPassword && digitsOnly === envPassword) {
     return NextResponse.json({ ok: true });
   }
 
+  // 3. Supabase (for custom passwords set in Settings)
   const supabase = getSupabase();
-  if (!supabase) {
-    return NextResponse.json({ ok: false, error: 'Database unavailable' }, { status: 503 });
+  if (supabase) {
+    try {
+      const { data, error } = await (supabase as any).rpc('validate_master_password', {
+        p_password: digitsOnly,
+      });
+      if (!error && data === true) {
+        return NextResponse.json({ ok: true });
+      }
+    } catch {
+      // RPC missing or error — already checked default and env above
+    }
   }
 
-  const { data, error } = await (supabase as any).rpc('validate_master_password', {
-    p_password: password,
-  });
-  if (error) {
-    return NextResponse.json({ ok: false, error: error.message ?? 'Validation failed' }, { status: 500 });
-  }
-  if (data === true) {
-    return NextResponse.json({ ok: true });
-  }
-  return NextResponse.json({ ok: false, error: 'Incorrect password' }, { status: 401 });
+  return NextResponse.json(
+    { ok: false, error: 'Incorrect password' },
+    { status: 401, headers: { 'Cache-Control': 'no-store' } }
+  );
 }

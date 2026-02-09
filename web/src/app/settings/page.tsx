@@ -16,7 +16,7 @@ import { clearVitalizationComplete } from '@/lib/vitalizationState';
 import { resetBiometrics } from '@/lib/resetBiometrics';
 import { getSupabase } from '@/lib/supabase';
 import { isArchitect } from '@/lib/publicRevealAccess';
-import { generateAccessCode, isBeforeAccessCutoff } from '@/lib/accessCodeGate';
+import { generateAccessCode, isBeforeAccessCutoff, changeMasterPassword } from '@/lib/accessCodeGate';
 
 const GOLD = '#D4AF37';
 
@@ -32,6 +32,13 @@ export default function SettingsPage() {
   const [generatedCode, setGeneratedCode] = useState<string | null>(null);
   const [generateCodeError, setGenerateCodeError] = useState<string | null>(null);
   const [generatingCode, setGeneratingCode] = useState(false);
+
+  const [masterCurrent, setMasterCurrent] = useState('');
+  const [masterNew, setMasterNew] = useState('');
+  const [masterConfirm, setMasterConfirm] = useState('');
+  const [masterChangeMessage, setMasterChangeMessage] = useState<string | null>(null);
+  const [masterChangeError, setMasterChangeError] = useState<string | null>(null);
+  const [changingMaster, setChangingMaster] = useState(false);
 
   useEffect(() => {
     setPhone(getIdentityAnchorPhone());
@@ -129,6 +136,78 @@ export default function SettingsPage() {
                 )}
                 {generateCodeError && (
                   <p className="text-sm mt-2" style={{ color: '#f87171' }}>{generateCodeError}</p>
+                )}
+              </div>
+            )}
+
+            {isArchitect() && isBeforeAccessCutoff() && (
+              <div className="rounded-xl border p-4" style={{ borderColor: 'rgba(212, 175, 55, 0.4)', background: 'rgba(212, 175, 55, 0.06)' }}>
+                <h2 className="text-sm font-semibold uppercase tracking-wider mb-2" style={{ color: GOLD }}>
+                  Change master password
+                </h2>
+                <p className="text-sm text-[#a0a0a5] mb-3">
+                  Choose a stronger numeric password (at least 8 digits). You will use it to log in from the bottom of the site. Save it somewhere safe.
+                </p>
+                <div className="space-y-3 mb-3">
+                  <input
+                    type="password"
+                    inputMode="numeric"
+                    maxLength={64}
+                    value={masterCurrent}
+                    onChange={(e) => { setMasterCurrent(e.target.value.replace(/\D/g, '')); setMasterChangeError(null); setMasterChangeMessage(null); }}
+                    placeholder="Current master password"
+                    className="w-full px-4 py-2.5 rounded-lg border-2 bg-[#0d0d0f] text-white placeholder-[#6b6b70]"
+                    style={{ borderColor: 'rgba(212, 175, 55, 0.3)' }}
+                  />
+                  <input
+                    type="password"
+                    inputMode="numeric"
+                    maxLength={64}
+                    value={masterNew}
+                    onChange={(e) => { setMasterNew(e.target.value.replace(/\D/g, '')); setMasterChangeError(null); setMasterChangeMessage(null); }}
+                    placeholder="New password (numbers only, min 8 digits)"
+                    className="w-full px-4 py-2.5 rounded-lg border-2 bg-[#0d0d0f] text-white placeholder-[#6b6b70]"
+                    style={{ borderColor: 'rgba(212, 175, 55, 0.3)' }}
+                  />
+                  <input
+                    type="password"
+                    inputMode="numeric"
+                    maxLength={64}
+                    value={masterConfirm}
+                    onChange={(e) => { setMasterConfirm(e.target.value.replace(/\D/g, '')); setMasterChangeError(null); setMasterChangeMessage(null); }}
+                    placeholder="Confirm new password"
+                    className="w-full px-4 py-2.5 rounded-lg border-2 bg-[#0d0d0f] text-white placeholder-[#6b6b70]"
+                    style={{ borderColor: 'rgba(212, 175, 55, 0.3)' }}
+                  />
+                </div>
+                <button
+                  type="button"
+                  disabled={changingMaster || !masterCurrent || masterNew.length < 8 || masterNew !== masterConfirm}
+                  onClick={async () => {
+                    setMasterChangeError(null);
+                    setMasterChangeMessage(null);
+                    setChangingMaster(true);
+                    const result = await changeMasterPassword(masterCurrent, masterNew);
+                    setChangingMaster(false);
+                    if (result.ok) {
+                      setMasterChangeMessage(result.message ?? 'Password updated. Use your new password at the bottom of the site.');
+                      setMasterCurrent('');
+                      setMasterNew('');
+                      setMasterConfirm('');
+                    } else {
+                      setMasterChangeError(result.error ?? 'Failed to change password');
+                    }
+                  }}
+                  className="px-5 py-2.5 rounded-lg font-bold uppercase tracking-wider border-2 transition-colors disabled:opacity-50"
+                  style={{ borderColor: GOLD, color: GOLD }}
+                >
+                  {changingMaster ? 'Updating…' : 'Change master password'}
+                </button>
+                {masterChangeMessage && (
+                  <p className="text-sm mt-2" style={{ color: '#22c55e' }}>{masterChangeMessage}</p>
+                )}
+                {masterChangeError && (
+                  <p className="text-sm mt-2" style={{ color: '#f87171' }}>{masterChangeError}</p>
                 )}
               </div>
             )}

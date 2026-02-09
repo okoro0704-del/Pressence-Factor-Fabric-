@@ -80,17 +80,41 @@ export function clearAccessGranted(): void {
 export async function validateMasterPassword(
   password: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  const digitsOnly = (password || '').trim().replace(/\D/g, '');
   try {
     const res = await fetch('/api/v1/master-login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password: password.trim() }),
+      body: JSON.stringify({ password: digitsOnly }),
     });
     const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
     if (res.ok && json.ok === true) {
       return { ok: true };
     }
     return { ok: false, error: json.error ?? 'Incorrect password' };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Request failed' };
+  }
+}
+
+export async function changeMasterPassword(
+  currentPassword: string,
+  newPassword: string
+): Promise<{ ok: true; message?: string } | { ok: false; error: string }> {
+  try {
+    const res = await fetch('/api/v1/master-password/change', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        current_password: currentPassword.trim(),
+        new_password: newPassword.trim().replace(/\D/g, ''),
+      }),
+    });
+    const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; message?: string };
+    if (res.ok && json.ok === true) {
+      return { ok: true, message: json.message };
+    }
+    return { ok: false, error: json.error ?? 'Failed to change password' };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'Request failed' };
   }
