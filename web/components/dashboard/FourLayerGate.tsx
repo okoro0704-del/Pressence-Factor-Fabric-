@@ -99,7 +99,12 @@ import { resetMediaPipeHands } from '@/lib/mediaPipeHandsLoader';
 import { saveFourPillars, savePillarsAt75, getCurrentGeolocation, generateAndSaveSovereignRoot } from '@/lib/fourPillars';
 import { getSupabase } from '@/lib/supabase';
 
-/** After face scan: wait for teardown, then one frame, then open palm with a fresh Hands instance. */
+/**
+ * Render-frame barrier + Palm reinit: after Face scan closes, wait for teardown, then one rAF, then open Palm.
+ * - 200ms allows Face teardown (tracks, srcObject, Face Mesh close) to complete on mobile.
+ * - resetMediaPipeHands() ensures a new Hands instance (no reuse).
+ * - requestAnimationFrame ensures at least one paint cycle before Palm gets camera.
+ */
 function schedulePalmAfterFace(setShowPalmPulse: (v: boolean) => void): void {
   setTimeout(() => {
     resetMediaPipeHands();

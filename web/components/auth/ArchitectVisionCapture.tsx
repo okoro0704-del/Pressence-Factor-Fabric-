@@ -181,8 +181,14 @@ export function ArchitectVisionCapture({
     };
   }, []);
 
-  /** Hard teardown: release camera, GPU, and MediaPipe Face so Palm scan can run cleanly on mobile. */
-  const stopCamera = useCallback(() => {
+  /**
+   * FaceScan teardown (hard stop): release camera, all frame loops, and MediaPipe Face.
+   * - Stops all camera tracks, clears video.srcObject, cancels animation loops.
+   * - Disposes MediaPipe Face instance (close() releases WebGL/GPU used by Face Mesh).
+   * - Resets Face Mesh singleton so Palm scan gets a clean slate.
+   * Call before starting Palm scan; do not reuse any of these resources.
+   */
+  const faceScanTeardown = useCallback(() => {
     if (rafRef.current) {
       cancelAnimationFrame(rafRef.current);
       rafRef.current = 0;
@@ -208,6 +214,9 @@ export function ArchitectVisionCapture({
     lastFaceLandmarksRef.current = null;
     resetMediaPipeFaceMesh();
   }, []);
+
+  /** Alias for compatibility with existing call sites. */
+  const stopCamera = faceScanTeardown;
 
   // Initialize camera and MediaPipe Face Mesh (runs on mount and on Retry)
   useEffect(() => {

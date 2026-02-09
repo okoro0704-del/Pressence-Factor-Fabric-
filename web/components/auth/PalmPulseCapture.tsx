@@ -28,12 +28,14 @@ const LIVENESS_DURATION_MS = 1500;
 const STABLE_FRAMES_AFTER_LIVENESS = 48;
 const PROGRESS_THROTTLE_MS = 80;
 const INIT_TIMEOUT_MS = 20000;
-/** Fail fast if no palm ROI detected within this time after ready (mobile stability). */
-const PALM_DETECTION_TIMEOUT_MS = 20000;
+/** Fail fast if no palm ROI detected within this time after ready (~5s, mobile stability). */
+const PALM_DETECTION_TIMEOUT_MS = 5000;
 /** Run heavy work (getImageData, reflectance) only every N frames so draw stays responsive */
 const HEAVY_WORK_INTERVAL = 3;
 const MAX_LIVENESS_SAMPLES = 60;
+/** Frame-by-frame debug: camera frames, hand landmarks, ROI extraction (dev only). */
 const DEBUG_PALM = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+const DEBUG_PALM_LOG_EVERY_N_FRAMES = 10;
 const GOLD = '#D4AF37';
 const GOLD_RING = 'rgba(212, 175, 55, 0.9)';
 const GOLD_BG = 'rgba(212, 175, 55, 0.25)';
@@ -123,10 +125,15 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
     }
   }, []);
 
+  /**
+   * PalmScan re-initialization: clean lifecycle, no shared state with Face.
+   * - Reset MediaPipe Hands singleton so we create a new instance (no reuse).
+   * - New getUserMedia (do not reuse camera stream).
+   * - Palm geometry and NIR-simulation run only after valid palm ROI is confirmed.
+   */
   useEffect(() => {
     if (!isOpen || typeof window === 'undefined') return;
 
-    // Clean reinit after face scan: new MediaPipe Hands instance (no reuse)
     resetMediaPipeHands();
 
     setError(null);
@@ -290,11 +297,26 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
 
       if (!ctx || video.readyState < 2 || video.videoWidth === 0) return;
 
-      // Frame debug (dev only): log every 60 frames
+      const hasValidFrame = video.readyState >= 2 && video.videoWidth > 0;
+      const hasLandmarks = !!(landmarks && landmarks.length >= 21);
+
+      // Frame-by-frame debug (dev): camera frames received, hand landmarks detected, ROI extraction
       if (DEBUG_PALM) {
         frameLogCounterRef.current++;
-        if (frameLogCounterRef.current % 60 === 0) {
-          console.log('[Palm]', 'frame', statusRef.current, 'landmarks', !!(landmarks && landmarks.length >= 21), 'video', video.readyState, video.videoWidth);
+        if (frameLogCounterRef.current % DEBUG_PALM_LOG_EVERY_N_FRAMES === 0) {
+          const vw = video.videoWidth;
+          const vh = video.videoHeight;
+          const c = hasLandmarks ? palmCenter(landmarks!) : { x: 0.5, y: 0.5 };
+          const cxPx = vw * c.x;
+          const cyPx = vh * c.y;
+          const reflectRegion = 32;
+          const roiExtractionSuccess =
+            hasLandmarks &&
+            cxPx - reflectRegion / 2 >= 0 &&
+            cyPx - reflectRegion / 2 >= 0 &&
+            cxPx + reflectRegion / 2 <= vw &&
+            cyPx + reflectRegion / 2 <= vh;
+          console.log('[Palm]', 'cameraFramesReceived:', hasValidFrame, 'videoWh:', vw, 'x', vh, '|', 'handLandmarksDetected:', hasLandmarks, 'count:', landmarks?.length ?? 0, '|', 'roiExtractionSuccess:', roiExtractionSuccess, 'status:', statusRef.current);
         }
       }
 
@@ -326,19 +348,21 @@ export function PalmPulseCapture({ isOpen, onClose, onSuccess, onError }: PalmPu
       const pendingCapture = pendingCaptureHashRef.current;
       const currentProgress = pendingCapture ? 100 : progressRingRef.current;
 
+      // Early exit if palm ROI not detected — no geometry/NIR until ROI confirmed
       if (!hasPalm) {
         stableCountRef.current = 0;
         if (statusRef.current === 'scanning') setStatus('liveness');
-        // While waiting for palm, show a slow 0–15% pulse so the bar isn’t frozen
         if (statusRef.current === 'ready') {
           const pulse = Math.floor(5 + 10 * Math.sin(Date.now() / 800));
           setProgressThrottled(Math.max(0, Math.min(15, pulse)));
         } else {
           setProgressThrottled(0);
         }
+        rafRef.current = requestAnimationFrame(draw);
         return;
       }
 
+      // Valid palm ROI confirmed. Geometry and NIR-simulation only run after this point.
       if (statusRef.current === 'ready') {
         setStatus('liveness');
         livenessStartRef.current = Date.now();
