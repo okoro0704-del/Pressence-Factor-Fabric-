@@ -336,6 +336,15 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
   /** Dual-Pillar: after Face Pulse, show Palm Pulse (Palm Wave) to authorize $100 daily unlock; replaces fingerprint. */
   const [showPalmPulse, setShowPalmPulse] = useState(false);
   const [palmPulseError, setPalmPulseError] = useState<string | null>(null);
+  /** Device (Passkey) binding: show after face verified so user clicks to trigger WebAuthn (browser requires user gesture). */
+  const [showDeviceBindingPrompt, setShowDeviceBindingPrompt] = useState(false);
+  const [deviceBindingParams, setDeviceBindingParams] = useState<{
+    phone: string;
+    faceHash: string;
+    deviceId: string;
+    displayName: string;
+  } | null>(null);
+  const deviceBindingOnSuccessRef = useRef<(() => void) | null>(null);
   /** Architect Mode: when active in session, show Debug Info on mobile too. */
   const [architectMode, setArchitectMode] = useState(false);
   /** Face Pulse fail count: after 2 failures show "Use Backup Anchor" (Sovereign Palm + Device ID only). */
@@ -1109,21 +1118,22 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
             setShowArchitectVision(false);
             if (!identityAnchor.isMinor) {
               palmVitalizationFlowRef.current = true;
-              // Face + Device: run device binding (no palm scan)
+              // Face + Device: show "Bind this device" so user clicks (browser requires user gesture for passkey).
               const faceHash = getFaceHashFromSession(identityAnchor.phone)?.trim() ?? '';
               const deviceId = await getCompositeDeviceFingerprint();
               if (faceHash && faceHash.length === 64 && deviceId) {
-                const res = await runDeviceBindingAndSovereignHash(
-                  identityAnchor.phone,
+                setDeviceBindingParams({
+                  phone: identityAnchor.phone,
                   faceHash,
                   deviceId,
-                  identityAnchor.name || `PFF — ${identityAnchor.phone.slice(-4)}`
-                );
-                if (res.ok) {
+                  displayName: identityAnchor.name || `PFF — ${identityAnchor.phone.slice(-4)}`,
+                });
+                deviceBindingOnSuccessRef.current = () => {
                   setPillarPalm(true);
                   saveVerifiedPillar(identityAnchor.phone, 'palm');
                   speakVitalizationSuccess();
-                }
+                };
+                setShowDeviceBindingPrompt(true);
               }
             }
             biometricPillarRef.current?.triggerExternalCapture();
@@ -1340,30 +1350,27 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
       await proceedAfterSecondPillar(p);
       return;
     }
-    // Device binding (WebAuthn): no palm scan
+    // Device binding (WebAuthn): show prompt so user clicks (browser requires user gesture for passkey).
     const faceHash = getFaceHashFromSession(anchor.phone)?.trim() ?? '';
     if (!faceHash || faceHash.length !== 64) {
       setPalmPulseError('Face hash not ready. Please try again.');
       return;
     }
     const deviceId = compositeDeviceId ?? '';
-    const result = await runDeviceBindingAndSovereignHash(
-      anchor.phone,
+    setDeviceBindingParams({
+      phone: anchor.phone,
       faceHash,
       deviceId,
-      anchor.name || `PFF — ${anchor.phone.slice(-4)}`
-    );
-    if (!result.ok) {
-      setPalmPulseError(result.error);
-      return;
-    }
-    setTripleAnchorVerified('fingerprint');
-    setPillarPalm(true);
-    palmResolveRef.current?.();
-    palmResolveRef.current = null;
-    void setVitalizationAnchor(faceHash, anchor.phone, result.deviceHash);
-    void anchorIdentityToDevice(faceHash, anchor.phone);
-    await proceedAfterSecondPillar(p);
+      displayName: anchor.name || `PFF — ${anchor.phone.slice(-4)}`,
+    });
+    deviceBindingOnSuccessRef.current = () => {
+      setTripleAnchorVerified('fingerprint');
+      setPillarPalm(true);
+      palmResolveRef.current?.();
+      palmResolveRef.current = null;
+      proceedAfterSecondPillar(p);
+    };
+    setShowDeviceBindingPrompt(true);
   }, [setBiometricSessionVerified, proceedAfterSecondPillar]);
 
   const handlePalmSuccess = useCallback(
@@ -1427,6 +1434,34 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
       architectSuccessRef.current = null;
     }
   }, [proceedAfterSecondPillar]);
+
+  /** User clicked "Bind this device" — run WebAuthn with user gesture so passkey create/get is allowed. */
+  const handleDeviceBindingClick = useCallback(async () => {
+    const params = deviceBindingParams;
+    if (!params) return;
+    setPalmPulseError(null);
+    try {
+      const result = await runDeviceBindingAndSovereignHash(
+        params.phone,
+        params.faceHash,
+        params.deviceId,
+        params.displayName
+      );
+      if (result.ok) {
+        void setVitalizationAnchor(params.faceHash, params.phone, result.deviceHash);
+        void anchorIdentityToDevice(params.faceHash, params.phone);
+        deviceBindingOnSuccessRef.current?.();
+        deviceBindingOnSuccessRef.current = null;
+        setDeviceBindingParams(null);
+        setShowDeviceBindingPrompt(false);
+      } else {
+        setPalmPulseError(result.error);
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setPalmPulseError(msg || 'Device binding failed.');
+    }
+  }, [deviceBindingParams]);
 
   const handleMismatchDismiss = () => {
     setShowMismatchScreen(false);
@@ -2974,6 +3009,39 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
             setPillarPalm(true);
           }}
         />
+      )}
+
+      {/* Device (Passkey) binding prompt — shown after face verified; user must click to trigger (browser requires user gesture). */}
+      {showDeviceBindingPrompt && deviceBindingParams && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/80" aria-modal="true" role="dialog" aria-labelledby="device-binding-title">
+          <div className="w-full max-w-md rounded-xl border-2 border-[#D4AF37]/60 bg-[#1a1a1e] p-6 shadow-xl">
+            <h2 id="device-binding-title" className="text-lg font-bold text-[#D4AF37] mb-2">Face verified</h2>
+            <p className="text-sm text-[#a0a0a5] mb-4">
+              Bind this device with a Passkey so you can sign in with face + device. Click the button below — your browser will ask you to create or use a passkey (e.g. Touch ID, Windows Hello).
+            </p>
+            {palmPulseError && (
+              <div className="mb-4 rounded-lg bg-red-500/20 border border-red-500/50 px-3 py-2 text-sm text-red-300">
+                {palmPulseError}
+              </div>
+            )}
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={handleDeviceBindingClick}
+                className="flex-1 min-h-[48px] py-3 px-4 rounded-lg font-bold bg-[#D4AF37] text-black hover:bg-[#e8c547] transition-colors"
+              >
+                Bind this device (Passkey)
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowDeviceBindingPrompt(false); setDeviceBindingParams(null); deviceBindingOnSuccessRef.current = null; setPalmPulseError(null); }}
+                className="px-4 py-3 rounded-lg border border-[#6b6b70] text-[#a0a0a5] hover:bg-white/5 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Dual-Pillar Scan 2: Palm Pulse (Palm Wave) — contactless palm verification, replaces fingerprint for daily unlock */}

@@ -56,7 +56,7 @@ function encode(n: number[]): string {
   return n.map((x) => ALPHABET[x & 63]).join('');
 }
 
-/** Create a new platform authenticator credential (register). userVerification: required → biometrics. */
+/** Create a new passkey (platform or cross-platform). Prefer platform; fall back to security key. userVerification: required. */
 export async function createCredential(userId: string, userName: string): Promise<PublicKeyCredential | null> {
   if (!isSecureContext() || !isWebAuthnSupported()) return null;
   const challenge = new Uint8Array(generateChallenge());
@@ -74,17 +74,25 @@ export async function createCredential(userId: string, userName: string): Promis
         { type: 'public-key', alg: -257 },
       ],
       authenticatorSelection: {
-        authenticatorAttachment: 'platform',
-        userVerification: 'required', // Fortress: hard biometric; never 'preferred'
+        authenticatorAttachment: 'preferred', // platform first (Touch ID / Windows Hello), then cross-platform if needed
+        userVerification: 'required',
         residentKey: 'preferred',
         requireResidentKey: false,
       },
-      timeout: 60000,
+      timeout: 90000,
       attestation: 'none',
     },
   };
-  const cred = await navigator.credentials.create(opts);
-  return cred as PublicKeyCredential | null;
+  try {
+    const cred = await navigator.credentials.create(opts);
+    return cred as PublicKeyCredential | null;
+  } catch (e) {
+    const err = e instanceof Error ? e : new Error(String(e));
+    if (/NotAllowedError|not allowed|user cancelled|canceled/i.test(err.name + err.message)) {
+      throw new Error('Passkey creation was cancelled or is not allowed. Please click "Bind this device" and complete the prompt.');
+    }
+    throw err;
+  }
 }
 
 export interface AssertionWithCredential {
@@ -112,9 +120,17 @@ export async function getAssertion(
       ...(allowCredentials.length ? { allowCredentials } : {}),
     },
   };
-  const cred = await navigator.credentials.get(opts);
-  if (!cred || !(cred instanceof PublicKeyCredential)) return null;
-  return { credential: cred, response: cred.response as AuthenticatorAssertionResponse };
+  try {
+    const cred = await navigator.credentials.get(opts);
+    if (!cred || !(cred instanceof PublicKeyCredential)) return null;
+    return { credential: cred, response: cred.response as AuthenticatorAssertionResponse };
+  } catch (e) {
+    const err = e instanceof Error ? e : new Error(String(e));
+    if (/NotAllowedError|not allowed|user cancelled|canceled/i.test(err.name + err.message)) {
+      throw new Error('Sign-in was cancelled. Please try again and complete the passkey prompt.');
+    }
+    throw err;
+  }
 }
 
 export function getRpId(): string {
