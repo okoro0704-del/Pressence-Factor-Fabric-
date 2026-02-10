@@ -145,6 +145,39 @@ export async function setVitalizationAnchor(
   }
 }
 
+/**
+ * True if this phone number OR current device is already in the citizens table (user_profiles).
+ * When true, hide "Vitalize New Soul" and show only "Retry Scan" or "Use Device Passkey".
+ */
+export async function getIsExistingCitizen(phone?: string | null): Promise<boolean> {
+  const supabase = getSupabase();
+  if (!supabase) return false;
+  try {
+    if (phone?.trim()) {
+      const { data: byPhone, error: e1 } = await (supabase as any)
+        .from('user_profiles')
+        .select('id')
+        .eq('phone_number', phone.trim())
+        .limit(1)
+        .maybeSingle();
+      if (!e1 && byPhone?.id) return true;
+    }
+    const deviceId = await getCompositeDeviceFingerprint();
+    if (deviceId?.trim()) {
+      const { data: byDevice, error: e2 } = await (supabase as any)
+        .from('user_profiles')
+        .select('id')
+        .eq('primary_sentinel_device_id', deviceId.trim())
+        .limit(1)
+        .maybeSingle();
+      if (!e2 && byDevice?.id) return true;
+    }
+  } catch {
+    // non-blocking
+  }
+  return false;
+}
+
 /** Clear anchor (e.g. "Vitalize New Soul"). */
 export function clearVitalizationAnchor(): void {
   if (typeof localStorage === 'undefined') return;

@@ -25,7 +25,7 @@ interface LoginRequestNotificationProps {
 
 /**
  * Phone: Sentinel push — "Access requested from [Laptop Name]. Verify DNA to Grant."
- * Primary action opens 2s Face/Palm scanner; 95%+ match approves and sends handshake to laptop.
+ * Primary action opens 2s Face/Palm scanner; 85%+ match approves and sends handshake to laptop.
  * Deny or scan fail → audit log "Unauthorized Access Blocked."
  */
 export function LoginRequestNotification({

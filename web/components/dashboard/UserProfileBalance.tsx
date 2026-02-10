@@ -346,7 +346,7 @@ export function UserProfileBalance({
           >
             <span className="text-amber-400 text-lg" aria-hidden>🔒</span>
             <p className="text-sm text-amber-200/90">
-              Face-First Security: Verify face (95%+ match) to view balance and National Reserve data.
+              Face-First Security: Verify face (85%+ match) to view balance and National Reserve data.
             </p>
           </button>
         )}
@@ -546,7 +546,7 @@ export function UserProfileBalance({
                 {showBalanceAsMinted ? formatNaira(spendableNaira) : '••••••'}
               </span>
             </div>
-            <p className="text-xs text-[#6b6b70] mt-1">{showBalanceAsMinted ? `Sovereign Reserve Value: $1,000. Sentinel fee 0.1 VIDA ($100). Liquid after fee: ${formatNaira(spendableNaira)}.` : 'Verify face (95%+ match) to view'}</p>
+            <p className="text-xs text-[#6b6b70] mt-1">{showBalanceAsMinted ? `Sovereign Reserve Value: $1,000. Sentinel fee 0.1 VIDA ($100). Liquid after fee: ${formatNaira(spendableNaira)}.` : 'Verify face (85%+ match) to view'}</p>
           </div>
 
           <div className="p-4 bg-[#0d0d0f] rounded-lg border border-[#2a2a2e]">

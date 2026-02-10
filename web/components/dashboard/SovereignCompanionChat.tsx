@@ -28,7 +28,7 @@ import {
   detectLangFromRecognitionMessage,
 } from '@/lib/sovereignRecognition';
 import { getVibration, setVibration, getVibrationFromInput, levelToRegister } from '@/lib/vibrationEngine';
-import { getMemoryVault, formatVaultForContext } from '@/lib/memoryVault';
+import { getMemoryVault, formatVaultForContext, clearCompanionContext } from '@/lib/memoryVault';
 import {
   isRelationalSmallTalk,
   getRelationalShortResponse,
@@ -88,8 +88,20 @@ export function SovereignCompanionChat({
   const [input, setInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
+  const [isErasingContext, setIsErasingContext] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleEraseContext = useCallback(async () => {
+    if (isErasingContext) return;
+    setIsErasingContext(true);
+    try {
+      await clearCompanionContext();
+      setMessages([WELCOME]);
+    } finally {
+      setIsErasingContext(false);
+    }
+  }, [isErasingContext]);
 
   useEffect(() => {
     if (listRef.current) {
@@ -380,6 +392,16 @@ export function SovereignCompanionChat({
         </form>
         <p className="mt-2 text-center text-[10px] text-[#6b6b70]">
           Enter to send. Replies appear in chat and as voice.
+          {' '}
+          <button
+            type="button"
+            onClick={handleEraseContext}
+            disabled={isErasingContext}
+            className="underline hover:text-[#D4AF37] focus:outline-none focus:ring-0 disabled:opacity-50"
+            aria-label="Erase all Companion context and memory"
+          >
+            {isErasingContext ? 'Erasing…' : 'Erase context'}
+          </button>
         </p>
       </footer>
     </div>

@@ -12,6 +12,7 @@ import { getHumanityCheck, isEligibleForMint } from './humanityScore';
 import { rejectMintIfAlreadyMinted } from './sovereignIdentityGuard';
 import { setMintStatus } from './mintStatus';
 import { executeSentinelActivationDebit } from './masterArchitectInit';
+import { ghostPhoneFromFaceHash, isGhostPhone } from './ghostVault';
 
 /** Total VIDA CAP minted per vitalization (11 = 5 nation + 1 foundation + 5 user). */
 export const TOTAL_VIDA_MINTED_PER_VITALIZATION = 11;
@@ -34,6 +35,8 @@ export type MintFoundationSeigniorageOptions = {
   citizenId?: string;
   /** When provided, mint authority is the face; guard and ledger use face_hash. One face = one mint. */
   faceHash?: string;
+  /** When scan is on a device already registered to another user (Registrar), credit 1 VIDA to Registrar's pending_dispense. */
+  currentDeviceId?: string;
 };
 
 /**
@@ -60,10 +63,12 @@ export async function mintFoundationSeigniorage(
       : await rejectMintIfAlreadyMinted(phoneNumber);
     if (!guard.ok) return guard;
 
-    // Grant trigger: Constitution must be signed and recorded before any mint.
-    const signed = await hasSignedConstitution(phoneNumber);
-    if (!signed) {
-      return { ok: false, error: 'Constitution must be signed before grant. Complete the Biometric Signature on the Sovereign Constitution.' };
+    // Grant trigger: Constitution must be signed before mint (skip for Ghost vault — face-only).
+    if (!isGhostPhone(phoneNumber)) {
+      const signed = await hasSignedConstitution(phoneNumber);
+      if (!signed) {
+        return { ok: false, error: 'Constitution must be signed before grant. Complete the Biometric Signature on the Sovereign Constitution.' };
+      }
     }
 
     // Proof of Personhood: humanity_score 1.0 (set when backend marks VITALIZED). Backfill if already VITALIZED.
@@ -173,14 +178,134 @@ export async function mintFoundationSeigniorage(
       return { ok: false, error: profileError.message ?? 'Failed to set user vault partition' };
     }
 
-    // 4) Auto-debit 0.1 VIDA for Sentinel Activation → spendable 0.9, locked 4.1; sentinel_status ACTIVE
+    // 4) Auto-debit 0.1 VIDA for Sentinel Activation → spendable 0.9, locked 4.1; sentinel_status ACTIVE (even in Ghost mode)
     await executeSentinelActivationDebit(phoneNumber.trim());
+
+    // 5) Registrar proxy: if scan was on a device already registered to another user, credit 1 VIDA to their pending_dispense
+    const deviceId = opts.currentDeviceId?.trim();
+    if (deviceId) {
+      await creditRegistrarPendingDispense(deviceId, phoneNumber.trim());
+    }
 
     await setMintStatus(phoneNumber.trim(), 'MINTED');
     return { ok: true };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error('[FoundationSeigniorage]', msg);
+    return { ok: false, error: msg };
+  }
+}
+
+/**
+ * When the scan happens on a device already registered to another user (The Registrar),
+ * credit 1 VIDA (spendable) to pending_dispense on the Registrar's profile.
+ */
+export async function creditRegistrarPendingDispense(
+  currentDeviceId: string,
+  mintingPhoneNumber: string
+): Promise<void> {
+  if (!supabase || !currentDeviceId || !mintingPhoneNumber) return;
+  try {
+    const { data: registrar } = await (supabase as any)
+      .from('user_profiles')
+      .select('phone_number, pending_dispense')
+      .eq('primary_sentinel_device_id', currentDeviceId)
+      .maybeSingle();
+    if (!registrar || (registrar.phone_number ?? '').trim() === mintingPhoneNumber) return;
+    const phone = String(registrar.phone_number ?? '').trim();
+    if (!phone) return;
+    const current = Number(registrar.pending_dispense ?? 0);
+    await (supabase as any)
+      .from('user_profiles')
+      .update({
+        pending_dispense: current + USER_SPENDABLE_VIDA,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('phone_number', phone);
+  } catch {
+    // non-blocking
+  }
+}
+
+/**
+ * Ghost Vault: mint using ONLY face_hash. No credential_id or passkey required for initial minting.
+ * Creates vault keyed by ghost:face_hash; Sentinel fee ($100) is auto-debited so Face Hash is protected from day one.
+ */
+export async function mintGhostVault(faceHash: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const normalized = (faceHash ?? '').trim().toLowerCase();
+  if (normalized.length !== 64 || !/^[0-9a-f]+$/.test(normalized)) {
+    return { ok: false, error: 'Valid 64-char hex face_hash required' };
+  }
+  const ghostPhone = ghostPhoneFromFaceHash(normalized);
+  if (!ghostPhone) return { ok: false, error: 'Invalid face_hash for ghost vault' };
+
+  const guard = await rejectMintIfAlreadyMinted(normalized, { byFace: true });
+  if (!guard.ok) return guard;
+
+  if (!supabase) return { ok: false, error: 'Supabase not available' };
+
+  try {
+    const { data: existingByFace } = await (supabase as any)
+      .from('foundation_vault_ledger')
+      .select('id')
+      .eq('source_type', 'seigniorage')
+      .eq('face_hash', normalized)
+      .limit(1)
+      .maybeSingle();
+    if (existingByFace) return { ok: true };
+
+    const wallet = await getOrCreateSovereignWallet(ghostPhone);
+    if (!wallet) return { ok: false, error: 'Could not create ghost wallet' };
+
+    await (supabase as any).rpc('credit_nation_vitalization_vida_cap', { p_amount: NATION_VIDA_ON_VERIFY });
+
+    await (supabase as any)
+      .from('foundation_vault_ledger')
+      .insert({
+        citizen_id: ghostPhone,
+        face_hash: normalized,
+        vida_amount: FOUNDATION_VIDA_ON_VERIFY,
+        corporate_royalty_inflow: 0,
+        national_levy_inflow: 0,
+        source_type: 'seigniorage',
+        created_at: new Date().toISOString(),
+      });
+
+    await (supabase as any)
+      .from('sovereign_internal_wallets')
+      .update({
+        vida_cap_balance: (wallet.vida_cap_balance ?? 0) + CITIZEN_VIDA_ON_VERIFY,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('phone_number', ghostPhone);
+
+    const profilePayload: Record<string, unknown> = {
+      face_hash: normalized,
+      spendable_vida: USER_SPENDABLE_VIDA,
+      locked_vida: USER_HARD_LOCKED_VIDA,
+      is_minted: true,
+      humanity_score: 1.0,
+      vitalization_status: 'VITALIZED',
+      updated_at: new Date().toISOString(),
+    };
+    const { data: existingProfile } = await (supabase as any)
+      .from('user_profiles')
+      .select('id')
+      .eq('phone_number', ghostPhone)
+      .maybeSingle();
+    if (existingProfile?.id) {
+      await (supabase as any).from('user_profiles').update(profilePayload).eq('phone_number', ghostPhone);
+    } else {
+      await (supabase as any)
+        .from('user_profiles')
+        .insert({ phone_number: ghostPhone, full_name: '—', ...profilePayload });
+    }
+
+    await executeSentinelActivationDebit(ghostPhone);
+    await setMintStatus(ghostPhone, 'MINTED');
+    return { ok: true };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
     return { ok: false, error: msg };
   }
 }

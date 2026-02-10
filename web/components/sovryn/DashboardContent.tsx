@@ -238,7 +238,7 @@ export function DashboardContent({
                   <span className="text-2xl" aria-hidden>🔒</span>
                   <div className="flex-1">
                     <p className="text-sm font-semibold text-amber-200/95">Personal Vault is private</p>
-                    <p className="text-xs text-amber-200/80 mt-0.5">Balances and Merchant QR are hidden until you verify with a face scan (95%+ match).</p>
+                    <p className="text-xs text-amber-200/80 mt-0.5">Balances and Merchant QR are hidden until you verify with a face scan (85%+ match).</p>
                   </div>
                   <button
                     type="button"

@@ -27,6 +27,13 @@ export function getArchitectMasterPhone(): string | null {
   return null;
 }
 
+/** True when the given phone number is the Architect master phone (allows one-time hash update bypass). */
+export function isArchitectPhone(phone: string | null | undefined): boolean {
+  if (!phone?.trim()) return false;
+  const master = getArchitectMasterPhone();
+  return master !== null && master.trim() === phone.trim();
+}
+
 /** Display name for the Architect's Master (e.g. ISREAL OKORO). Shown when that phone is identity anchor. */
 export const ARCHITECT_MASTER_DISPLAY_NAME = 'ISREAL OKORO';
 

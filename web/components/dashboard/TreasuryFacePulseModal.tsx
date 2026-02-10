@@ -9,7 +9,7 @@ const GOLD = '#D4AF37';
 export interface TreasuryFacePulseModalProps {
   isOpen: boolean;
   onClose: () => void;
-  /** Called when verification succeeds with 95%+ match; caller should reveal balance and trigger gold pulse. */
+  /** Called when verification succeeds with 85%+ match; caller should reveal balance and trigger gold pulse. */
   onVerified: () => void;
 }
 
@@ -105,7 +105,7 @@ export function TreasuryFacePulseModal({ isOpen, onClose, onVerified }: Treasury
 
         <div className="p-6 space-y-6">
           <p className="text-sm text-[#6b6b70] text-center">
-            Face Pulse unlocks your Total Wealth and Send/Transfer. Match 95%+ to continue.
+            Face Pulse unlocks your Total Wealth and Send/Transfer. Match 85%+ to continue.
           </p>
 
           {/* Visual: gold ring / pulse */}

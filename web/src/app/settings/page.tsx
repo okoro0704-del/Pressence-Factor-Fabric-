@@ -14,6 +14,7 @@ import { getTrustLevel, shouldSuggestSovereignShield } from '@/lib/trustLevel';
 import { requestTerminateSession } from '@/lib/deviceTerminateSession';
 import { clearVitalizationComplete } from '@/lib/vitalizationState';
 import { resetBiometrics } from '@/lib/resetBiometrics';
+import { clearCompanionContext } from '@/lib/memoryVault';
 import { getSupabase } from '@/lib/supabase';
 import { isArchitect, isDesktop, getArchitectMasterPhone, ARCHITECT_MASTER_DISPLAY_NAME } from '@/lib/publicRevealAccess';
 import { generateAccessCode, isBeforeAccessCutoff, changeMasterPassword } from '@/lib/accessCodeGate';
@@ -374,6 +375,7 @@ export default function SettingsPage() {
                   const result = await resetBiometrics(anchor);
                   setResettingBiometrics(false);
                   if (result.ok) {
+                    await clearCompanionContext();
                     localStorage.clear();
                     sessionStorage.clear();
                     window.location.href = '/vitalization?reset=1';

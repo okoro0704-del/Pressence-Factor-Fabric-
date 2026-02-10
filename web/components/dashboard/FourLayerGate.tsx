@@ -74,8 +74,11 @@ import {
   verify3Words,
 } from '@/lib/recoverySeed';
 import { storeRecoverySeedWithFaceAndMint, hasRecoverySeed, confirmRecoverySeedStored, confirmFaceAndSeedStored } from '@/lib/recoverySeedStorage';
-import { getStoredBiometricAnchors, getFaceHashFromSession, syncPersistentFaceHashToSession, deriveFaceHashFromCredential } from '@/lib/biometricAnchorSync';
-import { setVitalizationAnchor, getVitalizationAnchor, clearVitalizationAnchor, type VitalizationAnchor as VitalizationAnchorType } from '@/lib/vitalizationAnchor';
+import { getStoredBiometricAnchors, getFaceHashFromSession, syncPersistentFaceHashToSession, deriveFaceHashFromCredential, persistFaceHash } from '@/lib/biometricAnchorSync';
+import { setVitalizationAnchor, getVitalizationAnchor, clearVitalizationAnchor, getIsExistingCitizen, type VitalizationAnchor as VitalizationAnchorType } from '@/lib/vitalizationAnchor';
+import { isArchitectPhone } from '@/lib/publicRevealAccess';
+import { checkForOrphanVault } from '@/lib/ghostVault';
+import { getCompositeDeviceFingerprint } from '@/lib/biometricAuth';
 import { getTimeBasedGreeting } from '@/lib/timeBasedGreeting';
 import type { DeviceInfo } from '@/lib/multiDeviceVitalization';
 import { RecoverMyAccountScreen } from '@/components/auth/RecoverMyAccountScreen';
@@ -360,6 +363,13 @@ export function FourLayerGate({ hubVerification = false, vitalizeOthersMode = fa
   useSovereignCompanion();
   /** Persistent Vitalization: when device has is_vitalized anchor, show instant login (face-only) or "Vitalize Someone Else". */
   const [instantLoginAnchor, setInstantLoginAnchor] = useState<VitalizationAnchorType | null>(null);
+  /** When true, phone or device is already in citizens table — hide "Vitalize New Soul", show only Retry Scan / Use Device Passkey. */
+  const [isExistingCitizen, setIsExistingCitizen] = useState(false);
+  /** Orphan vault bind: face matched a Ghost Vault (no device bound). Prompt: "Identity Found. Bind your 4 VIDA Treasury to this device?" */
+  const [showOrphanBindPrompt, setShowOrphanBindPrompt] = useState(false);
+  const [orphanBindPhone, setOrphanBindPhone] = useState<string | null>(null);
+  const [orphanFaceHash, setOrphanFaceHash] = useState<string | null>(null);
+  const [orphanBindLoading, setOrphanBindLoading] = useState(false);
   const [showInstantLoginScreen, setShowInstantLoginScreen] = useState(false);
   const [instantLoginScanning, setInstantLoginScanning] = useState(false);
   const [instantLoginError, setInstantLoginError] = useState<string | null>(null);
@@ -412,6 +422,17 @@ export function FourLayerGate({ hubVerification = false, vitalizeOthersMode = fa
     return () => { cancelled = true; };
   }, [identityAnchor?.phone, showInstantLoginScreen]);
 
+  /** Existing citizen check: if phone or device is in user_profiles, hide "Vitalize New Soul". */
+  useEffect(() => {
+    const phone = instantLoginAnchor?.phone?.trim();
+    if (!phone && !showInstantLoginScreen) return;
+    let cancelled = false;
+    getIsExistingCitizen(phone ?? undefined).then((existing) => {
+      if (!cancelled) setIsExistingCitizen(existing);
+    });
+    return () => { cancelled = true; };
+  }, [instantLoginAnchor?.phone, showInstantLoginScreen]);
+
   /** Sub device: when phone is entered on a different device, show face-verify screen. Only same face can request access; different face never gains access. */
   const [showSubDeviceFaceVerify, setShowSubDeviceFaceVerify] = useState(false);
   const [subDeviceFaceError, setSubDeviceFaceError] = useState<string | null>(null);
@@ -432,6 +453,7 @@ export function FourLayerGate({ hubVerification = false, vitalizeOthersMode = fa
     return () => { cancelled = true; };
   }, [identityAnchor?.phone, showInstantLoginScreen, showAwaitingLoginApproval, loginRequestId, showSubDeviceFaceVerify]);
 
+  /** Instant login: prioritize device passkey (getAssertion = Face ID / fingerprint) to avoid in-app camera mismatch. Force sync face_hash from Supabase central DB. */
   const handleInstantLoginFaceScan = useCallback(async () => {
     const phone = instantLoginAnchor?.phone ?? getIdentityAnchorPhone();
     if (!instantLoginAnchor?.citizenHash || !phone) return;
@@ -452,11 +474,29 @@ export function FourLayerGate({ hubVerification = false, vitalizeOthersMode = fa
           authenticatorData: cred.response.authenticatorData,
         },
       };
-      const liveHash = await deriveFaceHashFromCredential(credentialForHash);
-      const stored = (instantLoginAnchor.citizenHash ?? '').trim();
-      if (liveHash.trim() !== stored) {
-        setInstantLoginError('Face did not match. Try again or use Vitalize New Soul.');
-        return;
+      const liveHash = (await deriveFaceHashFromCredential(credentialForHash)).trim();
+      const storedFromDb = await getStoredBiometricAnchors(phone);
+      const stored = (storedFromDb.ok && storedFromDb.anchors.face_hash?.trim())
+        ? storedFromDb.anchors.face_hash.trim()
+        : (instantLoginAnchor.citizenHash ?? '').trim();
+      if (liveHash !== stored) {
+        const orphanCheck = await checkForOrphanVault(liveHash);
+        if (orphanCheck.ok && orphanCheck.isOrphan && orphanCheck.bindPhone) {
+          setOrphanFaceHash(liveHash);
+          setOrphanBindPhone(orphanCheck.bindPhone);
+          setShowOrphanBindPrompt(true);
+          return;
+        }
+        if (isArchitectPhone(phone)) {
+          const updated = await persistFaceHash(phone, liveHash);
+          if (updated.ok) {
+            await setVitalizationAnchor(liveHash, phone);
+            setInstantLoginAnchor((prev) => (prev ? { ...prev, citizenHash: liveHash } : null));
+          }
+        } else {
+          setInstantLoginError('Face did not match. Try again or use Device Passkey.');
+          return;
+        }
       }
       setIdentityAnchorForSession(phone);
       setPresenceVerified(true);
@@ -478,6 +518,40 @@ export function FourLayerGate({ hubVerification = false, vitalizeOthersMode = fa
     setInstantLoginAnchor(null);
     setShowInstantLoginScreen(false);
   }, []);
+
+  const handleOrphanBind = useCallback(async () => {
+    const phone = orphanBindPhone?.trim();
+    const faceHash = orphanFaceHash?.trim();
+    if (!phone || !faceHash) return;
+    setOrphanBindLoading(true);
+    try {
+      const deviceId = await getCompositeDeviceFingerprint();
+      if (!deviceId) {
+        setInstantLoginError('Could not get device ID. Try again.');
+        return;
+      }
+      const updated = await updatePrimarySentinelDeviceForMigration(phone, deviceId);
+      if (!updated) {
+        setInstantLoginError('Failed to bind vault to this device.');
+        return;
+      }
+      await setVitalizationAnchor(faceHash, phone);
+      setIdentityAnchorForSession(phone);
+      setPresenceVerified(true);
+      setSessionIdentity(phone);
+      setShowOrphanBindPrompt(false);
+      setOrphanBindPhone(null);
+      setOrphanFaceHash(null);
+      setWelcomeGreeting(getTimeBasedGreeting());
+      setShowWelcomeHome(true);
+      try { localStorage.removeItem(SOV_STATUS_KEY); } catch { /* ignore */ }
+      setTimeout(() => router.replace(ROUTES.DASHBOARD), 2600);
+    } catch (e) {
+      setInstantLoginError(e instanceof Error ? e.message : 'Bind failed.');
+    } finally {
+      setOrphanBindLoading(false);
+    }
+  }, [orphanBindPhone, orphanFaceHash, router, setPresenceVerified]);
 
   /** Debug Info: only on non-production; on mobile, only when Architect Mode is active in session. */
   const showDebugInfo = !isProductionDomain() && (!isMobile || architectMode);
@@ -2066,6 +2140,60 @@ export function FourLayerGate({ hubVerification = false, vitalizeOthersMode = fa
     );
   }
 
+  /** Orphan vault bind: face matched a Ghost Vault — prompt to bind 4 VIDA Treasury to this device. */
+  if (showOrphanBindPrompt && orphanBindPhone) {
+    return (
+      <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center p-4">
+        <div
+          className="absolute inset-0 opacity-20 pointer-events-none"
+          style={{ background: 'radial-gradient(circle at center, rgba(212, 175, 55, 0.2) 0%, rgba(5, 5, 5, 0) 70%)' }}
+          aria-hidden
+        />
+        <div
+          className="relative z-10 rounded-2xl border-2 p-8 max-w-md w-full text-center"
+          style={{
+            background: 'linear-gradient(180deg, rgba(30, 28, 22, 0.98) 0%, rgba(15, 14, 10, 0.99) 100%)',
+            borderColor: 'rgba(212, 175, 55, 0.5)',
+          }}
+        >
+          <p className="text-lg font-bold mb-2" style={{ color: '#D4AF37' }}>
+            Identity Found
+          </p>
+          <p className="text-sm text-[#a0a0a5] mb-6">
+            Bind your 4 VIDA Treasury to this device?
+          </p>
+          {instantLoginError && (
+            <p className="text-sm text-red-400 mb-4" role="alert">{instantLoginError}</p>
+          )}
+          <div className="flex flex-col gap-3">
+            <button
+              type="button"
+              onClick={handleOrphanBind}
+              disabled={orphanBindLoading}
+              className="w-full py-4 rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#C9A227] text-black font-bold uppercase tracking-wider disabled:opacity-70"
+              style={{ boxShadow: '0 0 20px rgba(212, 175, 55, 0.4)' }}
+            >
+              {orphanBindLoading ? 'Binding…' : 'Bind to this device'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowOrphanBindPrompt(false);
+                setOrphanBindPhone(null);
+                setOrphanFaceHash(null);
+                setInstantLoginError(null);
+              }}
+              className="w-full py-3 text-sm uppercase tracking-wider transition-colors hover:underline"
+              style={{ color: '#6b6b70' }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   /** Persistent Vitalization: instant login (face-only) when device has is_vitalized anchor; or "Vitalize Someone Else" for full 4-pillar. */
   if (showInstantLoginScreen && instantLoginAnchor?.citizenHash) {
     return (
@@ -2132,14 +2260,16 @@ export function FourLayerGate({ hubVerification = false, vitalizeOthersMode = fa
                 )}
               </button>
             </div>
-            <button
-              type="button"
-              onClick={handleVitalizeSomeoneElse}
-              className="mt-6 w-full text-xs uppercase tracking-wider transition-colors hover:underline"
-              style={{ color: '#6b6b70' }}
-            >
-              Vitalize New Soul
-            </button>
+            {!isExistingCitizen && (
+              <button
+                type="button"
+                onClick={handleVitalizeSomeoneElse}
+                className="mt-6 w-full text-xs uppercase tracking-wider transition-colors hover:underline"
+                style={{ color: '#6b6b70' }}
+              >
+                Vitalize New Soul
+              </button>
+            )}
           </div>
         )}
       </div>

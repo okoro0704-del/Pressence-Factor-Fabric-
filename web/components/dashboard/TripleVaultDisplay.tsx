@@ -14,7 +14,7 @@ export interface TripleVaultDisplayProps {
   sentinelFeePaidUsd?: number;
   /** Current global user count (for progress bar). */
   globalUserCount?: number;
-  /** Face-First Security: when false, vault amounts are hidden until face match >= 95%. */
+  /** Face-First Security: when false, vault amounts are hidden until face match >= 85%. */
   faceVerified?: boolean;
   /** BETA: show full $1,000 spendable (no Sentinel fee). */
   betaLiquidityTest?: boolean;

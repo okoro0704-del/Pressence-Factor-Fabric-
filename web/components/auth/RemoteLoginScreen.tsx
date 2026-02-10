@@ -47,7 +47,7 @@ export function RemoteLoginScreen({ onSuccess, onCancel }: RemoteLoginScreenProp
   const instantAttemptedRef = useRef(false);
 
   // Instant recognition: if sov_anchor exists in localStorage, auto-trigger Face/Palm on load.
-  // If scan matches hardware Passkey (95%+), skip email/OTP/password and go to dashboard (2-Second Rule).
+  // If scan matches hardware Passkey (85%+), skip email/OTP/password and go to dashboard (2-Second Rule).
   useEffect(() => {
     if (instantAttemptedRef.current || step !== 'id') return;
     const phone = getIdentityAnchorPhone();

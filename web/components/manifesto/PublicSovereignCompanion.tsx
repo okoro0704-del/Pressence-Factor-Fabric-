@@ -27,7 +27,7 @@ import {
   formatVerifiedPffMetrics,
   type VltPffMetricsPayload,
 } from '@/lib/vltLedgerCompanion';
-import { getMemoryVault, formatVaultForContext } from '@/lib/memoryVault';
+import { getMemoryVault, formatVaultForContext, clearCompanionContext, SOVEREIGN_COMPANION_SESSION_KEY } from '@/lib/memoryVault';
 import { getVibration, setVibration, getVibrationFromInput, levelToRegister } from '@/lib/vibrationEngine';
 import { useSovereignAwakening } from '@/contexts/SovereignAwakeningContext';
 import { useGlobalPresenceGateway, PRESENCE_DB_ERROR_GREETING } from '@/contexts/GlobalPresenceGateway';
@@ -154,7 +154,6 @@ const BLESSING_VISIBLE_MS = 4_000;
 const EYE_SMOOTH = 0.12;
 const EYE_MAX_OFFSET = 6;
 
-const SOVEREIGN_SESSION_KEY = 'sovereign_companion_session';
 const SOVEREIGN_SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX_MESSAGES = 10;
@@ -179,6 +178,7 @@ export function PublicSovereignCompanion() {
   const langDropdownRef = useRef<HTMLDivElement>(null);
   const presenceDbErrorInjectedRef = useRef(false);
   const handshakeCompleteInjectedRef = useRef(false);
+  const [isErasingContext, setIsErasingContext] = useState(false);
 
   const { presenceGreeting, isPresenceVerified } = useGlobalPresenceGateway();
 
@@ -226,7 +226,7 @@ export function PublicSovereignCompanion() {
     let initial: Message[] = [];
     if (typeof window !== 'undefined') {
       try {
-        const raw = window.localStorage.getItem(SOVEREIGN_SESSION_KEY);
+        const raw = window.localStorage.getItem(SOVEREIGN_COMPANION_SESSION_KEY);
         const session = raw ? (JSON.parse(raw) as StoredSession) : null;
         const valid = session && session.name && session.timestamp && Date.now() - session.timestamp < SOVEREIGN_SESSION_TTL_MS;
         if (valid && !sessionRestoredRef.current) {
@@ -383,6 +383,23 @@ export function PublicSovereignCompanion() {
     rafRef.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafRef.current);
   }, []);
+
+  const handleEraseContext = useCallback(async () => {
+    if (isErasingContext) return;
+    setIsErasingContext(true);
+    try {
+      await clearCompanionContext();
+      greetingInjectedRef.current = false;
+      sessionRestoredRef.current = false;
+      const firstLine = presenceGreeting?.startsWith('The Ledger is synchronized') && presenceGreeting
+        ? presenceGreeting
+        : AUTO_GREETING;
+      setMessages([{ id: 'greeting', role: 'assistant', text: firstLine }]);
+      setGreetingSpoken(false);
+    } finally {
+      setIsErasingContext(false);
+    }
+  }, [isErasingContext, presenceGreeting]);
 
   const sendMessage = async (text: string) => {
     const t = text.trim();
@@ -543,7 +560,7 @@ export function PublicSovereignCompanion() {
             setVibration(register, lang);
             try {
               window.localStorage.setItem(
-                SOVEREIGN_SESSION_KEY,
+                SOVEREIGN_COMPANION_SESSION_KEY,
                 JSON.stringify({
                   name: resName || name,
                   recognitionText: fullText,
@@ -762,6 +779,16 @@ export function PublicSovereignCompanion() {
                 </div>
               </div>
               <div className="flex items-center gap-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleEraseContext}
+                  disabled={isErasingContext}
+                  className="px-2 py-1.5 rounded-lg hover:bg-white/10 text-[10px] uppercase tracking-wider text-[#6b6b70] hover:text-[#D4AF37] transition-colors focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/50 disabled:opacity-50"
+                  aria-label="Erase all Companion context and memory"
+                  title="Erase every information or context in the SOVRYN Companion"
+                >
+                  {isErasingContext ? '…' : 'Erase'}
+                </button>
                 <div className="relative" ref={langDropdownRef}>
                   <button
                     type="button"

@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { getVitalizationAnchor, clearVitalizationAnchor, type VitalizationAnchor } from '@/lib/vitalizationAnchor';
+import { getVitalizationAnchor, clearVitalizationAnchor, getIsExistingCitizen, type VitalizationAnchor } from '@/lib/vitalizationAnchor';
 import { getAssertion, isWebAuthnSupported, isUserVerifyingPlatformAuthenticatorAvailable } from '@/lib/webauthn';
 import { deriveFaceHashFromCredential } from '@/lib/biometricAnchorSync';
 import { setIdentityAnchorForSession } from '@/lib/sentinelActivation';
@@ -136,6 +136,8 @@ export function AnchoredLanding() {
   const autoLoginAttemptedRef = useRef(false);
   /** When false, this number is linked to another (master) device — require verification from master before login. */
   const [isMasterDevice, setIsMasterDevice] = useState<boolean | null>(null);
+  /** When true, phone or device is already in citizens table — hide "Vitalize New Soul". */
+  const [isExistingCitizen, setIsExistingCitizen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -160,6 +162,16 @@ export function AnchoredLanding() {
           setRequestHandshakeMode(true);
         }
       }
+    });
+    return () => { cancelled = true; };
+  }, [anchor?.phone]);
+
+  useEffect(() => {
+    const phone = anchor?.phone?.trim();
+    if (!phone) return;
+    let cancelled = false;
+    getIsExistingCitizen(phone).then((existing) => {
+      if (!cancelled) setIsExistingCitizen(existing);
     });
     return () => { cancelled = true; };
   }, [anchor?.phone]);
@@ -483,14 +495,16 @@ export function AnchoredLanding() {
         )}
       </div>
 
-      <button
-        type="button"
-        onClick={handleVitalizeNewSoul}
-        className="absolute bottom-8 left-0 right-0 mx-auto w-fit text-xs uppercase tracking-wider transition-colors hover:underline"
-        style={{ color: '#6b6b70' }}
-      >
-        Vitalize New Soul
-      </button>
+      {!isExistingCitizen && (
+        <button
+          type="button"
+          onClick={handleVitalizeNewSoul}
+          className="absolute bottom-8 left-0 right-0 mx-auto w-fit text-xs uppercase tracking-wider transition-colors hover:underline"
+          style={{ color: '#6b6b70' }}
+        >
+          Vitalize New Soul
+        </button>
+      )}
     </div>
   );
 }

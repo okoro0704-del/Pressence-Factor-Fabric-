@@ -76,7 +76,7 @@ export function LoginQRDisplay({ requestId, onDenied, onError }: LoginQRDisplayP
             Authorization Requested on Master Device
           </h1>
           <p className="text-sm text-[#a0a0a5]">
-            Open PFF on your phone. You’ll get a prompt to verify DNA — or scan this QR to approve. Laptop unlocks on 95%+ match.
+            Open PFF on your phone. You’ll get a prompt to verify DNA — or scan this QR to approve. Laptop unlocks on 85%+ match.
           </p>
         </div>
         <div

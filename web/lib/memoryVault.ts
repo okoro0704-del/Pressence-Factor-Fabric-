@@ -11,6 +11,9 @@ export type VaultScope = 'family' | 'health' | 'goals' | 'other' | 'vibration';
 const VAULT_TABLE = 'sovereign_memory_vault';
 const SESSION_KEY = 'pff_sovereign_vault_session';
 
+/** localStorage key used by PublicSovereignCompanion for session / welcome-back. */
+export const SOVEREIGN_COMPANION_SESSION_KEY = 'sovereign_companion_session';
+
 export interface VaultEntry {
   scope: VaultScope;
   content: string;
@@ -108,4 +111,34 @@ export function formatVaultForContext(entries: VaultEntry[], vibration?: Vibrati
   if (parts.length) lines.push(`[Citizen has shared: ${parts.join('; ')}. Reference naturally in small talk when relevant.]`);
   if (vibration) lines.push(`[Current vibration: ${vibration.register}|${vibration.lang}. Keep this register and language unless the user clearly switches. Banter memory.]`);
   return lines.join(' ');
+}
+
+/**
+ * Erase every information or context in the SOVRYN Companion.
+ * Clears: localStorage session (welcome-back), sessionStorage Memory Vault, and Supabase sovereign_memory_vault for current user.
+ * Call this when the user requests "Clear context" or "Erase memory".
+ */
+export async function clearCompanionContext(): Promise<boolean> {
+  if (typeof window === 'undefined') return false;
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(SOVEREIGN_COMPANION_SESSION_KEY);
+    }
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.removeItem(SESSION_KEY);
+    }
+    const supabase = getSupabase();
+    if (supabase) {
+      const { data: { user } } = await (supabase.auth?.getUser?.() ?? Promise.resolve({ data: { user: null } }));
+      if (user?.id) {
+        await (supabase as any)
+          .from(VAULT_TABLE)
+          .delete()
+          .eq('citizen_id', user.id);
+      }
+    }
+    return true;
+  } catch {
+    return false;
+  }
 }

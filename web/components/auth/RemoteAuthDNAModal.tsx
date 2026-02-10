@@ -10,7 +10,7 @@ export interface RemoteAuthDNAModalProps {
   onClose: () => void;
   /** Phone number for biometric verification */
   phone: string;
-  /** Called when 95%+ match — caller should approve login and send handshake */
+  /** Called when 85%+ match — caller should approve login and send handshake */
   onSuccess: () => void;
   /** Called when scan fails, low match, or user cancels — caller should deny and audit log */
   onFail: () => void;
@@ -20,7 +20,7 @@ type Status = 'idle' | 'scanning' | 'success' | 'error' | 'low_match';
 
 /**
  * 2-second Face/Palm scanner for Remote Biometric Authorization (Sentinel Push).
- * On 95%+ match calls onSuccess; otherwise onFail.
+ * On 85%+ match calls onSuccess; otherwise onFail.
  */
 export function RemoteAuthDNAModal({
   isOpen,
@@ -118,7 +118,7 @@ export function RemoteAuthDNAModal({
 
         <div className="p-6 space-y-6">
           <p className="text-sm text-[#a0a0a5] text-center">
-            Face/Palm scan — 95%+ match unlocks the requesting device.
+            Face/Palm scan — 85%+ match unlocks the requesting device.
           </p>
 
           <div className="flex justify-center">

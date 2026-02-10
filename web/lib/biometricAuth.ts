@@ -407,8 +407,8 @@ function isMobileUserAgent(): boolean {
   return /Android|iPhone|iPad|iPod|webOS|Mobile/i.test(navigator.userAgent);
 }
 
-/** Face-First Security: balance hidden until face match score >= 95% (variance <= 5). */
-export const FACE_MATCH_THRESHOLD_PERCENT = 95;
+/** Face-First Security: balance hidden until face match score >= 85%. Lower threshold allows natural lighting/environment changes. */
+export const FACE_MATCH_THRESHOLD_PERCENT = 85;
 
 /** When biometrics (face+palm) captured but GPS fails during scan. */
 export const GPS_EARTH_ANCHOR_SEARCHING_MESSAGE =
@@ -1623,7 +1623,7 @@ export async function generateIdentityMeshHash(
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-/** Face-First Security: $1,000 balance hidden until face match score >= 95%. Persisted 24h in sessionStorage. */
+/** Face-First Security: $1,000 balance hidden until face match score >= 85%. Persisted 24h in sessionStorage. */
 const FACE_VERIFIED_CACHE_MS = 24 * 60 * 60 * 1000;
 
 export function isFaceVerifiedForBalance(): boolean {
@@ -1640,7 +1640,7 @@ export function isFaceVerifiedForBalance(): boolean {
   }
 }
 
-/** Call after successful Face Pulse verification (95%+ match) to reveal balance and unlock Send/Transfer for 24h. */
+/** Call after successful Face Pulse verification (85%+ match) to reveal balance and unlock Send/Transfer for 24h. */
 export function markFaceVerifiedForBalance(): void {
   if (typeof sessionStorage === 'undefined') return;
   try {
