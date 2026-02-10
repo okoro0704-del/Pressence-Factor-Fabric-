@@ -12,8 +12,6 @@ import { setVitalizationComplete, shouldNeverRedirectBack } from '@/lib/vitaliza
 import { isArchitect } from '@/lib/manifestoUnveiling';
 import { getCitizenStatusForPhone } from '@/lib/supabaseTelemetry';
 import { mintFoundationSeigniorage } from '@/lib/foundationSeigniorage';
-import { fetchLedgerStats } from '@/lib/ledgerStats';
-
 /** Dashboard = overview: Pulse bar. Use bottom tab for Wallet, Treasury, Settings. */
 export default function DashboardPage() {
   const router = useRouter();
@@ -21,7 +19,6 @@ export default function DashboardPage() {
   const [identityPhone, setIdentityPhone] = useState<string | null>(null);
   const [accessChecked, setAccessChecked] = useState(false);
   const [vitalizedOrArchitect, setVitalizedOrArchitect] = useState(false);
-  const [grandBalanceUsd, setGrandBalanceUsd] = useState<number | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -69,10 +66,6 @@ export default function DashboardPage() {
     if (mounted) setIdentityPhone(getIdentityAnchorPhone());
   }, [mounted]);
 
-  useEffect(() => {
-    if (!mounted || !vitalizedOrArchitect) return;
-    fetchLedgerStats().then((s) => setGrandBalanceUsd(s.nationalReserveUsd));
-  }, [mounted, vitalizedOrArchitect]);
 
   if (!mounted || !accessChecked) {
     return null;
@@ -91,22 +84,10 @@ export default function DashboardPage() {
       <AppShell>
         <main className="min-h-screen bg-[#0d0d0f] pb-24 md:pb-8 flex flex-col">
           <header className="shrink-0 border-b border-[#2a2a2e] bg-[#16161a]/95 backdrop-blur px-4 py-3 safe-area-top">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <h1 className="text-lg font-bold bg-gradient-to-r from-[#e8c547] to-[#c9a227] bg-clip-text text-transparent">
-                  PFF Dashboard
-                </h1>
-                <p className="text-xs text-[#6b6b70] mt-0.5">Use the tabs below for Wallet, Treasury, Settings</p>
-              </div>
-              {grandBalanceUsd != null && (
-                <div className="text-right">
-                  <p className="text-[10px] uppercase tracking-widest text-[#6b6b70]">PFF Grand Balance</p>
-                  <p className="text-lg font-bold font-mono" style={{ color: '#D4AF37' }}>
-                    ${grandBalanceUsd.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                  </p>
-                </div>
-              )}
-            </div>
+            <h1 className="text-lg font-bold bg-gradient-to-r from-[#e8c547] to-[#c9a227] bg-clip-text text-transparent">
+              PFF Dashboard
+            </h1>
+            <p className="text-xs text-[#6b6b70] mt-0.5">Use the tabs below for Wallet, Treasury, Settings</p>
           </header>
           <div className="flex-1 p-4 md:p-6 max-w-2xl mx-auto w-full">
             <SovereignPulseBar className="mb-6" />

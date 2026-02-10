@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { JetBrains_Mono } from 'next/font/google';
 import { getIdentityAnchorPhone } from '@/lib/sentinelActivation';
 import { getIdCardProfile, HUMANITY_SCORE_VERIFIED } from '@/lib/humanityScore';
-import { maskPhoneForDisplay } from '@/lib/phoneMask';
+import { toSovereignIdE164 } from '@/lib/phoneMask';
+import { subscribeToBackendSync } from '@/lib/backendRealtimeSync';
 
 const jetbrains = JetBrains_Mono({ weight: ['400', '600'], subsets: ['latin'] });
 
@@ -12,19 +13,15 @@ const jetbrains = JetBrains_Mono({ weight: ['400', '600'], subsets: ['latin'] })
  * Sovereign ID Card — Proof of Personhood (Verified Human).
  * WorldID-style high-tech aesthetics, branded as Sovereign Protocol.
  * Shows Verified Human badge when humanity_score is 1.0.
+ * Subscribes to backend Realtime so profile changes from server push to the UI.
  */
 export function SovereignIdCard() {
   const [profile, setProfile] = useState<{ full_name: string | null; humanity_score: number | null } | null>(null);
   const [loading, setLoading] = useState(true);
   const [phone, setPhone] = useState<string | null>(null);
+  const [refreshTick, setRefreshTick] = useState(0);
 
-  useEffect(() => {
-    const p = getIdentityAnchorPhone();
-    setPhone(p);
-    if (!p) {
-      setLoading(false);
-      return;
-    }
+  const fetchProfile = useCallback((p: string) => {
     getIdCardProfile(p)
       .then((res) => {
         if (res.ok) setProfile(res.profile);
@@ -33,6 +30,25 @@ export function SovereignIdCard() {
       .catch(() => setProfile({ full_name: null, humanity_score: null }))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    const p = getIdentityAnchorPhone();
+    setPhone(p);
+    if (!p) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    fetchProfile(p);
+  }, [fetchProfile, refreshTick]);
+
+  useEffect(() => {
+    if (!phone) return;
+    const unsub = subscribeToBackendSync(phone, {
+      onProfileChange: () => setRefreshTick((t) => t + 1),
+    });
+    return unsub;
+  }, [phone]);
 
   if (loading || !phone) {
     return (
@@ -49,7 +65,7 @@ export function SovereignIdCard() {
 
   const verifiedHuman = profile?.humanity_score === HUMANITY_SCORE_VERIFIED;
   const displayName = profile?.full_name?.trim() || 'Sovereign Citizen';
-  const maskedPhone = maskPhoneForDisplay(phone);
+  const sovereignId = toSovereignIdE164(phone);
 
   return (
     <div
@@ -109,7 +125,7 @@ export function SovereignIdCard() {
           </div>
           <div>
             <p className={`text-lg font-semibold text-white ${jetbrains.className}`}>{displayName}</p>
-            <p className={`text-xs text-[#6b6b70] ${jetbrains.className}`}>Sovereign ID · {maskedPhone}</p>
+            <p className={`text-xs text-[#6b6b70] ${jetbrains.className}`} title="Full E.164 (unique across networks)">Sovereign ID · {sovereignId}</p>
           </div>
         </div>
 

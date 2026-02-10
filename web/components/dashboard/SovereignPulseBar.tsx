@@ -1,41 +1,48 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { fetchLedgerStats } from '@/lib/ledgerStats';
+import { subscribeToLedgerSync } from '@/lib/backendRealtimeSync';
 
 const GOLD = '#D4AF37';
 const GRAY = '#6b6b70';
 
+/** Per vitalization: 1 (project) + 5 (nations) + 5 (citizens) = 11 VIDA CAP in circulation. */
+const VIDA_CAP_PER_VITALIZATION = 11;
+
 /**
  * Global Pulse Bar — thin, elegant ticker at top of Commander's Dashboard.
- * POPULATION: Vitalized humans on Earth | TREASURY: National Reserve | MINTED VIDA CAP: Total VIDA in circulation | UNIT PRICE: $1,000
- * Data from global ledger_stats table (fallback: national_block_reserves + sentinel_telemetry).
+ * POPULATION: Total Vitalized Humans | MINTED VIDA CAP: Total in circulation (11 per vitalized: 1 project + 5 nations + 5 citizens) | UNIT PRICE: $1,000
+ * No Treasury row under header. Data from ledger_stats; subscribes to backend Realtime.
  */
 export function SovereignPulseBar({ className = '' }: { className?: string }) {
   const [stats, setStats] = useState<{
     citizens: number;
-    treasuryUsd: number | null;
     totalMintedVida: number | null;
-  }>({ citizens: 0, treasuryUsd: null, totalMintedVida: null });
+  }>({ citizens: 0, totalMintedVida: null });
 
-  useEffect(() => {
+  const refresh = useCallback(() => {
     fetchLedgerStats().then((s) => {
+      const vitalized = s.totalVitalizedCount ?? 0;
+      const fromLedger = s.totalMintedVida != null && s.totalMintedVida > 0;
       setStats({
-        citizens: s.totalVitalizedCount,
-        treasuryUsd: s.nationalReserveUsd,
-        totalMintedVida: s.totalMintedVida,
+        citizens: vitalized,
+        totalMintedVida: fromLedger ? s.totalMintedVida : vitalized * VIDA_CAP_PER_VITALIZATION,
       });
     });
   }, []);
 
-  const treasuryStr =
-    stats.treasuryUsd != null
-      ? `$${stats.treasuryUsd.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
-      : '—';
-  const mintedStr =
-    stats.totalMintedVida != null
-      ? `${(stats.totalMintedVida / 1_000_000).toFixed(1)}M VIDA`
-      : '—';
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  useEffect(() => {
+    const unsub = subscribeToLedgerSync(refresh);
+    return unsub;
+  }, [refresh]);
+
+  const mintedInCirculation =
+    stats.totalMintedVida != null ? stats.totalMintedVida : stats.citizens * VIDA_CAP_PER_VITALIZATION;
   const unitPriceStr = '$1,000';
 
   return (
@@ -51,15 +58,11 @@ export function SovereignPulseBar({ className = '' }: { className?: string }) {
       <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-6 gap-y-1 text-sm">
         <span className="flex items-baseline gap-1.5">
           <span className="text-[10px] uppercase tracking-widest font-semibold" style={{ color: GRAY }}>POPULATION:</span>
-          <span className="font-bold font-mono" style={{ color: GOLD }} title="Vitalized humans on Earth">{stats.citizens.toLocaleString()}</span>
-        </span>
-        <span className="flex items-baseline gap-1.5">
-          <span className="text-[10px] uppercase tracking-widest font-semibold" style={{ color: GRAY }}>TREASURY:</span>
-          <span className="font-bold font-mono" style={{ color: GOLD }}>{treasuryStr}</span>
+          <span className="font-bold font-mono" style={{ color: GOLD }} title="Total Vitalized Humans">{stats.citizens.toLocaleString()}</span>
         </span>
         <span className="flex items-baseline gap-1.5">
           <span className="text-[10px] uppercase tracking-widest font-semibold" style={{ color: GRAY }}>MINTED VIDA CAP:</span>
-          <span className="font-bold font-mono" style={{ color: GOLD }} title="Total VIDA CAP in circulation">{mintedStr}</span>
+          <span className="font-bold font-mono" style={{ color: GOLD }} title="Total VIDA CAP in circulation: 1 project + 5 nations + 5 citizens per vitalized human">{mintedInCirculation.toLocaleString('en-US')}</span>
         </span>
         <span className="flex items-baseline gap-1.5">
           <span className="text-[10px] uppercase tracking-widest font-semibold" style={{ color: GRAY }}>UNIT PRICE:</span>

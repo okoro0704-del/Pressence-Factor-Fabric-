@@ -15,6 +15,7 @@ import { setSessionIdentity } from '@/lib/sessionIsolation';
 import { setVitalizationComplete } from '@/lib/vitalizationState';
 import { logGuestAccessIfNeeded } from '@/lib/guestMode';
 import { getLinkedMobileDeviceId } from '@/lib/phoneIdBridge';
+import { formatPhoneE164 } from '@/lib/supabaseClient';
 import { ensurePasskeyAnchor, sovereignEntryHaptic } from '@/src/lib/auth/passkeyEngine';
 import { Loader2, Smartphone, ShieldCheck } from 'lucide-react';
 
@@ -75,12 +76,15 @@ export function RemoteLoginScreen({ onSuccess, onCancel }: RemoteLoginScreenProp
   }, [step]);
 
   const handleSubmitId = async () => {
-    const trimmed = sovereignId.trim().replace(/\D/g, '');
-    if (!trimmed || trimmed.length < 10) {
-      setError('Enter a valid Sovereign ID (phone number).');
+    const raw = sovereignId.trim().replace(/\s/g, '');
+    const e164 = raw.startsWith('+')
+      ? formatPhoneE164(raw)
+      : formatPhoneE164(raw.replace(/\D/g, ''), 'NG');
+    if (!e164.ok) {
+      setError('Enter a valid Sovereign ID (e.g. +2347038256449 or 07038256449).');
       return;
     }
-    const phone = trimmed.startsWith('+') ? trimmed : `+${trimmed}`;
+    const phone = e164.e164;
     setError(null);
     setLoading(true);
     if (isPc) {
