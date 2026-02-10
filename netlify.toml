@@ -48,6 +48,18 @@
   status = 200
   force = true
 
+# Device binding (Face + Passkey): save pillars and sovereign root — static export has no API routes
+[[redirects]]
+  from = "/api/v1/save-pillars-at-75"
+  to = "/.netlify/functions/save-pillars-at-75"
+  status = 200
+  force = true
+[[redirects]]
+  from = "/api/v1/save-sovereign-root"
+  to = "/.netlify/functions/save-sovereign-root"
+  status = 200
+  force = true
+
 # Sovereign Companion search: static export has no API routes; serve via Netlify Function (no 404)
 [[redirects]]
   from = "/api/sovereign-recognition"
