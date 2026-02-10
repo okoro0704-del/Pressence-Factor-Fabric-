@@ -1,6 +1,43 @@
 # Verify Vitalization in Supabase
 
-This doc confirms **where** vitalization hashes are stored and **how to check** in the Supabase dashboard.
+This doc confirms **where** vitalization hashes are stored and **how to check** that the backend has recorded your vitalization (without relying on the UI).
+
+---
+
+## Ways to check the backend
+
+### 1. API (from browser or curl)
+
+Call the app’s status endpoint with your phone number (E.164, e.g. `+234...`):
+
+- **URL:** `GET /api/v1/vitalization-status?phone=+234XXXXXXXXXX`
+- **Example (same origin):**  
+  `https://your-app.netlify.app/api/v1/vitalization-status?phone=+2348012345678`
+- **Example (local):**  
+  `http://localhost:3000/api/v1/vitalization-status?phone=+2348012345678`
+
+**Response when vitalized (example):**
+
+```json
+{
+  "ok": true,
+  "found": true,
+  "vitalization_status": "VITALIZED",
+  "is_minted": true,
+  "face_hash_set": true,
+  "device_id_set": true,
+  "vida_cap_balance": 10,
+  "updated_at": "2025-02-09T..."
+}
+```
+
+**Response when no profile yet:** `"found": false` and a short `message`. So you can confirm the backend has (or has not) recorded your vitalization.
+
+**Note:** You must run the migration that adds the RPC `get_vitalization_status` (e.g. `20260278000000_get_vitalization_status_rpc.sql`) in your Supabase project for this endpoint to work.
+
+### 2. Supabase SQL Editor
+
+Run the queries below in **Supabase → SQL Editor** (replace `+234...` with your phone).
 
 ---
 
@@ -135,3 +172,15 @@ SELECT * FROM public.four_pillars_complete('+234XXXXXXXXXX');
 - `20260268000000_save_at_75_vitalized.sql` — RPC `save_pillars_at_75` (writes hashes + sets `vitalization_status = 'VITALIZED'`)
 
 If these migrations have been applied to your Supabase project, vitalization data is stored in **`public.user_profiles`** as above. Use the SQL queries in this file to confirm that the hash was created and where it was saved.
+
+---
+
+## Quick check via RPC (same as the API)
+
+In **Supabase → SQL Editor** you can call the same function the API uses:
+
+```sql
+SELECT get_vitalization_status('+234XXXXXXXXXX');  -- replace with your phone
+```
+
+This returns one JSONB row with `ok`, `found`, `vitalization_status`, `is_minted`, `face_hash_set`, `device_id_set`, `vida_cap_balance`, `updated_at` (or `message` when not found). Requires migration `20260278000000_get_vitalization_status_rpc.sql` to be applied.

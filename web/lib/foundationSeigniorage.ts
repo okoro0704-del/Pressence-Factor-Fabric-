@@ -1,6 +1,6 @@
 /**
  * Foundation Seigniorage Protocol — Dual-Minting on Root Identity creation only.
- * Per new identity (first device): 10 VIDA CAP to user wallet, 1 VIDA to PFF_FOUNDATION_VAULT.
+ * Per successful vitalization: 10 VIDA CAP total — 5 to the Citizen, 5 to the Nation of the citizen.
  * Grant trigger: Constitution signed + humanity check. Single-mint guard: if (vidaCapMinted) rejectMint().
  * Device linking MUST NOT mint again.
  */
@@ -11,8 +11,14 @@ import { hasSignedConstitution } from './legalApprovals';
 import { getHumanityCheck, isEligibleForMint } from './humanityScore';
 import { rejectMintIfAlreadyMinted } from './sovereignIdentityGuard';
 
-/** VIDA CAP minted to user when 3-of-4 gate clears. */
+/** Total VIDA CAP per vitalization (5 citizen + 5 nation). */
 export const USER_VIDA_ON_VERIFY = 10;
+
+/** VIDA CAP to citizen (sovereign_internal_wallets) per vitalization. */
+export const CITIZEN_VIDA_ON_VERIFY = 5;
+
+/** VIDA CAP to nation of the citizen (national_block_reserves) per vitalization. */
+export const NATION_VIDA_ON_VERIFY = 5;
 
 /** VIDA minted to PFF Foundation Vault per verification (audit in foundation_vault_ledger). */
 export const FOUNDATION_VIDA_ON_VERIFY = 1;
@@ -54,16 +60,26 @@ export async function mintFoundationSeigniorage(
       return { ok: false, error: 'Constitution must be signed before grant. Complete the Biometric Signature on the Sovereign Constitution.' };
     }
 
-    // Anti-Bot Protocol: Mint only if humanity_score is 1.0 and biometric is from external device.
+    // Proof of Personhood: humanity_score 1.0 (set when backend marks VITALIZED). Backfill if already VITALIZED.
     const humanityResult = await getHumanityCheck(phoneNumber);
     if (!humanityResult.ok) {
       return { ok: false, error: humanityResult.error };
     }
     if (!isEligibleForMint(humanityResult.data)) {
-      return {
-        ok: false,
-        error: 'Proof of Personhood required. Complete a Triple-Pillar scan with an external biometric device to unlock minting.',
-      };
+      const { data: profile } = await (supabase as any)
+        .from('user_profiles')
+        .select('vitalization_status')
+        .eq('phone_number', phoneNumber.trim())
+        .maybeSingle();
+      const vitalized = profile?.vitalization_status === 'VITALIZED' || profile?.vitalization_status === 'Master_Vitalization';
+      if (vitalized) {
+        await (supabase as any).from('user_profiles').update({ humanity_score: 1.0, updated_at: new Date().toISOString() }).eq('phone_number', phoneNumber.trim());
+      } else {
+        return {
+          ok: false,
+          error: 'Proof of Personhood required. Complete vitalization (Face + Device) to unlock minting.',
+        };
+      }
     }
 
     // Idempotent: already minted for this face (or citizen when no faceHash)?
@@ -91,21 +107,30 @@ export async function mintFoundationSeigniorage(
       return { ok: false, error: 'Could not get or create sovereign wallet' };
     }
 
-    // 1) Mint 10 VIDA to user's wallet
+    // 1) Mint 5 VIDA CAP to citizen's wallet
     const { error: updateError } = await (supabase as any)
       .from('sovereign_internal_wallets')
       .update({
-        vida_cap_balance: (wallet.vida_cap_balance ?? 0) + USER_VIDA_ON_VERIFY,
+        vida_cap_balance: (wallet.vida_cap_balance ?? 0) + CITIZEN_VIDA_ON_VERIFY,
         updated_at: new Date().toISOString(),
       })
       .eq('phone_number', phoneNumber);
 
     if (updateError) {
-      console.error('[FoundationSeigniorage] User mint failed:', updateError);
-      return { ok: false, error: updateError.message ?? 'User mint failed' };
+      console.error('[FoundationSeigniorage] Citizen mint failed:', updateError);
+      return { ok: false, error: updateError.message ?? 'Citizen mint failed' };
     }
 
-    // 2) Record 1 VIDA to foundation_vault_ledger (PFF_FOUNDATION_VAULT). face_hash = who minted (one face = one mint).
+    // 2) Credit 5 VIDA CAP to nation of the citizen (national_block_reserves)
+    const { data: nationRpc, error: nationError } = await (supabase as any).rpc('credit_nation_vitalization_vida_cap', {
+      p_amount: NATION_VIDA_ON_VERIFY,
+    });
+    if (nationError || (nationRpc && nationRpc.ok === false)) {
+      console.error('[FoundationSeigniorage] Nation credit failed:', nationError ?? nationRpc?.error);
+      // Citizen already credited; do not roll back. Log and continue.
+    }
+
+    // 3) Record 1 VIDA to foundation_vault_ledger (PFF_FOUNDATION_VAULT). face_hash = who minted (one face = one mint).
     const { error: ledgerError } = await (supabase as any)
       .from('foundation_vault_ledger')
       .insert({

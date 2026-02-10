@@ -2181,7 +2181,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     );
   }
 
-  // Success shield — minting press: "5 VIDA CAP SUCCESSFULLY MINTED" in gold
+  // Success shield — minting press: "10 VIDA CAP SUCCESSFULLY MINTED" in gold (protocol: 10 per Vitalization)
   if (showSeedSuccessShield && identityAnchor) {
     return (
       <div className="min-h-screen bg-[#050505] flex items-center justify-center p-4">
@@ -2198,7 +2198,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
             boxShadow: '0 0 60px rgba(212, 175, 55, 0.25), inset 0 1px 0 rgba(212, 175, 55, 0.15)',
           }}
         >
-          {/* Minting press / digital forge: stamp drops onto 5 VIDA plate */}
+          {/* Minting press / digital forge: stamp drops onto 10 VIDA plate */}
           <div className="relative flex flex-col items-center mb-6 h-24" aria-hidden>
             <motion.div
               className="absolute left-1/2 -translate-x-1/2 w-24 h-4 rounded-b-lg bg-gradient-to-b from-[#4a4035] to-[#2a2520] border-x-2 border-b-2 border-[#D4AF37]/50 z-10"
@@ -2208,11 +2208,11 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
               transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
             />
             <div className="absolute bottom-0 w-36 h-14 rounded-lg flex items-center justify-center border-2 border-[#D4AF37]/60 bg-gradient-to-b from-[#2a2520] to-[#1a1815]" style={{ boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.5), 0 4px 16px rgba(212,175,55,0.25)' }}>
-              <span className="text-xl font-bold font-mono text-[#D4AF37] tracking-tight">5 VIDA</span>
+              <span className="text-xl font-bold font-mono text-[#D4AF37] tracking-tight">10 VIDA</span>
             </div>
           </div>
           <h2 className={`text-2xl font-bold uppercase tracking-wider mb-4 ${jetbrains.className}`} style={{ color: '#D4AF37' }}>
-            5 VIDA CAP SUCCESSFULLY MINTED
+            10 VIDA CAP SUCCESSFULLY MINTED
           </h2>
           <p className="text-sm text-[#a0a0a5] mb-8">
             Your Master Key is verified. Continue to complete device binding and access your dashboard.

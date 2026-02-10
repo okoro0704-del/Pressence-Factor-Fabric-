@@ -10,6 +10,8 @@ import { LoginRequestListener } from '@/components/dashboard/LoginRequestListene
 import { getIdentityAnchorPhone } from '@/lib/sentinelActivation';
 import { setVitalizationComplete, shouldNeverRedirectBack } from '@/lib/vitalizationState';
 import { isArchitect } from '@/lib/manifestoUnveiling';
+import { getCitizenStatusForPhone } from '@/lib/supabaseTelemetry';
+import { mintFoundationSeigniorage } from '@/lib/foundationSeigniorage';
 
 /** Dashboard = overview: Pulse bar. Use bottom tab for Wallet, Treasury, Settings. */
 export default function DashboardPage() {
@@ -45,6 +47,13 @@ export default function DashboardPage() {
           router.replace('/');
         }
         return;
+      }
+      if (phone) {
+        const status = await getCitizenStatusForPhone(phone);
+        if (status === 'VITALIZED') {
+          setVitalizationComplete();
+          mintFoundationSeigniorage(phone).catch(() => {});
+        }
       }
       if (!cancelled) {
         setVitalizedOrArchitect(true);

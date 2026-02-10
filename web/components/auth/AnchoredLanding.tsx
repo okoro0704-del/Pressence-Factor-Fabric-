@@ -17,6 +17,98 @@ import { resolveIdentityFromCredentialId } from '@/lib/deviceAnchors';
 import { isCurrentDevicePrimary } from '@/lib/phoneIdBridge';
 import { getCurrentDeviceInfo } from '@/lib/multiDeviceVitalization';
 import { executeSentinelActivationDebit } from '@/lib/masterArchitectInit';
+import { mintFoundationSeigniorage } from '@/lib/foundationSeigniorage';
+
+/** Screen when no local anchor: "Already vitalized?" check by phone (syncs with backend) or continue to registration. */
+function NoIdentityScreen({
+  onContinueToRegistration,
+  onAlreadyVitalized,
+}: {
+  onContinueToRegistration: () => void;
+  onAlreadyVitalized: (phone: string) => void;
+}) {
+  const [phone, setPhone] = useState('');
+  const [checking, setChecking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleCheckStatus = useCallback(async () => {
+    const trimmed = phone?.trim();
+    if (!trimmed) {
+      setError('Enter your phone number (e.g. +234...)');
+      return;
+    }
+    setError(null);
+    setChecking(true);
+    try {
+      const res = await fetch(`/api/v1/vitalization-status?phone=${encodeURIComponent(trimmed)}`);
+      const data = await res.json();
+      if (data?.ok && data?.found && (data.vitalization_status === 'VITALIZED' || data.vitalization_status === 'Master_Vitalization')) {
+        await mintFoundationSeigniorage(trimmed);
+        onAlreadyVitalized(trimmed);
+        return;
+      }
+      if (data?.ok && data?.found) {
+        setError('This number is not yet vitalized. Complete registration first.');
+      } else if (data?.ok && !data?.found) {
+        setError('No record for this number. Complete registration first.');
+      } else {
+        setError(data?.error ?? 'Could not check status.');
+      }
+    } catch {
+      setError('Network error. Try again.');
+    } finally {
+      setChecking(false);
+    }
+  }, [phone, onAlreadyVitalized]);
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-[#050505] p-4">
+      <div
+        className="absolute inset-0 opacity-30 pointer-events-none"
+        style={{ background: 'radial-gradient(ellipse 80% 50% at 50% 40%, rgba(212, 175, 55, 0.15) 0%, transparent 60%)' }}
+        aria-hidden
+      />
+      <p className="relative z-10 text-sm text-center max-w-xs mb-4" style={{ color: '#a0a0a5' }}>
+        No saved identity on this device.
+      </p>
+      <p className="relative z-10 text-xs text-center max-w-xs mb-6" style={{ color: '#6b6b70' }}>
+        Already vitalized? Enter your number to sync with the backend and open the dashboard.
+      </p>
+      <div className="relative z-10 w-full max-w-xs space-y-2 mb-6">
+        <input
+          type="tel"
+          value={phone}
+          onChange={(e) => { setPhone(e.target.value); setError(null); }}
+          placeholder="+234..."
+          className="w-full px-3 py-2.5 rounded-lg bg-[#1a1a1e] border border-[#6b6b70] text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#D4AF37]"
+          aria-label="Phone number"
+          disabled={checking}
+        />
+        <button
+          type="button"
+          onClick={handleCheckStatus}
+          disabled={checking}
+          className="w-full py-2.5 rounded-lg font-semibold text-sm bg-[#D4AF37] text-black hover:bg-[#e8c547] disabled:opacity-70 transition-colors"
+        >
+          {checking ? 'Checking…' : "I'm already vitalized"}
+        </button>
+        {error && <p className="text-xs text-red-400 text-center" role="alert">{error}</p>}
+      </div>
+      <button
+        type="button"
+        onClick={onContinueToRegistration}
+        className="relative z-10 px-6 py-3 rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/50 text-sm"
+        style={{
+          background: 'transparent',
+          border: '1px solid rgba(212, 175, 55, 0.4)',
+          color: '#D4AF37',
+        }}
+      >
+        Continue to registration
+      </button>
+    </div>
+  );
+}
 
 /**
  * Pre-flight: verify face (and device passkey) to confirm user has vitalized.
@@ -228,34 +320,20 @@ export function AnchoredLanding() {
     );
   }
 
-  // No saved identity (e.g. cleared or race): offer fallback to full registration
+  // No saved identity (e.g. cleared or race): offer "Already vitalized?" check or full registration
   if (!anchor?.citizenHash) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-[#050505] p-4">
-        <div
-          className="absolute inset-0 opacity-30 pointer-events-none"
-          style={{ background: 'radial-gradient(ellipse 80% 50% at 50% 40%, rgba(212, 175, 55, 0.15) 0%, transparent 60%)' }}
-          aria-hidden
-        />
-        <p className="relative z-10 text-sm text-center max-w-xs mb-6" style={{ color: '#a0a0a5' }}>
-          No saved identity found.
-        </p>
-        <button
-          type="button"
-          onClick={() => {
-            clearVitalizationAnchor();
-            router.replace('/vitalization');
-          }}
-          className="relative z-10 px-6 py-3 rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/50"
-          style={{
-            background: 'linear-gradient(145deg, rgba(212, 175, 55, 0.15) 0%, rgba(212, 175, 55, 0.08) 100%)',
-            border: '1px solid rgba(212, 175, 55, 0.4)',
-            color: '#D4AF37',
-          }}
-        >
-          Continue to registration
-        </button>
-      </div>
+      <NoIdentityScreen
+        onContinueToRegistration={() => {
+          clearVitalizationAnchor();
+          router.replace('/vitalization');
+        }}
+        onAlreadyVitalized={(phone) => {
+          setIdentityAnchorForSession(phone);
+          setVitalizationComplete();
+          router.replace('/dashboard');
+        }}
+      />
     );
   }
 

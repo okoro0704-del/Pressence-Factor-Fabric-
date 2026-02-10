@@ -214,6 +214,22 @@ export default function SettingsPage() {
 
             <BiometricStrictnessSlider />
 
+            <div className="rounded-xl border p-4" style={{ borderColor: 'rgba(212, 175, 55, 0.3)' }}>
+              <h2 className="text-sm font-semibold uppercase tracking-wider mb-2" style={{ color: GOLD }}>
+                Sovereign Constitution
+              </h2>
+              <p className="text-sm text-[#a0a0a5] mb-3">
+                Attest to the Articles of the Protocol with your biometric. Required once before your 10 VIDA CAP (5 to you, 5 to Nation) can be minted. If you were already vitalized and have not signed, do this to unlock minting.
+              </p>
+              <Link
+                href="/settings/sign-constitution"
+                className="inline-block px-4 py-2 rounded-lg font-medium text-sm transition-colors"
+                style={{ background: 'rgba(212, 175, 55, 0.15)', color: GOLD }}
+              >
+                Sign Sovereign Constitution
+              </Link>
+            </div>
+
             {shouldSuggestSovereignShield(trustLevel) && (
               <div className="rounded-xl border p-4 bg-[#D4AF37]/5" style={{ borderColor: 'rgba(212, 175, 55, 0.4)' }}>
                 <h2 className="text-sm font-semibold uppercase tracking-wider mb-2" style={{ color: GOLD }}>

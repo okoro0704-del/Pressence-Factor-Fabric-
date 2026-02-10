@@ -9,6 +9,7 @@
 import { getIdentityAnchorPhone } from './sentinelActivation';
 import { getVitalizationAnchor } from './vitalizationAnchor';
 import { getSupabase } from './supabase';
+import { getCitizenStatusForPhone } from './supabaseTelemetry';
 
 export type VitalizationStatus =
   | 'no_user'           // No identity anchor (phone) — show gate / registration
@@ -94,13 +95,24 @@ export function isVitalizationComplete(): boolean {
 
 /**
  * Resolve current vitalization status from identity anchor, Supabase user_profiles, and local anchor.
- * Call from client only (uses localStorage and Supabase).
+ * Backend is source of truth: if Supabase says VITALIZED for this phone, we return 'vitalized' and
+ * set local flags so the UI aligns (even when this device has no stored anchor yet).
  */
 export async function getVitalizationStatus(): Promise<VitalizationStatus> {
   if (typeof window === 'undefined') return 'no_user';
 
   const phone = getIdentityAnchorPhone();
   if (!phone?.trim()) return 'no_user';
+
+  try {
+    const citizenStatus = await getCitizenStatusForPhone(phone.trim());
+    if (citizenStatus === 'VITALIZED') {
+      setVitalizationComplete();
+      return 'vitalized';
+    }
+  } catch {
+    // fall through to local/Supabase checks
+  }
 
   const supabase = getSupabase();
   if (!supabase) return 'no_citizen_record';

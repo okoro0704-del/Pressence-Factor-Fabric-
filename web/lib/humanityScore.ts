@@ -78,13 +78,9 @@ export async function getHumanityCheck(
   }
 }
 
-/** True when user is verified human (humanity_score 1.0 and biometric from external device). */
+/** True when user is verified human (humanity_score 1.0). Set by save_pillars_at_75 when vitalized; allows 5+5 mint. */
 export function isEligibleForMint(check: HumanityCheck): boolean {
-  const scoreOk = check.humanity_score === HUMANITY_SCORE_VERIFIED;
-  const externalBiometric =
-    (check.external_scanner_serial_number != null && check.external_scanner_serial_number.trim() !== '') ||
-    (check.external_fingerprint_hash != null && check.external_fingerprint_hash.trim() !== '');
-  return !!scoreOk && !!externalBiometric;
+  return check.humanity_score === HUMANITY_SCORE_VERIFIED;
 }
 
 export interface IdCardProfile {
