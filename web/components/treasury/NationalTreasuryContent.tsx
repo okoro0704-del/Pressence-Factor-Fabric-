@@ -47,6 +47,11 @@ export function NationalTreasuryContent() {
   const vidaPriceUsd = feed?.vida_price_usd ?? VIDA_USD_VALUE;
   const vidaPriceNaira = vidaPriceUsd * usdToNgn;
 
+  const nationalLiquidityHalf = feed != null ? (feed.national_liquidity ?? 0) / 2 : 0;
+  const nationalLiquidityDisplay = feed != null ? (feed.vida_cap_liquidity != null && feed.vida_cap_liquidity > 0 ? feed.vida_cap_liquidity : nationalLiquidityHalf) : 0;
+  const liquidPoolDisplay = feed != null ? (feed.liquid_pool != null && feed.liquid_pool > 0 ? feed.liquid_pool : nationalLiquidityHalf) : 0;
+  const totalMintedNationDisplay = feed != null ? (feed.total_minted_vida_cap_nation > 0 ? feed.total_minted_vida_cap_nation : feed.total_minted_vida || feed.total_reserve_vida || 0) : 0;
+
   return (
     <div className="flex flex-col min-h-full">
       <section className="rounded-2xl border-2 p-6 mb-8" style={{ borderColor: 'rgba(212,175,55,0.35)', background: 'rgba(22,22,26,0.9)' }}>
@@ -73,18 +78,16 @@ export function NationalTreasuryContent() {
           <p className="text-xs text-[#6b6b70] mt-1">Vitalized humans on Earth (National Block feeds treasury from this count).</p>
         </div>
 
-        {/* Total Minted VIDA CAP for the Nation */}
+        {/* Total Minted VIDA CAP for the Nation — prefer nation cap, fallback to global total */}
         <div className="rounded-xl border border-[#2a2a2e] p-4 mb-4">
           <h3 className="text-xs font-bold text-[#6b6b70] uppercase tracking-wider mb-2">Total Minted VIDA CAP for the Nation</h3>
           <p className="text-xl font-bold font-mono" style={{ color: GOLD }}>
-            {feed != null
-              ? `${feed.total_minted_vida_cap_nation.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VIDA`
-              : '—'}
+            {feed != null ? `${totalMintedNationDisplay.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VIDA` : '—'}
           </p>
           {feed != null && (
             <>
-              <p className="text-sm text-[#a0a0a5]">{formatUsd(feed.total_minted_vida_cap_nation * vidaPriceUsd)} USD</p>
-              <p className="text-sm text-[#a0a0a5]">{formatNaira(feed.total_minted_vida_cap_nation * vidaPriceNaira)} Naira</p>
+              <p className="text-sm text-[#a0a0a5]">{formatUsd(totalMintedNationDisplay * vidaPriceUsd)} USD</p>
+              <p className="text-sm text-[#a0a0a5]">{formatNaira(totalMintedNationDisplay * vidaPriceNaira)} Naira</p>
             </>
           )}
         </div>
@@ -105,34 +108,30 @@ export function NationalTreasuryContent() {
           )}
         </div>
 
-        {/* National Liquidity */}
+        {/* National Liquidity (15% — VIDA CAP Liquidity); half of 30% when only sum is provided */}
         <div className="rounded-xl border border-[#2a2a2e] p-4 mb-4">
-          <h3 className="text-xs font-bold text-[#6b6b70] uppercase tracking-wider mb-2">National Liquidity</h3>
+          <h3 className="text-xs font-bold text-[#6b6b70] uppercase tracking-wider mb-2">National Liquidity (15%)</h3>
           <p className="text-xl font-bold font-mono" style={{ color: GOLD }}>
-            {feed != null
-              ? `${feed.national_liquidity.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VIDA`
-              : '—'}
+            {feed != null ? `${nationalLiquidityDisplay.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VIDA` : '—'}
           </p>
           {feed != null && (
             <>
-              <p className="text-sm text-[#a0a0a5]">{formatUsd(feed.national_liquidity * vidaPriceUsd)} USD</p>
-              <p className="text-sm text-[#a0a0a5]">{formatNaira(feed.national_liquidity * vidaPriceNaira)} Naira</p>
+              <p className="text-sm text-[#a0a0a5]">{formatUsd(nationalLiquidityDisplay * vidaPriceUsd)} USD</p>
+              <p className="text-sm text-[#a0a0a5]">{formatNaira(nationalLiquidityDisplay * vidaPriceNaira)} Naira</p>
             </>
           )}
         </div>
 
-        {/* Liquid Pool */}
+        {/* Liquid Pool (15% — National VIDA Pool); half of 30% when only sum is provided */}
         <div className="rounded-xl border border-[#2a2a2e] p-4">
-          <h3 className="text-xs font-bold text-[#6b6b70] uppercase tracking-wider mb-2">Liquid Pool</h3>
+          <h3 className="text-xs font-bold text-[#6b6b70] uppercase tracking-wider mb-2">Liquid Pool (15%)</h3>
           <p className="text-xl font-bold font-mono" style={{ color: GOLD }}>
-            {feed != null
-              ? `${feed.liquid_pool.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VIDA`
-              : '—'}
+            {feed != null ? `${liquidPoolDisplay.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VIDA` : '—'}
           </p>
           {feed != null && (
             <>
-              <p className="text-sm text-[#a0a0a5]">{formatUsd(feed.liquid_pool * vidaPriceUsd)} USD</p>
-              <p className="text-sm text-[#a0a0a5]">{formatNaira(feed.liquid_pool * vidaPriceNaira)} Naira</p>
+              <p className="text-sm text-[#a0a0a5]">{formatUsd(liquidPoolDisplay * vidaPriceUsd)} USD</p>
+              <p className="text-sm text-[#a0a0a5]">{formatNaira(liquidPoolDisplay * vidaPriceNaira)} Naira</p>
             </>
           )}
         </div>

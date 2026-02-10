@@ -100,9 +100,9 @@ export function LayerStatusBar({
     ? 'CORE MESH ACTIVE'
     : `${count}/${totalPillars} verified`;
   const subText = isVitalized
-    ? '1 VIDA Unlocked'
+    ? '11 VIDA CAP Unlocked'
     : allGold
-    ? '1 VIDA Unlocked'
+    ? '11 VIDA CAP Unlocked'
     : coreMeshActive
     ? 'Face · Device · Phone Anchor verified (GPS optional)'
     : showGps

@@ -102,8 +102,9 @@ import { IdentityState } from '@/lib/identityState';
 
 /**
  * Face + Device pipeline (no palm): bind WebAuthn credential and generate sovereign hash.
- * Registration: createCredential; Authentication: getAssertion. DeviceHash = SHA-256(credentialId).
- * Fail gracefully if WebAuthn unavailable (show error, do not proceed).
+ * Binding = create a new passkey for this site (createCredential). Do NOT use getAssertion first —
+ * that would show "Sign in with QR code or security key" instead of "Create passkey for this website".
+ * DeviceHash = SHA-256(credentialId). Fail gracefully if WebAuthn unavailable.
  */
 async function runDeviceBindingAndSovereignHash(
   phone: string,
@@ -116,14 +117,9 @@ async function runDeviceBindingAndSovereignHash(
   }
   let credentialId: string;
   try {
-    const existing = await getAssertion();
-    if (existing?.credential?.id) {
-      credentialId = existing.credential.id;
-    } else {
-      const created = await createCredential(phone, displayName);
-      if (!created?.id) return { ok: false, error: 'Passkey creation was cancelled or failed.' };
-      credentialId = created.id;
-    }
+    const created = await createCredential(phone, displayName);
+    if (!created?.id) return { ok: false, error: 'Passkey creation was cancelled or failed.' };
+    credentialId = created.id;
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return { ok: false, error: msg || 'Device binding failed.' };
