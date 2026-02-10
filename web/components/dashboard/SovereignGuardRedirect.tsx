@@ -13,6 +13,7 @@ export function SovereignGuardRedirect({ children }: { children: React.ReactNode
     if (typeof window === 'undefined') return;
     const path = pathname ?? window.location.pathname;
     if (path !== '/registration' && path !== '/vitalization') return;
+    if (path === '/vitalization') return;
     if (isAlreadyVerified()) {
       router.replace('/dashboard');
     }

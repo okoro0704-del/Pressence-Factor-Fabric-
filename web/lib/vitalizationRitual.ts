@@ -1,15 +1,12 @@
 /**
- * Single Handshake = 100% Vitalization (9-Day Ritual removed).
- * One Quad-Pillar Handshake triggers full Vitalization immediately.
- * - Citizen_Vault: first 0.1 VIDA spendable on Day Zero; no daily-scan or 10-day vesting requirement.
- * - getVitalizationStatus: unlocked when user has any spendable or is_minted (already vitalized).
- * - recordDailyScan: still records scan for analytics; first scan treated as full unlock (streak = 10, full spendable if needed).
+ * Vitalization is a one-time instant event. No 10-day or daily-release logic.
+ * - getVitalizationStatus: reads spendable_vida, locked_vida, is_minted (unlocked when is_minted or spendable > 0).
+ * - recordDailyScan: optional analytics only; does NOT change spendable/locked (instant 11-VIDA mint handles allocation).
  */
 
 import { getSupabase } from './supabase';
 import { setBiometricStrictness } from './biometricStrictness';
 
-/** Single handshake = full unlock; no 9-day requirement. */
 const STREAK_TARGET = 10;
 const DAILY_UNLOCK_VIDA_AMOUNT = 0.1;
 
@@ -51,8 +48,8 @@ export async function getVitalizationStatus(phoneNumber: string): Promise<Vitali
 }
 
 /**
- * Record a successful scan (Face + Palm/Fingerprint). Single handshake = full unlock.
- * No 9-day or 10-day vesting: first scan sets streak to STREAK_TARGET and full spendable (1 VIDA) immediately.
+ * Record a successful scan for analytics only. Does NOT change spendable_vida or locked_vida.
+ * Instant 11-VIDA mint (foundationSeigniorage) handles all allocation; no daily release or 10-day ritual.
  */
 export async function recordDailyScan(phoneNumber: string): Promise<{
   ok: true;
@@ -70,27 +67,17 @@ export async function recordDailyScan(phoneNumber: string): Promise<{
 
     const { data: profile, error: fetchError } = await (supabase as any)
       .from('user_profiles')
-      .select('vitalization_streak, vitalization_last_scan_date, spendable_vida, locked_vida, is_minted')
+      .select('vitalization_streak, vitalization_last_scan_date, spendable_vida, is_minted')
       .eq('phone_number', trimmed)
       .maybeSingle();
 
     if (fetchError || !profile) return { ok: false, error: fetchError?.message ?? 'Profile not found' };
-
-    const currentStreak = Number(profile.vitalization_streak) || 0;
-    const lastScan = profile.vitalization_last_scan_date ? String(profile.vitalization_last_scan_date).slice(0, 10) : null;
-    const spendable = Number(profile.spendable_vida) || 0;
-    const locked = Number(profile.locked_vida) || 0;
 
     const payload: Record<string, unknown> = {
       vitalization_last_scan_date: today,
       updated_at: new Date().toISOString(),
       vitalization_streak: STREAK_TARGET,
     };
-
-    if (spendable < 1 && locked >= 0.9) {
-      payload.spendable_vida = 1;
-      payload.locked_vida = Math.max(0, locked - (1 - spendable));
-    }
 
     const { error: updateError } = await (supabase as any)
       .from('user_profiles')
@@ -110,14 +97,12 @@ export async function recordDailyScan(phoneNumber: string): Promise<{
       /* ignore */
     }
 
-    const newSpendable = payload.spendable_vida != null ? Number(payload.spendable_vida) : spendable;
-    const justUnlocked = currentStreak < STREAK_TARGET;
+    const spendable = Number(profile.spendable_vida) || 0;
     return {
       ok: true,
       streak: STREAK_TARGET,
-      justUnlocked,
-      unlockedToday: payload.spendable_vida != null,
-      newSpendableVida: newSpendable > 0 ? newSpendable : undefined,
+      justUnlocked: false,
+      newSpendableVida: spendable > 0 ? spendable : undefined,
     };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

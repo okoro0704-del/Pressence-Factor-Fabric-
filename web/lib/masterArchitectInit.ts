@@ -31,7 +31,7 @@ export async function executeSentinelActivationDebit(phoneNumber: string): Promi
   try {
     const { data: profile, error: fetchError } = await (supabase as any)
       .from('user_profiles')
-      .select('spendable_vida, sentinel_activation_debited')
+      .select('spendable_vida, locked_vida, sentinel_activation_debited')
       .eq('phone_number', trimmed)
       .maybeSingle();
     if (fetchError) return { ok: false, error: fetchError.message ?? 'Failed to read profile' };
@@ -41,14 +41,23 @@ export async function executeSentinelActivationDebit(phoneNumber: string): Promi
     if (spendable < SENTINEL_ACTIVATION_VIDA) return { ok: true, debited: false, reason: 'insufficient_balance' };
 
     const newSpendable = Math.max(0, spendable - SENTINEL_ACTIVATION_VIDA);
-    const { error: updateError } = await (supabase as any)
+    const currentLocked = Number(profile.locked_vida) ?? 0;
+    const newLocked = currentLocked + SENTINEL_ACTIVATION_VIDA;
+    const updatePayload: Record<string, unknown> = {
+      spendable_vida: newSpendable,
+      locked_vida: newLocked,
+      sentinel_activation_debited: true,
+      updated_at: new Date().toISOString(),
+    };
+    let { error: updateError } = await (supabase as any)
       .from('user_profiles')
-      .update({
-        spendable_vida: newSpendable,
-        sentinel_activation_debited: true,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq('phone_number', trimmed);
+    if (updateError && /column.*locked_vida|does not exist/i.test(updateError.message ?? '')) {
+      delete updatePayload.locked_vida;
+      const retry = await (supabase as any).from('user_profiles').update(updatePayload).eq('phone_number', trimmed);
+      updateError = retry.error;
+    }
     if (updateError) return { ok: false, error: updateError.message ?? 'Failed to debit Sentinel Activation' };
 
     const { data: sentinelRow } = await (supabase as any)
@@ -99,8 +108,8 @@ export async function isFirstRegistration(): Promise<FirstRegistrationResult> {
 }
 
 /**
- * Credit 5 VIDA to the Architect on first Face Pulse: 0.1 spendable ($100), 4.9 locked (9-Day Unlock Ritual).
- * Updates user_profiles (spendable_vida=0.1, locked_vida=4.9, is_minted=true) and sovereign_internal_wallets (vida_cap_balance=5).
+ * Credit 5 VIDA to the Architect on first Face Pulse: 1.0 spendable, 4.0 locked (instant vitalization).
+ * Then executeSentinelActivationDebit runs → 0.9 spendable, 4.1 locked.
  * Call from ensureMintedAndBalance or from the success handler when isFirstRegistration was true.
  */
 export async function creditArchitectVidaGrant(phoneNumber: string): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -112,8 +121,8 @@ export async function creditArchitectVidaGrant(phoneNumber: string): Promise<{ o
   try {
     const payload: Record<string, unknown> = {
       is_minted: true,
-      spendable_vida: 0.1,
-      locked_vida: 4.9,
+      spendable_vida: 1.0,
+      locked_vida: 4.0,
       updated_at: new Date().toISOString(),
     };
     let { error: profileError } = await (supabase as any)

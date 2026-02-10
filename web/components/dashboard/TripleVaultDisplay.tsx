@@ -5,7 +5,7 @@ import {
   FUTURE_VALUE_LOCKED_VIDA,
   CURRENT_POWER_SPENDABLE_USD,
   FULL_SPENDABLE_USD,
-  VESTING_DAYS,
+  LOCKED_RELEASE_CONDITION,
 } from '@/lib/sovereignTreasurySplit';
 import { VIDA_PRICE_USD } from '@/lib/economic';
 
@@ -89,16 +89,16 @@ export function TripleVaultDisplay({
           </span>
         </div>
         <p className="text-[10px] text-[#6b6b70] mt-2 uppercase tracking-wide">
-          {nairaFirst ? 'Sovereign Reserve Value: $5,000. ' : ''}4/1 vesting: 4 locked 365 days, 1 spendable (minus Sentinel)
+          {nairaFirst ? 'Sovereign Reserve Value: $5,000. ' : ''}Spendable 0.9 VIDA after Sentinel; Locked Reserve 4.1 VIDA
         </p>
       </div>
 
-      {/* Balance 2 — Future Value (Locked): 4 VIDA */}
+      {/* Balance 2 — Locked Reserve: 4.1 VIDA (0.1 Sentinel + 4.0 Global Goal) */}
       <div className="relative bg-gradient-to-br from-[#1a1a1f] via-[#0d0d12] to-[#2a2a30] rounded-xl p-5 border-2 border-[#3d3d45] overflow-hidden">
         <div className="absolute -top-10 -right-10 w-32 h-32 bg-indigo-500/10 rounded-full blur-3xl" />
         <div className="relative z-10 flex items-center justify-between">
           <div>
-            <h4 className="text-xs font-bold text-[#8b8b95] uppercase tracking-wider mb-1">Future Value (Locked)</h4>
+            <h4 className="text-xs font-bold text-[#8b8b95] uppercase tracking-wider mb-1">Locked Reserve</h4>
             <span className="inline-flex items-center gap-1 text-[10px] font-mono text-[#6b6b70] bg-[#2a2a2e] px-2 py-1 rounded uppercase tracking-wide">
               <svg className="w-3 h-3 text-[#6b6b70]" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
@@ -110,7 +110,7 @@ export function TripleVaultDisplay({
             {showVida(FUTURE_VALUE_LOCKED_VIDA)}
           </span>
         </div>
-        <p className="text-[10px] text-[#6b6b70] mt-2 uppercase tracking-wide">VestingContract: unlocks in {VESTING_DAYS} days</p>
+        <p className="text-[10px] text-[#6b6b70] mt-2 uppercase tracking-wide">0.1 Sentinel + 4.0 until {LOCKED_RELEASE_CONDITION}</p>
       </div>
 
       {/* Balance 3 — Current Power (Spendable): Naira-First or USD */}
@@ -136,11 +136,11 @@ export function TripleVaultDisplay({
         </div>
       </div>
 
-      {/* Vesting info */}
+      {/* Treasury summary */}
       <div className="bg-[#0d0d0f] rounded-xl p-4 border border-[#2a2a2e]">
-        <h4 className="text-xs font-bold text-[#e8c547] uppercase tracking-wider mb-2">4/1 Vesting</h4>
+        <h4 className="text-xs font-bold text-[#e8c547] uppercase tracking-wider mb-2">Treasury Split</h4>
         <p className="text-[10px] text-[#6b6b70] uppercase tracking-wide">
-          {FUTURE_VALUE_LOCKED_VIDA} VIDA locked (untransferable) for {VESTING_DAYS} days. 1 VIDA spendable{betaLiquidityTest ? ' (BETA: no fee)' : '; $100 (0.1 VIDA) Sentinel fee'} → Current Power {nairaFirst ? formatNaira(spendableNaira) : `$${currentPowerUsd.toLocaleString()}`}.
+          Total Wealth: {TOTAL_WEALTH_VIDA} VIDA. Spendable: 0.9 VIDA (after $100 Sentinel). Locked Reserve: {FUTURE_VALUE_LOCKED_VIDA} VIDA (0.1 Sentinel + 4.0 until 1B citizens).
         </p>
       </div>
 

@@ -1,8 +1,8 @@
 /**
- * Foundation Seigniorage Protocol — Dual-Minting on Root Identity creation only.
- * Per successful vitalization: 10 VIDA CAP total — 5 to the Citizen, 5 to the Nation of the citizen.
- * Grant trigger: Constitution signed + humanity check. Single-mint guard: if (vidaCapMinted) rejectMint().
- * Device linking MUST NOT mint again.
+ * Foundation Seigniorage Protocol — Instant 11-VIDA mint on Root Identity creation only.
+ * One-time instant event (no 10-day or daily release). Face + Device = trigger.
+ * 11 VIDA total: 5 → national reserve (Nigeria), 1 → foundation vault, 5 → user personal vault.
+ * User vault: 1.0 spendable + 4.0 hard_locked (release at global_citizens >= 1B); then 0.1 Sentinel debit → 0.9 spendable, 4.1 locked.
  */
 
 import { supabase } from './supabase';
@@ -10,18 +10,24 @@ import { getOrCreateSovereignWallet } from './sovereignInternalWallet';
 import { hasSignedConstitution } from './legalApprovals';
 import { getHumanityCheck, isEligibleForMint } from './humanityScore';
 import { rejectMintIfAlreadyMinted } from './sovereignIdentityGuard';
+import { setMintStatus } from './mintStatus';
+import { executeSentinelActivationDebit } from './masterArchitectInit';
 
-/** Total VIDA CAP per vitalization (5 citizen + 5 nation). */
-export const USER_VIDA_ON_VERIFY = 10;
+/** Total VIDA CAP minted per vitalization (11 = 5 nation + 1 foundation + 5 user). */
+export const TOTAL_VIDA_MINTED_PER_VITALIZATION = 11;
 
-/** VIDA CAP to citizen (sovereign_internal_wallets) per vitalization. */
+/** VIDA CAP to citizen personal vault (sovereign_internal_wallets + user_profiles spendable/locked). */
 export const CITIZEN_VIDA_ON_VERIFY = 5;
 
-/** VIDA CAP to nation of the citizen (national_block_reserves) per vitalization. */
+/** VIDA CAP to national reserve (national_block_reserves, tagged Nigeria) per vitalization. */
 export const NATION_VIDA_ON_VERIFY = 5;
 
-/** VIDA minted to PFF Foundation Vault per verification (audit in foundation_vault_ledger). */
+/** VIDA CAP to PFF Foundation Vault (foundation_vault_ledger) per vitalization. */
 export const FOUNDATION_VIDA_ON_VERIFY = 1;
+
+/** User allocation: 1.0 spendable, 4.0 hard_locked (release when global_citizens >= 1B). */
+export const USER_SPENDABLE_VIDA = 1.0;
+export const USER_HARD_LOCKED_VIDA = 4.0;
 
 /** Options for mint: faceHash is the sole criterion for "already minted" (one face = one mint). */
 export type MintFoundationSeigniorageOptions = {
@@ -107,30 +113,15 @@ export async function mintFoundationSeigniorage(
       return { ok: false, error: 'Could not get or create sovereign wallet' };
     }
 
-    // 1) Mint 5 VIDA CAP to citizen's wallet
-    const { error: updateError } = await (supabase as any)
-      .from('sovereign_internal_wallets')
-      .update({
-        vida_cap_balance: (wallet.vida_cap_balance ?? 0) + CITIZEN_VIDA_ON_VERIFY,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('phone_number', phoneNumber);
-
-    if (updateError) {
-      console.error('[FoundationSeigniorage] Citizen mint failed:', updateError);
-      return { ok: false, error: updateError.message ?? 'Citizen mint failed' };
-    }
-
-    // 2) Credit 5 VIDA CAP to nation of the citizen (national_block_reserves)
+    // 1) Credit 5 VIDA to national reserve (national_block_reserves — Nigeria)
     const { data: nationRpc, error: nationError } = await (supabase as any).rpc('credit_nation_vitalization_vida_cap', {
       p_amount: NATION_VIDA_ON_VERIFY,
     });
     if (nationError || (nationRpc && nationRpc.ok === false)) {
       console.error('[FoundationSeigniorage] Nation credit failed:', nationError ?? nationRpc?.error);
-      // Citizen already credited; do not roll back. Log and continue.
     }
 
-    // 3) Record 1 VIDA to foundation_vault_ledger (PFF_FOUNDATION_VAULT). face_hash = who minted (one face = one mint).
+    // 2) Record 1 VIDA to foundation_vault_ledger (PFF Foundation)
     const { error: ledgerError } = await (supabase as any)
       .from('foundation_vault_ledger')
       .insert({
@@ -148,6 +139,44 @@ export async function mintFoundationSeigniorage(
       return { ok: false, error: ledgerError.message ?? 'Foundation ledger failed' };
     }
 
+    // 3) User personal vault: 5 VIDA total — 1.0 spendable, 4.0 hard_locked (release at global_citizens >= 1B)
+    const { error: walletUpdateError } = await (supabase as any)
+      .from('sovereign_internal_wallets')
+      .update({
+        vida_cap_balance: (wallet.vida_cap_balance ?? 0) + CITIZEN_VIDA_ON_VERIFY,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('phone_number', phoneNumber);
+
+    if (walletUpdateError) {
+      console.error('[FoundationSeigniorage] Citizen wallet failed:', walletUpdateError);
+      return { ok: false, error: walletUpdateError.message ?? 'Citizen mint failed' };
+    }
+
+    const profilePayload: Record<string, unknown> = {
+      spendable_vida: USER_SPENDABLE_VIDA,
+      locked_vida: USER_HARD_LOCKED_VIDA,
+      is_minted: true,
+      updated_at: new Date().toISOString(),
+    };
+    let { error: profileError } = await (supabase as any)
+      .from('user_profiles')
+      .update(profilePayload)
+      .eq('phone_number', phoneNumber);
+    if (profileError && /column.*locked_vida|does not exist/i.test(profileError.message ?? '')) {
+      delete profilePayload.locked_vida;
+      const retry = await (supabase as any).from('user_profiles').update(profilePayload).eq('phone_number', phoneNumber);
+      profileError = retry.error;
+    }
+    if (profileError) {
+      console.error('[FoundationSeigniorage] Profile spendable/locked failed:', profileError);
+      return { ok: false, error: profileError.message ?? 'Failed to set user vault partition' };
+    }
+
+    // 4) Auto-debit 0.1 VIDA for Sentinel Activation → spendable 0.9, locked 4.1; sentinel_status ACTIVE
+    await executeSentinelActivationDebit(phoneNumber.trim());
+
+    await setMintStatus(phoneNumber.trim(), 'MINTED');
     return { ok: true };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

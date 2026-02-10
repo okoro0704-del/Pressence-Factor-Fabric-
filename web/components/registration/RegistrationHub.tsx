@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { PersonalRegistration } from './PersonalRegistration';
 import { AuthenticateOthers } from './AuthenticateOthers';
 import { AuthenticateDependents } from './AuthenticateDependents';
@@ -8,7 +9,14 @@ import { AuthenticateDependents } from './AuthenticateDependents';
 type RegistrationTier = 'personal' | 'others' | 'dependents';
 
 export function RegistrationHub() {
-  const [activeTier, setActiveTier] = useState<RegistrationTier>('personal');
+  const searchParams = useSearchParams();
+  const tierParam = searchParams.get('tier');
+  const [activeTier, setActiveTier] = useState<RegistrationTier>(
+    tierParam === 'dependents' ? 'dependents' : tierParam === 'others' ? 'others' : 'personal'
+  );
+  useEffect(() => {
+    if (tierParam === 'dependents' || tierParam === 'others') setActiveTier(tierParam);
+  }, [tierParam]);
 
   return (
     <div className="min-h-screen bg-[#050505] py-12 px-4">

@@ -23,8 +23,7 @@ import {
   NET_SPENDABLE_VIDA,
   VIDA_PRICE_USD,
 } from '@/lib/sovereignHandshakeConstants';
-import { LIQUID_TIER_USD } from '@/lib/economic';
-import { CURRENT_POWER_SPENDABLE_USD, CURRENT_POWER_SPENDABLE_VIDA, TOTAL_WEALTH_VIDA, FUTURE_VALUE_LOCKED_VIDA } from '@/lib/sovereignTreasurySplit';
+import { CURRENT_POWER_SPENDABLE_VIDA, TOTAL_WEALTH_VIDA, FUTURE_VALUE_LOCKED_VIDA } from '@/lib/sovereignTreasurySplit';
 import { BETA_LIQUIDITY_TEST, BETA_SPENDABLE_VIDA, BETA_SPENDABLE_USD, SOVRYN_AMM_SWAP_URL } from '@/lib/betaLiquidityTest';
 import { isFaceVerifiedForBalance } from '@/lib/biometricAuth';
 import { getMintStatus, getSpendingUnlocked, getBiometricSpendingActive, MINT_STATUS_MINTED } from '@/lib/mintStatus';
@@ -105,10 +104,10 @@ export function UserProfileBalance({
         owner: mockData.owner || 'Isreal Okoro',
         alias: mockData.alias || 'mrfundzman',
         status: displayStatus,
-        total_vida_cap_minted: GROSS_SOVEREIGN_GRANT_VIDA,
+        total_vida_cap_minted: TOTAL_WEALTH_VIDA,
         personal_share_50: NET_SPENDABLE_VIDA,
         state_contribution_50: NATIONAL_CONTRIBUTION_VIDA,
-        spendable_balance_vida: LIQUID_TIER_USD / VIDA_PRICE_USD,
+        spendable_balance_vida: CURRENT_POWER_SPENDABLE_VIDA,
         linked_bank_accounts: mockData.linked_bank_accounts || [],
       });
       setLoading(false);

@@ -4,18 +4,21 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { FourLayerGate } from '@/components/dashboard/FourLayerGate';
 import { SovereignGuardRedirect } from '@/components/dashboard/SovereignGuardRedirect';
+import { VitalizationHubContent } from '@/components/vitalization/VitalizationHubContent';
 import { getVitalizationStatus } from '@/lib/vitalizationState';
 import { ROUTES } from '@/lib/constants';
 import { useTranslation } from '@/lib/i18n/TranslationContext';
 
 /**
- * Vitalization page: full 4-pillar gate (Face, Palm, GPS, Mobile ID) with pillar boxes visible at top.
- * Block re-vitalization: if user (phone) already has citizen_hash in Supabase, redirect to dashboard or link-device.
+ * Vitalization page: full 4-pillar gate when not yet vitalized; when vitalized, show Vitalization Hub (dependent + others).
+ * No redirect to dashboard when vitalized — show hub content so user can vitalize dependents or others.
  */
 export function VitalizationPageClient() {
   const router = useRouter();
   const { t } = useTranslation();
   const [allowRegistration, setAllowRegistration] = useState<boolean | null>(null);
+  const [isVitalized, setIsVitalized] = useState(false);
+  const [showGateForOthers, setShowGateForOthers] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -27,7 +30,8 @@ export function VitalizationPageClient() {
       .then((status) => {
         if (cancelled) return;
         if (status === 'vitalized') {
-          router.replace(ROUTES.DASHBOARD ?? '/dashboard');
+          setIsVitalized(true);
+          setAllowRegistration(true);
           return;
         }
         if (status === 'needs_restore') {
@@ -63,9 +67,17 @@ export function VitalizationPageClient() {
     );
   }
 
+  if (isVitalized && !showGateForOthers) {
+    return (
+      <SovereignGuardRedirect>
+        <VitalizationHubContent onVitalizeOthers={() => setShowGateForOthers(true)} />
+      </SovereignGuardRedirect>
+    );
+  }
+
   return (
     <SovereignGuardRedirect>
-      <FourLayerGate />
+      <FourLayerGate vitalizeOthersMode={showGateForOthers} />
     </SovereignGuardRedirect>
   );
 }

@@ -104,7 +104,7 @@ export async function getMintStatusForPresence(
   }
 }
 
-/** 5 VIDA auto-credit on successful Face Pulse: set user_profiles.is_minted = true and credit sovereign_internal_wallets.vida_cap_balance += 5. Uses RPC when available to bypass RLS. */
+/** 5 VIDA auto-credit on successful Face Pulse: 1.0 spendable + 4.0 locked, then Sentinel debit → 0.9 + 4.1. Uses RPC when available to bypass RLS. */
 export async function ensureMintedAndBalance(phoneNumber: string): Promise<{ ok: true } | { ok: false; error: string }> {
   const supabase = getSupabase();
   if (!supabase) return { ok: false, error: 'Supabase not available' };
@@ -121,8 +121,8 @@ export async function ensureMintedAndBalance(phoneNumber: string): Promise<{ ok:
 
     const payload: Record<string, unknown> = {
       is_minted: true,
-      spendable_vida: 0.1,
-      locked_vida: 4.9,
+      spendable_vida: 1.0,
+      locked_vida: 4.0,
       updated_at: new Date().toISOString(),
     };
     let { error: profileError } = await (supabase as any)

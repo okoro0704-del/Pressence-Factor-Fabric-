@@ -78,12 +78,22 @@ export default function SettingsPage() {
         setProfileNameMessage('Not connected');
         return;
       }
+      const nameToSave = profileName.trim() || '';
+      const { data: rpcData, error: rpcError } = await (supabase as any).rpc('update_user_profile_full_name', {
+        p_phone_number: phone.trim(),
+        p_full_name: nameToSave || null,
+      });
+      if (!rpcError && rpcData?.ok === true) {
+        setProfileNameMessage('Saved');
+        return;
+      }
       const { error } = await (supabase as any)
         .from('user_profiles')
-        .update({ full_name: profileName.trim() || null, updated_at: new Date().toISOString() })
+        .update({ full_name: nameToSave || null, updated_at: new Date().toISOString() })
         .eq('phone_number', phone.trim());
       if (error) {
-        setProfileNameMessage(error.message ?? 'Failed to save');
+        const msg = (rpcData?.error ?? rpcError?.message ?? error?.message) || 'Failed to save';
+        setProfileNameMessage(msg);
         return;
       }
       setProfileNameMessage('Saved');

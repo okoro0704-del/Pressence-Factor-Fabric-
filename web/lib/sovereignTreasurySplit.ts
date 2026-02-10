@@ -1,9 +1,8 @@
 /**
- * Sovereign Treasury Split — 5 VIDA minting.
- * National: 5 VIDA to National_Vault_Address (70% locked, 30% liquid).
- * Citizen: 5 VIDA total; 4/1 vesting: 4 VIDA locked 365 days, 1 VIDA spendable.
- * Sentinel: $100 (0.1 VIDA) from citizen spendable → Sentinel_Wallet_Address.
- * UI: Total Wealth 5 VIDA, Future Value (Locked) 4 VIDA, Current Power (Spendable) $900.
+ * Sovereign Treasury Split — Instant 11-VIDA mint (5 nation + 1 foundation + 5 user).
+ * Citizen: 5 VIDA total. 1.0 spendable → after 0.1 Sentinel debit: 0.9 spendable, 4.1 locked.
+ * Locked Reserve: 4.1 VIDA (0.1 Sentinel + 4.0 hard_locked until global_citizens >= 1B).
+ * UI: Total Wealth 5 VIDA, Spendable 0.9 VIDA ($900), Locked Reserve 4.1 VIDA.
  */
 
 import { VIDA_PRICE_USD, VIDA_USD_VALUE } from './economic';
@@ -11,8 +10,8 @@ import { VIDA_PRICE_USD, VIDA_USD_VALUE } from './economic';
 /** Total citizen allocation (display). */
 export const TOTAL_WEALTH_VIDA = 5;
 
-/** Vesting: 4 VIDA locked for 365 days (untransferable). */
-export const FUTURE_VALUE_LOCKED_VIDA = 4;
+/** Locked reserve: 4.0 global goal + 0.1 Sentinel Activation. */
+export const FUTURE_VALUE_LOCKED_VIDA = 4.1;
 
 /** Spendable portion of citizen allocation (1 VIDA before Sentinel fee). */
 export const CITIZEN_SPENDABLE_VIDA = 1;
@@ -28,8 +27,8 @@ export const CITIZEN_ONCHAIN_VIDA = TOTAL_WEALTH_VIDA - SENTINEL_FEE_VIDA;
 export const CURRENT_POWER_SPENDABLE_VIDA = CITIZEN_SPENDABLE_VIDA - SENTINEL_FEE_VIDA;
 export const CURRENT_POWER_SPENDABLE_USD = CURRENT_POWER_SPENDABLE_VIDA * VIDA_PRICE_USD;
 
-/** Vesting period in days (4 VIDA locked for 365 days). */
-export const VESTING_DAYS = 365;
+/** Locked reserve unlocks when global_citizens >= 1B (no time-based vesting). */
+export const LOCKED_RELEASE_CONDITION = 'global_citizens >= 1,000,000,000';
 
 /** When BETA_LIQUIDITY_TEST: effective spendable is full 1 VIDA = $1,000 (VIDA_USD_VALUE). */
 export const FULL_SPENDABLE_VIDA = 1;

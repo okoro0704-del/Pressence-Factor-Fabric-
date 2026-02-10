@@ -91,7 +91,7 @@ import { setTripleAnchorVerified } from '@/lib/tripleAnchor';
 import { getAssertion, createCredential, isWebAuthnSupported } from '@/lib/webauthn';
 import { getLinkedMobileDeviceId, isSubDevice } from '@/lib/phoneIdBridge';
 import { useSoftStart, incrementTrustLevel } from '@/lib/trustLevel';
-import { recordDailyScan, getVitalizationStatus, DAILY_UNLOCK_VIDA_AMOUNT } from '@/lib/vitalizationRitual';
+import { recordDailyScan, getVitalizationStatus } from '@/lib/vitalizationRitual';
 import { LEARNING_MODE_DAYS, getLearningModeMessage, LEDGER_SYNC_MESSAGE } from '@/lib/learningMode';
 import { getBiometricStrictness, strictnessToConfig } from '@/lib/biometricStrictness';
 import dynamic from 'next/dynamic';
@@ -132,7 +132,6 @@ async function runDeviceBindingAndSovereignHash(
   return { ok: true, deviceHash };
 }
 
-import { DailyUnlockCelebration } from '@/components/dashboard/DailyUnlockCelebration';
 import { useSovereignCompanion } from '@/contexts/SovereignCompanionContext';
 import { IS_PUBLIC_REVEAL, isVettedUser, isArchitect, isDesktop } from '@/lib/publicRevealAccess';
 import { ENABLE_GPS_AS_FOURTH_PILLAR, ROUTES } from '@/lib/constants';
@@ -198,6 +197,8 @@ function clearVerifiedPillars(phone: string): void {
 export interface FourLayerGateProps {
   /** Hub verification (PC): force external fingerprint, then set MINTED and mint; redirect to /dashboard?minted=1 */
   hubVerification?: boolean;
+  /** When true, skip instant-login screen and show full flow for vitalizing another person (from Vitalization Hub). */
+  vitalizeOthersMode?: boolean;
 }
 
 /**
@@ -206,7 +207,7 @@ export interface FourLayerGateProps {
  * Requires Identity Anchor (phone number) BEFORE biometric scan
  * No access to any page without completing all 4 layers
  */
-export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = {}) {
+export function FourLayerGate({ hubVerification = false, vitalizeOthersMode = false }: FourLayerGateProps = {}) {
   const { t } = useTranslation();
   const { setVerified: setBiometricSessionVerified } = useBiometricSession();
   const [mounted, setMounted] = useState(false);
@@ -318,8 +319,6 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
   /** Soft Start: first 10 logins use LOW sensitivity (no strict lighting/confidence barriers). */
   const [softStart, setSoftStart] = useState(true);
   /** Daily Unlock Celebration: full-screen overlay when recordDailyScan confirms $100 (0.1 VIDA) added (Days 2–9). */
-  const [showDailyUnlockCelebration, setShowDailyUnlockCelebration] = useState(false);
-  const [celebrationData, setCelebrationData] = useState<{ streak: number; newSpendableVida?: number; isDay9: boolean } | null>(null);
   /** Legacy state (unused; palm scan removed). Kept to avoid breaking refs. */
   const [showPalmPulse, setShowPalmPulse] = useState(false);
   const [showSovereignPalmScan, setShowSovereignPalmScan] = useState(false);
@@ -358,7 +357,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
   const router = useRouter();
   const searchParams = useSearchParams();
   const { setPresenceVerified } = useGlobalPresenceGateway();
-  const { setSpendableVidaAnimation } = useSovereignCompanion();
+  useSovereignCompanion();
   /** Persistent Vitalization: when device has is_vitalized anchor, show instant login (face-only) or "Vitalize Someone Else". */
   const [instantLoginAnchor, setInstantLoginAnchor] = useState<VitalizationAnchorType | null>(null);
   const [showInstantLoginScreen, setShowInstantLoginScreen] = useState(false);
@@ -378,6 +377,11 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
     if (typeof sessionStorage === 'undefined') return;
     setArchitectMode(sessionStorage.getItem('pff_architect_mode') === '1');
   }, []);
+
+  /** When vitalizeOthersMode (from Vitalization Hub), skip instant login so user sees full flow for another person. */
+  useEffect(() => {
+    if (vitalizeOthersMode) skipInstantLoginRef.current = true;
+  }, [vitalizeOthersMode]);
 
   /** Persistent Vitalization: on mount, try getVitalizationAnchor (runs deep recovery if storage cleared). If is_vitalized, show instant-login screen. */
   useEffect(() => {
@@ -1272,16 +1276,8 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
           if (!mintRes.ok && !mintRes.error?.includes('already minted')) {
             console.warn('[FourLayerGate] Root identity mint:', mintRes.error);
           }
-          const ritual = await recordDailyScan(anchor.phone);
-          if (ritual.ok && (ritual.unlockedToday || ritual.justUnlocked)) {
-            setCelebrationData({ streak: ritual.streak, newSpendableVida: ritual.newSpendableVida, isDay9: ritual.justUnlocked ?? false });
-            if (ritual.newSpendableVida != null) {
-              setSpendableVidaAnimation({ from: ritual.newSpendableVida - DAILY_UNLOCK_VIDA_AMOUNT, to: ritual.newSpendableVida });
-            }
-            setShowDailyUnlockCelebration(true);
-          } else {
-            await goToDashboard();
-          }
+          await recordDailyScan(anchor.phone);
+          await goToDashboard();
           return;
         }
         const ipAddress = 'unknown';
@@ -1295,18 +1291,10 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
       await updateDeviceLastUsed(compId);
       if (authResult.externalScannerSerialNumber != null) await setHumanityScoreVerified(anchor.phone);
       await incrementTrustLevel(anchor.phone);
-      const ritual = await recordDailyScan(anchor.phone);
-      if (ritual.ok && (ritual.unlockedToday || ritual.justUnlocked)) {
-        setCelebrationData({ streak: ritual.streak, newSpendableVida: ritual.newSpendableVida, isDay9: ritual.justUnlocked ?? false });
-        if (ritual.newSpendableVida != null) {
-          setSpendableVidaAnimation({ from: ritual.newSpendableVida - DAILY_UNLOCK_VIDA_AMOUNT, to: ritual.newSpendableVida });
-        }
-        setShowDailyUnlockCelebration(true);
-      } else {
-        await goToDashboard();
-      }
+      await recordDailyScan(anchor.phone);
+      await goToDashboard();
     },
-    [goToDashboard, isFirstRun, setSpendableVidaAnimation]
+    [goToDashboard, isFirstRun]
   );
 
   /** Face + Device (no palm): after face verified, bind WebAuthn and generate sovereign hash. */
@@ -2945,21 +2933,6 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
             </div>
           </div>
         </div>
-      )}
-
-      {/* Daily Unlock Celebration: full-screen overlay when $100 (0.1 VIDA) is added (Days 2–9) or Day 9 full unlock */}
-      {showDailyUnlockCelebration && celebrationData && (
-        <DailyUnlockCelebration
-          streak={celebrationData.streak}
-          newSpendableVida={celebrationData.newSpendableVida}
-          isDay9={celebrationData.isDay9}
-          onClose={() => {
-            setShowDailyUnlockCelebration(false);
-            setCelebrationData(null);
-            goToDashboard();
-          }}
-          playSound
-        />
       )}
 
       {/* Master device: listen for verification requests when this number is used on another device */}

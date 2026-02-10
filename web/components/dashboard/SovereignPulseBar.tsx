@@ -25,9 +25,14 @@ export function SovereignPulseBar({ className = '' }: { className?: string }) {
     fetchLedgerStats().then((s) => {
       const vitalized = s.totalVitalizedCount ?? 0;
       const fromLedger = s.totalMintedVida != null && s.totalMintedVida > 0;
+      const totalMinted = fromLedger
+        ? s.totalMintedVida
+        : vitalized > 0
+          ? Math.max(VIDA_CAP_PER_VITALIZATION, vitalized * VIDA_CAP_PER_VITALIZATION)
+          : 0;
       setStats({
         citizens: vitalized,
-        totalMintedVida: fromLedger ? s.totalMintedVida : vitalized * VIDA_CAP_PER_VITALIZATION,
+        totalMintedVida: totalMinted,
       });
     });
   }, []);
@@ -42,7 +47,11 @@ export function SovereignPulseBar({ className = '' }: { className?: string }) {
   }, [refresh]);
 
   const mintedInCirculation =
-    stats.totalMintedVida != null ? stats.totalMintedVida : stats.citizens * VIDA_CAP_PER_VITALIZATION;
+    stats.totalMintedVida != null && stats.totalMintedVida > 0
+      ? stats.totalMintedVida
+      : stats.citizens > 0
+        ? Math.max(VIDA_CAP_PER_VITALIZATION, stats.citizens * VIDA_CAP_PER_VITALIZATION)
+        : 0;
   const unitPriceStr = '$1,000';
 
   return (
