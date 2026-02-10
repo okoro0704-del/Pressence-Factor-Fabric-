@@ -41,6 +41,13 @@
   status = 200
   force = true
 
+# Vitalization status: static export has no API routes; serve via Netlify Function
+[[redirects]]
+  from = "/api/v1/vitalization-status"
+  to = "/.netlify/functions/vitalization-status"
+  status = 200
+  force = true
+
 # Sovereign Companion search: static export has no API routes; serve via Netlify Function (no 404)
 [[redirects]]
   from = "/api/sovereign-recognition"
