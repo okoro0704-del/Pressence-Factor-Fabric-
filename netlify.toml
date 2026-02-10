@@ -24,7 +24,7 @@
   [headers.values]
     Permissions-Policy = "camera=(self), microphone=(self), geolocation=(self)"
 
-# Functions live in web/netlify/functions (relative to base)
+# Functions live in web/netlify/functions (relative to base when base = "web")
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"

@@ -3,6 +3,10 @@
 /api/sovereign-recognition/   /.netlify/functions/sovereign-recognition    200
 /api/identity-reset           /.netlify/functions/identity-reset          200
 /api/identity-reset/          /.netlify/functions/identity-reset           200
+# Device binding (Face + Passkey) — required for "Bind device" step
+/api/v1/save-pillars-at-75    /.netlify/functions/save-pillars-at-75    200
+/api/v1/save-sovereign-root   /.netlify/functions/save-sovereign-root   200
+/api/v1/vitalization-status   /.netlify/functions/vitalization-status   200
 
 # No redirect: Treasury and Vitalization are directly accessible. Only sign-in and device-approval require vitalization; no 9-day ritual or countdown gate.
 # SPA fallback: Netlify serves out/<path>/index.html for /<path>/ and /<path> automatically
