@@ -192,11 +192,11 @@ export async function generateAndSaveSovereignRootFaceDevice(
   }
   try {
     const sovereignRoot = await generateSovereignRootFaceDevice(f, d);
-    const byPhone = await saveSovereignRootToUserProfile(phone.trim(), sovereignRoot);
-    if (!byPhone.ok) return { ok: false, error: byPhone.error ?? 'Failed to save sovereign root' };
-    // Persist face + device hashes (device hash in palm_hash column for API compatibility)
+    // Persist face + device hashes first so user_profiles row exists (save_pillars_at_75 inserts if missing).
     const saved = await savePillarsAt75(phone.trim(), f, d, deviceId.trim());
     if (!saved.ok) return { ok: false, error: saved.error ?? 'Failed to save pillars' };
+    const byPhone = await saveSovereignRootToUserProfile(phone.trim(), sovereignRoot);
+    if (!byPhone.ok) return { ok: false, error: byPhone.error ?? 'Failed to save sovereign root to profile' };
     return { ok: true };
   } catch (e) {
     return {
