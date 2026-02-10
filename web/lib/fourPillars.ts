@@ -96,7 +96,8 @@ export async function savePillarsAt75(
     });
     const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
     if (res.ok && json.ok === true) return { ok: true };
-    return { ok: false, error: json.error ?? 'Failed to save pillars at 75%' };
+    const msg = json.error?.trim() || (res.status === 404 ? 'API not found (check deployment).' : res.status === 503 ? 'Server not configured.' : `Failed to save pillars (${res.status}).`);
+    return { ok: false, error: msg };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'Failed to save pillars at 75%' };
   }
