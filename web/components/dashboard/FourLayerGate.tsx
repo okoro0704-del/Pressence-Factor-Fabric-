@@ -2294,7 +2294,7 @@ export function FourLayerGate({ hubVerification = false, vitalizeOthersMode = fa
     );
   }
 
-  // Success shield — minting press: "10 VIDA CAP SUCCESSFULLY MINTED" in gold (protocol: 10 per Vitalization)
+  // Success shield — minting press: "11 VIDA CAP SUCCESSFULLY MINTED" in gold (protocol: 11 per Vitalization)
   if (showSeedSuccessShield && identityAnchor) {
     return (
       <div className="min-h-screen bg-[#050505] flex items-center justify-center p-4">
@@ -2321,11 +2321,11 @@ export function FourLayerGate({ hubVerification = false, vitalizeOthersMode = fa
               transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
             />
             <div className="absolute bottom-0 w-36 h-14 rounded-lg flex items-center justify-center border-2 border-[#D4AF37]/60 bg-gradient-to-b from-[#2a2520] to-[#1a1815]" style={{ boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.5), 0 4px 16px rgba(212,175,55,0.25)' }}>
-              <span className="text-xl font-bold font-mono text-[#D4AF37] tracking-tight">10 VIDA</span>
+              <span className="text-xl font-bold font-mono text-[#D4AF37] tracking-tight">11 VIDA</span>
             </div>
           </div>
           <h2 className={`text-2xl font-bold uppercase tracking-wider mb-4 ${jetbrains.className}`} style={{ color: '#D4AF37' }}>
-            10 VIDA CAP SUCCESSFULLY MINTED
+            11 VIDA CAP SUCCESSFULLY MINTED
           </h2>
           <p className="text-sm text-[#a0a0a5] mb-8">
             Your Master Key is verified. Continue to complete device binding and access your dashboard.

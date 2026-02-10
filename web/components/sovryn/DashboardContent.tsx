@@ -30,7 +30,7 @@ export function DashboardContent({
   openSwapFromUrl = false,
 }: {
   vaultStable?: boolean;
-  /** When set, show "5 VIDA MINTED ON BITCOIN LAYER 2" with golden checkmark (tx mined). */
+  /** When set, show "11 VIDA CAP MINTED ON BITCOIN LAYER 2" with golden checkmark (tx mined). */
   mintTxHash?: string | null;
   /** After Identity Re-Link: open swap modal and auto-resume with pending amount. */
   openSwapFromUrl?: boolean;

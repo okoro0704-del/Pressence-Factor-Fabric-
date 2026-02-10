@@ -22,12 +22,10 @@ export function SovereignAuthGuard({ children }: SovereignAuthGuardProps) {
     if (!shouldNeverRedirectBack()) return;
     const path = pathname ?? '';
     // Do NOT redirect from / — root page runs face+palm verification then sends to dashboard.
-    const isVitalizationOrRegistration =
-      path === ROUTES.VITALIZATION ||
-      path.startsWith(ROUTES.VITALIZATION + '/') ||
-      path === '/registration' ||
-      path.startsWith('/registration/');
-    if (isVitalizationOrRegistration) {
+    // Do NOT redirect from /vitalization — Vitalization tab shows Vitalization Hub (vitalize others, dependents) for already-vitalized users.
+    const isRegistration =
+      path === '/registration' || path.startsWith('/registration/');
+    if (isRegistration) {
       router.replace(ROUTES.DASHBOARD);
     }
   }, [pathname, router]);

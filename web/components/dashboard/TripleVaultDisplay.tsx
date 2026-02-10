@@ -52,7 +52,7 @@ export function TripleVaultDisplay({
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
         </svg>
         <h3 className="text-sm font-semibold text-[#e8c547] uppercase tracking-wider">
-          Sovereign Treasury Split — 5 VIDA
+          Sovereign Treasury Split — 11 VIDA CAP per Vitalization
         </h3>
         <svg className="w-5 h-5 text-[#e8c547]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -76,13 +76,13 @@ export function TripleVaultDisplay({
         </>
       )}
 
-      {/* Balance 1 — Total Wealth: Naira-First or 5 VIDA */}
+      {/* Balance 1 — Total Wealth: Naira-First or 5 VIDA (citizen share of 11) */}
       <div className="relative bg-gradient-to-br from-amber-600/25 via-[#c9a227]/20 to-amber-800/15 rounded-xl p-5 border-2 border-amber-500/50 overflow-hidden">
         <div className="absolute -top-10 -right-10 w-32 h-32 bg-amber-400/20 rounded-full blur-3xl" />
         <div className="relative z-10 flex items-center justify-between">
           <div>
             <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-1">Total Wealth</h4>
-            <p className="text-[10px] text-amber-200/80 uppercase tracking-wide">Citizen allocation (5 VIDA minted)</p>
+            <p className="text-[10px] text-amber-200/80 uppercase tracking-wide">Citizen allocation (11 VIDA CAP per vitalization, 5 to you)</p>
           </div>
           <span className="text-2xl font-bold font-mono text-amber-300 tracking-tight" title={!faceVerified ? 'Verify face to view' : undefined}>
             {nairaFirst ? showNaira(totalWealthNaira) : showVida(TOTAL_WEALTH_VIDA)}

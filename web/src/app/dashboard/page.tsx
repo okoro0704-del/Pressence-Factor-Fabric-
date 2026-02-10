@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { ProtectedRoute } from '@/components/dashboard/ProtectedRoute';
 import { AppShell } from '@/components/layout/AppShell';
 import { SovereignPulseBar } from '@/components/dashboard/SovereignPulseBar';
+import { GlowingGlobe } from '@/components/dashboard/GlowingGlobe';
+import { TopVitalizedNations } from '@/components/dashboard/TopVitalizedNations';
 import { VitalizationRequestListener } from '@/components/dashboard/VitalizationRequestListener';
 import { LoginRequestListener } from '@/components/dashboard/LoginRequestListener';
 import { getIdentityAnchorPhone } from '@/lib/sentinelActivation';
@@ -13,7 +15,7 @@ import { isArchitect } from '@/lib/manifestoUnveiling';
 import { getCitizenStatusForPhone } from '@/lib/supabaseTelemetry';
 import { mintFoundationSeigniorage } from '@/lib/foundationSeigniorage';
 import { getIdCardProfile } from '@/lib/humanityScore';
-import { getWelcomeToVitalieGreeting } from '@/lib/timeGreeting';
+import { getGreetingLine1, WELCOME_TO_VITALIE_LINE2 } from '@/lib/timeGreeting';
 import { fetchLedgerStats } from '@/lib/ledgerStats';
 import { subscribeToLedgerSync } from '@/lib/backendRealtimeSync';
 
@@ -118,9 +120,10 @@ export default function DashboardPage() {
       <AppShell>
         <main className="min-h-screen bg-[#0d0d0f] pb-24 md:pb-8 flex flex-col">
           <header className="shrink-0 border-b border-[#2a2a2e] bg-[#16161a]/95 backdrop-blur px-4 py-3 safe-area-top flex flex-wrap items-center justify-between gap-3">
-            <p className="text-base font-bold text-[#e8c547]" aria-live="polite">
-              {getWelcomeToVitalieGreeting(displayName)}
-            </p>
+            <div className="flex flex-col gap-0.5" aria-live="polite">
+              <p className="text-base text-[#e8c547]">{getGreetingLine1(displayName)}</p>
+              <p className="text-xl md:text-2xl font-bold text-[#e8c547]">{WELCOME_TO_VITALIE_LINE2}</p>
+            </div>
             {grandBalanceUsd != null && (
               <div className="text-right shrink-0">
                 <p className="text-[10px] uppercase tracking-widest text-[#6b6b70]">PFF Grand Total</p>
@@ -130,14 +133,16 @@ export default function DashboardPage() {
               </div>
             )}
           </header>
-          <div className="flex-1 p-4 md:p-6 max-w-2xl mx-auto w-full">
+          <div className="flex-1 p-4 md:p-6 max-w-2xl mx-auto w-full relative flex flex-col">
             {mintError && (
               <div className="mb-4 p-3 rounded-lg border border-amber-500/50 bg-amber-500/10 flex items-start justify-between gap-2">
                 <p className="text-sm text-amber-200">Mint not confirmed: {mintError}</p>
                 <button type="button" onClick={() => setMintError(null)} className="text-amber-400 hover:text-amber-300 shrink-0" aria-label="Dismiss">×</button>
               </div>
             )}
+            <GlowingGlobe className="my-4" />
             <SovereignPulseBar className="mb-6" />
+            <TopVitalizedNations className="mt-auto" />
           </div>
         </main>
         {identityPhone && <VitalizationRequestListener phoneNumber={identityPhone} />}

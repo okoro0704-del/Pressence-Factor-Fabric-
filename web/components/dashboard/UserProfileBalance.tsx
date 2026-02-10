@@ -48,7 +48,7 @@ export function UserProfileBalance({
   obfuscate = false,
 }: {
   vaultStable?: boolean;
-  /** When set (tx mined), show golden checkmark + "5 VIDA MINTED ON BITCOIN LAYER 2". */
+  /** When set (tx mined), show golden checkmark + "11 VIDA CAP MINTED ON BITCOIN LAYER 2". */
   mintTxHash?: string | null;
   /** When true (e.g. /dashboard?openSwap=1), open swap modal and auto-resume with pending amount from sessionStorage. */
   openSwapFromUrl?: boolean;
@@ -371,7 +371,7 @@ export function UserProfileBalance({
             </button>
           )}
         </div>
-        {/* Confirmation: once tx is mined, show golden checkmark + "5 VIDA MINTED ON BITCOIN LAYER 2" + Proof of Wealth link */}
+        {/* Confirmation: once tx is mined, show golden checkmark + "11 VIDA CAP MINTED ON BITCOIN LAYER 2" + Proof of Wealth link */}
         {mintTxHash && (
           <div className="mb-4 p-4 bg-[#D4AF37]/20 border-2 border-[#D4AF37]/60 rounded-xl flex flex-col items-center justify-center gap-3">
             <div className="flex items-center gap-3">
@@ -381,7 +381,7 @@ export function UserProfileBalance({
                 </svg>
               </span>
               <p className="text-lg font-bold text-[#D4AF37] uppercase tracking-wider">
-                5 VIDA MINTED ON BITCOIN LAYER 2
+                11 VIDA CAP MINTED ON BITCOIN LAYER 2
               </p>
             </div>
             <a
@@ -493,7 +493,7 @@ export function UserProfileBalance({
       </div>
 
       <div className="bg-[#16161a] rounded-xl p-6 border border-[#2a2a2e]">
-        <h3 className="text-sm font-semibold text-[#6b6b70] uppercase tracking-wider mb-4">5 VIDA Minted Cap — Sovereign Liquidity</h3>
+        <h3 className="text-sm font-semibold text-[#6b6b70] uppercase tracking-wider mb-4">11 VIDA CAP per Vitalization — Sovereign Liquidity</h3>
         <div className="space-y-4">
           <div
             role={showBalanceAsMinted ? undefined : 'button'}

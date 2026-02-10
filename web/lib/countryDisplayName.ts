@@ -27,3 +27,10 @@ export function getCountryDisplayName(code: string | null | undefined): string {
   const name = COUNTRY_NAMES[code.trim().toUpperCase()];
   return name || 'Nigeria';
 }
+
+/** Display name when in map; otherwise the code (e.g. for Top Vitalized Nations so unknown codes show as "BR" not "Nigeria"). */
+export function getCountryDisplayNameOrCode(code: string | null | undefined): string {
+  if (!code || typeof code !== 'string') return '—';
+  const key = code.trim().toUpperCase();
+  return COUNTRY_NAMES[key] || key;
+}

@@ -179,7 +179,7 @@ export function RemoteLoginScreen({ onSuccess, onCancel }: RemoteLoginScreenProp
         <div className="rounded-2xl border-2 p-8" style={{ borderColor: 'rgba(212, 175, 55, 0.6)', background: 'linear-gradient(180deg, rgba(30, 28, 22, 0.98) 0%, rgba(15, 14, 10, 0.99) 100%)' }}>
           <div className="text-5xl mb-4">✓</div>
           <h2 className={`text-xl font-bold uppercase tracking-wider mb-2 ${jetbrains.className}`} style={{ color: GOLD }}>
-            5 VIDA CAP SUCCESSFULLY MINTED
+            11 VIDA CAP SUCCESSFULLY MINTED
           </h2>
           <p className="text-sm text-[#a0a0a5] mb-6">Redirecting to your dashboard...</p>
         </div>

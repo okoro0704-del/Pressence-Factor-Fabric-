@@ -20,3 +20,13 @@ export function getWelcomeToVitalieGreeting(displayName: string | null): string 
   const name = displayName?.trim() || 'there';
   return `${greeting}, ${name}. Welcome to Vitalie.`;
 }
+
+/** Line 1: "Good morning, [Name]." (or "there" when no name). */
+export function getGreetingLine1(displayName: string | null): string {
+  const greeting = getTimeBasedGreeting();
+  const name = displayName?.trim() || 'there';
+  return `${greeting}, ${name}.`;
+}
+
+/** Line 2: "Welcome to Vitalie" — display bolder and bigger. */
+export const WELCOME_TO_VITALIE_LINE2 = 'Welcome to Vitalie';
