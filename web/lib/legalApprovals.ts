@@ -13,21 +13,29 @@ import { waitForExternalFingerprint } from './externalScannerBridge';
 /** Current constitution version; bump when Articles change to force re-sign. */
 export const CURRENT_CONSTITUTION_VERSION = '1.0';
 
-/** Check if user has signed the current constitution. */
+/** Check if user has signed the current constitution. Tries multiple phone variants so DB format (e.g. with/without +) does not block. */
 export async function hasSignedConstitution(
   identityAnchor: string,
   version: string = CURRENT_CONSTITUTION_VERSION
 ): Promise<boolean> {
   const client = typeof window !== 'undefined' ? supabase : getSupabase();
   if (!client?.from) return false;
+  const trimmed = identityAnchor.trim();
+  if (!trimmed) return false;
   try {
-    const { data, error } = await (client as any)
-      .from('legal_approvals')
-      .select('id')
-      .eq('identity_anchor', identityAnchor.trim())
-      .eq('constitution_version', version)
-      .maybeSingle();
-    return !error && !!data?.id;
+    const { normalizePhoneVariants } = await import('./universalIdentityComparison');
+    const variants = normalizePhoneVariants(trimmed);
+    const toTry = variants.length > 0 ? variants : [trimmed];
+    for (const anchor of toTry) {
+      const { data, error } = await (client as any)
+        .from('legal_approvals')
+        .select('id')
+        .eq('identity_anchor', anchor)
+        .eq('constitution_version', version)
+        .maybeSingle();
+      if (!error && data?.id) return true;
+    }
+    return false;
   } catch {
     return false;
   }

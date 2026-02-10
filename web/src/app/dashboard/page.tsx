@@ -14,15 +14,19 @@ import { getCitizenStatusForPhone } from '@/lib/supabaseTelemetry';
 import { mintFoundationSeigniorage } from '@/lib/foundationSeigniorage';
 import { getIdCardProfile } from '@/lib/humanityScore';
 import { getWelcomeToVitalieGreeting } from '@/lib/timeGreeting';
+import { fetchLedgerStats } from '@/lib/ledgerStats';
+import { subscribeToLedgerSync } from '@/lib/backendRealtimeSync';
 
-/** Dashboard = overview: Pulse bar. Use bottom tab for Wallet, Treasury, Settings. */
+/** Dashboard = overview: greeting, PFF Grand Total, Pulse bar. */
 export default function DashboardPage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [identityPhone, setIdentityPhone] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState<string | null>(null);
+  const [grandBalanceUsd, setGrandBalanceUsd] = useState<number | null>(null);
   const [accessChecked, setAccessChecked] = useState(false);
   const [vitalizedOrArchitect, setVitalizedOrArchitect] = useState(false);
+  const [mintError, setMintError] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -55,7 +59,18 @@ export default function DashboardPage() {
         const status = await getCitizenStatusForPhone(phone);
         if (status === 'VITALIZED') {
           setVitalizationComplete();
-          mintFoundationSeigniorage(phone, { citizenId: phone }).catch(() => {});
+          mintFoundationSeigniorage(phone, { citizenId: phone }).then((res) => {
+            if (!res.ok && !cancelled) {
+              console.error('[Dashboard] Mint not confirmed:', res.error);
+              setMintError(res.error);
+            }
+          }).catch((err) => {
+            if (!cancelled) {
+              const msg = err?.message ?? String(err);
+              console.error('[Dashboard] Mint failed:', msg);
+              setMintError(msg);
+            }
+          });
         }
       }
       if (!cancelled) {
@@ -77,6 +92,14 @@ export default function DashboardPage() {
     });
   }, [identityPhone]);
 
+  useEffect(() => {
+    if (!mounted || !vitalizedOrArchitect) return;
+    const refresh = () => fetchLedgerStats().then((s) => setGrandBalanceUsd(s.nationalReserveUsd));
+    refresh();
+    const unsub = subscribeToLedgerSync(refresh);
+    return () => unsub();
+  }, [mounted, vitalizedOrArchitect]);
+
 
   if (!mounted || !accessChecked) {
     return null;
@@ -94,16 +117,26 @@ export default function DashboardPage() {
     <ProtectedRoute>
       <AppShell>
         <main className="min-h-screen bg-[#0d0d0f] pb-24 md:pb-8 flex flex-col">
-          <header className="shrink-0 border-b border-[#2a2a2e] bg-[#16161a]/95 backdrop-blur px-4 py-3 safe-area-top">
-            <p className="text-sm font-medium text-[#e8c547]/95" aria-live="polite">
+          <header className="shrink-0 border-b border-[#2a2a2e] bg-[#16161a]/95 backdrop-blur px-4 py-3 safe-area-top flex flex-wrap items-center justify-between gap-3">
+            <p className="text-base font-bold text-[#e8c547]" aria-live="polite">
               {getWelcomeToVitalieGreeting(displayName)}
             </p>
-            <h1 className="text-lg font-bold bg-gradient-to-r from-[#e8c547] to-[#c9a227] bg-clip-text text-transparent mt-1">
-              PFF Dashboard
-            </h1>
-            <p className="text-xs text-[#6b6b70] mt-0.5">Use the tabs below for Wallet, Treasury, Settings</p>
+            {grandBalanceUsd != null && (
+              <div className="text-right shrink-0">
+                <p className="text-[10px] uppercase tracking-widest text-[#6b6b70]">PFF Grand Total</p>
+                <p className="text-lg font-bold font-mono" style={{ color: '#D4AF37' }}>
+                  ${grandBalanceUsd.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                </p>
+              </div>
+            )}
           </header>
           <div className="flex-1 p-4 md:p-6 max-w-2xl mx-auto w-full">
+            {mintError && (
+              <div className="mb-4 p-3 rounded-lg border border-amber-500/50 bg-amber-500/10 flex items-start justify-between gap-2">
+                <p className="text-sm text-amber-200">Mint not confirmed: {mintError}</p>
+                <button type="button" onClick={() => setMintError(null)} className="text-amber-400 hover:text-amber-300 shrink-0" aria-label="Dismiss">×</button>
+              </div>
+            )}
             <SovereignPulseBar className="mb-6" />
           </div>
         </main>

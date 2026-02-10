@@ -60,7 +60,7 @@ export async function getVidaCapMintedByFace(faceHash: string): Promise<boolean>
   }
 }
 
-/** Legacy: true if this phone's profile has already minted (by citizen_id). Used when face_hash not yet in ledger. */
+/** True only when foundation_vault_ledger has a seigniorage row for this identity. We do NOT block on user_profiles.is_minted so old/stale is_minted does not prevent mint. */
 export async function getVidaCapMinted(phoneNumber: string): Promise<boolean> {
   const supabase = getSupabase();
   if (!supabase) return false;
@@ -75,12 +75,20 @@ export async function getVidaCapMinted(phoneNumber: string): Promise<boolean> {
       .limit(1)
       .maybeSingle();
     if (ledger) return true;
-    const { data: profile } = await (supabase as any)
-      .from('user_profiles')
-      .select('is_minted')
-      .eq('phone_number', trimmed)
-      .maybeSingle();
-    return profile?.is_minted === true;
+    const { normalizePhoneVariants } = await import('./universalIdentityComparison');
+    const variants = normalizePhoneVariants(trimmed);
+    for (const v of variants) {
+      if (v === trimmed) continue;
+      const { data: ledger2 } = await (supabase as any)
+        .from('foundation_vault_ledger')
+        .select('id')
+        .eq('citizen_id', v)
+        .eq('source_type', 'seigniorage')
+        .limit(1)
+        .maybeSingle();
+      if (ledger2) return true;
+    }
+    return false;
   } catch {
     return false;
   }
