@@ -12,11 +12,15 @@ import { setVitalizationComplete, shouldNeverRedirectBack } from '@/lib/vitaliza
 import { isArchitect } from '@/lib/manifestoUnveiling';
 import { getCitizenStatusForPhone } from '@/lib/supabaseTelemetry';
 import { mintFoundationSeigniorage } from '@/lib/foundationSeigniorage';
+import { getIdCardProfile } from '@/lib/humanityScore';
+import { getWelcomeToVitalieGreeting } from '@/lib/timeGreeting';
+
 /** Dashboard = overview: Pulse bar. Use bottom tab for Wallet, Treasury, Settings. */
 export default function DashboardPage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [identityPhone, setIdentityPhone] = useState<string | null>(null);
+  const [displayName, setDisplayName] = useState<string | null>(null);
   const [accessChecked, setAccessChecked] = useState(false);
   const [vitalizedOrArchitect, setVitalizedOrArchitect] = useState(false);
 
@@ -66,6 +70,13 @@ export default function DashboardPage() {
     if (mounted) setIdentityPhone(getIdentityAnchorPhone());
   }, [mounted]);
 
+  useEffect(() => {
+    if (!identityPhone) return;
+    getIdCardProfile(identityPhone).then((res) => {
+      if (res.ok && res.profile.full_name) setDisplayName(res.profile.full_name);
+    });
+  }, [identityPhone]);
+
 
   if (!mounted || !accessChecked) {
     return null;
@@ -84,7 +95,10 @@ export default function DashboardPage() {
       <AppShell>
         <main className="min-h-screen bg-[#0d0d0f] pb-24 md:pb-8 flex flex-col">
           <header className="shrink-0 border-b border-[#2a2a2e] bg-[#16161a]/95 backdrop-blur px-4 py-3 safe-area-top">
-            <h1 className="text-lg font-bold bg-gradient-to-r from-[#e8c547] to-[#c9a227] bg-clip-text text-transparent">
+            <p className="text-sm font-medium text-[#e8c547]/95" aria-live="polite">
+              {getWelcomeToVitalieGreeting(displayName)}
+            </p>
+            <h1 className="text-lg font-bold bg-gradient-to-r from-[#e8c547] to-[#c9a227] bg-clip-text text-transparent mt-1">
               PFF Dashboard
             </h1>
             <p className="text-xs text-[#6b6b70] mt-0.5">Use the tabs below for Wallet, Treasury, Settings</p>
