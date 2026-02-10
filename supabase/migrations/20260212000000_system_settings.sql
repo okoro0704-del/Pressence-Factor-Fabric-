@@ -20,12 +20,15 @@ ON CONFLICT (key) DO NOTHING;
 
 ALTER TABLE public.system_settings ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Allow public read system_settings" ON public.system_settings;
 CREATE POLICY "Allow public read system_settings"
   ON public.system_settings FOR SELECT TO public USING (true);
 
 -- Update: API (server-side anon key) enforces MASTER_ARCHITECT via cookie before calling update
+DROP POLICY IF EXISTS "Allow authenticated update system_settings" ON public.system_settings;
 CREATE POLICY "Allow authenticated update system_settings"
   ON public.system_settings FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow anon update system_settings" ON public.system_settings;
 CREATE POLICY "Allow anon update system_settings"
   ON public.system_settings FOR UPDATE TO anon USING (true) WITH CHECK (true);
 

@@ -1,5 +1,7 @@
 # Run SQL in this order (Supabase SQL Editor)
 
+> **⚠️ DO NOT paste this file into the SQL Editor.** This is a guide. Open each **.sql** file listed below, copy *that* file’s contents, and paste *that* into the SQL Editor.
+
 If you get **"column citizen_id does not exist"**, the `presence_handshakes` table was created with the wrong structure. Use this order.
 
 ---

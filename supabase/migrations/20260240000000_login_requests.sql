@@ -20,16 +20,19 @@ CREATE INDEX IF NOT EXISTS idx_login_requests_created_at ON login_requests(creat
 ALTER TABLE login_requests ENABLE ROW LEVEL SECURITY;
 
 -- Allow insert from anon/authenticated (computer creates request with phone only)
+DROP POLICY IF EXISTS login_requests_insert_policy ON login_requests;
 CREATE POLICY login_requests_insert_policy ON login_requests
   FOR INSERT TO anon, authenticated
   WITH CHECK (true);
 
 -- Allow select by phone_number so phone can see PENDING for own number
+DROP POLICY IF EXISTS login_requests_select_policy ON login_requests;
 CREATE POLICY login_requests_select_policy ON login_requests
   FOR SELECT TO anon, authenticated
   USING (true);
 
 -- Allow update so phone can set status to APPROVED/DENIED
+DROP POLICY IF EXISTS login_requests_update_policy ON login_requests;
 CREATE POLICY login_requests_update_policy ON login_requests
   FOR UPDATE TO anon, authenticated
   USING (true)

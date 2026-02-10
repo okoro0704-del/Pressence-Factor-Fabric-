@@ -24,10 +24,15 @@ CREATE TABLE IF NOT EXISTS sentinel_identities (
   metadata JSONB DEFAULT '{}'
 );
 
-CREATE INDEX idx_sentinel_identities_phone ON sentinel_identities(phone_number);
-CREATE INDEX idx_sentinel_identities_biometric_hash ON sentinel_identities(biometric_hash);
-CREATE INDEX idx_sentinel_identities_voice_hash ON sentinel_identities(voice_print_hash);
-CREATE INDEX idx_sentinel_identities_status ON sentinel_identities(status);
+-- If sentinel_identities already existed without these columns, add them (idempotent)
+ALTER TABLE sentinel_identities ADD COLUMN IF NOT EXISTS authorized_device_uuids TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE sentinel_identities ADD COLUMN IF NOT EXISTS face_signature_data TEXT;
+ALTER TABLE sentinel_identities ADD COLUMN IF NOT EXISTS voice_mfcc_coefficients NUMERIC[] DEFAULT '{}';
+
+CREATE INDEX IF NOT EXISTS idx_sentinel_identities_phone ON sentinel_identities(phone_number);
+CREATE INDEX IF NOT EXISTS idx_sentinel_identities_biometric_hash ON sentinel_identities(biometric_hash);
+CREATE INDEX IF NOT EXISTS idx_sentinel_identities_voice_hash ON sentinel_identities(voice_print_hash);
+CREATE INDEX IF NOT EXISTS idx_sentinel_identities_status ON sentinel_identities(status);
 
 -- ============================================================================
 -- BREACH ATTEMPTS (Security Monitoring)
@@ -68,9 +73,14 @@ CREATE TABLE IF NOT EXISTS breach_alerts (
   metadata JSONB DEFAULT '{}'
 );
 
-CREATE INDEX idx_breach_alerts_timestamp ON breach_alerts(timestamp DESC);
-CREATE INDEX idx_breach_alerts_acknowledged ON breach_alerts(acknowledged);
-CREATE INDEX idx_breach_alerts_severity ON breach_alerts(severity);
+-- If breach_alerts already existed without these columns, add them (idempotent)
+ALTER TABLE breach_alerts ADD COLUMN IF NOT EXISTS acknowledged BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE breach_alerts ADD COLUMN IF NOT EXISTS acknowledged_at TIMESTAMPTZ;
+ALTER TABLE breach_alerts ADD COLUMN IF NOT EXISTS acknowledged_by TEXT;
+
+CREATE INDEX IF NOT EXISTS idx_breach_alerts_timestamp ON breach_alerts(timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_breach_alerts_acknowledged ON breach_alerts(acknowledged);
+CREATE INDEX IF NOT EXISTS idx_breach_alerts_severity ON breach_alerts(severity);
 
 -- ============================================================================
 -- DEVICE APPROVAL REQUESTS (Secondary Guardian Approval)

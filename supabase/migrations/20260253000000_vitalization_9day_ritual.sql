@@ -29,5 +29,7 @@ CREATE INDEX IF NOT EXISTS idx_vitalization_daily_scans_phone_date ON vitalizati
 COMMENT ON TABLE vitalization_daily_scans IS 'Training Sample: one row per user per day when Face+Fingerprint scan completed. Lowers future biometric friction.';
 
 ALTER TABLE vitalization_daily_scans ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS vitalization_daily_scans_insert ON vitalization_daily_scans;
 CREATE POLICY vitalization_daily_scans_insert ON vitalization_daily_scans FOR INSERT TO anon, authenticated WITH CHECK (true);
+DROP POLICY IF EXISTS vitalization_daily_scans_select ON vitalization_daily_scans;
 CREATE POLICY vitalization_daily_scans_select ON vitalization_daily_scans FOR SELECT TO anon, authenticated USING (true);

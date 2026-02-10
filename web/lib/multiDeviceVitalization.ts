@@ -134,7 +134,7 @@ export async function isDeviceAuthorized(phoneNumber: string, deviceId: string):
     .eq('phone_number', phoneNumber)
     .eq('device_id', deviceId)
     .eq('status', 'ACTIVE')
-    .single();
+    .maybeSingle();
 
   if (error || !data) {
     return false;
@@ -153,7 +153,7 @@ export async function getPrimaryDevice(phoneNumber: string): Promise<{ device_id
     .eq('phone_number', phoneNumber)
     .eq('is_primary', true)
     .eq('status', 'ACTIVE')
-    .single();
+    .maybeSingle();
 
   if (error || !data) {
     return null;
@@ -194,7 +194,7 @@ export async function assignPrimarySentinel(
     .from('user_profiles')
     .select('*')
     .eq('phone_number', phoneNumber)
-    .single();
+    .maybeSingle();
 
   const basePayload: Record<string, unknown> = {
     primary_sentinel_device_id: deviceIdToStore,
@@ -359,7 +359,7 @@ export async function approveVitalizationRequest(requestId: string, primaryDevic
     .from('vitalization_requests')
     .select('*')
     .eq('id', requestId)
-    .single();
+    .maybeSingle();
 
   if (fetchError || !request) {
     throw new Error('Failed to fetch vitalization request');
@@ -428,7 +428,10 @@ export async function getAuthorizedDevices(phoneNumber: string): Promise<any[]> 
     .order('authorized_at', { ascending: false });
 
   if (error) {
-    console.error('Failed to fetch authorized devices:', error);
+    // 404 = table may not exist yet; return empty list
+    if (error.code !== 'PGRST301' && error.message?.indexOf('404') === -1) {
+      console.warn('Failed to fetch authorized devices:', error.message);
+    }
     return [];
   }
 
@@ -560,7 +563,7 @@ export async function getGuardianRecoveryStatus(requestId: string): Promise<any>
     .from('guardian_recovery_requests')
     .select('*')
     .eq('id', requestId)
-    .single();
+    .maybeSingle();
 
   if (error || !data) {
     return null;

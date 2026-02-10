@@ -29,12 +29,15 @@ COMMENT ON COLUMN public.pff_partner_applications.pff_api_key IS 'Generated when
 
 ALTER TABLE public.pff_partner_applications ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Allow public insert pff_partner_applications" ON public.pff_partner_applications;
 CREATE POLICY "Allow public insert pff_partner_applications"
   ON public.pff_partner_applications FOR INSERT TO anon, authenticated WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Allow public read own or all for foundation" ON public.pff_partner_applications;
 CREATE POLICY "Allow public read own or all for foundation"
   ON public.pff_partner_applications FOR SELECT TO anon, authenticated USING (true);
 
+DROP POLICY IF EXISTS "Allow authenticated update pff_partner_applications" ON public.pff_partner_applications;
 CREATE POLICY "Allow authenticated update pff_partner_applications"
   ON public.pff_partner_applications FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
 

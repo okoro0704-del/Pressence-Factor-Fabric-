@@ -19,19 +19,32 @@ export function VitalizationPageClient() {
 
   useEffect(() => {
     let cancelled = false;
-    getVitalizationStatus().then((status) => {
+    const timeout = setTimeout(() => {
       if (cancelled) return;
-      if (status === 'vitalized') {
-        router.replace(ROUTES.DASHBOARD ?? '/dashboard');
-        return;
-      }
-      if (status === 'needs_restore') {
-        router.replace('/link-device');
-        return;
-      }
-      setAllowRegistration(status === 'no_citizen_record' || status === 'no_user');
-    });
-    return () => { cancelled = true; };
+      setAllowRegistration((prev) => (prev === null ? true : prev));
+    }, 8000);
+    getVitalizationStatus()
+      .then((status) => {
+        if (cancelled) return;
+        if (status === 'vitalized') {
+          router.replace(ROUTES.DASHBOARD ?? '/dashboard');
+          return;
+        }
+        if (status === 'needs_restore') {
+          router.replace('/link-device');
+          return;
+        }
+        setAllowRegistration(status === 'no_citizen_record' || status === 'no_user');
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setAllowRegistration(true);
+      })
+      .finally(() => clearTimeout(timeout));
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
   }, [router]);
 
   if (allowRegistration === null) {
@@ -43,7 +56,11 @@ export function VitalizationPageClient() {
   }
 
   if (!allowRegistration) {
-    return null;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#050505]" style={{ color: '#6b6b70' }}>
+        <p className="text-sm">{t('vitalization.checkingIdentity', 'Checking identity…')}</p>
+      </div>
+    );
   }
 
   return (

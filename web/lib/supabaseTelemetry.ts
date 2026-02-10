@@ -145,26 +145,20 @@ export async function fetchLiveTelemetry(): Promise<SentinelTelemetry | null> {
       .from('sentinel_telemetry')
       .select('*')
       .eq('id', '00000000-0000-0000-0000-000000000001')
-      .single();
+      .maybeSingle();
 
     if (error) {
-      console.error('[TELEMETRY] ❌ Query failed');
-      console.error('[TELEMETRY] Error Code:', error.code);
-      console.error('[TELEMETRY] Error Message:', error.message);
-      console.error('[TELEMETRY] Error Details:', error.details);
-      console.error('[TELEMETRY] Error Hint:', error.hint);
-
-      // Specific error type detection
-      if (error.message.includes('Invalid API key') || error.message.includes('JWT')) {
-        console.error('[TELEMETRY] 🔑 INVALID API KEY ERROR');
-      } else if (error.message.includes('network') || error.message.includes('fetch')) {
-        console.error('[TELEMETRY] 🌐 NETWORK ERROR');
-      } else if (error.message.includes('CORS')) {
-        console.error('[TELEMETRY] 🚫 CORS ERROR');
-      } else if (error.code === 'PGRST116') {
-        console.error('[TELEMETRY] 📊 TABLE NOT FOUND OR NO ROWS');
+      // PGRST116 / 406 = 0 rows — table may be missing or empty; treat as no data
+      if (error.code === 'PGRST116' || error.message?.includes('0 rows')) {
+        return null;
       }
-
+      if (error.message?.includes('Invalid API key') || error.message?.includes('JWT')) {
+        console.error('[TELEMETRY] 🔑 Invalid API key');
+      } else if (error.message?.includes('network') || error.message?.includes('fetch')) {
+        console.error('[TELEMETRY] 🌐 Network error');
+      } else {
+        console.warn('[TELEMETRY] Query failed:', error.code, error.message);
+      }
       return null;
     }
 
@@ -328,10 +322,12 @@ export async function fetchNationalBlockReserves(): Promise<NationalBlockReserve
       .from('national_block_reserves')
       .select('*')
       .eq('id', '00000000-0000-0000-0000-000000000002')
-      .single();
+      .maybeSingle();
 
     if (error) {
-      console.error('[NATIONAL BLOCK] ❌ Error fetching data:', error);
+      if (error.code !== 'PGRST116') {
+        console.warn('[NATIONAL BLOCK] Error:', error.message);
+      }
       return null;
     }
 

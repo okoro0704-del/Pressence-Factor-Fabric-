@@ -89,25 +89,29 @@ export async function fetchNationalTreasuryFeed(): Promise<NationalTreasuryFeed>
  */
 export function subscribeToNationalTreasuryFeed(onFeedChange: () => void): () => void {
   if (!supabase?.channel) return () => {};
-  const channel = (supabase as any)
-    .channel('national_treasury_feed')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'ledger_stats' }, () => {
-      onFeedChange();
-    })
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'national_block_reserves' }, () => {
-      onFeedChange();
-    })
-    .subscribe();
-  return () => {
-    try {
-      (channel as { unsubscribe?: () => void }).unsubscribe?.();
-    } catch {
-      // ignore
-    }
-    try {
-      (supabase as any).removeChannel?.(channel);
-    } catch {
-      // ignore
-    }
-  };
+  try {
+    const channel = (supabase as any)
+      .channel('national_treasury_feed')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ledger_stats' }, () => {
+        onFeedChange();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'national_block_reserves' }, () => {
+        onFeedChange();
+      })
+      .subscribe();
+    return () => {
+      try {
+        (channel as { unsubscribe?: () => void }).unsubscribe?.();
+      } catch {
+        // ignore
+      }
+      try {
+        (supabase as any).removeChannel?.(channel);
+      } catch {
+        // ignore
+      }
+    };
+  } catch {
+    return () => {};
+  }
 }

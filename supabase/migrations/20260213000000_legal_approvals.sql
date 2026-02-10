@@ -21,9 +21,11 @@ COMMENT ON TABLE public.legal_approvals IS 'Sovereign Constitution acceptance: o
 
 ALTER TABLE public.legal_approvals ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Allow public read legal_approvals" ON public.legal_approvals;
 CREATE POLICY "Allow public read legal_approvals"
   ON public.legal_approvals FOR SELECT TO public USING (true);
 
+DROP POLICY IF EXISTS "Allow insert legal_approvals" ON public.legal_approvals;
 CREATE POLICY "Allow insert legal_approvals"
   ON public.legal_approvals FOR INSERT TO anon, authenticated WITH CHECK (true);
 

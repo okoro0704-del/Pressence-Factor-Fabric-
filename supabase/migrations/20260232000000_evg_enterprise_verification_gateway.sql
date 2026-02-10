@@ -64,11 +64,17 @@ ALTER TABLE public.evg_authorized_partners ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.evg_grants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.evg_verification_ledger ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Allow service read evg_authorized_partners" ON public.evg_authorized_partners;
 CREATE POLICY "Allow service read evg_authorized_partners" ON public.evg_authorized_partners FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow service read evg_grants" ON public.evg_grants;
 CREATE POLICY "Allow service read evg_grants" ON public.evg_grants FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow service insert evg_grants" ON public.evg_grants;
 CREATE POLICY "Allow service insert evg_grants" ON public.evg_grants FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow service update evg_grants" ON public.evg_grants;
 CREATE POLICY "Allow service update evg_grants" ON public.evg_grants FOR UPDATE USING (true);
+DROP POLICY IF EXISTS "Allow service read evg_verification_ledger" ON public.evg_verification_ledger;
 CREATE POLICY "Allow service read evg_verification_ledger" ON public.evg_verification_ledger FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow service insert evg_verification_ledger" ON public.evg_verification_ledger;
 CREATE POLICY "Allow service insert evg_verification_ledger" ON public.evg_verification_ledger FOR INSERT WITH CHECK (true);
 
 GRANT SELECT ON public.evg_authorized_partners TO anon, authenticated;

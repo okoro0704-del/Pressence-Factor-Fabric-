@@ -23,11 +23,19 @@ CREATE TABLE IF NOT EXISTS sovereign_audit_log (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- If sovereign_audit_log already existed without these columns, add them (idempotent)
+ALTER TABLE sovereign_audit_log ADD COLUMN IF NOT EXISTS phone_number TEXT NOT NULL DEFAULT '';
+ALTER TABLE sovereign_audit_log ADD COLUMN IF NOT EXISTS timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW();
+ALTER TABLE sovereign_audit_log ADD COLUMN IF NOT EXISTS reviewed BOOLEAN DEFAULT FALSE;
+ALTER TABLE sovereign_audit_log ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ;
+ALTER TABLE sovereign_audit_log ADD COLUMN IF NOT EXISTS reviewed_by TEXT;
+ALTER TABLE sovereign_audit_log ADD COLUMN IF NOT EXISTS severity TEXT NOT NULL DEFAULT 'LOW';
+
 -- Index for fast lookups
-CREATE INDEX idx_audit_log_phone ON sovereign_audit_log(phone_number);
-CREATE INDEX idx_audit_log_timestamp ON sovereign_audit_log(timestamp DESC);
-CREATE INDEX idx_audit_log_reviewed ON sovereign_audit_log(reviewed);
-CREATE INDEX idx_audit_log_severity ON sovereign_audit_log(severity);
+CREATE INDEX IF NOT EXISTS idx_audit_log_phone ON sovereign_audit_log(phone_number);
+CREATE INDEX IF NOT EXISTS idx_audit_log_timestamp ON sovereign_audit_log(timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_log_reviewed ON sovereign_audit_log(reviewed);
+CREATE INDEX IF NOT EXISTS idx_audit_log_severity ON sovereign_audit_log(severity);
 
 -- Push Notifications (Supabase Realtime)
 CREATE TABLE IF NOT EXISTS push_notifications (
@@ -44,10 +52,15 @@ CREATE TABLE IF NOT EXISTS push_notifications (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- If push_notifications already existed without these columns, add them (idempotent)
+ALTER TABLE push_notifications ADD COLUMN IF NOT EXISTS phone_number TEXT NOT NULL DEFAULT '';
+ALTER TABLE push_notifications ADD COLUMN IF NOT EXISTS timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW();
+ALTER TABLE push_notifications ADD COLUMN IF NOT EXISTS severity TEXT NOT NULL DEFAULT 'INFO';
+
 -- Index for fast lookups
-CREATE INDEX idx_push_notifications_phone ON push_notifications(phone_number);
-CREATE INDEX idx_push_notifications_read ON push_notifications(read);
-CREATE INDEX idx_push_notifications_timestamp ON push_notifications(timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_push_notifications_phone ON push_notifications(phone_number);
+CREATE INDEX IF NOT EXISTS idx_push_notifications_read ON push_notifications(read);
+CREATE INDEX IF NOT EXISTS idx_push_notifications_timestamp ON push_notifications(timestamp DESC);
 
 -- Unique Harmonic Peaks (Vocal Signature Storage)
 CREATE TABLE IF NOT EXISTS unique_harmonic_peaks (
@@ -64,8 +77,11 @@ CREATE TABLE IF NOT EXISTS unique_harmonic_peaks (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- If unique_harmonic_peaks already existed without phone_number, add it (idempotent)
+ALTER TABLE unique_harmonic_peaks ADD COLUMN IF NOT EXISTS phone_number TEXT NOT NULL DEFAULT '';
+
 -- Index for fast lookups
-CREATE INDEX idx_harmonic_peaks_phone ON unique_harmonic_peaks(phone_number);
+CREATE INDEX IF NOT EXISTS idx_harmonic_peaks_phone ON unique_harmonic_peaks(phone_number);
 
 -- Identity Mismatch Statistics (Analytics)
 CREATE TABLE IF NOT EXISTS identity_mismatch_stats (
@@ -85,7 +101,7 @@ CREATE TABLE IF NOT EXISTS identity_mismatch_stats (
 );
 
 -- Index for fast lookups
-CREATE INDEX idx_mismatch_stats_date ON identity_mismatch_stats(date DESC);
+CREATE INDEX IF NOT EXISTS idx_mismatch_stats_date ON identity_mismatch_stats(date DESC);
 
 -- Enable Row Level Security
 ALTER TABLE sovereign_audit_log ENABLE ROW LEVEL SECURITY;

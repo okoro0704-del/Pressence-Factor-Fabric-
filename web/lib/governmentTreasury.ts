@@ -47,7 +47,7 @@ export async function fetchReserveCounter(): Promise<number> {
         .from('national_block_reserves')
         .select('national_vault_vida_cap, vida_cap_liquidity, national_vida_pool_vida_cap')
         .eq('id', '00000000-0000-0000-0000-000000000002')
-        .single();
+        .maybeSingle();
       if (!error && data) {
         const total =
           Number(data.national_vault_vida_cap) + Number(data.vida_cap_liquidity) + Number(data.national_vida_pool_vida_cap);

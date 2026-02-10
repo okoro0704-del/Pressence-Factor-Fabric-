@@ -33,11 +33,11 @@ export async function getLinkedMobileDeviceId(
       .eq('phone_number', phoneNumber.trim())
       .maybeSingle();
     if (error || !data) return null;
-    const raw = data.primary_sentinel_device_id?.trim?.() ?? '';
+    const raw = (data as { primary_sentinel_device_id?: string }).primary_sentinel_device_id?.trim?.() ?? '';
     if (!raw) return null;
     const maskLen = Math.min(8, Math.max(4, Math.floor(raw.length / 2)));
     const maskedId = raw.length <= maskLen ? raw : `…${raw.slice(-maskLen)}`;
-    const deviceName = data.device_model?.trim?.() ?? null;
+    const deviceName = (data as { device_model?: string }).device_model?.trim?.() ?? null;
     return {
       deviceId: raw,
       maskedId,

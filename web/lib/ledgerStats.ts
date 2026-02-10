@@ -25,7 +25,7 @@ export async function fetchLedgerStatsFromSupabase(): Promise<LedgerStats | null
       .from('ledger_stats')
       .select('total_reserve_vida, total_vitalized_count, total_minted_vida')
       .eq('id', '00000000-0000-0000-0000-000000000001')
-      .single();
+      .maybeSingle();
     if (error || !data) return null;
     const totalReserveVida = Number(data.total_reserve_vida);
     const totalVitalizedCount = Number(data.total_vitalized_count) || 0;
@@ -49,7 +49,7 @@ export async function fetchLedgerStats(): Promise<LedgerStats> {
         .from('ledger_stats')
         .select('total_reserve_vida, total_vitalized_count, total_minted_vida')
         .eq('id', '00000000-0000-0000-0000-000000000001')
-        .single();
+        .maybeSingle();
 
       if (!error && data && Number(data.total_reserve_vida) > 0) {
         const totalReserveVida = Number(data.total_reserve_vida);

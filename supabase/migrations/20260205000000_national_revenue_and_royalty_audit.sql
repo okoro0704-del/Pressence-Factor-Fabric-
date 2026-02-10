@@ -57,16 +57,20 @@ COMMENT ON COLUMN public.foundation_vault_ledger.source_type IS 'seigniorage | c
 ALTER TABLE public.national_revenue_ledger ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.foundation_royalty_audit ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Allow public read national_revenue_ledger" ON public.national_revenue_ledger;
 CREATE POLICY "Allow public read national_revenue_ledger"
   ON public.national_revenue_ledger FOR SELECT TO public USING (true);
 
+DROP POLICY IF EXISTS "Allow public read foundation_royalty_audit" ON public.foundation_royalty_audit;
 CREATE POLICY "Allow public read foundation_royalty_audit"
   ON public.foundation_royalty_audit FOR SELECT TO public USING (true);
 
 -- Insert restricted to authenticated/service (application uses service or backend)
+DROP POLICY IF EXISTS "Allow authenticated insert national_revenue_ledger" ON public.national_revenue_ledger;
 CREATE POLICY "Allow authenticated insert national_revenue_ledger"
   ON public.national_revenue_ledger FOR INSERT TO authenticated WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Allow authenticated insert foundation_royalty_audit" ON public.foundation_royalty_audit;
 CREATE POLICY "Allow authenticated insert foundation_royalty_audit"
   ON public.foundation_royalty_audit FOR INSERT TO authenticated WITH CHECK (true);
 

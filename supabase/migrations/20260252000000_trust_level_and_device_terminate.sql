@@ -19,7 +19,9 @@ CREATE INDEX IF NOT EXISTS idx_device_session_terminate_requested_at ON device_s
 
 ALTER TABLE device_session_terminate ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS device_session_terminate_insert ON device_session_terminate;
 CREATE POLICY device_session_terminate_insert ON device_session_terminate FOR INSERT TO anon, authenticated WITH CHECK (true);
+DROP POLICY IF EXISTS device_session_terminate_select ON device_session_terminate;
 CREATE POLICY device_session_terminate_select ON device_session_terminate FOR SELECT TO anon, authenticated USING (true);
 
 COMMENT ON TABLE device_session_terminate IS 'Insert a row to signal a device to terminate session (location.reload). Laptops subscribe via Realtime and reload when their device_id appears.';

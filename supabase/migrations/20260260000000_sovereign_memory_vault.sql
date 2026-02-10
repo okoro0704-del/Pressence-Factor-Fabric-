@@ -17,19 +17,23 @@ CREATE INDEX IF NOT EXISTS idx_memory_vault_updated ON sovereign_memory_vault(up
 
 ALTER TABLE sovereign_memory_vault ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Citizens read own vault" ON sovereign_memory_vault;
 CREATE POLICY "Citizens read own vault"
   ON sovereign_memory_vault FOR SELECT
   USING (auth.uid() = citizen_id);
 
+DROP POLICY IF EXISTS "Citizens insert own vault" ON sovereign_memory_vault;
 CREATE POLICY "Citizens insert own vault"
   ON sovereign_memory_vault FOR INSERT
   WITH CHECK (auth.uid() = citizen_id);
 
+DROP POLICY IF EXISTS "Citizens update own vault" ON sovereign_memory_vault;
 CREATE POLICY "Citizens update own vault"
   ON sovereign_memory_vault FOR UPDATE
   USING (auth.uid() = citizen_id)
   WITH CHECK (auth.uid() = citizen_id);
 
+DROP POLICY IF EXISTS "Citizens delete own vault" ON sovereign_memory_vault;
 CREATE POLICY "Citizens delete own vault"
   ON sovereign_memory_vault FOR DELETE
   USING (auth.uid() = citizen_id);

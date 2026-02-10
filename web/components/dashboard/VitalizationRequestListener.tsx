@@ -47,15 +47,15 @@ export function VitalizationRequestListener({ phoneNumber }: VitalizationRequest
 
     // Check for existing pending requests on mount
     const checkPendingRequests = async () => {
-      const { data, error } = await supabase
+      const { data: rows, error } = await supabase
         .from('vitalization_requests')
         .select('*')
         .eq('phone_number', phoneNumber)
         .eq('status', 'PENDING')
         .order('requested_at', { ascending: false })
-        .limit(1)
-        .single();
+        .limit(1);
 
+      const data = Array.isArray(rows) ? rows[0] : rows;
       if (!error && data) {
         const currentDevice = getCurrentDeviceInfo();
         if (data.device_id !== currentDevice.deviceId) {

@@ -1,5 +1,7 @@
 # Verify Vitalization in Supabase
 
+> **⚠️ DO NOT paste this file into the Supabase SQL Editor.** This is documentation. The SQL Editor only runs **.sql** files (e.g. from `supabase/migrations/` or `ENABLE_REALTIME.sql`).
+
 This doc confirms **where** vitalization hashes are stored and **how to check** that the backend has recorded your vitalization (without relying on the UI).
 
 ---

@@ -18,9 +18,11 @@ COMMENT ON TABLE public.pff_sentinel_activations IS 'Mandatory Sentinel Activati
 
 ALTER TABLE public.pff_sentinel_activations ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Allow public read pff_sentinel_activations" ON public.pff_sentinel_activations;
 CREATE POLICY "Allow public read pff_sentinel_activations"
   ON public.pff_sentinel_activations FOR SELECT TO anon, authenticated USING (true);
 
+DROP POLICY IF EXISTS "Allow authenticated insert pff_sentinel_activations" ON public.pff_sentinel_activations;
 CREATE POLICY "Allow authenticated insert pff_sentinel_activations"
   ON public.pff_sentinel_activations FOR INSERT TO anon, authenticated WITH CHECK (true);
 

@@ -72,22 +72,26 @@ export function subscribeToBackendSync(
  */
 export function subscribeToLedgerSync(onLedgerChange: () => void): () => void {
   if (!supabase?.channel) return () => {};
-  const channel = (supabase as any)
-    .channel('backend_sync_ledger')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'ledger_stats' }, () => {
-      onLedgerChange();
-    })
-    .subscribe();
-  return () => {
-    try {
-      (channel as { unsubscribe?: () => void }).unsubscribe?.();
-    } catch {
-      // ignore
-    }
-    try {
-      (supabase as any).removeChannel?.(channel);
-    } catch {
-      // ignore
-    }
-  };
+  try {
+    const channel = (supabase as any)
+      .channel('backend_sync_ledger')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ledger_stats' }, () => {
+        onLedgerChange();
+      })
+      .subscribe();
+    return () => {
+      try {
+        (channel as { unsubscribe?: () => void }).unsubscribe?.();
+      } catch {
+        // ignore
+      }
+      try {
+        (supabase as any).removeChannel?.(channel);
+      } catch {
+        // ignore
+      }
+    };
+  } catch {
+    return () => {};
+  }
 }

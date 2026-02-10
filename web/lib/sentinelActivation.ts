@@ -136,7 +136,7 @@ export async function getDependentsForGuardian(guardianPhone: string): Promise<{
       .from('sentinel_identities')
       .select('phone_number, full_name, metadata')
       .eq('status', 'ACTIVE');
-    if (error || !data) return [];
+    if (error || !Array.isArray(data)) return [];
     const out: { phone_number: string; full_name: string }[] = [];
     const gNorm = normalized.replace(/^\+/, '');
     for (const row of data) {

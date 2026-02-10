@@ -17,9 +17,11 @@ COMMENT ON TABLE public.relayer_gas_alerts IS 'Alerts when gasless-mint relayer 
 -- Only service_role (Edge Function) inserts; Admin reads via dashboard or API.
 ALTER TABLE public.relayer_gas_alerts ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Service role can insert relayer_gas_alerts" ON public.relayer_gas_alerts;
 CREATE POLICY "Service role can insert relayer_gas_alerts"
   ON public.relayer_gas_alerts FOR INSERT TO service_role WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Authenticated can read relayer_gas_alerts" ON public.relayer_gas_alerts;
 CREATE POLICY "Authenticated can read relayer_gas_alerts"
   ON public.relayer_gas_alerts FOR SELECT TO authenticated USING (true);
 

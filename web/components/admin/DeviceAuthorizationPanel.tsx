@@ -84,11 +84,11 @@ export function DeviceAuthorizationPanel() {
         .from('sentinel_identities')
         .select('authorized_device_uuids')
         .eq('phone_number', phoneNumber)
-        .single();
+        .maybeSingle();
 
       if (fetchError || !identity) throw fetchError || new Error('Identity not found');
 
-      const updatedDevices = [...((identity as any).authorized_device_uuids || []), deviceUUID];
+      const updatedDevices = [...((identity as { authorized_device_uuids?: string[] }).authorized_device_uuids || []), deviceUUID];
 
       const { error: authError } = await (supabase as any)
         .from('sentinel_identities')

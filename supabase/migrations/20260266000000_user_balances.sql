@@ -18,10 +18,12 @@ CREATE INDEX IF NOT EXISTS idx_user_balances_phone ON public.user_balances(phone
 ALTER TABLE public.user_balances ENABLE ROW LEVEL SECURITY;
 
 -- Users can only read/update their own row (by phone_number from session/jwt or app context)
+DROP POLICY IF EXISTS "Users read own balance" ON public.user_balances;
 CREATE POLICY "Users read own balance"
   ON public.user_balances FOR SELECT
   USING (true);
 
+DROP POLICY IF EXISTS "Service role full access user_balances" ON public.user_balances;
 CREATE POLICY "Service role full access user_balances"
   ON public.user_balances FOR ALL TO service_role USING (true);
 
