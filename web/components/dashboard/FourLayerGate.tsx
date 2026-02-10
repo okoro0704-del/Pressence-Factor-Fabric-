@@ -78,7 +78,6 @@ import { getStoredBiometricAnchors, getFaceHashFromSession, syncPersistentFaceHa
 import { setVitalizationAnchor, getVitalizationAnchor, clearVitalizationAnchor, getIsExistingCitizen, type VitalizationAnchor as VitalizationAnchorType } from '@/lib/vitalizationAnchor';
 import { isArchitectPhone } from '@/lib/publicRevealAccess';
 import { checkForOrphanVault } from '@/lib/ghostVault';
-import { getCompositeDeviceFingerprint } from '@/lib/biometricAuth';
 import { getTimeBasedGreeting } from '@/lib/timeBasedGreeting';
 import type { DeviceInfo } from '@/lib/multiDeviceVitalization';
 import { RecoverMyAccountScreen } from '@/components/auth/RecoverMyAccountScreen';
