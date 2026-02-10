@@ -7,6 +7,7 @@ import { ProtectedRoute } from '@/components/dashboard/ProtectedRoute';
 import { SovereignConstitution } from '@/components/auth/SovereignConstitution';
 import { getIdentityAnchorPhone } from '@/lib/sentinelActivation';
 import { hasSignedConstitution } from '@/lib/legalApprovals';
+import { mintFoundationSeigniorage } from '@/lib/foundationSeigniorage';
 
 const GOLD = '#D4AF37';
 
@@ -30,6 +31,10 @@ export default function SignConstitutionPage() {
   }, [phone]);
 
   const handleAccept = async () => {
+    // Trigger 10 VIDA CAP mint (5 citizen + 5 nation) now that constitution is signed. ID = full phone with country code.
+    if (phone?.trim()) {
+      await mintFoundationSeigniorage(phone.trim(), { citizenId: phone.trim() });
+    }
     router.replace('/dashboard');
   };
 

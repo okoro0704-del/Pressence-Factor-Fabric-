@@ -3,6 +3,8 @@
  * All logic is client-safe: no top-level window/document so static build does not crash.
  */
 
+import { getIdentityAnchorPhone } from './sentinelActivation';
+
 /** When true: hide Withdraw and Palm Scan for non-vetted users. When false: full Protocol for Architect. */
 export const IS_PUBLIC_REVEAL = true;
 
@@ -16,6 +18,17 @@ function getProductionDomain(): string {
   }
   return 'pffprotocol.com';
 }
+
+/** Architect's Master Device: when this phone (E.164 with country code) is the identity anchor, treat as Architect. */
+export function getArchitectMasterPhone(): string | null {
+  if (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_ARCHITECT_MASTER_PHONE?.trim()) {
+    return process.env.NEXT_PUBLIC_ARCHITECT_MASTER_PHONE.trim();
+  }
+  return null;
+}
+
+/** Display name for the Architect's Master (e.g. ISREAL OKORO). Shown when that phone is identity anchor. */
+export const ARCHITECT_MASTER_DISPLAY_NAME = 'ISREAL OKORO';
 
 /** Default Architect + Sentinel device IDs (can be overridden by NEXT_PUBLIC_AUTHORIZED_DEVICE_IDS comma-separated). */
 function getAuthorizedDeviceIds(): string[] {
@@ -100,7 +113,7 @@ export function isVettedUser(): boolean {
   return isArchitect();
 }
 
-/** Architect: cookie, env, or authorized device. Used for dashboard access and vetted features. */
+/** Architect: cookie, env, Architect's Master Device (phone), or authorized device. Used for dashboard access and vetted features. */
 export function isArchitect(): boolean {
   if (typeof window === 'undefined') return false;
   const env = process.env.NEXT_PUBLIC_ARCHITECT_ACCESS === 'true' || process.env.NEXT_PUBLIC_ARCHITECT_ACCESS === '1';
@@ -108,6 +121,11 @@ export function isArchitect(): boolean {
     const cookie = document.cookie.split(';').find((c) => c.trim().startsWith(ARCHITECT_COOKIE + '='));
     const cookieVal = cookie?.split('=')[1]?.trim();
     if (env || cookieVal === 'true' || cookieVal === '1') return true;
+    const masterPhone = getArchitectMasterPhone();
+    if (masterPhone) {
+      const anchor = getIdentityAnchorPhone();
+      if (anchor && anchor.trim() === masterPhone) return true;
+    }
     return isAuthorizedIdentitySync();
   } catch {
     return !!env;

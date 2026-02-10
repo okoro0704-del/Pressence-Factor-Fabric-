@@ -15,7 +15,7 @@ import { requestTerminateSession } from '@/lib/deviceTerminateSession';
 import { clearVitalizationComplete } from '@/lib/vitalizationState';
 import { resetBiometrics } from '@/lib/resetBiometrics';
 import { getSupabase } from '@/lib/supabase';
-import { isArchitect } from '@/lib/publicRevealAccess';
+import { isArchitect, getArchitectMasterPhone, ARCHITECT_MASTER_DISPLAY_NAME } from '@/lib/publicRevealAccess';
 import { generateAccessCode, isBeforeAccessCutoff, changeMasterPassword } from '@/lib/accessCodeGate';
 
 const GOLD = '#D4AF37';
@@ -23,6 +23,9 @@ const GOLD = '#D4AF37';
 export default function SettingsPage() {
   const router = useRouter();
   const [phone, setPhone] = useState<string | null>(null);
+  const [profileName, setProfileName] = useState<string>('');
+  const [profileNameSaving, setProfileNameSaving] = useState(false);
+  const [profileNameMessage, setProfileNameMessage] = useState<string | null>(null);
   const [currentDeviceId, setCurrentDeviceId] = useState<string | null>(null);
   const [trustLevel, setTrustLevel] = useState<number>(0);
   const [resettingBiometrics, setResettingBiometrics] = useState(false);
@@ -48,6 +51,46 @@ export default function SettingsPage() {
     if (!phone) return;
     getTrustLevel(phone).then(setTrustLevel);
   }, [phone]);
+
+  useEffect(() => {
+    if (!phone) return;
+    const supabase = getSupabase();
+    if (!supabase) return;
+    (supabase as any)
+      .from('user_profiles')
+      .select('full_name')
+      .eq('phone_number', phone)
+      .maybeSingle()
+      .then(({ data }: { data: { full_name?: string | null } | null }) => {
+        const name = data?.full_name?.trim() ?? '';
+        const masterPhone = getArchitectMasterPhone();
+        setProfileName(name || (phone === masterPhone ? ARCHITECT_MASTER_DISPLAY_NAME : ''));
+      });
+  }, [phone]);
+
+  const saveProfileName = async () => {
+    if (!phone?.trim()) return;
+    setProfileNameMessage(null);
+    setProfileNameSaving(true);
+    try {
+      const supabase = getSupabase();
+      if (!supabase) {
+        setProfileNameMessage('Not connected');
+        return;
+      }
+      const { error } = await (supabase as any)
+        .from('user_profiles')
+        .update({ full_name: profileName.trim() || null, updated_at: new Date().toISOString() })
+        .eq('phone_number', phone.trim());
+      if (error) {
+        setProfileNameMessage(error.message ?? 'Failed to save');
+        return;
+      }
+      setProfileNameMessage('Saved');
+    } finally {
+      setProfileNameSaving(false);
+    }
+  };
 
   useEffect(() => {
     getCompositeDeviceFingerprint().then(setCurrentDeviceId);
@@ -89,6 +132,40 @@ export default function SettingsPage() {
           </p>
 
           <div className="space-y-6">
+            <div className="rounded-xl border p-4" style={{ borderColor: 'rgba(212, 175, 55, 0.3)', background: 'rgba(15,15,15,0.8)' }}>
+              <h2 className="text-sm font-semibold uppercase tracking-wider mb-2" style={{ color: GOLD }}>
+                Your name
+              </h2>
+              <p className="text-sm text-[#a0a0a5] mb-3">
+                Display name on your profile. Shown across the Protocol where your identity is displayed.
+              </p>
+              <div className="flex flex-wrap items-end gap-3">
+                <input
+                  type="text"
+                  value={profileName}
+                  onChange={(e) => { setProfileName(e.target.value); setProfileNameMessage(null); }}
+                  onBlur={() => { if (profileName.trim()) saveProfileName(); }}
+                  placeholder="e.g. ISREAL OKORO"
+                  className="flex-1 min-w-[180px] px-4 py-2.5 rounded-lg border-2 bg-[#0d0d0f] text-white placeholder-[#6b6b70]"
+                  style={{ borderColor: 'rgba(212, 175, 55, 0.3)' }}
+                />
+                <button
+                  type="button"
+                  disabled={profileNameSaving}
+                  onClick={saveProfileName}
+                  className="px-5 py-2.5 rounded-lg font-medium border-2 transition-colors disabled:opacity-50"
+                  style={{ borderColor: GOLD, color: GOLD }}
+                >
+                  {profileNameSaving ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+              {profileNameMessage && (
+                <p className={`text-sm mt-2 ${profileNameMessage === 'Saved' ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {profileNameMessage}
+                </p>
+              )}
+            </div>
+
             {isArchitect() && isBeforeAccessCutoff() && (
               <div className="rounded-xl border p-4" style={{ borderColor: 'rgba(212, 175, 55, 0.4)', background: 'rgba(212, 175, 55, 0.06)' }}>
                 <h2 className="text-sm font-semibold uppercase tracking-wider mb-2" style={{ color: GOLD }}>
