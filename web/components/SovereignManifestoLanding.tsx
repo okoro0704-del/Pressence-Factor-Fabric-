@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { getCountdownTarget, isArchitect } from '@/lib/manifestoUnveiling';
+import { isDesktop } from '@/lib/publicRevealAccess';
 import { insertWaitlistEntry } from '@/lib/waitlist';
 import { PublicSovereignCompanion } from '@/components/manifesto/PublicSovereignCompanion';
 import { SovereignAwakeningProvider, useSovereignAwakening } from '@/contexts/SovereignAwakeningContext';
@@ -71,7 +72,7 @@ export function SovereignManifestoLanding() {
 
   const needCode = mounted && (searchParams?.get('need_code') === '1' || false);
   const beforeCutoff = mounted && isBeforeAccessCutoff();
-  const isOwner = mounted && isArchitect();
+  const isOwner = mounted && isArchitect() && isDesktop();
   const masterAccess = mounted && hasMasterAccess();
   const accessGranted = mounted && hasAccessGranted();
   const showCodeForm = beforeCutoff && !isOwner && !masterAccess && (!accessGranted || needCode);

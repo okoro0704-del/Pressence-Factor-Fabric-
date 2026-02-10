@@ -12,6 +12,7 @@ import {
   type CompanionLangCode,
 } from '@/lib/manifestoCompanionKnowledge';
 import { isArchitect } from '@/lib/manifestoUnveiling';
+import { isDesktop } from '@/lib/publicRevealAccess';
 import { isProductionDomain, isArchitectMode } from '@/lib/utils';
 import {
   isRecognitionRequest,
@@ -204,7 +205,7 @@ export function PublicSovereignCompanion() {
   const displayLang: CompanionLangCode = preferredLang ?? lastResponseLang ?? 'en';
 
   useEffect(() => {
-    setArchitect(isArchitect());
+    setArchitect(isArchitect() && isDesktop());
   }, []);
 
   useEffect(() => {

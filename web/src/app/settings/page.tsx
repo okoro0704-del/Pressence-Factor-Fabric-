@@ -15,7 +15,7 @@ import { requestTerminateSession } from '@/lib/deviceTerminateSession';
 import { clearVitalizationComplete } from '@/lib/vitalizationState';
 import { resetBiometrics } from '@/lib/resetBiometrics';
 import { getSupabase } from '@/lib/supabase';
-import { isArchitect, getArchitectMasterPhone, ARCHITECT_MASTER_DISPLAY_NAME } from '@/lib/publicRevealAccess';
+import { isArchitect, isDesktop, getArchitectMasterPhone, ARCHITECT_MASTER_DISPLAY_NAME } from '@/lib/publicRevealAccess';
 import { generateAccessCode, isBeforeAccessCutoff, changeMasterPassword } from '@/lib/accessCodeGate';
 
 const GOLD = '#D4AF37';
@@ -166,7 +166,7 @@ export default function SettingsPage() {
               )}
             </div>
 
-            {isArchitect() && isBeforeAccessCutoff() && (
+            {isArchitect() && isBeforeAccessCutoff() && isDesktop() && (
               <div className="rounded-xl border p-4" style={{ borderColor: 'rgba(212, 175, 55, 0.4)', background: 'rgba(212, 175, 55, 0.06)' }}>
                 <h2 className="text-sm font-semibold uppercase tracking-wider mb-2" style={{ color: GOLD }}>
                   Generate access code (until April 7)
@@ -217,7 +217,7 @@ export default function SettingsPage() {
               </div>
             )}
 
-            {isArchitect() && isBeforeAccessCutoff() && (
+            {isArchitect() && isBeforeAccessCutoff() && isDesktop() && (
               <div className="rounded-xl border p-4" style={{ borderColor: 'rgba(212, 175, 55, 0.4)', background: 'rgba(212, 175, 55, 0.06)' }}>
                 <h2 className="text-sm font-semibold uppercase tracking-wider mb-2" style={{ color: GOLD }}>
                   Change master password

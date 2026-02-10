@@ -29,6 +29,7 @@ import { BETA_LIQUIDITY_TEST, BETA_SPENDABLE_VIDA, BETA_SPENDABLE_USD, SOVRYN_AM
 import { isFaceVerifiedForBalance } from '@/lib/biometricAuth';
 import { getMintStatus, getSpendingUnlocked, getBiometricSpendingActive, MINT_STATUS_MINTED } from '@/lib/mintStatus';
 import { isArchitect } from '@/lib/manifestoUnveiling';
+import { isDesktop } from '@/lib/publicRevealAccess';
 import { hasFaceAndSeed } from '@/lib/recoverySeedStorage';
 import { SpendingLockModal } from './SpendingLockModal';
 import { TreasuryFacePulseModal } from './TreasuryFacePulseModal';
@@ -146,7 +147,7 @@ export function UserProfileBalance({
         setFaceVerifiedForBalance(true);
         return;
       }
-      if (isArchitect()) {
+      if (isArchitect() && isDesktop()) {
         setFaceVerifiedForBalance(true);
         return;
       }

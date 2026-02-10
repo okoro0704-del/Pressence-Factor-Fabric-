@@ -138,7 +138,7 @@ async function runDeviceBindingAndSovereignHash(
 
 import { DailyUnlockCelebration } from '@/components/dashboard/DailyUnlockCelebration';
 import { useSovereignCompanion } from '@/contexts/SovereignCompanionContext';
-import { IS_PUBLIC_REVEAL, isVettedUser, isArchitect } from '@/lib/publicRevealAccess';
+import { IS_PUBLIC_REVEAL, isVettedUser, isArchitect, isDesktop } from '@/lib/publicRevealAccess';
 import { ENABLE_GPS_AS_FOURTH_PILLAR, ROUTES } from '@/lib/constants';
 import { setVitalizationComplete } from '@/lib/vitalizationState';
 import { anchorIdentityToDevice } from '@/lib/sovereignSSO';
@@ -2038,7 +2038,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
             {getLearningModeMessage(day)}
           </p>
           <div className="flex flex-col gap-3">
-            {faceFailCount >= 2 && isArchitect() && (
+            {faceFailCount >= 2 && isArchitect() && isDesktop() && (
               <button
                 type="button"
                 onClick={() => {
@@ -2792,7 +2792,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
               </p>
             )}
             <div className="flex flex-col gap-4 py-4">
-              {faceFailCount >= 2 && isArchitect() && (
+              {faceFailCount >= 2 && isArchitect() && isDesktop() && (
                 <button
                   type="button"
                   onClick={goToDashboard}
@@ -2913,7 +2913,7 @@ export function FourLayerGate({ hubVerification = false }: FourLayerGateProps = 
         isMasterArchitectInit={isFirstRun || softStart}
         confidenceThreshold={learningModeRef.current.active ? 0.6 : visionConfidenceThreshold}
         enforceBrightnessCheck={visionEnforceBrightness}
-        enableArchitectBypass={isArchitect()}
+        enableArchitectBypass={isArchitect() && isDesktop()}
         onForceCompleteRequest={() => setArchitectVerificationSuccess(true)}
         forceCompleteAfterLivenessMs={1500}
       />

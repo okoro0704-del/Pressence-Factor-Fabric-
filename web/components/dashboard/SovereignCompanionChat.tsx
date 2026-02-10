@@ -18,6 +18,7 @@ import {
   type CompanionLangCode,
 } from '@/lib/manifestoCompanionKnowledge';
 import { isArchitect } from '@/lib/manifestoUnveiling';
+import { isDesktop } from '@/lib/publicRevealAccess';
 import {
   isRecognitionRequest,
   getRecognitionName,
@@ -115,7 +116,7 @@ export function SovereignCompanionChat({
         const register = levelToRegister(level);
         const lang: CompanionLangCode =
           (vibration?.lang as CompanionLangCode) ?? detectLangFromRecognitionMessage(t) ?? 'en';
-        const architect = isArchitect();
+        const architect = isArchitect() && isDesktop();
 
         if (isRelationalSmallTalk(t)) {
           const isHowFar = /^how\s+far\s*!?\s*$/i.test(t);

@@ -113,6 +113,12 @@ export function isVettedUser(): boolean {
   return isArchitect();
 }
 
+/** True when not a mobile user agent (desktop/computer). Architect-only UI is shown only on desktop. */
+export function isDesktop(): boolean {
+  if (typeof navigator === 'undefined') return true;
+  return !/Android|iPhone|iPad|iPod|webOS|Mobile/i.test(navigator.userAgent);
+}
+
 /** Architect: cookie, env, Architect's Master Device (phone), or authorized device. Used for dashboard access and vetted features. */
 export function isArchitect(): boolean {
   if (typeof window === 'undefined') return false;

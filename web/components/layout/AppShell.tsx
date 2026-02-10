@@ -12,6 +12,7 @@ import {
   SlidersHorizontal,
   MessageCircle,
   Menu,
+  Shield,
 } from 'lucide-react';
 import { useTripleTapReset } from '@/lib/useTripleTapReset';
 import { TerminateSessionListener } from '@/components/dashboard/TerminateSessionListener';
@@ -21,9 +22,10 @@ import { getIdentityAnchorPhone } from '@/lib/sentinelActivation';
 
 const SettingsNavIcon = SlidersHorizontal;
 
-/** Bottom bar: Dashboard, Treasury, Wallet, Companion, Settings (Settings last). */
+/** Bottom bar: Dashboard, Vitalization, Treasury, Wallet, Companion, Settings (Settings last). */
 const NAV = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/vitalization', label: 'Vitalization', icon: Shield },
   { href: '/treasury', label: 'Treasury', icon: Landmark },
   { href: '/wallet', label: 'Wallet', icon: Wallet },
   { href: '/companion', label: 'Companion', icon: MessageCircle },
@@ -31,7 +33,7 @@ const NAV = [
 ];
 
 /** When user is on one of these pages, bottom tab always navigates to href (don't lock). */
-const PROTECTED_PATHS = ['/dashboard', '/treasury', '/wallet', '/settings', '/companion', '/government/elections'];
+const PROTECTED_PATHS = ['/dashboard', '/vitalization', '/treasury', '/wallet', '/settings', '/companion', '/government/elections'];
 function isOnProtectedPath(pathname: string) {
   return PROTECTED_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'));
 }
