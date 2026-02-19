@@ -21,12 +21,12 @@ import { Wallet, Coins, TrendingUp, RefreshCw } from "lucide-react";
  */
 function formatBalance(balance: any): string {
   if (!balance) return "0.00";
-  
+
   try {
-    const balanceBigInt = typeof balance === "string" ? BigInt(balance) : BigInt(balance.toString());
-    const formatted = ethers.formatUnits(balanceBigInt, 18);
+    // ethers v5 syntax
+    const formatted = ethers.utils.formatUnits(balance, 18);
     const num = parseFloat(formatted);
-    
+
     return num.toLocaleString("en-US", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
@@ -61,25 +61,25 @@ export function NationalPortfolio() {
   // ============================================================================
 
   // Fetch VIDA CAP balance
-  const { 
-    data: vidaCapBalance, 
+  const {
+    data: vidaCapBalance,
     isLoading: isLoadingVida,
-    refetch: refetchVida 
+    refetch: refetchVida
   } = useContractRead(
     vidaCapContract,
     "balanceOf",
-    [address || ethers.ZeroAddress]
+    [address || ethers.constants.AddressZero]
   );
 
   // Fetch ngnVIDA balance
-  const { 
-    data: ngnVidaBalance, 
+  const {
+    data: ngnVidaBalance,
     isLoading: isLoadingNgn,
-    refetch: refetchNgn 
+    refetch: refetchNgn
   } = useContractRead(
     ngnVidaContract,
     "balanceOf",
-    [address || ethers.ZeroAddress]
+    [address || ethers.constants.AddressZero]
   );
 
   // ============================================================================

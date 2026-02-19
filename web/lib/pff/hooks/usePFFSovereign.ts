@@ -12,6 +12,7 @@ import { useAddress, useContract, useContractRead, useContractWrite } from "@thi
 import { useState, useCallback, useEffect } from "react";
 import { PFF_CONTRACTS, FOUNDATION_VAULT_ABI, NATIONAL_TREASURY_ABI, ERC20_ABI } from "../contracts";
 import { ethers } from "ethers";
+import { BigNumber } from "ethers";
 
 export interface PFFSovereignData {
   // Balances
@@ -42,14 +43,14 @@ export interface PFFSovereignData {
 /**
  * Format balance from wei to human-readable with commas
  */
-function formatBalance(balance: bigint | string | undefined): string {
+function formatBalance(balance: any): string {
   if (!balance) return "0.00";
-  
+
   try {
-    const balanceBigInt = typeof balance === "string" ? BigInt(balance) : balance;
-    const formatted = ethers.formatUnits(balanceBigInt, 18);
+    // Handle both BigNumber (ethers v5) and bigint
+    const formatted = ethers.utils.formatUnits(balance, 18);
     const num = parseFloat(formatted);
-    
+
     return num.toLocaleString("en-US", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
@@ -100,26 +101,26 @@ export function usePFFSovereign(): PFFSovereignData {
   // ============================================================================
 
   // Read VIDA CAP dual-vault balances
-  const { 
-    data: vaultBalances, 
+  const {
+    data: vaultBalances,
     isLoading: isLoadingVida,
-    refetch: refetchVida 
+    refetch: refetchVida
   } = useContractRead(
     foundationVault,
     "getVaultBalances",
-    [address || ethers.ZeroAddress],
+    [address || ethers.constants.AddressZero],
     { enabled: !!address }
   );
 
   // Read ngnVIDA balance
-  const { 
-    data: ngnVidaBalance, 
+  const {
+    data: ngnVidaBalance,
     isLoading: isLoadingNgn,
-    refetch: refetchNgn 
+    refetch: refetchNgn
   } = useContractRead(
     ngnVidaToken,
     "balanceOf",
-    [address || ethers.ZeroAddress],
+    [address || ethers.constants.AddressZero],
     { enabled: !!address }
   );
 

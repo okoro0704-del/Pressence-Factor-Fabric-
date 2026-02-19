@@ -61,8 +61,8 @@ export function ConvertToNairaButton({ onSuccess }: ConvertToNairaButtonProps) {
       setStatus("loading");
       setErrorMessage("");
 
-      // Convert amount to wei (18 decimals)
-      const amountWei = ethers.parseEther(amount);
+      // Convert amount to wei (18 decimals) - ethers v5 syntax
+      const amountWei = ethers.utils.parseEther(amount);
 
       // Call swapVidaToNgn function (gasless via Account Abstraction)
       const tx = await swapToNaira({
