@@ -103,7 +103,7 @@ if (!fs.existsSync(packageJsonPath)) {
   const requiredDeps = {
     '@thirdweb-dev/react': '^4.9.4',
     '@thirdweb-dev/sdk': '^4.0.99',
-    'ethers': '^6.13.0',
+    'ethers': '^5.7.2',
     'canvas-confetti': '^1.9.4',
     'lucide-react': '^0.563.0',
     'next': '^16.1.6',
