@@ -26,6 +26,20 @@ const nextConfig = {
   productionBrowserSourceMaps: false,
   poweredByHeader: false,
   compress: true,
+
+  // Webpack config to handle module resolution issues
+  webpack: (config, { isServer }) => {
+    // Fix for crypto-js and other ESM/CJS issues
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      crypto: false,
+      stream: false,
+      buffer: false,
+    };
+
+    return config;
+  },
+
   // Note: Next.js 16+ does not support eslint in next.config; do not run `next lint` in CI if you want to skip lint.
 };
 
