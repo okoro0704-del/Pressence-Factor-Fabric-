@@ -44,6 +44,11 @@ export const SENTINEL_WALLET_ADDRESS =
   (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_SENTINEL_WALLET_ADDRESS?.trim()) ||
   '';
 
+/** Foundation Vault (PFF_FOUNDATION_VAULT): receives 1 VIDA per vitalization + 2% conversion levy + 5% corporate royalty. */
+export const FOUNDATION_VAULT_ADDRESS =
+  (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_FOUNDATION_VAULT_ADDRESS?.trim()) ||
+  '0x0000000000000000000000000000000000000001';
+
 /** vNGN (VIDA Naira) — placeholder contract on RSK. Set when token is deployed. */
 export const VNGN_ADDRESS =
   (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_VNGN_ADDRESS?.trim()) ||

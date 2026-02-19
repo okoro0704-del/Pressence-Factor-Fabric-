@@ -24,6 +24,7 @@ import { getSentinelTokenVerified } from '@/lib/sentinelSecurityToken';
 import { getMintStatus, getSpendingUnlocked, getBiometricSpendingActive, MINT_STATUS_MINTED } from '@/lib/mintStatus';
 import { SpendingLockModal } from '@/components/dashboard/SpendingLockModal';
 import { SpendQRModal } from '@/components/dashboard/SpendQRModal';
+import { VitalizationAudit } from '@/components/wallet/VitalizationAudit';
 import { getAssertion, isUserVerifyingPlatformAuthenticatorAvailable } from '@/lib/webauthn';
 import { BETA_LIQUIDITY_TEST, SOVRYN_AMM_SWAP_URL } from '@/lib/betaLiquidityTest';
 import { useNativeBalances } from '@/lib/sovryn/useNativeBalances';
@@ -60,6 +61,7 @@ export function SovereignWallet({ phoneNumber, layerResults }: SovereignWalletPr
   const [biometricSpendingActive, setBiometricSpendingActive] = useState<boolean>(false);
   const [showLockModal, setShowLockModal] = useState<boolean>(false);
   const [showSpendQR, setShowSpendQR] = useState(false);
+  const [showVitalizationAudit, setShowVitalizationAudit] = useState(false);
   const sentinelVerified = BETA_LIQUIDITY_TEST || (hasLicense && tokenVerified);
   /** Protocol Release: unlock when is_fully_verified or face_hash present. */
   const canSpend = biometricSpendingActive || fingerprintVerified || spendingUnlocked;
@@ -68,6 +70,23 @@ export function SovereignWallet({ phoneNumber, layerResults }: SovereignWalletPr
   const dllrDisplay = nativeBalances.address ? nativeBalances.dllr : (wallet?.dllr_balance ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 });
   const usdtDisplay = nativeBalances.address ? nativeBalances.usdt : (wallet?.usdt_balance ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 });
   const hasEnoughGas = nativeBalances.address && parseFloat(nativeBalances.rbtc) >= MIN_RBTC_FOR_GAS;
+
+  const refreshWallet = useCallback(async () => {
+    setLoading(true);
+    const w = await getOrCreateSovereignWallet(phoneNumber);
+    setWallet(w ?? {
+      id: '',
+      phone_number: phoneNumber,
+      dllr_balance: 0,
+      usdt_balance: 0,
+      vida_cap_balance: 0,
+      usdt_deposit_address_erc20: null,
+      usdt_deposit_address_trc20: null,
+      created_at: '',
+      updated_at: '',
+    });
+    setLoading(false);
+  }, [phoneNumber]);
 
   useEffect(() => {
     let cancelled = false;
@@ -271,6 +290,18 @@ export function SovereignWallet({ phoneNumber, layerResults }: SovereignWalletPr
         </p>
       )}
 
+      {/* Vitalization Audit — Mint +5 VIDA */}
+      <div className="mb-4">
+        <button
+          type="button"
+          onClick={() => setShowVitalizationAudit(true)}
+          className="w-full py-3 rounded-xl border font-bold uppercase tracking-wider transition-all hover:opacity-90"
+          style={{ background: GOLD, borderColor: GOLD, color: BLACK }}
+        >
+          🔥 Activate Vitalization Engine — Mint +5 VIDA
+        </button>
+      </div>
+
       {/* Spend — QR for receive/pay address (no leaving app) */}
       <div className="mb-6">
         <button
@@ -436,6 +467,14 @@ export function SovereignWallet({ phoneNumber, layerResults }: SovereignWalletPr
       </section>
 
       <SpendingLockModal isOpen={showLockModal} onClose={() => setShowLockModal(false)} />
+
+      {/* Vitalization Audit Modal */}
+      <VitalizationAudit
+        isOpen={showVitalizationAudit}
+        onClose={() => setShowVitalizationAudit(false)}
+        phoneNumber={phoneNumber}
+        onSuccess={refreshWallet}
+      />
     </div>
   );
 }

@@ -55,7 +55,6 @@ CREATE TABLE IF NOT EXISTS push_notifications (
 -- If push_notifications already existed without these columns, add them (idempotent)
 ALTER TABLE push_notifications ADD COLUMN IF NOT EXISTS phone_number TEXT NOT NULL DEFAULT '';
 ALTER TABLE push_notifications ADD COLUMN IF NOT EXISTS timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW();
-ALTER TABLE push_notifications ADD COLUMN IF NOT EXISTS severity TEXT NOT NULL DEFAULT 'INFO';
 
 -- Index for fast lookups
 CREATE INDEX IF NOT EXISTS idx_push_notifications_phone ON push_notifications(phone_number);
