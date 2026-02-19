@@ -27,7 +27,10 @@ const nextConfig = {
   poweredByHeader: false,
   compress: true,
 
-  // Webpack config to handle module resolution issues
+  // Turbopack config (Next.js 16+ default) - empty config to silence webpack warning
+  turbopack: {},
+
+  // Webpack config to handle module resolution issues (fallback for non-turbopack builds)
   webpack: (config, { isServer }) => {
     // Fix for crypto-js and other ESM/CJS issues
     config.resolve.fallback = {
