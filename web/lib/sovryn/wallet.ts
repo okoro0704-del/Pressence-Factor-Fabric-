@@ -3,7 +3,7 @@
  * Non-custodial; sign only after PFF presence verification.
  */
 
-import { BrowserProvider, JsonRpcProvider } from 'ethers';
+import { ethers } from 'ethers';
 import { RSK_MAINNET } from './config';
 
 declare global {
@@ -16,10 +16,10 @@ export function getEth(): Window['ethereum'] {
   return typeof window !== 'undefined' ? window.ethereum : undefined;
 }
 
-export async function getBrowserProvider(): Promise<BrowserProvider | null> {
+export async function getBrowserProvider(): Promise<ethers.providers.Web3Provider | null> {
   const eth = getEth();
   if (!eth) return null;
-  return new BrowserProvider(eth);
+  return new ethers.providers.Web3Provider(eth);
 }
 
 export async function ensureRSK(): Promise<boolean> {
@@ -55,8 +55,8 @@ export async function ensureRSK(): Promise<boolean> {
   }
 }
 
-export async function getRSKProvider(): Promise<JsonRpcProvider> {
-  return new JsonRpcProvider(RSK_MAINNET.rpc);
+export async function getRSKProvider(): Promise<ethers.providers.JsonRpcProvider> {
+  return new ethers.providers.JsonRpcProvider(RSK_MAINNET.rpc);
 }
 
 export async function getConnectedAddress(): Promise<string | null> {

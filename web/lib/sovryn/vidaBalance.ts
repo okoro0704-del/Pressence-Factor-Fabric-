@@ -3,7 +3,7 @@
  * Use this instead of only reading from Supabase so the app shows on-chain balance.
  */
 
-import { Contract, JsonRpcProvider, formatUnits } from 'ethers';
+import { ethers } from 'ethers';
 import { RSK_MAINNET, VIDA_TOKEN_ADDRESS } from './config';
 
 const VIDA_ABI = [
@@ -42,15 +42,15 @@ export async function getVidaBalanceOnChain(
   }
 
   try {
-    const provider = new JsonRpcProvider(rpcUrl);
-    const contract = new Contract(VIDA_TOKEN_ADDRESS, VIDA_ABI, provider);
+    const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
+    const contract = new ethers.Contract(VIDA_TOKEN_ADDRESS, VIDA_ABI, provider);
     const [balanceWei, decimals] = await Promise.all([
       contract.balanceOf(address),
       contract.decimals().catch(() => 18),
     ]);
     const dec = Number(decimals);
     const balanceStr = balanceWei.toString();
-    const formatted = formatUnits(balanceStr, dec);
+    const formatted = ethers.utils.formatUnits(balanceStr, dec);
     const formattedDisplay = parseFloat(formatted).toFixed(2);
     return {
       ok: true,

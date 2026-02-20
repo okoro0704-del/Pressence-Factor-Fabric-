@@ -5,7 +5,7 @@
  * Contract: Sovryn swap convertByPath when configured; else DLLR credit path.
  */
 
-import { Contract, parseUnits } from 'ethers';
+import { ethers } from 'ethers';
 import { DLLR_ADDRESS, SOVRYN_SWAP_CONTRACT_ADDRESS } from './config';
 import { getBrowserProvider, getRbtcBalance } from './wallet';
 import { getInternalSigner, MIN_RBTC_FOR_GAS, type EncryptedSeedPayload } from './internalSigner';
@@ -263,7 +263,7 @@ export async function executeSovereignSwap(
     // Prefer Sovryn swap contract convertByPath when configured (VIDA → DLLR)
     if (SOVRYN_SWAP_CONTRACT_ADDRESS && VIDA_TOKEN_ADDRESS && VIDA_TOKEN_ADDRESS !== '0x0000000000000000000000000000000000000000') {
       const path = getVidaToDllrPath();
-      const vidaWei = parseUnits(vidaCapAmount.toString(), 18);
+      const vidaWei = ethers.utils.parseUnits(vidaCapAmount.toString(), 18);
       const swapResult = await swapByPath(signer, vidaWei, path);
       if ('txHash' in swapResult) {
         txHash = swapResult.txHash;
@@ -272,9 +272,9 @@ export async function executeSovereignSwap(
       }
     } else {
       // Fallback: DLLR credit path (transfer to self as placeholder when no swap contract)
-      const contract = new Contract(DLLR_ADDRESS, DLLR_ABI, signer);
+      const contract = new ethers.Contract(DLLR_ADDRESS, DLLR_ABI, signer);
       const decimals = (await contract.decimals()) as number;
-      const dllrAmountWei = parseUnits(dllrAmount.toString(), decimals);
+      const dllrAmountWei = ethers.utils.parseUnits(dllrAmount.toString(), decimals);
       const tx = await contract.transfer(walletAddress, dllrAmountWei);
       const receipt = await tx.wait();
       txHash = receipt.hash;

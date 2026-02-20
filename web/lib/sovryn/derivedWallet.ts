@@ -3,7 +3,7 @@
  * Uses BIP44 path for Rootstock (RSK): m/44'/137'/0'/0/0.
  */
 
-import { HDNodeWallet } from 'ethers';
+import { ethers } from 'ethers';
 import { getSupabase } from '../supabase';
 import { decryptSeed } from '../recoverySeed';
 
@@ -49,8 +49,7 @@ export async function deriveRSKWalletFromSeed(
       trimmed
     );
 
-    const hd = HDNodeWallet.fromPhrase(mnemonic);
-    const rskWallet = hd.derivePath(RSK_DERIVATION_PATH);
+    const rskWallet = ethers.Wallet.fromMnemonic(mnemonic, RSK_DERIVATION_PATH);
     const address = rskWallet.address;
 
     const result: { ok: true; address: string; mnemonic?: string } = { ok: true, address };

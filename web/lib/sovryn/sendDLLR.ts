@@ -3,7 +3,7 @@
  * Uses internal signer (derived from seed) when phoneNumber is provided — no Connect Wallet popup.
  */
 
-import { Contract, parseUnits, type Signer } from 'ethers';
+import { ethers } from 'ethers';
 import { DLLR_ADDRESS } from './config';
 import { getBrowserProvider } from './wallet';
 import { getInternalSigner } from './internalSigner';
@@ -55,23 +55,23 @@ export async function sendDLLR(
     }
 
     // Prefer internal signer (no popup) when phoneNumber is provided
-    let signer: Signer | null = null;
+    let signer: ethers.Signer | null = null;
     if (options?.phoneNumber?.trim()) {
       signer = await getInternalSigner(options.phoneNumber.trim());
       if (!signer) return { success: false, error: 'Recovery seed not available. Complete setup first.' };
     } else {
       const provider = await getBrowserProvider();
       if (!provider) return { success: false, error: 'No wallet provider found' };
-      signer = await provider.getSigner();
+      signer = provider.getSigner();
     }
 
-    const contract = new Contract(DLLR_ADDRESS, ERC20_ABI, signer);
+    const contract = new ethers.Contract(DLLR_ADDRESS, ERC20_ABI, signer);
 
     // Get decimals
     const decimals = await contract.decimals() as number;
 
     // Parse amount to wei
-    const amountWei = parseUnits(amount, decimals);
+    const amountWei = ethers.utils.parseUnits(amount, decimals);
 
     // Check balance
     const signerAddress = await signer.getAddress();

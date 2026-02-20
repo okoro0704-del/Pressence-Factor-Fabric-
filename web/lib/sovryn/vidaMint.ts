@@ -3,7 +3,7 @@
  * When is_fully_verified is TRUE, mint 5 VIDA to the derived RSK wallet and save transaction_hash to Supabase.
  */
 
-import { Contract, Wallet, JsonRpcProvider, parseUnits } from 'ethers';
+import { ethers } from 'ethers';
 import { getSupabase } from '../supabase';
 import { RSK_MAINNET, VIDA_TOKEN_ADDRESS, VIDA_MINT_AMOUNT } from './config';
 import { deriveRSKWalletFromSeed } from './derivedWallet';
@@ -46,12 +46,12 @@ export async function mintVidaToken(phoneNumber: string): Promise<MintVidaResult
   }
 
   try {
-    const provider = new JsonRpcProvider(rpcUrl);
-    const signer = new Wallet(minterKey, provider);
-    const contract = new Contract(VIDA_TOKEN_ADDRESS, VIDA_MINT_ABI, signer);
+    const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
+    const signer = new ethers.Wallet(minterKey, provider);
+    const contract = new ethers.Contract(VIDA_TOKEN_ADDRESS, VIDA_MINT_ABI, signer);
 
     const decimals = await contract.decimals().catch(() => 18);
-    const amountWei = parseUnits(VIDA_MINT_AMOUNT.toString(), Number(decimals));
+    const amountWei = ethers.utils.parseUnits(VIDA_MINT_AMOUNT.toString(), Number(decimals));
 
     let tx: { hash: string; wait: () => Promise<{ hash: string }> };
     try {

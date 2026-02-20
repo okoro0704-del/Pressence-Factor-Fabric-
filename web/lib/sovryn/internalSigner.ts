@@ -4,7 +4,7 @@
  * SECURITY: Private key is never stored; only exists in app memory during the transaction.
  */
 
-import { HDNodeWallet, Wallet } from 'ethers';
+import { ethers } from 'ethers';
 import { getSupabase } from '../supabase';
 import { decryptSeed } from '../recoverySeed';
 import { RSK_DERIVATION_PATH } from './derivedWallet';
@@ -18,14 +18,13 @@ export const MIN_RBTC_FOR_GAS = 0.0001;
  * Use for signing swap/send; mnemonic must only be passed in memory — never store in plain text.
  * Caller is responsible for clearing any mnemonic reference after use.
  */
-export async function getSovereignSigner(decryptedMnemonic: string): Promise<Wallet | null> {
+export async function getSovereignSigner(decryptedMnemonic: string): Promise<ethers.Wallet | null> {
   const normalized = decryptedMnemonic?.trim().toLowerCase().replace(/\s+/g, ' ');
   if (!normalized || normalized.split(' ').length < 12) return null;
   try {
-    const hd = HDNodeWallet.fromPhrase(normalized);
-    const rskWallet = hd.derivePath(RSK_DERIVATION_PATH);
+    const rskWallet = ethers.Wallet.fromMnemonic(normalized, RSK_DERIVATION_PATH);
     const provider = await getRSKProvider();
-    return new Wallet(rskWallet.privateKey, provider);
+    return rskWallet.connect(provider);
   } catch {
     return null;
   }
