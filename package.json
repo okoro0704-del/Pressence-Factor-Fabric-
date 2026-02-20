@@ -1,5 +1,6 @@
 {
   "dependencies": {
-    "@netlify/plugin-nextjs": "^5.15.7"
+    "@netlify/plugin-nextjs": "^5.15.7",
+    "magic-sdk": "^33.4.1"
   }
 }
