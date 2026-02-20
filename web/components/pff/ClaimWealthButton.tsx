@@ -250,6 +250,23 @@ export function ClaimWealthButton({ onSuccess, nationAddress }: ClaimWealthButto
           color: #d4af37;
           font-weight: 700;
         }
+
+        @media (max-width: 768px) {
+          .claim-wealth-button {
+            padding: 1rem 1.5rem;
+            font-size: 1rem;
+            min-height: 56px;
+          }
+
+          .claim-info {
+            padding: 1rem;
+          }
+
+          .claim-info li {
+            font-size: 0.8rem;
+            padding: 0.375rem 0;
+          }
+        }
       `}</style>
     </div>
   );

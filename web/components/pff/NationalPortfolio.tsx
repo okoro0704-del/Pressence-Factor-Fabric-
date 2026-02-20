@@ -13,7 +13,7 @@
 import { useAddress, useContract, useContractRead } from "@thirdweb-dev/react";
 import { PFF_CONTRACTS, ERC20_ABI } from "@/lib/pff/contracts";
 import { ethers } from "ethers";
-import { Wallet, Coins, TrendingUp, RefreshCw } from "lucide-react";
+import { Wallet, Coins, TrendingUp, RefreshCw, Plus } from "lucide-react";
 
 /**
  * Format balance from wei to human-readable
@@ -92,6 +92,58 @@ export function NationalPortfolio() {
   };
 
   // ============================================================================
+  // ADD TO METAMASK HANDLERS
+  // ============================================================================
+
+  const addVidaCapToMetaMask = async () => {
+    if (typeof window === 'undefined' || !window.ethereum) {
+      alert('MetaMask is not installed');
+      return;
+    }
+
+    try {
+      await window.ethereum.request({
+        method: 'wallet_watchAsset',
+        params: {
+          type: 'ERC20',
+          options: {
+            address: PFF_CONTRACTS.VIDA_CAP_TOKEN,
+            symbol: 'VIDA',
+            decimals: 18,
+            image: 'https://pffprotocol.com/vida-logo.png',
+          },
+        },
+      });
+    } catch (error) {
+      console.error('Error adding VIDA CAP to MetaMask:', error);
+    }
+  };
+
+  const addNgnVidaToMetaMask = async () => {
+    if (typeof window === 'undefined' || !window.ethereum) {
+      alert('MetaMask is not installed');
+      return;
+    }
+
+    try {
+      await window.ethereum.request({
+        method: 'wallet_watchAsset',
+        params: {
+          type: 'ERC20',
+          options: {
+            address: PFF_CONTRACTS.NGN_VIDA_TOKEN,
+            symbol: 'ngnVIDA',
+            decimals: 18,
+            image: 'https://pffprotocol.com/ngnvida-logo.png',
+          },
+        },
+      });
+    } catch (error) {
+      console.error('Error adding ngnVIDA to MetaMask:', error);
+    }
+  };
+
+  // ============================================================================
   // RENDER
   // ============================================================================
 
@@ -139,8 +191,14 @@ export function NationalPortfolio() {
               </>
             )}
           </div>
-          <div className="card-address">
-            {PFF_CONTRACTS.VIDA_CAP_TOKEN.slice(0, 6)}...{PFF_CONTRACTS.VIDA_CAP_TOKEN.slice(-4)}
+          <div className="card-footer">
+            <div className="card-address">
+              {PFF_CONTRACTS.VIDA_CAP_TOKEN.slice(0, 6)}...{PFF_CONTRACTS.VIDA_CAP_TOKEN.slice(-4)}
+            </div>
+            <button onClick={addVidaCapToMetaMask} className="add-to-wallet-btn" title="Add to MetaMask">
+              <Plus size={14} />
+              <span>MetaMask</span>
+            </button>
           </div>
         </div>
 
@@ -160,8 +218,14 @@ export function NationalPortfolio() {
               </>
             )}
           </div>
-          <div className="card-address">
-            {PFF_CONTRACTS.NGN_VIDA_TOKEN.slice(0, 6)}...{PFF_CONTRACTS.NGN_VIDA_TOKEN.slice(-4)}
+          <div className="card-footer">
+            <div className="card-address">
+              {PFF_CONTRACTS.NGN_VIDA_TOKEN.slice(0, 6)}...{PFF_CONTRACTS.NGN_VIDA_TOKEN.slice(-4)}
+            </div>
+            <button onClick={addNgnVidaToMetaMask} className="add-to-wallet-btn" title="Add to MetaMask">
+              <Plus size={14} />
+              <span>MetaMask</span>
+            </button>
           </div>
         </div>
       </div>
@@ -318,10 +382,45 @@ export function NationalPortfolio() {
           font-weight: 600;
         }
 
+        .card-footer {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 0.5rem;
+          flex-wrap: wrap;
+        }
+
         .card-address {
           font-size: 0.75rem;
           color: rgba(255, 255, 255, 0.5);
           font-family: "Courier New", monospace;
+        }
+
+        .add-to-wallet-btn {
+          display: flex;
+          align-items: center;
+          gap: 0.375rem;
+          padding: 0.5rem 0.75rem;
+          background: rgba(212, 175, 55, 0.1);
+          border: 1px solid rgba(212, 175, 55, 0.3);
+          border-radius: 6px;
+          color: #d4af37;
+          font-size: 0.75rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+        }
+
+        .add-to-wallet-btn:hover {
+          background: rgba(212, 175, 55, 0.2);
+          border-color: #d4af37;
+          transform: translateY(-1px);
+        }
+
+        .add-to-wallet-btn:active {
+          transform: translateY(0);
         }
 
         .loading-spinner {
@@ -357,12 +456,45 @@ export function NationalPortfolio() {
             font-size: 1.25rem;
           }
 
+          .header-icon {
+            width: 24px;
+            height: 24px;
+          }
+
           .balance-grid {
             grid-template-columns: 1fr;
+            gap: 1.25rem;
+          }
+
+          .balance-card {
+            padding: 1.5rem;
           }
 
           .balance-amount {
             font-size: 1.75rem;
+          }
+
+          .balance-unit {
+            font-size: 1.125rem;
+          }
+
+          .card-footer {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.75rem;
+          }
+
+          .add-to-wallet-btn {
+            width: 100%;
+            justify-content: center;
+            padding: 0.625rem 1rem;
+            min-height: 44px;
+          }
+
+          .refresh-button {
+            padding: 0.625rem;
+            min-width: 44px;
+            min-height: 44px;
           }
         }
       `}</style>

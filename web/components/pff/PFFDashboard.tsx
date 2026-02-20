@@ -11,12 +11,14 @@
 
 "use client";
 
-import { ConnectWallet, useAddress } from "@thirdweb-dev/react";
+import { ConnectWallet, useAddress, useContract, useContractRead } from "@thirdweb-dev/react";
 import { NationalPortfolio } from "./NationalPortfolio";
 import { ClaimWealthButton } from "./ClaimWealthButton";
 import { ConvertToNairaButton } from "./ConvertToNairaButton";
 import { usePFFSovereign } from "@/lib/pff/hooks/usePFFSovereign";
-import { Shield, Zap, Lock } from "lucide-react";
+import { Shield, Zap, Lock, CheckCircle } from "lucide-react";
+import { PFF_CONTRACTS, ERC20_ABI } from "@/lib/pff/contracts";
+import { ethers } from "ethers";
 
 // Nation address to receive 5 VIDA CAP during vitalization
 const NATION_ADDRESS = process.env.NEXT_PUBLIC_NATION_ADDRESS || "0x5E8474D3BaaF27A4531F34f6fA8c9E237ce1ebb4";
@@ -25,10 +27,27 @@ export function PFFDashboard() {
   const address = useAddress();
   const { refreshBalances } = usePFFSovereign();
 
+  // Connect to VIDA CAP Token to check balance
+  const { contract: vidaCapContract } = useContract(
+    PFF_CONTRACTS.VIDA_CAP_TOKEN,
+    ERC20_ABI
+  );
+
+  // Fetch VIDA CAP balance to determine if user is verified
+  const { data: vidaCapBalance, refetch: refetchVida } = useContractRead(
+    vidaCapContract,
+    "balanceOf",
+    [address || ethers.constants.AddressZero]
+  );
+
+  // Check if user has VIDA balance (is sovereign verified)
+  const hasVidaBalance = vidaCapBalance && vidaCapBalance.gt(0);
+
   const handleSuccess = () => {
     // Refresh balances after successful transaction
     setTimeout(() => {
       refreshBalances();
+      refetchVida();
     }, 2000);
   };
 
@@ -86,16 +105,35 @@ export function PFFDashboard() {
 
           {/* Action Buttons */}
           <div className="actions-section">
-            {/* Vitalize Button - Calls FoundationVault */}
+            {/* Vitalize Button - Calls FoundationVault (or Sovereign Verified Status) */}
             <div className="action-card">
               <h3 className="action-title">The Handshake</h3>
-              <p className="action-description">
-                Claim your sovereign wealth allocation (11 VIDA CAP)
-              </p>
-              <ClaimWealthButton 
-                onSuccess={handleSuccess}
-                nationAddress={NATION_ADDRESS}
-              />
+              {hasVidaBalance ? (
+                // Show Sovereign Verified status if user has VIDA balance
+                <div className="sovereign-verified">
+                  <div className="verified-badge">
+                    <CheckCircle className="verified-icon" size={48} />
+                    <h4 className="verified-title">Sovereign Verified</h4>
+                    <p className="verified-description">
+                      You have claimed your sovereign wealth allocation
+                    </p>
+                  </div>
+                  <div className="verified-info">
+                    <p>Your VIDA CAP balance confirms your sovereign citizenship status.</p>
+                  </div>
+                </div>
+              ) : (
+                // Show Vitalize button if user has no VIDA balance
+                <>
+                  <p className="action-description">
+                    Claim your sovereign wealth allocation (11 VIDA CAP)
+                  </p>
+                  <ClaimWealthButton
+                    onSuccess={handleSuccess}
+                    nationAddress={NATION_ADDRESS}
+                  />
+                </>
+              )}
             </div>
 
             {/* Swap Button - Calls NationalTreasury */}
@@ -236,6 +274,54 @@ export function PFFDashboard() {
           margin: 0 0 1.5rem 0;
         }
 
+        .sovereign-verified {
+          width: 100%;
+        }
+
+        .verified-badge {
+          text-align: center;
+          padding: 2rem;
+          background: linear-gradient(135deg, rgba(212, 175, 55, 0.1) 0%, rgba(212, 175, 55, 0.05) 100%);
+          border-radius: 12px;
+          border: 2px solid rgba(212, 175, 55, 0.4);
+          margin-bottom: 1.5rem;
+        }
+
+        .verified-icon {
+          color: #d4af37;
+          margin: 0 auto 1rem auto;
+          filter: drop-shadow(0 0 12px rgba(212, 175, 55, 0.5));
+        }
+
+        .verified-title {
+          font-size: 1.5rem;
+          font-weight: 700;
+          color: #d4af37;
+          margin: 0 0 0.75rem 0;
+          text-transform: uppercase;
+          letter-spacing: 0.1em;
+        }
+
+        .verified-description {
+          font-size: 0.875rem;
+          color: rgba(255, 255, 255, 0.7);
+          margin: 0;
+        }
+
+        .verified-info {
+          background: rgba(255, 255, 255, 0.05);
+          border-radius: 8px;
+          padding: 1.25rem;
+          border: 1px solid rgba(212, 175, 55, 0.2);
+        }
+
+        .verified-info p {
+          margin: 0;
+          font-size: 0.875rem;
+          color: rgba(255, 255, 255, 0.7);
+          line-height: 1.6;
+        }
+
         .info-section {
           display: grid;
           grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -298,14 +384,54 @@ export function PFFDashboard() {
           .dashboard-header {
             flex-direction: column;
             gap: 1rem;
+            padding: 1.25rem;
+          }
+
+          .header-title {
+            font-size: 1.5rem;
+          }
+
+          .header-subtitle {
+            font-size: 0.8rem;
           }
 
           .actions-section {
             grid-template-columns: 1fr;
+            gap: 1.5rem;
+          }
+
+          .action-card {
+            padding: 1.5rem;
+          }
+
+          .action-title {
+            font-size: 1.125rem;
           }
 
           .features-banner {
-            gap: 1rem;
+            gap: 0.75rem;
+          }
+
+          .feature {
+            padding: 0.625rem 1rem;
+            font-size: 0.75rem;
+          }
+
+          .verified-badge {
+            padding: 1.5rem;
+          }
+
+          .verified-icon {
+            width: 40px;
+            height: 40px;
+          }
+
+          .verified-title {
+            font-size: 1.25rem;
+          }
+
+          .info-section {
+            grid-template-columns: 1fr;
           }
         }
       `}</style>

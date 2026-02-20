@@ -369,6 +369,40 @@ export function ConvertToNairaButton({ onSuccess }: ConvertToNairaButtonProps) {
           color: #ef4444;
           font-size: 0.875rem;
         }
+
+        @media (max-width: 768px) {
+          .convert-header h3 {
+            font-size: 1.125rem;
+          }
+
+          .input-wrapper input {
+            padding: 0.875rem;
+            font-size: 1rem;
+          }
+
+          .max-button {
+            padding: 0 1rem;
+            min-height: 44px;
+          }
+
+          .conversion-preview {
+            padding: 1rem;
+          }
+
+          .preview-value {
+            font-size: 0.9rem;
+          }
+
+          .preview-value.highlight {
+            font-size: 1rem;
+          }
+
+          .convert-button {
+            padding: 1rem 1.5rem;
+            font-size: 1rem;
+            min-height: 56px;
+          }
+        }
       `}</style>
     </div>
   );
