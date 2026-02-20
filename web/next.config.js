@@ -43,17 +43,13 @@ const nextConfig = {
       tls: false,
     };
 
-    // Fix for broken @magic-ext/oauth package (missing './core' module)
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      '@magic-ext/oauth$': false,
-    };
-
-    // Ignore broken @magic-ext/oauth module
-    config.externals = {
-      ...config.externals,
-      '@magic-ext/oauth': 'commonjs @magic-ext/oauth',
-    };
+    // Completely ignore the broken @magic-ext/oauth package
+    config.plugins = config.plugins || [];
+    config.plugins.push(
+      new (require('webpack').IgnorePlugin)({
+        resourceRegExp: /@magic-ext\/oauth/,
+      })
+    );
 
     return config;
   },
