@@ -11,6 +11,8 @@
     "pff-dashboard": "npm run verify-pff && npm run dev"
   },
   "dependencies": {
+    "@babel/runtime": "^7.23.0",
+    "@ethersproject/providers": "^5.7.2",
     "@magic-ext/oauth": "^24.0.0",
     "@mediapipe/face_mesh": "^0.4.1633559619",
     "@mediapipe/hands": "^0.4.1675469240",
