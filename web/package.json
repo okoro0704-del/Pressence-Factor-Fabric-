@@ -13,7 +13,6 @@
   "dependencies": {
     "@babel/runtime": "^7.28.6",
     "@ethersproject/providers": "^5.8.0",
-    "@magic-ext/oauth": "^24.0.0",
     "@mediapipe/face_mesh": "^0.4.1633559619",
     "@mediapipe/hands": "^0.4.1675469240",
     "@stablelib/chacha20poly1305": "^2.0.1",
