@@ -15,6 +15,7 @@ import { ConnectWallet, useAddress, useContract, useContractRead } from "@thirdw
 import { NationalPortfolio } from "./NationalPortfolio";
 import { ClaimWealthButton } from "./ClaimWealthButton";
 import { ConvertToNairaButton } from "./ConvertToNairaButton";
+import { SovereignIDDisplay } from "./SovereignIDDisplay";
 import { usePFFSovereign } from "@/lib/pff/hooks/usePFFSovereign";
 import { Shield, Zap, Lock, CheckCircle } from "lucide-react";
 import { PFF_CONTRACTS, ERC20_ABI } from "@/lib/pff/contracts";
@@ -95,6 +96,9 @@ export function PFFDashboard() {
           <span>Account Abstraction</span>
         </div>
       </div>
+
+      {/* Sovereign ID Display - Auto-connects and shows temporary ID */}
+      <SovereignIDDisplay />
 
       {address ? (
         <>
