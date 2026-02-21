@@ -13,6 +13,7 @@
 import { useAddress, useConnectionStatus, useConnect } from "@thirdweb-dev/react";
 import { useEffect, useState } from "react";
 import { Shield, Loader2, CheckCircle2, Copy } from "lucide-react";
+import { SovereignVerifiedBadge } from "./SovereignVerifiedBadge";
 
 export function SovereignIDDisplay() {
   const address = useAddress();
@@ -139,8 +140,8 @@ export function SovereignIDDisplay() {
                 <p className="id-address" title={address}>
                   {formatAddress(address)}
                 </p>
-                <button 
-                  onClick={handleCopy} 
+                <button
+                  onClick={handleCopy}
                   className="copy-button"
                   aria-label="Copy full address"
                 >
@@ -151,7 +152,10 @@ export function SovereignIDDisplay() {
                   )}
                 </button>
               </div>
-              <p className="id-status">Guest Session Active</p>
+              <div className="id-status-row">
+                <p className="id-status">Guest Session Active</p>
+                <SovereignVerifiedBadge />
+              </div>
             </div>
           </div>
         </div>
@@ -246,6 +250,14 @@ export function SovereignIDDisplay() {
 
           .copy-button:active {
             transform: translateY(0);
+          }
+
+          .id-status-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            flex-wrap: wrap;
           }
 
           .id-status {
