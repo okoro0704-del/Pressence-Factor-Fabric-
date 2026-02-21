@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "verify-pff": "node scripts/verify-pff-setup.js",
-    "pff-dashboard": "npm run verify-pff && npm run dev"
+    "pff-dashboard": "npm run verify-pff && npm run dev",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@babel/runtime": "^7.28.6",
@@ -49,6 +50,7 @@
     "@types/react": "18.2.0",
     "@types/react-dom": "18.2.0",
     "autoprefixer": "10.4.0",
+    "patch-package": "^8.0.1",
     "postcss": "^8.4.31",
     "tailwindcss": "3.4.0",
     "typescript": "^5.3.3"
