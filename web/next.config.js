@@ -1,7 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Static export
-  output: 'export',
+  // IMPORTANT: Remove static export - use Netlify's Next.js runtime instead
+  // Static export with App Router + Turbopack has issues in Next.js 16
+  // output: 'export',  // REMOVED
 
   // Mark static export build so API routes can return stubs without reading request (cookies)
   env: { NEXT_STATIC_EXPORT: '1' },

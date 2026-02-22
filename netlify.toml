@@ -1,16 +1,17 @@
-# PFF — Netlify build must run. Set in Netlify UI: Base directory = web, Build command = npm run build, Publish = out.
-# If "Deploy successful" but site not updated: use "Clear cache and deploy" or deploy from CLI (see web/docs/NETLIFY-DEPLOY-FIX.md).
+# PFF — Netlify build with Next.js Runtime (not static export)
+# Next.js 16 + App Router + Turbopack has issues with static export
+# Using Netlify's Next.js runtime instead for proper SSR/SSG support
 
 [build]
   base = "web"
   command = "npm run build"
-  publish = "out"
+  publish = ".next"  # Changed from "out" to ".next" for Next.js runtime
 
 [build.environment]
   NODE_VERSION = "20"
   CI = "true"
   NEXT_TELEMETRY_DISABLED = "1"
-  NETLIFY_NEXT_PLUGIN_SKIP = "true"
+  # REMOVED: NETLIFY_NEXT_PLUGIN_SKIP - we need the Next.js plugin now
   NODE_OPTIONS = "--max-old-space-size=4096"
   # Force install and build (avoid skip)
   NPM_FLAGS = "--legacy-peer-deps"
