@@ -11,39 +11,52 @@ import {
 } from "./types";
 
 /**
- * Mint PFF Verified SBT for new sovereign
+ * Execute Sovereign Pulse (database vitalization + VIDA distribution)
+ * Replaces NFT/SBT minting with database-driven vitalization
  */
-export async function mintSovereignSBT(
+export async function executeSovereignPulse(
   sovereignId: string,
   biometricData: BiometricCaptureResult
 ): Promise<SBTMintResult> {
   try {
-    const response = await fetch("/api/identity/mint-sbt", {
+    const response = await fetch("/api/sovereign/pulse", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         sovereignId,
         biometricData,
+        phoneNumber: sovereignId, // Using sovereignId as phone number for now
       }),
     });
 
     if (!response.ok) {
-      throw new Error(`SBT minting failed: ${response.statusText}`);
+      throw new Error(`Sovereign Pulse failed: ${response.statusText}`);
     }
 
     const data = await response.json();
     return {
       success: true,
-      tokenId: data.tokenId,
+      tokenId: data.vitalizationStatus, // Return vitalization status instead of token ID
       transactionHash: data.transactionHash,
     };
   } catch (error: any) {
-    console.error("[SBT MINT ERROR]", error);
+    console.error("[SOVEREIGN PULSE ERROR]", error);
     return {
       success: false,
-      error: error.message || "Failed to mint SBT",
+      error: error.message || "Sovereign Pulse failed",
     };
   }
+}
+
+/**
+ * Legacy function - kept for backward compatibility
+ * @deprecated Use executeSovereignPulse instead
+ */
+export async function mintSovereignSBT(
+  sovereignId: string,
+  biometricData: BiometricCaptureResult
+): Promise<SBTMintResult> {
+  return executeSovereignPulse(sovereignId, biometricData);
 }
 
 /**

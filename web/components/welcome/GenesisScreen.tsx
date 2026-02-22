@@ -8,7 +8,7 @@
 import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Camera, CheckCircle, AlertCircle, Scan } from "lucide-react";
-import { captureBiometric, mintSovereignSBT } from "@/lib/welcome/api";
+import { captureBiometric, executeSovereignPulse } from "@/lib/welcome/api";
 import { BiometricCaptureResult } from "@/lib/welcome/types";
 
 interface GenesisScreenProps {
@@ -63,24 +63,24 @@ export function GenesisScreen({ sovereignId, onComplete }: GenesisScreenProps) {
     try {
       // Capture biometric
       const biometricData = await captureBiometric(videoRef.current);
-      
+
       // Stop camera
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
       }
       setCameraActive(false);
-      
-      // Mint SBT
+
+      // Execute Sovereign Pulse (database vitalization + VIDA distribution)
       setMinting(true);
-      const result = await mintSovereignSBT(sovereignId, biometricData);
-      
+      const result = await executeSovereignPulse(sovereignId, biometricData);
+
       if (result.success) {
         setSuccess(true);
         setTimeout(() => {
           onComplete();
         }, 2000);
       } else {
-        setError(result.error || "Failed to mint Sovereign SBT");
+        setError(result.error || "Sovereign Pulse failed");
         setMinting(false);
       }
     } catch (err: any) {
@@ -156,8 +156,8 @@ export function GenesisScreen({ sovereignId, onComplete }: GenesisScreenProps) {
               animate={{ opacity: 1, scale: 1 }}
             >
               <CheckCircle size={100} className="success-icon" />
-              <h2>Identity Verified</h2>
-              <p>Sovereign SBT Minted</p>
+              <h2>Sovereign Vitalized</h2>
+              <p>5 VIDA Distributed • Status: VITALIZED</p>
             </motion.div>
           )}
         </div>
@@ -187,7 +187,7 @@ export function GenesisScreen({ sovereignId, onComplete }: GenesisScreenProps) {
               animate={{ rotate: 360 }}
               transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
             />
-            <p>{minting ? "Minting Sovereign SBT..." : "Processing..."}</p>
+            <p>{minting ? "Executing Sovereign Pulse..." : "Processing..."}</p>
           </div>
         )}
       </motion.div>

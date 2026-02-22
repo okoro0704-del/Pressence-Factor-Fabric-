@@ -1,34 +1,24 @@
 /**
  * Sovereign Verified Badge Component
- * 
- * Checks if the user owns the PFF Verified SBT (Soul-Bound Token)
- * - If they own the token: Display gold "Sovereign Verified" badge
- * - If they don't own it: Show "Complete KYC" button
- * - Uses ERC721 balanceOf to check ownership
+ *
+ * Checks if the user is vitalized in the database
+ * - If vitalized: Display gold "Sovereign Verified" badge
+ * - If not vitalized: Show "Complete KYC" button
+ * - Uses Supabase database query instead of NFT ownership
  */
 
 "use client";
 
-import { useAddress, useContract, useContractRead } from "@thirdweb-dev/react";
+import { useAddress } from "@thirdweb-dev/react";
 import { Shield, CheckCircle2, AlertCircle } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { createClient } from "@supabase/supabase-js";
 
-// PFF Verified SBT Contract Address (Soul-Bound Token)
-// This should be set in your .env.local file
-const PFF_VERIFIED_SBT_ADDRESS = 
-  process.env.NEXT_PUBLIC_PFF_VERIFIED_SBT_ADDRESS || 
-  "0x0000000000000000000000000000000000000000"; // Placeholder
-
-// ERC721 ABI for balanceOf (minimal interface for SBT)
-const SBT_ABI = [
-  {
-    "inputs": [{"internalType": "address", "name": "owner", "type": "address"}],
-    "name": "balanceOf",
-    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-    "stateMutability": "view",
-    "type": "function"
-  }
-];
+// Supabase client
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 interface SovereignVerifiedBadgeProps {
   onKYCClick?: () => void;
@@ -37,16 +27,47 @@ interface SovereignVerifiedBadgeProps {
 export function SovereignVerifiedBadge({ onKYCClick }: SovereignVerifiedBadgeProps) {
   const address = useAddress();
   const [isHovered, setIsHovered] = useState(false);
+  const [isVitalized, setIsVitalized] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Connect to PFF Verified SBT contract
-  const { contract } = useContract(PFF_VERIFIED_SBT_ADDRESS, SBT_ABI);
+  // Check vitalization status from database
+  useEffect(() => {
+    async function checkVitalizationStatus() {
+      if (!address) {
+        setIsLoading(false);
+        return;
+      }
 
-  // Check if user owns the SBT (balanceOf > 0)
-  const { data: balance, isLoading, error } = useContractRead(
-    contract,
-    "balanceOf",
-    [address || "0x0000000000000000000000000000000000000000"]
-  );
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        // Query user profile by sovereign_id (wallet address)
+        const { data, error: queryError } = await supabase
+          .from("user_profiles")
+          .select("vitalization_status, vitalized_at")
+          .eq("phone_number", address) // Using address as phone_number for now
+          .single();
+
+        if (queryError) {
+          console.error("[VITALIZATION CHECK ERROR]", queryError);
+          setError(queryError.message);
+          setIsVitalized(false);
+        } else {
+          setIsVitalized(data?.vitalization_status === "VITALIZED");
+        }
+      } catch (err: any) {
+        console.error("[VITALIZATION CHECK ERROR]", err);
+        setError(err.message);
+        setIsVitalized(false);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    checkVitalizationStatus();
+  }, [address]);
 
   // Handle KYC button click
   const handleKYCClick = () => {
@@ -119,11 +140,8 @@ export function SovereignVerifiedBadge({ onKYCClick }: SovereignVerifiedBadgePro
     return null; // Silently fail if SBT contract not configured
   }
 
-  // Parse balance (BigNumber to number)
-  const hasVerifiedSBT = balance && balance.toString() !== "0";
-
-  // User owns the SBT - show Sovereign Verified badge
-  if (hasVerifiedSBT) {
+  // User is vitalized - show Sovereign Verified badge
+  if (isVitalized) {
     return (
       <div className="sovereign-verified-badge verified">
         <div className="verified-badge-content">
