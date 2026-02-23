@@ -1,6 +1,6 @@
 /**
  * PFF Backend — VIDA CAP Minting & Management.
- * mintOnVitalization: 10 VIDA per new user → 5 National_Vault (70/30 lock), 5 Citizen_Vault (4/1 lock).
+ * mintOnVitalization: 11 VIDA per new user → 5 Citizen, 5 National Treasury, 1 Foundation.
  * After VITALIZATION_CAP: 2 VIDA per user and Burning Mechanism enabled.
  */
 
@@ -12,11 +12,13 @@ import {
   POST_HALVING_MINT_VIDA,
   NATIONAL_VAULT_VIDA,
   CITIZEN_VAULT_VIDA,
+  FOUNDATION_VAULT_VIDA,
   GOVERNMENT_TREASURY_VIDA,
   USER_WALLET_VIDA,
   SENTINEL_BUSINESS_VIDA,
   type VidaCapAllocation,
 } from '../../../core/economic';
+import { config } from '../config';
 
 /**
  * Generate VLT transaction hash.
@@ -52,10 +54,11 @@ export interface MintOnVitalizationResult extends VidaCapAllocation {
 }
 
 /**
- * Mint on Vitalization: 10 VIDA per new user (or 2 after cap).
- * 50:50 split: 5 → National_Vault (70/30 lock), 5 → Citizen_Vault (4/1 lock).
- * National: hasSignedSovereignClauses = false → 70% remains untouchable.
- * Citizen: 1 VIDA released on Vitalization (Day Zero). Single Quad-Pillar Handshake = 100% vitalization; no 9-day or 10-day vesting.
+ * Mint on Vitalization: 11 VIDA per new user (5-5-1 split).
+ * - 5 VIDA → Citizen (spendable)
+ * - 5 VIDA → National Treasury (locked)
+ * - 1 VIDA → Foundation Vault (locked)
+ * After VITALIZATION_CAP: 2 VIDA per user (1 Citizen, 1 National, 0 Foundation).
  */
 const INITIAL_SPENDABLE_VIDA = 0.1;
 
@@ -67,9 +70,13 @@ export async function mintOnVitalization(
   const halvingActive = totalMintedLifecycle >= VITALIZATION_CAP;
   const burningEnabled = halvingActive;
 
-  const totalMinted = halvingActive ? POST_HALVING_MINT_VIDA : GROSS_SOVEREIGN_GRANT_VIDA;
-  const nationalShare = halvingActive ? 1 : NATIONAL_VAULT_VIDA;
-  const citizenShare = halvingActive ? 1 : CITIZEN_VAULT_VIDA;
+  // Use config values for 5-5-1 split
+  const totalMinted = halvingActive
+    ? POST_HALVING_MINT_VIDA
+    : config.economic.totalVidaPerVitalization;
+  const citizenShare = halvingActive ? 1 : config.economic.citizenVaultVida;
+  const nationalShare = halvingActive ? 1 : config.economic.nationalTreasuryVida;
+  const foundationShare = halvingActive ? 0 : config.economic.foundationVaultVida;
 
   const nationalLocked70 = nationalShare * 0.7;
   const nationalSpendable30 = nationalShare * 0.3;

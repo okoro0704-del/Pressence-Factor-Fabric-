@@ -1,21 +1,23 @@
 /**
  * PFF Core — Economic Layer Types & Constants.
  * VIDA CAP, $VIDA, ATE (Autonomous Truth Economy), VLT (Vitalization Ledger Technology).
- * Sovereign Handshake: 10 VIDA grant per Vitalization; 50/50 National_Vault / Citizen_Vault with locks.
+ * Sovereign Handshake: 11 VIDA grant per Vitalization (5-5-1 split).
  */
 
 /** Global cap: once total minted VIDA CAP reaches this, minting halves to 2 VIDA and Burning Mechanism is enabled. */
 export const VITALIZATION_CAP = 1_000_000_000;
 
-// Sovereign Handshake — 10 VIDA grant ($10,000) per Vitalization (pre-halving)
-export const GROSS_SOVEREIGN_GRANT_VIDA = 10;
+// Sovereign Handshake — 11 VIDA grant ($11,000) per Vitalization (pre-halving)
+// 5-5-1 Split: 5 Citizen + 5 National Treasury + 1 Foundation
+export const GROSS_SOVEREIGN_GRANT_VIDA = 11;
 
-/** After VITALIZATION_CAP is reached: each new user gets 2 VIDA (1 National, 1 Citizen). */
+/** After VITALIZATION_CAP is reached: each new user gets 2 VIDA (1 National, 1 Citizen, 0 Foundation). */
 export const POST_HALVING_MINT_VIDA = 2;
 
-// 50:50 split — 5 to National_Vault (70/30 lock), 5 to Citizen_Vault (4/1 lock)
-export const NATIONAL_VAULT_VIDA = 5.0;   // 50% → National_Vault (National Future)
-export const CITIZEN_VAULT_VIDA = 5.0;     // 50% → Citizen_Vault (Citizen's Heritage)
+// 5-5-1 split — 5 to Citizen (spendable), 5 to National Treasury (locked), 1 to Foundation (locked)
+export const CITIZEN_VAULT_VIDA = 5.0;           // 5 VIDA → Citizen (spendable)
+export const NATIONAL_VAULT_VIDA = 5.0;          // 5 VIDA → National Treasury (locked)
+export const FOUNDATION_VAULT_VIDA = 1.0;        // 1 VIDA → PFF Foundation (locked)
 
 // Legacy three-way (kept for backward compatibility)
 export const GOVERNMENT_TREASURY_VIDA = NATIONAL_VAULT_VIDA;
@@ -29,8 +31,9 @@ export const MIN_BALANCE_FOR_HUB_FEE_VIDA = 1.0;
 
 // Legacy 50/50 ratios (kept for backward compatibility; prefer Sovereign Handshake constants above)
 export const VIDA_CAP_MINT_AMOUNT = GROSS_SOVEREIGN_GRANT_VIDA;
-export const MINTING_SPLIT_CITIZEN = USER_WALLET_VIDA / GROSS_SOVEREIGN_GRANT_VIDA;  // 0.498
-export const MINTING_SPLIT_NATIONAL = GOVERNMENT_TREASURY_VIDA / GROSS_SOVEREIGN_GRANT_VIDA;  // 0.5
+export const MINTING_SPLIT_CITIZEN = CITIZEN_VAULT_VIDA / GROSS_SOVEREIGN_GRANT_VIDA;  // 5/11 = 0.4545
+export const MINTING_SPLIT_NATIONAL = NATIONAL_VAULT_VIDA / GROSS_SOVEREIGN_GRANT_VIDA;  // 5/11 = 0.4545
+export const MINTING_SPLIT_FOUNDATION = FOUNDATION_VAULT_VIDA / GROSS_SOVEREIGN_GRANT_VIDA;  // 1/11 = 0.0909
 
 export const RECOVERY_SPLIT_PEOPLE = 0.45;     // 45%
 export const RECOVERY_SPLIT_STATE = 0.45;      // 45%
@@ -39,12 +42,13 @@ export const RECOVERY_SPLIT_AGENT = 0.10;      // 10%
 // $VIDA issuance ratio (1:1 against VIDA CAP)
 export const VIDA_ISSUANCE_RATIO = 1.0;
 
-// VIDA CAP allocation result (Sovereign Handshake: three-way mint)
+// VIDA CAP allocation result (Sovereign Handshake: 5-5-1 split)
 export interface VidaCapAllocation {
   totalMinted: number;
-  citizenShare: number;           // user_wallet (Net Spendable) — 4.98 VIDA
-  nationalReserveShare: number;   // government_treasury_vault — 5 VIDA
-  sentinelShare: number;          // sentinel_business_ledger — 0.02 VIDA
+  citizenShare: number;           // Citizen Vault (spendable) — 5 VIDA
+  nationalReserveShare: number;   // National Treasury (locked) — 5 VIDA
+  foundationShare?: number;       // Foundation Vault (locked) — 1 VIDA
+  sentinelShare?: number;         // Legacy: sentinel_business_ledger — 0.02 VIDA
   transactionHash: string;
   batchId: string;
 }

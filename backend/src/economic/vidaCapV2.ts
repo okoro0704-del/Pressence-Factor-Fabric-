@@ -2,9 +2,9 @@
  * PFF Backend — VIDA CAP Minting V2 with Sovereign Gold Rush Logic
  * Genesis Protocol v1.0
  * Architect: Isreal Okoro (mrfundzman)
- * 
+ *
  * Implements era-based minting:
- * - 10 VIDA Cap per citizen (Pre-Burn Era, before 5B supply)
+ * - 11 VIDA Cap per citizen (Pre-Burn Era, before 5B supply) - 5-5-1 split
  * - 2 VIDA Cap per citizen (Post-Burn Era, after 5B supply)
  */
 
@@ -13,9 +13,11 @@ import { pool } from '../db/client';
 import {
   MINTING_SPLIT_CITIZEN,
   MINTING_SPLIT_NATIONAL,
+  MINTING_SPLIT_FOUNDATION,
   type VidaCapAllocation,
 } from '../../../core/economic';
 import { getNextMintAmount, getCurrentEraStatus } from './goldRush';
+import { config } from '../config';
 
 /**
  * Generate VLT transaction hash.
@@ -28,10 +30,10 @@ function generateTransactionHash(): string {
 }
 
 /**
- * Mint VIDA CAP upon Vitalization with 50/50 split.
+ * Mint VIDA CAP upon Vitalization with 5-5-1 split.
  * Uses Sovereign Gold Rush logic to determine mint amount based on current era.
- * 
- * Atomic transaction: allocation + citizen vault + national reserve + era tracking.
+ *
+ * Atomic transaction: allocation + citizen vault + national reserve + foundation vault + era tracking.
  */
 export async function mintVidaCapWithEra(
   citizenId: string,
@@ -40,10 +42,11 @@ export async function mintVidaCapWithEra(
   // Get mint amount based on current era
   const mintInfo = await getNextMintAmount();
   const eraStatus = await getCurrentEraStatus();
-  
+
   const totalMinted = mintInfo.mintAmount;
   const citizenShare = totalMinted * MINTING_SPLIT_CITIZEN;
   const nationalShare = totalMinted * MINTING_SPLIT_NATIONAL;
+  const foundationShare = totalMinted * MINTING_SPLIT_FOUNDATION;
   const transactionHash = generateTransactionHash();
 
   // Atomic transaction

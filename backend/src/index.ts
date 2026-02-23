@@ -10,6 +10,7 @@ import { vitalizeRouter } from './routes/vitalize';
 import { vaultRouter } from './routes/vault';
 import { guardianRouter } from './routes/guardian';
 import { economicRouter } from './routes/economic';
+import { pillarsRouter } from './routes/pillars';
 import { config } from './config';
 
 const app = express();
@@ -23,6 +24,7 @@ app.use('/vitalize', vitalizeRouter);
 app.use('/vault', vaultRouter);
 app.use('/guardian', guardianRouter);
 app.use('/economic', economicRouter);
+app.use('/pillars', pillarsRouter);
 // TODO: Add import { masterDashboardRouter } from './routes/masterDashboard'; at top
 // app.use('/api/master-dashboard', masterDashboardRouter);
 
