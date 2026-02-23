@@ -1,47 +1,37 @@
 /**
- * Native Device Auth (WebAuthn) — registerDevicePasskey triggers the browser's
- * navigator.credentials.create prompt (Face ID / Fingerprint). Sovereign link: map
- * credentialId to citizen_hash in Supabase device_anchors table.
+ * Auth helpers: Genesis (first citizen = MASTER_ARCHITECT) and session checks.
+ * If user_profiles is empty, the first person to pass the gate is granted MASTER_ARCHITECT.
  */
 
-import { createCredential, isWebAuthnSupported, isSecureContext } from '@/lib/webauthn';
-import { linkPasskeyToDeviceAnchors } from '@/lib/deviceAnchors';
+import { getSupabase } from './supabase';
 
 /**
- * Register a device passkey: triggers the browser's native navigator.credentials.create
- * prompt (Face ID / Fingerprint). Maps the resulting credentialId to the user's
- * citizen_hash in the Supabase device_anchors table (sovereign link).
+ * Genesis protocol: if the profiles table is completely empty, insert the current
+ * user as MASTER_ARCHITECT so the first person to log in becomes Master Architect.
+ * Call after setIdentityAnchorForSession (gate clear) so the user has a session.
  */
-export async function registerDevicePasskey(
-  phoneNumber: string,
-  citizenHash: string,
-  displayName?: string
-): Promise<{ ok: true; credentialId: string } | { ok: false; error: string }> {
-  if (typeof window === 'undefined') {
-    return { ok: false, error: 'Client only' };
-  }
-  if (!isSecureContext() || !isWebAuthnSupported()) {
-    return { ok: false, error: 'WebAuthn not supported. Use HTTPS or localhost.' };
-  }
-  const phone = String(phoneNumber ?? '').trim();
-  const citizen = String(citizenHash ?? '').trim();
-  if (!phone || !citizen) {
-    return { ok: false, error: 'Phone number and citizen_hash are required.' };
-  }
-  const name = displayName?.trim() || `PFF — ${phone.slice(-4)}`;
-
+export async function ensureGenesisIfEmpty(actorPhone: string, actorName: string): Promise<{ ok: boolean; role?: string; reason?: string }> {
+  const supabase = getSupabase();
   try {
-    const cred = await createCredential(phone, name);
-    if (!cred?.id) {
-      return { ok: false, error: 'Passkey creation was cancelled or failed.' };
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user?.id) return { ok: false, reason: 'no_session' };
+
+    const { data, error } = await (supabase as any).rpc('genesis_ensure_first_citizen', {
+      auth_user_id: user.id,
+      actor_phone: actorPhone.trim(),
+      actor_name: actorName?.trim() || 'Genesis',
+    });
+
+    if (error) {
+      console.error('[AUTH] genesis_ensure_first_citizen error:', error);
+      return { ok: false, reason: error.message };
     }
-    const link = await linkPasskeyToDeviceAnchors(cred.id, phone, citizen);
-    if (!link.ok) return { ok: false, error: link.error };
-    return { ok: true, credentialId: cred.id };
+
+    const result = data as { ok?: boolean; role?: string; reason?: string; error?: string } | null;
+    if (result?.ok) return { ok: true, role: result.role };
+    return { ok: false, reason: result?.reason ?? result?.error ?? 'unknown' };
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return { ok: false, error: msg };
+    console.error('[AUTH] ensureGenesisIfEmpty exception:', e);
+    return { ok: false, reason: e instanceof Error ? e.message : String(e) };
   }
 }
-
-export { linkPasskeyToDeviceAnchors, resolveIdentityFromCredentialId } from '@/lib/deviceAnchors';

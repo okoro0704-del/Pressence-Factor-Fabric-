@@ -1,0 +1,84 @@
+{
+  "language": {
+    "name": "Yorùbá",
+    "code": "yo",
+    "direction": "ltr"
+  },
+  "common": {
+    "loading": "Ń gbé...",
+    "error": "Àṣìṣe",
+    "success": "Àṣeyọrí",
+    "cancel": "Fagilee",
+    "confirm": "Jẹ́rìí",
+    "close": "Tì",
+    "save": "Fipamọ́",
+    "delete": "Pajẹ",
+    "edit": "Ṣàtúnṣe",
+    "back": "Padà",
+    "next": "Tókàn",
+    "submit": "Fíránṣẹ́"
+  },
+  "pff": {
+    "totalPFFBalance": "Àpapọ̀ Owó PFF",
+    "nationalVault": "Ilé-ìfowópamọ́ Orílẹ̀-èdè",
+    "spendableVIDA": "VIDA Tó Lè Ná",
+    "sovereignShare": "Ìpín Olómìnira",
+    "vidaCap": "VIDA CAP",
+    "presenceFactorFabric": "Aṣọ Ìwà Wíwà",
+    "architectVault": "Ilé-ìfowópamọ́ Ayàwòrán",
+    "stateVault": "Ilé-ìfowópamọ́ Ìjọba",
+    "lockedUntil1B": "Tì Títí Di Ẹgbẹ̀rún Mílíọ̀nù"
+  },
+  "banking": {
+    "fundzmanByUBA": "Fundzman Látọwọ́ UBA",
+    "sovereignDefault": "Olómìnira Àkọ́kọ́",
+    "preActivated": "Ti Múṣiṣẹ́ Tẹ́lẹ̀",
+    "nationalBlockAccount": "Àkáǹtì Búlọ́ọ̀kù Orílẹ̀-èdè",
+    "legacyAccounts": "Àwọn Àkáǹtì Àtijọ́",
+    "linkExternalInstitution": "So Ilé-iṣẹ́ Òde Pọ̀",
+    "accountNumber": "Nọ́mbà Àkáǹtì",
+    "accountName": "Orúkọ Àkáǹtì",
+    "balance": "Owó Tó Kù",
+    "status": "Ipò",
+    "active": "Ń Ṣiṣẹ́",
+    "pending": "Ń Dúró",
+    "inactive": "Kò Ṣiṣẹ́"
+  },
+  "features": {
+    "instantTransfers": "Gbígbé Owó Lẹ́sẹ̀kẹsẹ̀",
+    "biometricLock": "Títì Báyómẹ́tíríkì",
+    "globalAccess": "Ìwọlé Àgbáyé",
+    "vidaBridge": "Àfara VIDA",
+    "zeroFees": "Kò Sí Owó Ìdíyelé",
+    "fourLayerSecurity": "Ààbò Ìpele Mẹ́rin"
+  },
+  "ticker": {
+    "activeSovereignNodes": "Àwọn Nóòdù Olómìnira Tó Ń Ṣiṣẹ́",
+    "poweredByUBA": "Agbára Látọwọ́ Àfara Owó UBA",
+    "networkUptime": "Àkókò Ìṣiṣẹ́ Nẹ́tíwọ̀ọ̀kì",
+    "transactionsPerSec": "Ìṣòwò/Ìṣẹ́jú Àáyá",
+    "totalVolume24h": "Àpapọ̀ Ìwọ̀n (Wákàtí 24)",
+    "live": "LÁÀ YÈ"
+  },
+  "dashboard": {
+    "welcome": "Káàbọ̀",
+    "primaryAccount": "Àkáǹtì Àkọ́kọ́",
+    "secondaryAccount": "Àkáǹtì Kejì",
+    "tertiaryAccounts": "Àwọn Àkáǹtì Kẹta",
+    "nationalReserve": "Ìfowópamọ́ Orílẹ̀-èdè",
+    "backedByUBA": "Ní Àtìlẹ́yìn Látọwọ́ Ètò Owó Olómìnira UBA",
+    "biometricProtection": "Ìdáàbòbò Báyómẹ́tíríkì Ń Dáàbò Bo Gbogbo Ìṣòwò",
+    "instantTransfersDesc": "Kò Sí Owó Ìdíyelé Láàárín Fundzman Àti Àwọn Àkáǹtì Àtijọ́"
+  },
+  "companion": {
+    "greeting": "Ẹ Kú Àárọ̀, Ọmọ Ìlú Olómìnira",
+    "vitalized": "Mo Ti Ní Agbára",
+    "howCanIHelp": "Báwo Ni Mo Ṣe Lè Ràn Ọ́ Lọ́wọ́ Lónìí?",
+    "processingRequest": "Ń Ṣe Ìbéèrè Rẹ...",
+    "requestComplete": "Ìbéèrè Ti Parí"
+  },
+  "formula": {
+    "pffCalculation": "Owó PFF = Fundzman + Àtijọ́ + VIDA"
+  }
+}
+

@@ -1,0 +1,93 @@
+{
+  "language": {
+    "name": "English",
+    "code": "en",
+    "direction": "ltr",
+    "chooseYourLanguage": "Choose your language",
+    "tapToContinue": "The entire app will use this language. Tap one to continue to Vitalization."
+  },
+  "vitalization": {
+    "checkingIdentity": "Checking identity…",
+    "phoneAnchorLocked": "Phone Anchor Locked",
+    "quadPillarShield": "Quad-Pillar Shield",
+    "triplePillarShield": "Triple-Pillar Shield",
+    "step3Of4": "Step 3 of 4 — Architect Vision (Face + Palm Scan)"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "close": "Close",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "back": "Back",
+    "next": "Next",
+    "submit": "Submit"
+  },
+  "pff": {
+    "totalPFFBalance": "Total PFF Balance",
+    "nationalVault": "National Vault",
+    "spendableVIDA": "Spendable VIDA",
+    "sovereignShare": "Sovereign Share",
+    "vidaCap": "VIDA CAP",
+    "presenceFactorFabric": "Presence Factor Fabric",
+    "architectVault": "Architect Vault",
+    "stateVault": "State Vault",
+    "lockedUntil1B": "Locked Until 1B Users"
+  },
+  "banking": {
+    "fundzmanByUBA": "Presence Factor Fabric (PFF)",
+    "sovereignDefault": "Sovereign Default",
+    "preActivated": "Pre-Activated",
+    "nationalBlockAccount": "National Block Account",
+    "legacyAccounts": "Legacy Accounts",
+    "linkExternalInstitution": "Link External Institution",
+    "accountNumber": "Account Number",
+    "accountName": "Account Name",
+    "balance": "Balance",
+    "status": "Status",
+    "active": "Active",
+    "pending": "Pending",
+    "inactive": "Inactive"
+  },
+  "features": {
+    "instantTransfers": "Instant Transfers",
+    "biometricLock": "Biometric Lock",
+    "globalAccess": "Global Access",
+    "vidaBridge": "VIDA Bridge",
+    "zeroFees": "Zero Fees",
+    "fourLayerSecurity": "4-Layer Security"
+  },
+  "ticker": {
+    "activeSovereignNodes": "Active Sovereign Nodes",
+    "poweredByUBA": "Powered by Presence Factor Fabric",
+    "networkUptime": "Network Uptime",
+    "transactionsPerSec": "Transactions/Sec",
+    "totalVolume24h": "Total Volume (24h)",
+    "live": "LIVE"
+  },
+  "dashboard": {
+    "welcome": "Welcome",
+    "primaryAccount": "Primary Account",
+    "secondaryAccount": "Secondary Account",
+    "tertiaryAccounts": "Tertiary Accounts",
+    "nationalReserve": "National Reserve",
+    "backedByUBA": "Backed by PFF sovereign liquidity infrastructure",
+    "biometricProtection": "Biometric authentication protects every transaction",
+    "instantTransfersDesc": "Zero fees between PFF and legacy accounts"
+  },
+  "companion": {
+    "greeting": "Hello, Sovereign Citizen",
+    "vitalized": "I am Vitalized",
+    "howCanIHelp": "How can I assist you today?",
+    "processingRequest": "Processing your request...",
+    "requestComplete": "Request complete"
+  },
+  "formula": {
+    "pffCalculation": "PFF Balance = PFF Sovereign + Legacy + VIDA"
+  }
+}
+

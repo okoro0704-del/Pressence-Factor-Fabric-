@@ -1,0 +1,84 @@
+{
+  "language": {
+    "name": "Igbo",
+    "code": "ig",
+    "direction": "ltr"
+  },
+  "common": {
+    "loading": "Na-ebu...",
+    "error": "Njehie",
+    "success": "Ihe Ịga Nke Ọma",
+    "cancel": "Kagbuo",
+    "confirm": "Kwenye",
+    "close": "Mechie",
+    "save": "Chekwaa",
+    "delete": "Hichapụ",
+    "edit": "Dezie",
+    "back": "Laghachi Azụ",
+    "next": "Ọzọ",
+    "submit": "Ziga"
+  },
+  "pff": {
+    "totalPFFBalance": "Ngụkọta Ego PFF",
+    "nationalVault": "Ụlọ Nchekwa Mba",
+    "spendableVIDA": "VIDA A Ga-emefu",
+    "sovereignShare": "Òkè Onye Nwe Onwe Ya",
+    "vidaCap": "VIDA CAP",
+    "presenceFactorFabric": "Akwa Ihe Nnọchite Anya",
+    "architectVault": "Ụlọ Nchekwa Onye Nrụpụta",
+    "stateVault": "Ụlọ Nchekwa Gọọmentị",
+    "lockedUntil1B": "Akpọchiri Ruo Ijeri 1"
+  },
+  "banking": {
+    "fundzmanByUBA": "Fundzman Site Na UBA",
+    "sovereignDefault": "Onye Nwe Onwe Ya Mbụ",
+    "preActivated": "Emegharịrị Tupu Oge",
+    "nationalBlockAccount": "Akaụntụ Ngọngọ Mba",
+    "legacyAccounts": "Akaụntụ Ochie",
+    "linkExternalInstitution": "Jikọọ Ụlọ Ọrụ Mpụga",
+    "accountNumber": "Nọmba Akaụntụ",
+    "accountName": "Aha Akaụntụ",
+    "balance": "Ngụkọta",
+    "status": "Ọnọdụ",
+    "active": "Na-arụ Ọrụ",
+    "pending": "Na-eche",
+    "inactive": "Anaghị Arụ Ọrụ"
+  },
+  "features": {
+    "instantTransfers": "Mbufe Ozugbo",
+    "biometricLock": "Mkpọchi Biometric",
+    "globalAccess": "Nnweta Ụwa Niile",
+    "vidaBridge": "Àkwà Mmiri VIDA",
+    "zeroFees": "Enweghị Ụgwọ",
+    "fourLayerSecurity": "Nchekwa Ọkwa Anọ"
+  },
+  "ticker": {
+    "activeSovereignNodes": "Nodes Nwe Onwe Ha Na-arụ Ọrụ",
+    "poweredByUBA": "Ike Sitere Na Àkwà Mmiri Ego UBA",
+    "networkUptime": "Oge Ọrụ Netwọk",
+    "transactionsPerSec": "Azụmahịa/Sekọnd",
+    "totalVolume24h": "Ngụkọta Olu (Awa 24)",
+    "live": "NDỤ"
+  },
+  "dashboard": {
+    "welcome": "Nnọọ",
+    "primaryAccount": "Akaụntụ Mbụ",
+    "secondaryAccount": "Akaụntụ Nke Abụọ",
+    "tertiaryAccounts": "Akaụntụ Nke Atọ",
+    "nationalReserve": "Nchekwa Mba",
+    "backedByUBA": "Nkwado Sitere Na Usoro Ego Nwe Onwe Ya Nke UBA",
+    "biometricProtection": "Nchekwa Biometric Na-echebe Azụmahịa Ọ Bụla",
+    "instantTransfersDesc": "Enweghị Ụgwọ N'etiti Fundzman Na Akaụntụ Ochie"
+  },
+  "companion": {
+    "greeting": "Ndewo, Nwa Amaala Nwe Onwe Ya",
+    "vitalized": "Enwere M Ndụ",
+    "howCanIHelp": "Kedu Ka M Ga-esi Nyere Gị Aka Taa?",
+    "processingRequest": "Na-edozi Arịrịọ Gị...",
+    "requestComplete": "Emechara Arịrịọ"
+  },
+  "formula": {
+    "pffCalculation": "Ego PFF = Fundzman + Ochie + VIDA"
+  }
+}
+

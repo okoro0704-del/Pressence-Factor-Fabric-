@@ -1,0 +1,84 @@
+{
+  "language": {
+    "name": "Español",
+    "code": "es",
+    "direction": "ltr"
+  },
+  "common": {
+    "loading": "Cargando...",
+    "error": "Error",
+    "success": "Éxito",
+    "cancel": "Cancelar",
+    "confirm": "Confirmar",
+    "close": "Cerrar",
+    "save": "Guardar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "back": "Atrás",
+    "next": "Siguiente",
+    "submit": "Enviar"
+  },
+  "pff": {
+    "totalPFFBalance": "Saldo Total PFF",
+    "nationalVault": "Bóveda Nacional",
+    "spendableVIDA": "VIDA Gastable",
+    "sovereignShare": "Participación Soberana",
+    "vidaCap": "VIDA CAP",
+    "presenceFactorFabric": "Tejido del Factor de Presencia",
+    "architectVault": "Bóveda del Arquitecto",
+    "stateVault": "Bóveda del Estado",
+    "lockedUntil1B": "Bloqueado Hasta 1 Mil Millones"
+  },
+  "banking": {
+    "fundzmanByUBA": "Fundzman por UBA",
+    "sovereignDefault": "Soberano por Defecto",
+    "preActivated": "Pre-Activado",
+    "nationalBlockAccount": "Cuenta de Bloque Nacional",
+    "legacyAccounts": "Cuentas Heredadas",
+    "linkExternalInstitution": "Vincular Institución Externa",
+    "accountNumber": "Número de Cuenta",
+    "accountName": "Nombre de Cuenta",
+    "balance": "Saldo",
+    "status": "Estado",
+    "active": "Activo",
+    "pending": "Pendiente",
+    "inactive": "Inactivo"
+  },
+  "features": {
+    "instantTransfers": "Transferencias Instantáneas",
+    "biometricLock": "Bloqueo Biométrico",
+    "globalAccess": "Acceso Global",
+    "vidaBridge": "Puente VIDA",
+    "zeroFees": "Cero Tarifas",
+    "fourLayerSecurity": "Seguridad de 4 Capas"
+  },
+  "ticker": {
+    "activeSovereignNodes": "Nodos Soberanos Activos",
+    "poweredByUBA": "Impulsado por el Puente de Liquidez UBA",
+    "networkUptime": "Tiempo de Actividad de la Red",
+    "transactionsPerSec": "Transacciones/Seg",
+    "totalVolume24h": "Volumen Total (24h)",
+    "live": "EN VIVO"
+  },
+  "dashboard": {
+    "welcome": "Bienvenido",
+    "primaryAccount": "Cuenta Principal",
+    "secondaryAccount": "Cuenta Secundaria",
+    "tertiaryAccounts": "Cuentas Terciarias",
+    "nationalReserve": "Reserva Nacional",
+    "backedByUBA": "Respaldado por la infraestructura de liquidez soberana de UBA",
+    "biometricProtection": "La autenticación biométrica protege cada transacción",
+    "instantTransfersDesc": "Cero tarifas entre Fundzman y cuentas heredadas"
+  },
+  "companion": {
+    "greeting": "Hola, Ciudadano Soberano",
+    "vitalized": "Estoy Vitalizado",
+    "howCanIHelp": "¿Cómo Puedo Ayudarte Hoy?",
+    "processingRequest": "Procesando Tu Solicitud...",
+    "requestComplete": "Solicitud Completada"
+  },
+  "formula": {
+    "pffCalculation": "Saldo PFF = Fundzman + Heredadas + VIDA"
+  }
+}
+

@@ -1,0 +1,165 @@
+/**
+ * Master Identity Anchor: unify Face and Device (or legacy Face + Palm + Identity Anchor)
+ * into a single sovereign root hash via a Merkle tree. Once created, individual hashes must
+ * be deleted from local memory.
+ *
+ * Face + Device pipeline (no palm): sovereignHash = MerkleRoot([FaceHash, DeviceHash]).
+ * DeviceHash = SHA-256(WebAuthn credential ID); deterministic, no raw keys stored.
+ */
+
+import { generateMerkleRoot, generateMerkleRootFaceDevice } from './merkleRoot';
+
+const SOVEREIGN_ROOT_SEPARATOR = '\u001f'; // unit separator for identity anchor hash input
+
+/**
+ * Combine three verified pillar hashes into a single Master Root Hash using a Merkle tree.
+ * Leaves: [face_hash, palm_hash, identity_anchor_hash]; root = Merkle root (SHA-256 at each level).
+ * Same inputs always produce the same root. Stored in Supabase as citizen_root / sovereign_root.
+ *
+ * @param faceHash - Verified hash from Pillar 1 (Face) — 64 hex chars
+ * @param palmHash - Verified hash from Pillar 2 (Palm) — 64 hex chars
+ * @param identityAnchorHash - Verified hash from Pillar 3 (Identity Anchor), e.g. SHA-256(phone + '|' + device_id)
+ * @returns The Merkle root hex string (64 chars). Caller must clear faceHash, palmHash, identityAnchorHash from memory after storing.
+ */
+export async function generateSovereignRoot(
+  faceHash: string,
+  palmHash: string,
+  identityAnchorHash: string
+): Promise<string> {
+  return generateMerkleRoot(
+    String(faceHash).trim(),
+    String(palmHash).trim(),
+    String(identityAnchorHash).trim()
+  );
+}
+
+/** Sync version not supported; use generateSovereignRoot() (async). */
+export function generateSovereignRootSync(
+  _faceHash: string,
+  _palmHash: string,
+  _identityAnchorHash: string
+): string {
+  throw new Error('Use generateSovereignRoot() (async) for Merkle root');
+}
+
+/**
+ * Sovereign hash from Face + Device only (no palm).
+ * MerkleRoot([FaceHash, DeviceHash]). Deterministic across sessions.
+ * DeviceHash must be SHA-256(credential ID) from WebAuthn.
+ */
+export async function generateSovereignRootFaceDevice(
+  faceHash: string,
+  deviceHash: string
+): Promise<string> {
+  return generateMerkleRootFaceDevice(
+    String(faceHash).trim(),
+    String(deviceHash).trim()
+  );
+}
+
+/**
+ * Derive DeviceHash = SHA-256(credentialId) for WebAuthn binding.
+ * Credential ID is browser-managed, non-exportable; we only hash it for the Merkle leaf.
+ * Same credential always yields same device hash (deterministic).
+ */
+export async function deriveDeviceHashFromCredentialId(credentialId: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(String(credentialId).trim());
+  const buf = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(buf))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+/**
+ * Compute the Identity Anchor (Pillar 3) hash from phone and device_id.
+ * Use this when you have phone + device_id and need the third input to generateSovereignRoot.
+ */
+export async function computeIdentityAnchorHash(phone: string, deviceId: string): Promise<string> {
+  const payload = `${String(phone).trim()}${SOVEREIGN_ROOT_SEPARATOR}${String(deviceId).trim()}`;
+  const encoder = new TextEncoder();
+  const data = encoder.encode(payload);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = new Uint8Array(hashBuffer);
+  return Array.from(hashArray)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+/**
+ * After successfully storing the master root (e.g. via saveCitizenRootToSupabase),
+ * clear the pillar hash references from the given object to avoid retaining them in memory.
+ * In JavaScript we cannot force overwrite string contents; this sets the object keys to empty string
+ * so the original references can be GC'd if nothing else holds them.
+ */
+export function clearPillarHashesFromObject(holder: {
+  faceHash?: string;
+  palmHash?: string;
+  identityAnchorHash?: string;
+}): void {
+  if (holder.faceHash !== undefined) holder.faceHash = '';
+  if (holder.palmHash !== undefined) holder.palmHash = '';
+  if (holder.identityAnchorHash !== undefined) holder.identityAnchorHash = '';
+}
+
+/**
+ * Save the sovereign (Merkle) root to user_profiles by phone. Call after generateSovereignRoot.
+ * Ensures the combined hash is stored in Supabase even if citizens table has no row.
+ */
+export async function saveSovereignRootToUserProfile(
+  phone: string,
+  sovereignRoot: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const res = await fetch('/api/v1/save-sovereign-root', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        phone_number: phone.trim(),
+        sovereign_root: sovereignRoot.trim(),
+      }),
+    });
+    const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+    if (res.ok && json.ok === true) return { ok: true };
+    return { ok: false, error: json.error ?? 'Failed to save sovereign root to profile' };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Failed to save sovereign root' };
+  }
+}
+
+/**
+ * Save the Master Root to Supabase (citizens.citizen_root) and then clear the provided hashes.
+ * Call this after generateSovereignRoot. On success, the individual hashes are cleared from the holder object.
+ *
+ * @param citizenRoot - The Merkle root from generateSovereignRoot()
+ * @param deviceId - Citizen's device_id
+ * @param keyId - Citizen's key_id
+ * @param holder - Object holding faceHash, palmHash, identityAnchorHash; will be cleared on success
+ * @returns { ok: true } or { ok: false; error: string }
+ */
+export async function saveCitizenRootToSupabase(
+  citizenRoot: string,
+  deviceId: string,
+  keyId: string,
+  holder: { faceHash?: string; palmHash?: string; identityAnchorHash?: string }
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const res = await fetch('/api/v1/save-citizen-root', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        device_id: deviceId.trim(),
+        key_id: keyId.trim(),
+        citizen_root: citizenRoot.trim(),
+      }),
+    });
+    const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+    if (res.ok && json.ok === true) {
+      clearPillarHashesFromObject(holder);
+      return { ok: true };
+    }
+    return { ok: false, error: json.error ?? 'Failed to save citizen root' };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Failed to save citizen root' };
+  }
+}
