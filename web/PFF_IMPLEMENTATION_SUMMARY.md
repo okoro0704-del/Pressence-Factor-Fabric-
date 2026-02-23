@@ -262,10 +262,11 @@ web/
 
 | Contract | Address | Purpose |
 |----------|---------|---------|
-| **FoundationVault** | `0xD42C5b854319e43e2F9e2c387b13b84D1dF542E0` | VIDA CAP token, vitalization |
-| **NationalTreasury** | `0x5E8474D3BaaF27A4531F34f6fA8c9E237ce1ebb4` | SAMM, swap operations |
-| **VIDA CAP Token** | `0xDc6EFba149b47f6F6d77AC0523c51F204964C12E` | ERC20 interface |
-| **ngnVIDA Token** | `0x5dD456B88f2be6688E7A04f78471A3868bd06811` | Nigerian VIDA (1:1 Naira) |
+| **VIDA CAP Token** | `0xc226fFb538b6f80F05d5F0Ee0758E5D85a42DE0C` | ERC20 interface |
+| **ngnVIDA Token** | `0xe814561AdB492f8ff3019194337A17E9cba9fEFd` | Nigerian VIDA (1:1 Naira) |
+| **Sentinel Vault** | `0xBaF30D2fe8F8fb41F3053Ce68C4619A283B60211` | Security & Access Control |
+| **NationalTreasury** | `0x4c81E768f4B201bCd7E924f671ABA1B162786b48` | SAMM, swap operations |
+| **FoundationVault** | `0xDD8046422Bbeba12FD47DE854639abF7FB6E0858` | VIDA CAP token, vitalization |
 
 ---
 
