@@ -1,236 +1,142 @@
-# PFF × Sovryn — Gas Relayer Endpoints Documentation
+# PFF Protocol — Gas Fees Documentation
 
-This document lists all endpoints related to gas/relayer functionality for gasless transactions on Rootstock (RSK).
+This document explains how gas fees work in the PFF Protocol on Polygon.
 
 ---
 
 ## Overview
 
-The PFF Protocol provides **gasless transaction support** for users who don't have RBTC (Rootstock Bitcoin) for gas fees. The Protocol Relayer sends small amounts of RBTC to user wallets so they can execute their first transactions.
+The PFF Protocol is deployed on **Polygon Mainnet** (Chain ID: 137). All transactions require **MATIC** for gas fees.
 
 **Key Concepts:**
-- **RBTC**: Gas token on Rootstock (RSK) - required for all transactions
-- **MIN_RBTC_FOR_GAS**: 0.0001 RBTC - minimum balance needed for transactions
-- **GAS_DRIP_AMOUNT**: 0.001 RBTC - amount sent per drip request
-- **Relayer Wallet**: Protocol-owned wallet that funds gas drips
+- **MATIC**: Native gas token on Polygon - required for all transactions
+- **Gas Fees**: Typically 0.001-0.01 MATIC per transaction (~$0.001-$0.01 USD)
+- **User Responsibility**: Users must have MATIC in their wallet to interact with PFF contracts
 
 ---
 
-## Endpoints
+## Deployed Contracts (Polygon Mainnet)
 
-### 1. Next.js API Route: `/v1/sovryn/gas-drip`
+- **VIDA CAP Token**: `0xDc6EFba149b47f6F6d77AC0523c51F204964C12E`
+- **ngnVIDA Token**: `0x5dD456B88f2be6688E7A04f78471A3868bd06811`
+- **Foundation Vault**: `0xD42C5b854319e43e2F9e2c387b13b84D1dF542E0`
+- **National Treasury**: `0x5E8474D3BaaF27A4531F34f6fA8c9E237ce1ebb4`
 
-**Type:** Next.js API Route (Server-Side)  
-**File:** `web/src/app/api/v1/sovryn/gas-drip/route.ts`  
-**URL:** `https://sovrn.netlify.app/v1/sovryn/gas-drip`
-
-**Purpose:** Provide RBTC gas for users via HTTP API
-
-**Authentication:** `x-sovryn-secret` header
-
-**Request:**
-```bash
-curl -X POST https://sovrn.netlify.app/v1/sovryn/gas-drip \
-  -H "x-sovryn-secret: Pff-Sen-Sov-555-2026" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "phone": "+2348012345678",
-    "address": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"
-  }'
-```
-
-**Request Body:**
-```typescript
-{
-  phone?: string;    // Phone number to derive RSK address
-  address?: string;  // Direct RSK address (if phone not provided)
-}
-```
-
-**Response (Success):**
-```json
-{
-  "ok": true,
-  "txHash": "0x...",
-  "amount": "0.001",
-  "recipientAddress": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"
-}
-```
-
-**Response (Error):**
-```json
-{
-  "ok": false,
-  "error": "Relayer wallet low on RBTC (0.005 RBTC). Admin has been notified."
-}
-```
-
-**Environment Variables:**
-- `RELAYER_PRIVATE_KEY`: Private key of relayer wallet (required)
+All contracts use MATIC for gas fees.
 
 ---
 
-### 2. Supabase Edge Function: `relayer-gas`
+## How Users Get MATIC for Gas
 
-**Type:** Supabase Edge Function (Deno)  
-**File:** `supabase/functions/relayer-gas/index.ts`  
-**URL:** `https://YOUR_PROJECT_REF.supabase.co/functions/v1/relayer-gas`
+Users need MATIC to interact with PFF Protocol contracts. Here are the recommended ways:
 
-**Purpose:** Provide RBTC gas for users via Supabase Edge Function
+### 1. **Buy MATIC on Exchanges**
+- Binance, Coinbase, Kraken, etc.
+- Withdraw directly to Polygon network
+- Minimum: 0.1 MATIC (~$0.10 USD) is enough for hundreds of transactions
 
-**Authentication:** Supabase `Authorization: Bearer` header
+### 2. **Bridge from Ethereum**
+- Use Polygon Bridge: https://wallet.polygon.technology/
+- Bridge ETH or other tokens to Polygon
+- Swap for MATIC on Polygon DEXs
 
-**Request:**
-```bash
-curl -X POST https://YOUR_PROJECT_REF.supabase.co/functions/v1/relayer-gas \
-  -H "Authorization: Bearer YOUR_ANON_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "phone": "+2348012345678",
-    "recipientAddress": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"
-  }'
-```
+### 3. **Faucets (Testnet Only)**
+- For testing: https://faucet.polygon.technology/
+- Mainnet: Users must acquire MATIC through exchanges
 
-**Request Body:**
-```typescript
-{
-  phone: string;            // Phone number (for logging/tracking)
-  recipientAddress: string; // RSK address to receive RBTC
-}
-```
-
-**Response:** Same as Next.js API route
-
-**Supabase Secrets:**
-- `RELAYER_PRIVATE_KEY`: Private key of relayer wallet (required)
-- `RSK_RPC_URL`: Rootstock RPC endpoint (default: https://public-node.rsk.co)
-- `GAS_DRIP_AMOUNT`: Amount of RBTC per drip (default: 0.001)
-- `RELAYER_MIN_RBTC`: Minimum relayer balance (default: 0.01)
-
-**Deployment:**
-```bash
-supabase functions deploy relayer-gas
-supabase secrets set RELAYER_PRIVATE_KEY=0x...
-```
+### 4. **On-Ramp Services**
+- Transak, MoonPay, Ramp Network
+- Buy MATIC directly with credit card
+- Delivered to Polygon wallet
 
 ---
 
-### 3. Supabase Edge Function: `gasless-mint`
+## Gas Fee Estimates
 
-**Type:** Supabase Edge Function (Deno)  
-**File:** `supabase/functions/gasless-mint/index.ts`  
-**URL:** `https://YOUR_PROJECT_REF.supabase.co/functions/v1/gasless-mint`
+Typical gas costs on Polygon for PFF Protocol operations:
 
-**Purpose:** Mint VIDA tokens without requiring user to have RBTC for gas
+| Operation | Estimated Gas (MATIC) | USD Cost |
+|-----------|----------------------|----------|
+| VIDA Transfer | 0.001 - 0.005 | $0.001 - $0.005 |
+| ngnVIDA Transfer | 0.001 - 0.005 | $0.001 - $0.005 |
+| Vitalization (Sovereign Pulse) | 0.005 - 0.01 | $0.005 - $0.01 |
+| Contract Interaction | 0.002 - 0.01 | $0.002 - $0.01 |
 
-**Authentication:** Supabase `Authorization: Bearer` header
-
-**Request:**
-```bash
-curl -X POST https://YOUR_PROJECT_REF.supabase.co/functions/v1/gasless-mint \
-  -H "Authorization: Bearer YOUR_ANON_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "phone": "+2348012345678",
-    "recipientAddress": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"
-  }'
-```
-
-**Request Body:**
-```typescript
-{
-  phone: string;            // Phone number (for verification)
-  recipientAddress: string; // RSK address to receive VIDA tokens
-}
-```
-
-**Response (Success):**
-```json
-{
-  "ok": true,
-  "txHash": "0x...",
-  "recipientAddress": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
-  "blockExplorerUrl": "https://explorer.rsk.co/tx/0x...",
-  "amountMinted": "5.00"
-}
-```
-
-**Supabase Secrets:**
-- `VIDA_MINTER_PRIVATE_KEY`: Private key of minter wallet (required)
-- `VIDA_TOKEN_ADDRESS`: VIDA token contract address (required)
-- `RSK_RPC_URL`: Rootstock RPC endpoint
-- `RELAYER_MIN_RBTC`: Minimum relayer balance
+**Note:** Gas prices fluctuate based on network congestion. Polygon is typically very cheap.
 
 ---
 
-## Client-Side Integration
+## Developer Guide: Checking User Gas Balance
 
-### Using `requestRelayerGasForSwap()`
-
-**File:** `web/lib/sovryn/relayerGas.ts`
+**Check if user has enough MATIC for transactions:**
 
 ```typescript
-import { requestRelayerGasForSwap } from '@/lib/sovryn/relayerGas';
+import { ethers } from 'ethers';
 
-// Request gas for a user
-const result = await requestRelayerGasForSwap('+2348012345678');
-if (result.ok) {
-  console.log('Gas drip successful');
-} else {
-  console.error('Gas drip failed:', result.error);
+async function checkGasBalance(userAddress: string): Promise<boolean> {
+  const provider = new ethers.providers.JsonRpcProvider(
+    'https://polygon-rpc.com'
+  );
+
+  const balance = await provider.getBalance(userAddress);
+  const minGas = ethers.utils.parseEther('0.001'); // 0.001 MATIC minimum
+
+  return balance.gte(minGas);
 }
 ```
 
-**Flow:**
-1. Tries Supabase Edge Function `relayer-gas` first
-2. Falls back to Next.js API route `/api/relayer/gas` if Edge Function unavailable
-3. Returns `{ ok: boolean, error?: string }`
+**Display gas balance in UI:**
+
+```typescript
+const balance = await provider.getBalance(userAddress);
+const maticBalance = ethers.utils.formatEther(balance);
+console.log(`User has ${maticBalance} MATIC`);
+```
 
 ---
 
-## Security
+## Network Configuration
 
-**Authentication:**
-- Next.js API: `x-sovryn-secret` header (value: `Pff-Sen-Sov-555-2026`)
-- Supabase Edge Functions: Supabase `Authorization: Bearer` header
+**Polygon Mainnet:**
+- **Chain ID**: 137
+- **RPC URL**: https://polygon-rpc.com
+- **Block Explorer**: https://polygonscan.com
+- **Currency Symbol**: MATIC
 
-**Rate Limiting:**
-- Only drips gas if recipient has < 0.0001 RBTC (prevents abuse)
-- Relayer must maintain minimum balance (prevents draining)
-
-**Private Key Management:**
-- Never commit private keys to Git
-- Store in environment variables (Netlify) or Supabase secrets
-- Use separate relayer wallet (not deployer wallet)
-
----
-
-## Monitoring
-
-**Relayer Balance Alerts:**
-- If relayer balance < `RELAYER_MIN_RBTC`, endpoint returns 503 error
-- Admin should monitor relayer wallet and top up when low
-- Consider setting up webhook alerts for low balance
-
-**Transaction Tracking:**
-- All gas drips return transaction hash
-- View on RSK Explorer: `https://explorer.rsk.co/tx/{txHash}`
+**Add to MetaMask:**
+```javascript
+await window.ethereum.request({
+  method: 'wallet_addEthereumChain',
+  params: [{
+    chainId: '0x89', // 137 in hex
+    chainName: 'Polygon Mainnet',
+    nativeCurrency: {
+      name: 'MATIC',
+      symbol: 'MATIC',
+      decimals: 18
+    },
+    rpcUrls: ['https://polygon-rpc.com'],
+    blockExplorerUrls: ['https://polygonscan.com']
+  }]
+});
+```
 
 ---
 
-## Troubleshooting
+## Future: Gasless Transactions (Meta-Transactions)
 
-**Error: "Relayer not configured"**
-- Set `RELAYER_PRIVATE_KEY` environment variable
+**Phase 2 Enhancement:**
 
-**Error: "Relayer wallet low on RBTC"**
-- Top up relayer wallet with RBTC
+The PFF Protocol may implement **ERC-2771 meta-transactions** in the future, allowing:
+- Users to sign transactions without MATIC
+- Protocol relayer pays gas fees
+- User experience: completely gasless
 
-**Error: "Recipient already has sufficient gas"**
-- User already has >= 0.0001 RBTC, no drip needed
+**Implementation would require:**
+1. Deploy Trusted Forwarder contract
+2. Update PFF contracts to support meta-transactions
+3. Create relayer service to submit transactions
+4. Frontend integration for signature-based transactions
 
-**Error: "Transaction failed"**
-- Check RSK RPC endpoint is accessible
-- Verify relayer wallet has RBTC
-- Check transaction on RSK Explorer
+**Status:** Not implemented in Phase 1. Users must have MATIC for now.
 
