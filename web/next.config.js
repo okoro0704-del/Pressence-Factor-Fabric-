@@ -1,14 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // IMPORTANT: Remove static export - use Netlify's Next.js runtime instead
+  // Using Netlify's Next.js runtime (NOT static export)
   // Static export with App Router + Turbopack has issues in Next.js 16
-  // output: 'export',  // REMOVED
+  // output: 'export',  // REMOVED - using SSR/SSG instead
 
-  // Mark static export build so API routes can return stubs without reading request (cookies)
-  env: { NEXT_STATIC_EXPORT: '1' },
+  // Remove static export flag - we're using Next.js runtime now
+  // env: { NEXT_STATIC_EXPORT: '1' },  // REMOVED
 
-  // Trailing slash for Netlify static hosting
-  trailingSlash: true,
+  // Remove trailing slash - not needed for Next.js runtime
+  // trailingSlash: true,  // REMOVED
   // Redirects for vitalization/treasury → countdown are in public/_redirects (Netlify)
 
   // Disable image optimization for static export

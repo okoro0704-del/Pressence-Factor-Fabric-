@@ -1,13 +1,14 @@
 # PFF — Netlify Configuration with Next.js Runtime (not static export)
 # Next.js 16 + App Router + Turbopack has issues with static export
 # Using Netlify's Next.js runtime instead for proper SSR/SSG support
+# IMPORTANT: Do NOT set publish directory - let Netlify Next.js plugin handle it
 
 [build]
   # Build command - npm run build only (npm ci handled by Netlify automatically)
   command = "npm run build"
 
-  # Publish directory - Changed from "out" to ".next" for Next.js runtime
-  publish = ".next"
+  # DO NOT set publish directory - Netlify Next.js plugin handles deployment automatically
+  # publish = ".next"  # REMOVED - causes 404s with Next.js runtime
 
 [build.environment]
   # Node.js version
