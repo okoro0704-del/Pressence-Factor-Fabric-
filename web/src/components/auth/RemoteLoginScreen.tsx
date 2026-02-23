@@ -16,7 +16,7 @@ import { setVitalizationComplete } from '@/lib/vitalizationState';
 import { logGuestAccessIfNeeded } from '@/lib/guestMode';
 import { getLinkedMobileDeviceId } from '@/lib/phoneIdBridge';
 import { formatPhoneE164 } from '@/lib/supabaseClient';
-import { ensurePasskeyAnchor, sovereignEntryHaptic } from '@/src/lib/auth/passkeyEngine';
+import { ensurePasskeyAnchor, sovereignEntryHaptic } from '@/lib/auth/passkeyEngine';
 import { Loader2, Smartphone, ShieldCheck } from 'lucide-react';
 
 const jetbrains = JetBrains_Mono({ weight: ['400', '600', '700'], subsets: ['latin'] });

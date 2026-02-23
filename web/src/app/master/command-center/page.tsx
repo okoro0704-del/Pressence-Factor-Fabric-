@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { MasterArchitectGuard } from '@/components/admin/MasterArchitectGuard';
-import { CommandCenterTicker } from '@/src/components/commandCenter/CommandCenterTicker';
+import { CommandCenterTicker } from '@/components/commandCenter/CommandCenterTicker';
 import {
   BarChart3,
   Globe,
