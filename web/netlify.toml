@@ -1,28 +1,28 @@
-# PFF — Netlify Configuration (Minimal & Stable)
-# Framework: Next.js 16 Static Export
+# PFF — Netlify Configuration with Next.js Runtime (not static export)
+# Next.js 16 + App Router + Turbopack has issues with static export
+# Using Netlify's Next.js runtime instead for proper SSR/SSG support
 
 [build]
   # Build command - npm run build only (npm ci handled by Netlify automatically)
   command = "npm run build"
 
-  # Publish directory
-  publish = "out"
+  # Publish directory - Changed from "out" to ".next" for Next.js runtime
+  publish = ".next"
 
 [build.environment]
   # Node.js version
-  NODE_VERSION = "20.10.0"
+  NODE_VERSION = "20"
 
   # Disable telemetry
   NEXT_TELEMETRY_DISABLED = "1"
 
-  # Skip Netlify plugins
-  NETLIFY_NEXT_PLUGIN_SKIP = "true"
+  # REMOVED: NETLIFY_NEXT_PLUGIN_SKIP - we need the Next.js plugin now
 
   # Memory limit
   NODE_OPTIONS = "--max-old-space-size=4096"
 
-  # Enable verbose logging
-  NPM_FLAGS = "--loglevel=verbose"
+  # Legacy peer deps for compatibility
+  NPM_FLAGS = "--legacy-peer-deps"
 
   # Supabase: set in Netlify UI (Site settings → Environment) so keys are not in repo
   # NEXT_PUBLIC_SUPABASE_URL = (from Supabase Project Settings → API)
