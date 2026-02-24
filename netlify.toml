@@ -11,10 +11,12 @@
   NODE_VERSION = "20"
   CI = "true"
   NEXT_TELEMETRY_DISABLED = "1"
-  # REMOVED: NETLIFY_NEXT_PLUGIN_SKIP - we need the Next.js plugin now
   NODE_OPTIONS = "--max-old-space-size=4096"
-  # Force install and build (avoid skip)
   NPM_FLAGS = "--legacy-peer-deps"
+
+# Explicitly enable Next.js plugin
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
 
 # Required in Netlify UI (Site → Build & deploy → Environment):
 # NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY
