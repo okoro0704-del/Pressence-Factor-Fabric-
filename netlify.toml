@@ -1,10 +1,10 @@
 # PFF Protocol - Netlify Configuration for Next.js 16
 # Using Netlify's Next.js Runtime (Essential Next.js plugin)
+# NOTE: No base directory - using full paths instead to avoid publish=base conflict
 
 [build]
-  base = "web"
-  command = "npm run build"
-  publish = ".next"
+  command = "cd web && npm run build"
+  publish = "web/.next"
 
 [build.environment]
   NODE_VERSION = "20"
@@ -21,9 +21,9 @@
   [headers.values]
     Permissions-Policy = "camera=(self), microphone=(self), geolocation=(self)"
 
-# Functions live in web/netlify/functions (relative to base when base = "web")
+# Functions live in web/netlify/functions (full path since no base directory)
 [functions]
-  directory = "netlify/functions"
+  directory = "web/netlify/functions"
   node_bundler = "esbuild"
 
 # Edge: Sovereign Companion responds from the data center closest to the user
