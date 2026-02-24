@@ -10,8 +10,11 @@ import { RegisterServiceWorker } from '@/components/RegisterServiceWorker';
 import { BiometricSessionProvider } from '@/contexts/BiometricSessionContext';
 import { TranslationProvider } from '@/lib/i18n/TranslationContext';
 
-/** Force static generation for all routes (consolidate to single static site). */
-export const dynamic = 'force-static';
+/**
+ * Using Netlify Next.js Runtime (NOT static export)
+ * Removed 'force-static' to allow SSR/SSG with Next.js runtime
+ */
+// export const dynamic = 'force-static';  // REMOVED - conflicts with Next.js runtime
 
 /** Canonical origin for Grand Unveiling: set on custom domain only (e.g. https://app.purefreedomfoundation.org). Leave unset on Netlify URL so site stays functional for testing. */
 const CANONICAL_ORIGIN =
