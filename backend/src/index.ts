@@ -6,14 +6,23 @@
 
 import 'dotenv/config';
 import express from 'express';
+import cors from 'cors';
 import { vitalizeRouter } from './routes/vitalize';
 import { vaultRouter } from './routes/vault';
 import { guardianRouter } from './routes/guardian';
 import { economicRouter } from './routes/economic';
 import { pillarsRouter } from './routes/pillars';
+import { chatRouter } from './routes/chat';
 import { config } from './config';
 
 const app = express();
+
+// Enable CORS for frontend
+app.use(cors({
+  origin: process.env.FRONTEND_URL || '*',
+  credentials: true,
+}));
+
 app.use(express.json());
 
 app.get('/health', (_req, res) => {
@@ -25,6 +34,7 @@ app.use('/vault', vaultRouter);
 app.use('/guardian', guardianRouter);
 app.use('/economic', economicRouter);
 app.use('/pillars', pillarsRouter);
+app.use('/api', chatRouter);
 // TODO: Add import { masterDashboardRouter } from './routes/masterDashboard'; at top
 // app.use('/api/master-dashboard', masterDashboardRouter);
 
