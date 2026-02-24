@@ -5,7 +5,7 @@
 [build]
   base = "web"
   command = "npm run build"
-  publish = ".next"  # Changed from "out" to ".next" for Next.js runtime
+  # DO NOT set publish - let Netlify Next.js plugin handle it automatically
 
 [build.environment]
   NODE_VERSION = "20"
