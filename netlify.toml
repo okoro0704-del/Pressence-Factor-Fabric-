@@ -3,7 +3,7 @@
 # NOTE: No base directory - using full paths instead to avoid publish=base conflict
 
 [build]
-  command = "cd web && npm run build"
+  command = "cd web && npm install --legacy-peer-deps && npm run build"
   publish = "web/.next"
 
 [build.environment]
