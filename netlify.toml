@@ -1,22 +1,15 @@
-# PFF — Netlify build with Next.js Runtime (not static export)
-# Next.js 16 + App Router + Turbopack has issues with static export
-# Using Netlify's Next.js runtime instead for proper SSR/SSG support
+# PFF Protocol - Netlify Configuration for Next.js 16
+# Using Netlify's Next.js Runtime (Essential Next.js plugin)
 
 [build]
   base = "web"
   command = "npm run build"
-  # DO NOT set publish - let Netlify Next.js plugin handle it automatically
 
 [build.environment]
   NODE_VERSION = "20"
-  CI = "true"
   NEXT_TELEMETRY_DISABLED = "1"
   NODE_OPTIONS = "--max-old-space-size=4096"
   NPM_FLAGS = "--legacy-peer-deps"
-
-# Explicitly enable Next.js plugin
-[[plugins]]
-  package = "@netlify/plugin-nextjs"
 
 # Required in Netlify UI (Site → Build & deploy → Environment):
 # NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY
