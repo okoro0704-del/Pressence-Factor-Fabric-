@@ -10,8 +10,11 @@ Your PFF Protocol project now includes a **complete SOVRYN AI Chat system** with
 
 ### **Frontend Components**
 1. ✅ `web/src/components/sovryn/SovrynChat.tsx` - Main chat component (240 lines)
-2. ✅ `web/src/app/sovryn-chat/page.tsx` - Example standalone page (150 lines)
-3. ✅ `web/src/components/sovryn/SOVRYN_CHAT_README.md` - Component documentation
+2. ✅ `web/src/components/sovryn/FloatingChatButton.tsx` - Global floating chat button (110 lines)
+3. ✅ `web/src/components/sovryn/index.ts` - Centralized exports
+4. ✅ `web/src/app/sovryn-chat/page.tsx` - Example standalone page (150 lines)
+5. ✅ `web/src/components/sovryn/SOVRYN_CHAT_README.md` - Component documentation
+6. ✅ `web/src/components/sovryn/INTEGRATION_EXAMPLES.md` - Integration patterns
 
 ### **Backend Services**
 1. ✅ `backend/src/routes/chat.ts` - Chat API routes with streaming (85 lines)
@@ -121,11 +124,28 @@ Navigate to: `http://localhost:3000/sovryn-chat`
 
 ## 🎨 Component Usage
 
-### **Basic Usage**
+### **Option 1: Floating Chat Button (Recommended)**
 ```tsx
-import { SovrynChat } from '@/components/sovryn/SovrynChat';
+// Add to your layout.tsx for global access
+import { FloatingChatButton } from '@/components/sovryn';
 
-export default function MyPage() {
+export default function RootLayout({ children }) {
+  return (
+    <html>
+      <body>
+        {children}
+        <FloatingChatButton />
+      </body>
+    </html>
+  );
+}
+```
+
+### **Option 2: Standalone Page**
+```tsx
+import { SovrynChat } from '@/components/sovryn';
+
+export default function ChatPage() {
   return (
     <div className="h-screen">
       <SovrynChat />
@@ -134,20 +154,26 @@ export default function MyPage() {
 }
 ```
 
-### **With User Context**
+### **Option 3: With User Context**
 ```tsx
-<SovrynChat 
-  walletAddress="0x1234...5678"
-  phoneNumber="+2348012345678"
-/>
+import { SovrynChat } from '@/components/sovryn';
+
+export default function DashboardPage() {
+  return (
+    <SovrynChat
+      walletAddress="0x1234...5678"
+      phoneNumber="+2348012345678"
+    />
+  );
+}
 ```
 
-### **Custom Styling**
-```tsx
-<SovrynChat 
-  className="max-w-4xl mx-auto shadow-2xl"
-/>
-```
+### **More Integration Patterns**
+See `web/src/components/sovryn/INTEGRATION_EXAMPLES.md` for:
+- Dashboard sidebar
+- Tabbed interface
+- Inline help widget
+- Collapsible panel
 
 ---
 
@@ -262,9 +288,17 @@ NEXT_PUBLIC_PFF_BACKEND_URL=https://your-backend.railway.app
 
 **🎉 SOVRYN AI Chat is ready to use!**
 
-**Commit:** `458e5ed`  
-**Files Changed:** 10 files, 1409 insertions  
+**Latest Commit:** `814fbe1`
+**Total Files Created:** 13 files
+**Total Lines Added:** 2,000+ lines
 **Status:** ✅ Pushed to GitHub
 
-Navigate to: `http://localhost:3000/sovryn-chat` (after setup)
+**Quick Start:**
+1. Install: `cd backend && npm install cors @types/cors`
+2. Migrate: Run `supabase/migrations/20260224000000_ai_chat_logs.sql`
+3. Configure: Set `NEXT_PUBLIC_PFF_BACKEND_URL` in `web/.env.local`
+4. Test: Navigate to `http://localhost:3000/sovryn-chat`
+
+**Or use globally:**
+Add `<FloatingChatButton />` to your layout.tsx!
 
