@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { ArrowLeft } from 'lucide-react';
 import { FourLayerGate } from '@/components/dashboard/FourLayerGate';
 import { SovereignGuardRedirect } from '@/components/dashboard/SovereignGuardRedirect';
 import { VitalizationHubContent } from '@/components/vitalization/VitalizationHubContent';
@@ -70,6 +71,16 @@ export function VitalizationPageClient() {
   if (isVitalized && !showGateForOthers) {
     return (
       <SovereignGuardRedirect>
+        {/* Back Button */}
+        <button
+          onClick={() => router.back()}
+          className="fixed top-6 left-6 z-50 flex items-center gap-2 px-4 py-2 rounded-lg bg-[#0d0d0f] border border-[#D4AF37]/30 hover:border-[#D4AF37] transition-all duration-200 group"
+          style={{ color: '#D4AF37' }}
+        >
+          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+          <span className="text-sm font-medium">Back</span>
+        </button>
+
         <VitalizationHubContent onVitalizeOthers={() => setShowGateForOthers(true)} />
       </SovereignGuardRedirect>
     );
@@ -77,6 +88,16 @@ export function VitalizationPageClient() {
 
   return (
     <SovereignGuardRedirect>
+      {/* Back Button */}
+      <button
+        onClick={() => router.back()}
+        className="fixed top-6 left-6 z-50 flex items-center gap-2 px-4 py-2 rounded-lg bg-[#0d0d0f] border border-[#D4AF37]/30 hover:border-[#D4AF37] transition-all duration-200 group"
+        style={{ color: '#D4AF37' }}
+      >
+        <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+        <span className="text-sm font-medium">Back</span>
+      </button>
+
       <FourLayerGate vitalizeOthersMode={showGateForOthers} />
     </SovereignGuardRedirect>
   );

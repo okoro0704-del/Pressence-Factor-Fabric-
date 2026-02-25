@@ -17,8 +17,9 @@ This guide explains how to completely clear all PFF Protocol data from both the 
 - ✅ All user profiles and identity data
 - ✅ All biometric verification records
 - ✅ All login requests and sessions
-- ✅ All financial transactions and wallets
+- ✅ All financial transactions and wallets (COMPLETELY CLEARED)
 - ✅ All vitalization logs and VIDA distributions
+- ✅ All National Treasury data (EXCEPT VIDA PRICE - preserved at $1,000 USD)
 
 ---
 

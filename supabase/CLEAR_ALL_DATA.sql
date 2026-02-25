@@ -41,12 +41,46 @@ TRUNCATE TABLE public.proof_of_life_checks CASCADE;
 -- ECONOMIC & FINANCIAL TABLES
 -- ============================================================================
 
+-- Clear wallet data (ALL data removed)
 TRUNCATE TABLE public.sovereign_internal_wallets CASCADE;
 TRUNCATE TABLE public.sovereign_ledger CASCADE;
 TRUNCATE TABLE public.vida_distribution_log CASCADE;
 TRUNCATE TABLE public.vitalization_log CASCADE;
 TRUNCATE TABLE public.foundation_vault_ledger CASCADE;
-TRUNCATE TABLE public.national_block_reserves CASCADE;
+
+-- Clear National Treasury data BUT PRESERVE VIDA PRICE
+DO $$
+DECLARE
+  saved_price NUMERIC;
+BEGIN
+  -- Save the current VIDA price
+  SELECT vida_price_usd INTO saved_price
+  FROM public.national_block_reserves
+  WHERE id = '00000000-0000-0000-0000-000000000002'
+  LIMIT 1;
+
+  -- If no price found, use default $1,000
+  IF saved_price IS NULL THEN
+    saved_price := 1000;
+  END IF;
+
+  -- Clear all treasury data
+  TRUNCATE TABLE public.national_block_reserves CASCADE;
+
+  -- Restore the row with ONLY the price preserved
+  INSERT INTO public.national_block_reserves (
+    id,
+    vida_price_usd,
+    last_updated
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000002',
+    saved_price,
+    NOW()
+  );
+
+  RAISE NOTICE '💰 VIDA Price preserved: $%', saved_price;
+END $$;
+
 TRUNCATE TABLE public.national_revenue_audit CASCADE;
 TRUNCATE TABLE public.sovereign_tax_ledger CASCADE;
 
