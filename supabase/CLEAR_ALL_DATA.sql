@@ -22,11 +22,29 @@ TRUNCATE TABLE public.citizens CASCADE;
 -- AUTHENTICATION & SESSION TABLES
 -- ============================================================================
 
-TRUNCATE TABLE public.login_requests CASCADE;
-TRUNCATE TABLE public.vitalization_requests CASCADE;
-TRUNCATE TABLE public.sovereign_device_handshake CASCADE;
-TRUNCATE TABLE public.session_destruction_log CASCADE;
-TRUNCATE TABLE public.zero_persistence_sessions CASCADE;
+DO $$
+BEGIN
+  -- Clear tables only if they exist
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'login_requests') THEN
+    TRUNCATE TABLE public.login_requests CASCADE;
+  END IF;
+
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'vitalization_requests') THEN
+    TRUNCATE TABLE public.vitalization_requests CASCADE;
+  END IF;
+
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'sovereign_device_handshake') THEN
+    TRUNCATE TABLE public.sovereign_device_handshake CASCADE;
+  END IF;
+
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'session_destruction_log') THEN
+    TRUNCATE TABLE public.session_destruction_log CASCADE;
+  END IF;
+
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'zero_persistence_sessions') THEN
+    TRUNCATE TABLE public.zero_persistence_sessions CASCADE;
+  END IF;
+END $$;
 
 -- ============================================================================
 -- BIOMETRIC & VERIFICATION TABLES

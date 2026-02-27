@@ -7,6 +7,8 @@ import { ProtectedRoute } from '@/components/dashboard/ProtectedRoute';
 import { BiometricStrictnessSlider } from '@/components/settings/BiometricStrictnessSlider';
 import { AppShell } from '@/components/layout/AppShell';
 import { SentinelDevicesManager } from '@/components/dashboard/SentinelDevicesManager';
+import { SovereignVault } from '@/components/settings/SovereignVault';
+import { PartnerAuthorizations } from '@/components/settings/PartnerAuthorizations';
 import { getIdentityAnchorPhone, clearIdentityAnchorForSession, clearSessionForLogout } from '@/lib/sentinelActivation';
 import { clearPresenceVerification } from '@/lib/withPresenceCheck';
 import { getCompositeDeviceFingerprint } from '@/lib/biometricAuth';
@@ -301,6 +303,16 @@ export default function SettingsPage() {
             )}
 
             <BiometricStrictnessSlider />
+
+            {/* Sovereign Vault Section */}
+            <div className="rounded-xl border p-4" style={{ borderColor: 'rgba(212, 175, 55, 0.3)', background: 'rgba(15,15,15,0.8)' }}>
+              <SovereignVault />
+            </div>
+
+            {/* Partner Authorizations Section */}
+            <div className="rounded-xl border p-4" style={{ borderColor: 'rgba(212, 175, 55, 0.3)', background: 'rgba(15,15,15,0.8)' }}>
+              <PartnerAuthorizations />
+            </div>
 
             <div className="rounded-xl border p-4" style={{ borderColor: 'rgba(212, 175, 55, 0.3)' }}>
               <h2 className="text-sm font-semibold uppercase tracking-wider mb-2" style={{ color: GOLD }}>
