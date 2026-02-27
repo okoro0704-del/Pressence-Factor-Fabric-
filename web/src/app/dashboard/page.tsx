@@ -9,6 +9,7 @@ import { GlowingGlobe } from '@/components/dashboard/GlowingGlobe';
 import { TopVitalizedNations } from '@/components/dashboard/TopVitalizedNations';
 import { VitalizationRequestListener } from '@/components/dashboard/VitalizationRequestListener';
 import { LoginRequestListener } from '@/components/dashboard/LoginRequestListener';
+import { VitalizationBanner } from '@/components/dashboard/VitalizationBanner';
 import { getIdentityAnchorPhone } from '@/lib/sentinelActivation';
 import { setVitalizationComplete, shouldNeverRedirectBack } from '@/lib/vitalizationState';
 import { isArchitect } from '@/lib/manifestoUnveiling';
@@ -29,6 +30,7 @@ export default function DashboardPage() {
   const [accessChecked, setAccessChecked] = useState(false);
   const [vitalizedOrArchitect, setVitalizedOrArchitect] = useState(false);
   const [mintError, setMintError] = useState<string | null>(null);
+  const [isVitalized, setIsVitalized] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -61,6 +63,7 @@ export default function DashboardPage() {
         const status = await getCitizenStatusForPhone(phone);
         if (status === 'VITALIZED') {
           setVitalizationComplete();
+          setIsVitalized(true);
           mintFoundationSeigniorage(phone, { citizenId: phone }).then((res) => {
             if (!res.ok && !cancelled) {
               console.error('[Dashboard] Mint not confirmed:', res.error);
@@ -73,6 +76,9 @@ export default function DashboardPage() {
               setMintError(msg);
             }
           });
+        } else {
+          // User is logged in but NOT vitalized - Zero-State
+          setIsVitalized(false);
         }
       }
       if (!cancelled) {
@@ -140,6 +146,13 @@ export default function DashboardPage() {
                 <button type="button" onClick={() => setMintError(null)} className="text-amber-400 hover:text-amber-300 shrink-0" aria-label="Dismiss">×</button>
               </div>
             )}
+
+            {/* Zero-State Banner: Show when user is logged in but NOT vitalized */}
+            {!isVitalized && identityPhone && (
+              <VitalizationBanner />
+            )}
+
+            {/* Global Data: Always visible (World Data) */}
             <GlowingGlobe className="my-4" />
             <SovereignPulseBar className="mb-6" />
             <TopVitalizedNations className="mt-auto" />
