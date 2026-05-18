@@ -5,7 +5,7 @@ import { type GlobalIdentity, validatePhoneNumber } from '@/lib/phoneIdentity';
 
 interface PersonalDetailsStepProps {
   identity: GlobalIdentity;
-  onComplete: (updatedIdentity: GlobalIdentity) => void;
+  onComplete: (updatedIdentity: GlobalIdentity, bvn: string) => void;
   onBack: () => void;
 }
 
@@ -14,10 +14,11 @@ export function PersonalDetailsStep({ identity, onComplete, onBack }: PersonalDe
   const [fullName, setFullName] = useState(identity.full_name);
   const [bankAccount, setBankAccount] = useState('');
   const [bankName, setBankName] = useState('');
-  const [errors, setErrors] = useState<{ phone?: string; name?: string }>({});
+  const [bvn, setBvn] = useState('');
+  const [errors, setErrors] = useState<{ phone?: string; name?: string; bvn?: string }>({});
 
   const handleSubmit = () => {
-    const newErrors: { phone?: string; name?: string } = {};
+    const newErrors: { phone?: string; name?: string; bvn?: string } = {};
 
     // Validate phone number
     if (!validatePhoneNumber(phoneNumber)) {
@@ -27,6 +28,11 @@ export function PersonalDetailsStep({ identity, onComplete, onBack }: PersonalDe
     // Validate full name
     if (!fullName || fullName.trim().length < 2) {
       newErrors.name = 'Please enter a valid full name';
+    }
+
+    const bvnDigits = bvn.replace(/\D/g, '');
+    if (bvnDigits.length !== 11) {
+      newErrors.bvn = 'BVN must be exactly 11 digits';
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -42,7 +48,7 @@ export function PersonalDetailsStep({ identity, onComplete, onBack }: PersonalDe
       linked_bank_accounts: bankAccount ? [bankAccount] : [],
     };
 
-    onComplete(updatedIdentity);
+    onComplete(updatedIdentity, bvnDigits);
   };
 
   return (
@@ -110,6 +116,36 @@ export function PersonalDetailsStep({ identity, onComplete, onBack }: PersonalDe
               {errors.name}
             </p>
           )}
+        </div>
+
+        {/* BVN — required for genesis registration */}
+        <div>
+          <label className="block text-sm font-bold mb-2" style={{ color: '#D4AF37' }}>
+            Bank Verification Number (BVN) *
+          </label>
+          <input
+            type="text"
+            inputMode="numeric"
+            maxLength={11}
+            value={bvn}
+            onChange={(e) => setBvn(e.target.value.replace(/\D/g, '').slice(0, 11))}
+            placeholder="12345678901"
+            className="w-full px-4 py-3 rounded-lg font-mono text-sm"
+            style={{
+              background: 'rgba(0, 0, 0, 0.6)',
+              border: errors.bvn ? '2px solid #ef4444' : '2px solid #2a2a2e',
+              color: '#ffffff',
+              outline: 'none',
+            }}
+          />
+          {errors.bvn && (
+            <p className="text-xs mt-1" style={{ color: '#ef4444' }}>
+              {errors.bvn}
+            </p>
+          )}
+          <p className="text-xs mt-1" style={{ color: '#6b6b70' }}>
+            Required for immutable genesis registration on PFF Express
+          </p>
         </div>
 
         {/* Bank Account (Optional) */}

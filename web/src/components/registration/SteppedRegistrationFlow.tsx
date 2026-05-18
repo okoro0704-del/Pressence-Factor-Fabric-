@@ -6,6 +6,7 @@ import { PresenceScanStep } from './steps/PresenceScanStep';
 import { PersonalDetailsStep } from './steps/PersonalDetailsStep';
 import { DependentRegistrationStep } from './steps/DependentRegistrationStep';
 import { RegistrationCompleteStep } from './steps/RegistrationCompleteStep';
+import { IdentityGenesisUnionStep } from './steps/IdentityGenesisUnionStep';
 import { FamilyTreeVisualization } from './FamilyTreeVisualization';
 
 interface SteppedRegistrationFlowProps {
@@ -18,7 +19,7 @@ interface SteppedRegistrationFlowProps {
   guardianPhone?: string;
 }
 
-type RegistrationStep = 'scan' | 'details' | 'dependent' | 'complete';
+type RegistrationStep = 'scan' | 'details' | 'genesis-union' | 'dependent' | 'complete';
 
 export function SteppedRegistrationFlow({
   accountType,
@@ -32,15 +33,22 @@ export function SteppedRegistrationFlow({
   const [currentStep, setCurrentStep] = useState<RegistrationStep>('scan');
   const [identity, setIdentity] = useState<GlobalIdentity | null>(null);
   const [dependents, setDependents] = useState<GlobalIdentity[]>([]);
+  const [bvn, setBvn] = useState('');
+  const [unionSeal, setUnionSeal] = useState<{ citizenId: string; unionSealedAt: string } | null>(null);
 
   const handleScanComplete = (scannedIdentity: GlobalIdentity) => {
     setIdentity(scannedIdentity);
     setCurrentStep('details');
   };
 
-  const handleDetailsComplete = (updatedIdentity: GlobalIdentity) => {
+  const handleDetailsComplete = (updatedIdentity: GlobalIdentity, collectedBvn: string) => {
     setIdentity(updatedIdentity);
-    
+    setBvn(collectedBvn);
+    setCurrentStep('genesis-union');
+  };
+
+  const handleGenesisUnionComplete = (result: { citizenId: string; unionSealedAt: string }) => {
+    setUnionSeal(result);
     if (allowDependentRegistration && accountType === AccountType.SOVEREIGN_OPERATOR) {
       setCurrentStep('dependent');
     } else {
@@ -85,13 +93,20 @@ export function SteppedRegistrationFlow({
           number={2} 
           label="Personal Details" 
           active={currentStep === 'details'} 
+          completed={currentStep !== 'scan' && currentStep !== 'details'}
+        />
+        <StepConnector completed={currentStep !== 'scan' && currentStep !== 'details'} />
+        <StepIndicator 
+          number={3} 
+          label="Seal Union" 
+          active={currentStep === 'genesis-union'} 
           completed={currentStep === 'dependent' || currentStep === 'complete'}
         />
         {allowDependentRegistration && (
           <>
             <StepConnector completed={currentStep === 'complete'} />
             <StepIndicator 
-              number={3} 
+              number={4} 
               label="Add Dependent (Optional)" 
               active={currentStep === 'dependent'} 
               completed={currentStep === 'complete'}
@@ -125,6 +140,15 @@ export function SteppedRegistrationFlow({
             identity={identity}
             onComplete={handleDetailsComplete}
             onBack={() => setCurrentStep('scan')}
+          />
+        )}
+
+        {currentStep === 'genesis-union' && identity && bvn && (
+          <IdentityGenesisUnionStep
+            identity={identity}
+            bvn={bvn}
+            onComplete={handleGenesisUnionComplete}
+            onBack={() => setCurrentStep('details')}
           />
         )}
 

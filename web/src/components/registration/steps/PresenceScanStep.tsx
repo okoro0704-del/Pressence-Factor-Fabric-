@@ -20,6 +20,8 @@ export function PresenceScanStep({ accountType, guardianPhone, onComplete, onCan
 
   const handleAnchorVerified = (payload: { phoneNumber: string; fullName: string }) => {
     setIdentityAnchor({ phone: payload.phoneNumber, name: payload.fullName });
+    setAuthStatus(AuthStatus.IDLE);
+    setResult(null);
   };
 
   const handleStartScan = async () => {
@@ -85,6 +87,15 @@ export function PresenceScanStep({ accountType, guardianPhone, onComplete, onCan
       <h3 className="text-2xl font-bold mb-6 text-center" style={{ color: '#D4AF37' }}>
         Step 1: Scan Presence
       </h3>
+
+      <div className="mb-8">
+        <IdentityAnchorInput
+          onAnchorVerified={handleAnchorVerified}
+          onCancel={onCancel}
+          title="Identity Anchor"
+          subtitle="Enter your phone number before the 4-layer presence scan."
+        />
+      </div>
 
       {/* 4-Layer Status Display */}
       <div className="grid grid-cols-2 gap-4 mb-8">
@@ -174,7 +185,7 @@ export function PresenceScanStep({ accountType, guardianPhone, onComplete, onCan
         </button>
         <button
           onClick={handleStartScan}
-          disabled={authStatus === AuthStatus.SCANNING || (result !== null && result.success)}
+          disabled={!identityAnchor || authStatus === AuthStatus.SCANNING || (result !== null && result.success)}
           className="px-8 py-3 rounded-lg font-bold text-sm uppercase tracking-wider transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
           style={{
             background: 'linear-gradient(135deg, #D4AF37 0%, #c9a227 100%)',
